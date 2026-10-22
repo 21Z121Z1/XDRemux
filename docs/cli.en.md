@@ -94,8 +94,7 @@ Package output and validation are supported; `convert`, `batch` and `categorize`
 The App exposes the same output choice and delegates creation to Rust. It
 preserves existing packages instead of adopting them based only on structural
 validation. Current package tests do not establish Photos import or dynamic
-wallpaper support. The unavailable historical sample and its prior import
-feedback are separate evidence from this implementation.
+wallpaper support.
 
 ### OPPO Gallery compatibility
 

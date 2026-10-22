@@ -115,8 +115,6 @@ int xdremux_texture_infer(const char *inputPath, const char *directoryPath) {
                 }
             }
             report[@"face_geometry"] = FaceFacts(faces.results);
-            // Match each face to one distinct native instance using probability
-            // mass in its measured bounds. Never reuse the aggregate as an instance.
             NSMutableArray *edges = [NSMutableArray new];
             for (NSUInteger f=0; f<faces.results.count; f++) {
                 CGRect b = faces.results[f].boundingBox;
@@ -147,14 +145,10 @@ int xdremux_texture_infer(const char *inputPath, const char *directoryPath) {
             report[@"people"] = people; report[@"unmatched_faces"] = unmatched; report[@"matching_candidates"] = edges;
             report[@"instance_resources"] = instanceRows;
             if(people.count==1)report[@"native_person_without_stats"]=people[0][@"native_person_without_stats"];
-            // Empty observations mean an empty derived editing context, not a
-            // template person. Keep every scalar role explicitly dimensioned.
             NSMutableSet *zeroRoles=[NSMutableSet new];
             for(NSString *role in @[@"semanticskinmattev2",@"semantichairmatte",@"semanticteethmattev2",@"semanticglassesmattev2",@"semanticpersonmatte",@"semanticfaceskinmatte"])
                 if(!masks[role]){masks[role]=@{@"data":[NSMutableData dataWithLength:w*h],@"width":@(w),@"height":@(h)};[zeroRoles addObject:role];}
             report[@"mask_resampling"]=@"native probability buffers are sampled at working-pixel centers with nearest-neighbor interpolation, clamped and quantized to L8 before producer/writer sharing";
-            // Declared derived resource: real inferred skin intersected with the
-            // measured face bounds; this is not presented as FSINC inference.
             NSDictionary *skin = masks[@"semanticskinmattev2"];
             if (skin && faces.results.count) {
                 NSMutableData *data = [skin[@"data"] mutableCopy]; size_t mw = [skin[@"width"] unsignedLongValue], mh = [skin[@"height"] unsignedLongValue];

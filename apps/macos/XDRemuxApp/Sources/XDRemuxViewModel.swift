@@ -229,8 +229,6 @@ final class XDRemuxViewModel {
 
     private var processTask: Task<Void, Never>?
     private var importTask: Task<Void, Never>?
-    /// Bumped by every import. A scan that resumes after being superseded uses
-    /// it to detect that the state it would publish is no longer the truth.
     private var importGeneration = 0
 
     func addFiles(from urls: [URL]) {
@@ -272,8 +270,6 @@ final class XDRemuxViewModel {
             }
         }.value
 
-        // A newer import already owns the UI; publishing this one's queue items
-        // or terminal state here would clobber the scan the user is watching.
         guard generation == importGeneration else { return 0 }
 
         if Task.isCancelled {
@@ -497,8 +493,6 @@ final class XDRemuxViewModel {
             return
         }
 
-        // Queue structure is immutable while processing (`canEditQueue == false`), so build the
-        // UUID projection once instead of rescanning the whole value array for every result.
         var queueIndexByID: [UUID: Int] = [:]
         queueIndexByID.reserveCapacity(queue.count)
         for index in queue.indices {

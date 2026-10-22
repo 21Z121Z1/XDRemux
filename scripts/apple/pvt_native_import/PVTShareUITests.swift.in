@@ -1,6 +1,5 @@
 import XCTest
 
-// Only the exact bundle installed by this probe in its owned simulator.
 final class PVTShareUITests: XCTestCase {
     func testWholePackageSystemShare() throws {
         continueAfterFailure = false
@@ -39,7 +38,6 @@ final class PVTShareUITests: XCTestCase {
             print("PVT_SHARE_SYSTEM_COMPLETED: phase=\(phase); library admission still requires independent readback")
             return
         }
-        // The Python owner records non-PASS and stops this process group.
         print("PVT_SHARE_UI_BLOCKED: no Photos save action for either whole-package representation")
     }
 }

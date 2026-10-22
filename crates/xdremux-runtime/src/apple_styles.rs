@@ -37,8 +37,6 @@ const STYLE_DELTA_COLUMNS_LANDSCAPE: u32 = 6;
 const STYLE_DELTA_ROWS_PORTRAIT: u32 = 6;
 const STYLE_DELTA_COLUMNS_PORTRAIT: u32 = 5;
 
-// Opt-in diagnostics contain fixed stage labels and elapsed time only. Keep
-// stdout and the native adapter protocol unchanged.
 fn profile_start() -> Option<Instant> {
     std::env::var("XDREMUX_STYLES_PROFILE")
         .is_ok_and(|value| value == "1")
@@ -688,8 +686,6 @@ fn derive_style_scene(
     let pixel_count = width.checked_mul(height).ok_or_else(|| {
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
-    // This validated source has only256 possible channel codes. Reuse the
-    // exact scalar decoding result; retain the same f32 operations and HDR path.
     let srgb8_to_linear: [f32; 256] =
         std::array::from_fn(|code| srgb_decode(f32::from(code as u8) / 255.0));
     let mut full_sdr = Vec::with_capacity(pixel_count.saturating_mul(3));
