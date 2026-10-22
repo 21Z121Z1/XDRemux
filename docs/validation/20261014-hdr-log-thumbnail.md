@@ -17,7 +17,9 @@ UHDR 夹具覆盖 RGB gain，LHDR 夹具覆盖单色 gain。接收门槛为对 H
 
 反向对照临时恢复原来的 SDR 复制语句后，同一真实媒体测试在 UHDR 夹具上以 HDR Log MAE 32.0010 / 255 失败。最终构建和 completion gate 运行前已恢复修正语句。
 
-当前编码原语接受 RGB8 输入，输出 Main10 4:2:0。这些结果不代表无损 10-bit RGB 重建。
+记录本说明时，编码原语接受 RGB8 输入，输出 Main10 4:2:0。这些结果不代表无损 10-bit RGB 重建。
+
+当前缩略图编码器不再使用二次 toe。它是 macOS 指数 Apple Log 解码器的逆变换，并把 16 位码值送给 VideoToolbox。上面的 MAE 属于更早的 RGB8 编码器。
 
 ## 同条件原生渲染诊断
 

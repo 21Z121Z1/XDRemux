@@ -29,8 +29,12 @@ As a negative control, restoring the original SDR-copy statement makes the same
 real-media test fail on the UHDR fixture with HDR Log MAE 32.0010 / 255. The
 corrected statement was restored before the final build and completion gate.
 
-The codec currently takes RGB8 input and writes Main10 4:2:0. These results do
-not imply lossless 10-bit RGB reconstruction.
+The codec at the time of this note took RGB8 input and wrote Main10 4:2:0.
+These results do not imply lossless 10-bit RGB reconstruction.
+
+The current thumbnail encoder no longer uses the quadratic toe. It is the
+inverse of the macOS exponential Apple Log decoder, and it sends 16-bit codes
+to VideoToolbox. The MAE figures above belong to the earlier RGB8 encoder.
 
 ## Matched native-render diagnostic
 

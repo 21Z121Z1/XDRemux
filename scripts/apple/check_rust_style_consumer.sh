@@ -17,9 +17,15 @@ cargo build --locked -p xdremux-cli
 cli="$repo_root/target/debug/xdremux"
 test -x "$cli"
 
+test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
+trap 'rm -rf "$test_root"' EXIT
+
 # Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
 # conversions. This fails if the producer writes SDR codes as the reference.
+# Native Main10/Log roundtrip tests run with isolated temporary output.
+# Test media are not Photos acceptance files and must not enter the artifact.
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+XDREMUX_TEST_STYLES_REPORT="$test_root/thumbnail-report" \
   cargo test --locked -p xdremux-runtime --lib \
   real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
 
@@ -29,12 +35,10 @@ XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
 fixture="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic"
 test -s "$fixture"
 
-test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
-trap 'rm -rf "$test_root"' EXIT
-
 # Capture effective HEVC format-description tags from the native encoder.
-# This probe intentionally does not change the existing private Styles carrier
-# color interpretation; comparison to an Apple-authored thumbnail is still needed.
+# The probe feeds 16-bit codes, the same width as the Styles thumbnail path,
+# and still expects the existing 709 / 709 / 601 identification. It does not
+# retag the carrier. Comparison to an Apple-authored thumbnail is still needed.
 python3 - "$adapter" "$test_root" <<'PY'
 import json
 from pathlib import Path
@@ -43,15 +47,18 @@ import sys
 
 adapter, root = sys.argv[1:]
 root = Path(root)
-raw = root / "color-probe-rgb8.bin"
-raw.write_bytes(bytes([128, 128, 128]) * (64 * 64))
+raw = root / "color-probe-rgb16.bin"
+# Mid-gray little-endian RGB u16. The value is only a legal 16-bit code;
+# the probe checks encoder color tags, not the Apple Log curve.
+raw.write_bytes(bytes([0x00, 0x80, 0x00, 0x80, 0x00, 0x80]) * (64 * 64))
 request = {
     "schema_version": 2,
     "operation": "videotoolbox-encode-main10",
     "input_path": str(raw),
     "output_path": str(root / "color-probe.hevc"),
     "video_toolbox_main10": {
-        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 192,
+        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 384,
+        "raw_component_bits": 16,
         "quality": 0.85, "hvcc_path": str(root / "color-probe.hvcc"),
     },
 }
@@ -217,3 +224,47 @@ for path, inspect_path in ((output, inspect_path), (batch_output, batch_inspect_
         f"scene_type={plist['5']}"
     )
 PY
+
+# Keep the actual v15 product carrier as a diagnostic, including its native
+# Texture resources. Version-only experiments have their own research owner.
+if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
+  acceptance="$XDREMUX_STYLES_ACCEPTANCE_DIR"
+  mkdir -p "$acceptance"
+  master="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic"
+  target="$acceptance/uhdr-master-v2-01-apple-styles-v15.heic"
+  test ! -e "$target"
+  XDREMUX_APPLE_ADAPTER="$adapter" \
+    "$cli" convert --input "$master" --output "$target" --apple-styles
+  test -s "$target"
+  XDREMUX_APPLE_ADAPTER="$adapter" "$cli" validate "$target" --apple-styles >/dev/null
+
+  inspection="$test_root/master-inspect.json"
+  python3 scripts/diagnostics/inspect_oppo_heif.py "$target" --json > "$inspection"
+  python3 - "$target" "$inspection" <<'PY'
+import hashlib
+import json
+import pathlib
+import plistlib
+import sys
+
+from research.oppo_styles.tools.probe_style_version import style_metadata_payload
+
+heic = pathlib.Path(sys.argv[1])
+inspection = json.loads(pathlib.Path(sys.argv[2]).read_text())
+raw = heic.read_bytes()
+plist = plistlib.loads(style_metadata_payload(raw, inspection))
+if plist.get("0") != 15:
+    raise SystemExit(f"not the product v15 Styles carrier: {plist.get('0')!r}")
+if len(plist.get("1", b"")) != 51840 or len(plist.get("3", b"")) != 516:
+    raise SystemExit("Styles payload missing expected key1 or GTC")
+print(f"v15-product-diagnostic: file={heic.name} bytes={len(raw)} "
+      f"sha256={hashlib.sha256(raw).hexdigest()} "
+      "Photos Tone/Color admission remains UNVERIFIED")
+PY
+  cp "$test_root/thumbnail-report/linear-thumbnail-roundtrip.json" "$acceptance/"
+  files=( "$acceptance"/* )
+  if [[ "${#files[@]}" -ne 2 || ! -s "$target" || ! -s "$acceptance/linear-thumbnail-roundtrip.json" ]]; then
+    echo "Only the final diagnostic HEIC and native thumbnail report may enter this artifact" >&2
+    exit 1
+  fi
+fi

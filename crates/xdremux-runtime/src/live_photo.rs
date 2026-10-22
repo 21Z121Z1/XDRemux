@@ -8,7 +8,8 @@ use xdremux_codec::{
     RasterPixelFormat, ZuneJpegProvider,
 };
 use xdremux_engine::{
-    GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile, GainMapTileEncoder, RasterDecoder,
+    GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile, GainMapTileEncoder, LivePhotoOutput,
+    RasterDecoder,
 };
 use xdremux_format::{jpeg_icc_profile, jpeg_image_end, probe_jpeg_frame_profile, ChromaSampling};
 use xdremux_heif::{
@@ -21,11 +22,12 @@ use xdremux_metadata::{
     UltraHdrGainMapMetadata,
 };
 use xdremux_motion_photo::{
-    build_live_photo_jpeg_exif, companion_video_path, media_mdat_payloads,
-    normalize_embedded_video, parse_oppo_motion_photo, publish_live_photo_pair,
-    read_apple_content_identifier, read_live_photo_content_identifier, reconcile_live_photo_pair,
-    resolve_live_photo_still_time, validate_live_photo_movie, write_live_photo_heif_still,
-    write_live_photo_movie, ByteRange, MotionPhotoAsset, MotionPhotoSourceKind,
+    apple, build_live_photo_jpeg_exif, companion_video_path, parse_first_lpex_object,
+    presentation_geometry, product_source_kind, publish_live_photo_pair,
+    resolve_live_photo_still_time, write_live_photo_heif_still, ConversionReport, Disposition,
+    Input, MediaTime, MotionAsset, MotionPhoto, PairingMetadata, ParseOptions,
+    PreservationEvidence, RelationshipKind, ResourceConversion, ResourceRole, TargetProfile,
+    VendorDialect,
 };
 
 use crate::{Result, RuntimeError};
@@ -34,11 +36,32 @@ use crate::{Result, RuntimeError};
 pub struct LivePhotoFileReceipt {
     pub image: PathBuf,
     pub video: PathBuf,
+    pub package: Option<PathBuf>,
     pub content_identifier: String,
     pub still_time_seconds: f64,
+    pub presentation: MediaTime,
+    pub presentation_inferred: bool,
+    pub conversion_report: ConversionReport,
     pub source_kind: String,
     pub source_had_gain_map: bool,
     pub removed_vendor_bytes: usize,
+}
+
+impl LivePhotoFileReceipt {
+    pub fn output_paths(&self) -> Vec<PathBuf> {
+        match &self.package {
+            Some(package) => vec![package.clone()],
+            None => vec![self.image.clone(), self.video.clone()],
+        }
+    }
+
+    pub fn omitted_resource_count(&self) -> usize {
+        self.conversion_report
+            .resources
+            .iter()
+            .filter(|r| r.disposition == Disposition::Dropped)
+            .count()
+    }
 }
 
 #[derive(Debug)]
@@ -53,21 +76,11 @@ struct ValidatedGainJpeg<'a> {
     metadata: UltraHdrGainMapMetadata,
 }
 
-fn range_slice<'a>(source: &'a [u8], range: ByteRange, context: &'static str) -> Result<&'a [u8]> {
-    let start = usize::try_from(range.lower_bound)
-        .map_err(|_| RuntimeError::new(context, "range start exceeds usize"))?;
-    let end = usize::try_from(range.upper_bound)
-        .map_err(|_| RuntimeError::new(context, "range end exceeds usize"))?;
-    source
-        .get(start..end)
-        .ok_or_else(|| RuntimeError::new(context, "range is outside source bytes"))
-}
-
 fn generate_content_identifier() -> String {
     Uuid::new_v4().hyphenated().to_string().to_ascii_uppercase()
 }
 
-fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
+pub(crate) fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -79,58 +92,30 @@ fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
         .map_err(|error| RuntimeError::external("Live Photo temporary sync", error))
 }
 
-fn pair_matches(image: &Path, video: &Path) -> bool {
-    let Ok(image_bytes) = fs::read(image) else {
-        return false;
-    };
-    let Ok(video_bytes) = fs::read(video) else {
-        return false;
-    };
-    let Ok(Some(image_identifier)) = read_apple_content_identifier(&image_bytes) else {
-        return false;
-    };
-    let Ok(Some(video_identifier)) = read_live_photo_content_identifier(&video_bytes) else {
-        return false;
-    };
-    if image_identifier != video_identifier {
-        return false;
-    }
-    let Ok(Some(still_time)) = xdremux_motion_photo::read_live_photo_still_time(&video_bytes)
-    else {
-        return false;
-    };
-    validate_live_photo_movie(&video_bytes, &video_identifier, still_time).is_ok()
+fn source_declares_gain_map(asset: &MotionAsset) -> bool {
+    asset.auxiliary.iter().any(|r| {
+        r.vendor_role
+            .as_deref()
+            .is_some_and(|n| n.eq_ignore_ascii_case("GainMap"))
+    })
 }
 
-fn temporary_pair_paths(output_image: &Path, identifier: &str) -> Result<(PathBuf, PathBuf)> {
-    let parent = match output_image.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    let stem = output_image
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| RuntimeError::new("Live Photo output", "output has no UTF-8 stem"))?;
-    let token = identifier.replace('-', "").to_ascii_lowercase();
-    Ok((
-        parent.join(format!(".{stem}.{token}.tmp.heic")),
-        parent.join(format!(".{stem}.{token}.tmp.mov")),
-    ))
-}
-
-fn source_declares_gain_map(asset: &MotionPhotoAsset) -> bool {
-    asset
-        .items
-        .iter()
-        .any(|item| item.semantic.eq_ignore_ascii_case("GainMap"))
-}
-
-fn declared_gain_map_lengths(asset: &MotionPhotoAsset) -> Vec<u64> {
+fn declared_gain_map_lengths(asset: &MotionAsset) -> Vec<u64> {
     let mut lengths = asset
-        .items
+        .auxiliary
         .iter()
-        .filter(|item| item.semantic.eq_ignore_ascii_case("GainMap") && item.length > 0)
-        .map(|item| item.length)
+        .filter(|r| {
+            r.vendor_role
+                .as_deref()
+                .is_some_and(|n| n.eq_ignore_ascii_case("GainMap"))
+        })
+        .filter(|r| {
+            !r.relationship
+                .as_ref()
+                .is_some_and(|r| r.kind == RelationshipKind::SharedData)
+        })
+        .map(|r| r.extents.iter().map(|e| e.length()).sum::<u64>())
+        .filter(|n| *n > 0)
         .collect::<Vec<_>>();
     lengths.sort_unstable();
     lengths.dedup();
@@ -156,11 +141,9 @@ fn next_soi(data: &[u8], start: usize) -> Option<usize> {
 fn validated_gain_jpeg<'a>(
     static_bytes: &'a [u8],
     primary_end: usize,
-    asset: &MotionPhotoAsset,
+    asset: &MotionAsset,
 ) -> Result<Option<ValidatedGainJpeg<'a>>> {
-    if !source_declares_gain_map(asset) {
-        return Ok(None);
-    }
+    let declared = source_declares_gain_map(asset);
     let declared_lengths = declared_gain_map_lengths(asset);
     let mut search = primary_end;
     while let Some(start) = next_soi(static_bytes, search) {
@@ -186,12 +169,21 @@ fn validated_gain_jpeg<'a>(
             search = start.saturating_add(2);
             continue;
         }
+        if !declared {
+            return Err(RuntimeError::new(
+                "Ultra HDR JPEG/R",
+                "static JPEG contains validated HDR data without a mapped GainMap resource; refusing SDR conversion",
+            ));
+        }
         return Ok(Some(ValidatedGainJpeg {
             bytes: candidate,
             metadata,
         }));
     }
 
+    if !declared {
+        return Ok(None);
+    }
     Err(RuntimeError::new(
         "Ultra HDR JPEG/R",
         if declared_lengths.is_empty() {
@@ -318,7 +310,7 @@ fn prepare_jpeg_still(
     jpeg: &ZuneJpegProvider,
     heif: &LibHeifProvider,
     static_bytes: &[u8],
-    asset: &MotionPhotoAsset,
+    asset: &MotionAsset,
     content_identifier: &str,
 ) -> Result<PreparedStill> {
     let primary_end = jpeg_image_end(static_bytes, 0)
@@ -329,6 +321,7 @@ fn prepare_jpeg_still(
             "primary range is outside static resource",
         )
     })?;
+    let gain = validated_gain_jpeg(static_bytes, primary_end, asset)?;
     let raster = jpeg
         .decode_raster(&JpegRasterDecodeRequest {
             data: primary.to_vec(),
@@ -345,7 +338,6 @@ fn prepare_jpeg_still(
         )
         .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
 
-    let gain = validated_gain_jpeg(static_bytes, primary_end, asset)?;
     match gain {
         Some(gain) => Ok(PreparedStill {
             bytes: assemble_jpeg_gain_map(jpeg, heif, &encoded_base, &gain)?,
@@ -362,25 +354,110 @@ fn prepare_still(
     jpeg: &ZuneJpegProvider,
     heif: &LibHeifProvider,
     static_bytes: &[u8],
-    asset: &MotionPhotoAsset,
+    asset: &MotionAsset,
     content_identifier: &str,
 ) -> Result<PreparedStill> {
-    match asset.source_kind {
-        MotionPhotoSourceKind::AndroidHeifMotionPhotoV1 => Ok(PreparedStill {
+    if asset.still.mime == "image/heic" {
+        Ok(PreparedStill {
             bytes: write_live_photo_heif_still(static_bytes, content_identifier)
                 .map_err(|error| RuntimeError::external("Live Photo HEIF still", error))?,
-            // Existing HEIF Motion Photo conversion preserves the complete static
-            // HEIF graph. Whether that graph carries a gain map is not inferred
-            // from the Android directory alone, so report only the JPEG/R case
-            // here until the HEIF validator exposes that property directly.
             had_gain_map: false,
-        }),
-        MotionPhotoSourceKind::AndroidMotionPhotoV1
-        | MotionPhotoSourceKind::LegacyMicroVideoV1b
-        | MotionPhotoSourceKind::OppoLivePhoto => {
-            prepare_jpeg_still(jpeg, heif, static_bytes, asset, content_identifier)
-        }
+        })
+    } else if asset.still.mime == "image/jpeg" {
+        prepare_jpeg_still(jpeg, heif, static_bytes, asset, content_identifier)
+    } else {
+        Err(RuntimeError::new(
+            "Live Photo still",
+            "unsupported still container",
+        ))
     }
+}
+
+// This report describes the product's HEIC/MOV output. JPEG/HDR encoding is
+// an explicit XDRemux policy and is not a LibLivePhoto lossless conversion.
+fn product_conversion_report(
+    photo: &MotionPhoto<'_>,
+    identifier: &str,
+    had_gain_map: bool,
+) -> Result<ConversionReport> {
+    let jpeg = photo.still().mime == "image/jpeg";
+    let mut report = ConversionReport {
+        target: TargetProfile::ApplePair,
+        pairing: PairingMetadata {
+            identifier: Some(identifier.to_owned()),
+        },
+        resources: Vec::new(),
+        evidence: vec![
+            PreservationEvidence::EncodedMoviePayloadsEqual,
+            PreservationEvidence::ExactPresentationEqual,
+        ],
+    };
+    for resource in photo.resources() {
+        let (disposition, reason) = if resource.id == photo.still().id && jpeg {
+            (
+                Disposition::TranscodeRequired,
+                "XDRemux decodes JPEG and encodes HEIC under its product policy",
+            )
+        } else if resource.id == photo.still().id || resource.id == photo.motion_video().id {
+            (
+                Disposition::Rewritten,
+                "pairing and presentation container metadata are rewritten",
+            )
+        } else if jpeg && resource.vendor_role.as_deref() == Some("GainMap") && had_gain_map {
+            (
+                Disposition::TranscodeRequired,
+                "XDRemux decodes and encodes the declared gain map",
+            )
+        } else if jpeg && resource.vendor_role.as_deref() == Some("JPEG EXIF") {
+            (
+                Disposition::Rewritten,
+                "raw TIFF is transferred; active MakerNote pairing is replaced",
+            )
+        } else if !jpeg && resource.parent == Some(photo.still().id) {
+            if resource.mime == "application/x-exif"
+                || resource.provenance.evidence == "HEIF primary XMP item"
+            {
+                (
+                    Disposition::Rewritten,
+                    "active HEIF pairing or recognition metadata is rewritten",
+                )
+            } else {
+                (
+                    Disposition::Preserved,
+                    "HEIF item bytes remain in the output still",
+                )
+            }
+        } else {
+            let mut bytes = Vec::new();
+            if jpeg && resource.vendor_role.as_deref() == Some("JPEG APP2") {
+                photo
+                    .extract(resource, &mut bytes)
+                    .map_err(|e| RuntimeError::external("source metadata report", e))?;
+            }
+            if bytes.starts_with(b"ICC_PROFILE\0") {
+                (
+                    Disposition::Rewritten,
+                    "ICC content is transferred into the HEIF color profile",
+                )
+            } else {
+                (
+                    Disposition::Dropped,
+                    "resource is not represented in the output pair; original input is retained",
+                )
+            }
+        };
+        report.resources.push(ResourceConversion {
+            resource: Some(resource.id),
+            disposition,
+            reason: reason.into(),
+        });
+    }
+    report.resources.push(ResourceConversion {
+        resource: None,
+        disposition: Disposition::Generated,
+        reason: "new pairing identity and still-time metadata are generated".into(),
+    });
+    Ok(report)
 }
 
 pub(crate) fn convert_motion_photo_file(
@@ -389,19 +466,29 @@ pub(crate) fn convert_motion_photo_file(
     source: &[u8],
     input: &Path,
     output_image: &Path,
+    format: LivePhotoOutput,
 ) -> Result<LivePhotoFileReceipt> {
-    let asset = parse_oppo_motion_photo(source)
-        .map_err(|error| RuntimeError::external("Motion Photo analysis", error))?
-        .ok_or_else(|| RuntimeError::new("Motion Photo analysis", "input is not a Motion Photo"))?;
+    let photo = MotionPhoto::parse(Input::SingleFile(source), ParseOptions::compatible())
+        .map_err(|error| RuntimeError::external("Motion Photo analysis", error))?;
+    photo
+        .validate()
+        .map_err(|error| RuntimeError::external("Motion Photo validation", error))?;
+    let asset = photo.asset();
 
+    crate::live_photo_package::validate_output_parent(output_image)?;
     let extension = output_image
         .extension()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    if !extension.eq_ignore_ascii_case("heic") && !extension.eq_ignore_ascii_case("heif") {
+    if match format {
+        LivePhotoOutput::Pair => {
+            !extension.eq_ignore_ascii_case("heic") && !extension.eq_ignore_ascii_case("heif")
+        }
+        LivePhotoOutput::Pvt => !extension.eq_ignore_ascii_case("pvt"),
+    } {
         return Err(RuntimeError::new(
             "Live Photo output",
-            "still output must use .heic or .heif",
+            "pair output must use .heic/.heif; PVT output must use .pvt",
         ));
     }
     if output_image == input {
@@ -411,66 +498,95 @@ pub(crate) fn convert_motion_photo_file(
         ));
     }
     let output_video = companion_video_path(output_image);
-    if output_image.exists() || output_video.exists() {
+    if fs::symlink_metadata(output_image).is_ok()
+        || (format == LivePhotoOutput::Pair && fs::symlink_metadata(&output_video).is_ok())
+    {
         return Err(RuntimeError::new(
             "Live Photo output",
-            "output HEIC/MOV pair already exists; refusing to overwrite unknown provenance",
+            "output already exists; refusing to overwrite unknown provenance",
         ));
     }
 
-    reconcile_live_photo_pair(output_image, &output_video, pair_matches)
-        .map_err(|error| RuntimeError::external("Live Photo pair reconciliation", error))?;
+    let parent = output_image
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Live Photo output directory", error))?;
 
-    let static_bytes = range_slice(
-        source,
-        asset.still_resource_range,
-        "Motion Photo still range",
-    )?;
-    let embedded_video = range_slice(
-        source,
-        asset.video_resource_range,
-        "Motion Photo video range",
-    )?;
-    let normalized_video = normalize_embedded_video(embedded_video)
-        .map_err(|error| RuntimeError::external("Motion Photo video normalization", error))?;
-    let still_time_seconds =
-        resolve_live_photo_still_time(normalized_video.data, asset.presentation_timestamp_us)
-            .map_err(|error| RuntimeError::external("Live Photo still-time resolution", error))?;
-
+    let static_bytes = photo
+        .still_bytes()
+        .map_err(|error| RuntimeError::external("Motion Photo still resource", error))?;
+    let primary_video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("Motion Photo primary motion resource", error))?;
+    let fallback_seconds = resolve_live_photo_still_time(primary_video, None)
+        .map_err(|error| RuntimeError::external("Live Photo video sample validation", error))?;
+    let presentation = match photo.presentation_time() {
+        Some(time) => time,
+        None => {
+            // The existing product fallback chooses a presentation position.
+            // Its inferred time is not a source-format fact.
+            let timescale = asset
+                .containers
+                .iter()
+                .find(|c| c.resource == photo.motion_video().id)
+                .and_then(|c| c.movie_timescale)
+                .ok_or_else(|| {
+                    RuntimeError::new("Live Photo still-time fallback", "movie timescale missing")
+                })?;
+            MediaTime::new(
+                (fallback_seconds * f64::from(timescale)).round() as i64,
+                timescale,
+            )
+            .ok_or_else(|| {
+                RuntimeError::new("Live Photo still-time fallback", "invalid movie timescale")
+            })?
+        }
+    };
+    let still_time_seconds = presentation.seconds();
+    let metadata = if asset.dialect == VendorDialect::Oplus {
+        parse_first_lpex_object(source)
+    } else {
+        None
+    };
     let content_identifier = generate_content_identifier();
-    let still = prepare_still(jpeg, heif, static_bytes, &asset, &content_identifier)?;
-    let movie = write_live_photo_movie(
-        normalized_video.data,
+    let still = prepare_still(jpeg, heif, static_bytes, asset, &content_identifier)?;
+    let movie = apple::remux_movie_with_geometry(
+        primary_video,
         &content_identifier,
-        still_time_seconds,
-        asset.vendor_metadata.as_ref(),
+        presentation,
+        presentation_geometry(metadata.as_ref()),
     )
     .map_err(|error| RuntimeError::external("Live Photo MOV", error))?;
-
-    let still_identifier = read_apple_content_identifier(&still.bytes)
-        .map_err(|error| RuntimeError::external("Live Photo still validation", error))?;
-    if still_identifier.as_deref() != Some(content_identifier.as_str()) {
-        return Err(RuntimeError::new(
-            "Live Photo pair validation",
-            "HEIF Apple MakerNote ContentIdentifier mismatch",
-        ));
-    }
-    if read_live_photo_content_identifier(&movie)
-        .map_err(|error| RuntimeError::external("Live Photo movie validation", error))?
-        .as_deref()
-        != Some(content_identifier.as_str())
+    let pair = MotionPhoto::parse(
+        Input::ApplePair {
+            still: &still.bytes,
+            movie: &movie,
+        },
+        ParseOptions::strict(),
+    )
+    .map_err(|error| RuntimeError::external("Live Photo pair validation", error))?;
+    if !pair
+        .presentation_time()
+        .is_some_and(|time| time.equivalent(presentation))
     {
         return Err(RuntimeError::new(
             "Live Photo pair validation",
-            "MOV QuickTime ContentIdentifier mismatch",
+            "exact presentation time changed",
         ));
     }
-    validate_live_photo_movie(&movie, &content_identifier, still_time_seconds)
-        .map_err(|error| RuntimeError::external("Live Photo pair validation", error))?;
 
-    let source_media = media_mdat_payloads(normalized_video.data)
+    if pair.asset().pairing.identifier.as_deref() != Some(content_identifier.as_str()) {
+        return Err(RuntimeError::new(
+            "Live Photo pair validation",
+            "pairing identifier changed",
+        ));
+    }
+
+    let source_media = apple::media_payloads(primary_video)
         .map_err(|error| RuntimeError::external("source Motion Photo media validation", error))?;
-    let output_media = media_mdat_payloads(&movie)
+    let output_media = apple::media_payloads(&movie)
         .map_err(|error| RuntimeError::external("Live Photo media validation", error))?;
     if source_media != output_media {
         return Err(RuntimeError::new(
@@ -479,34 +595,64 @@ pub(crate) fn convert_motion_photo_file(
         ));
     }
 
-    let (temporary_image, temporary_video) =
-        temporary_pair_paths(output_image, &content_identifier)?;
-    let publish_result: Result<()> = (|| {
+    let conversion_report =
+        product_conversion_report(&photo, &content_identifier, still.had_gain_map)?;
+    let (image_path, video_path, package) = if format == LivePhotoOutput::Pvt {
+        let members = crate::live_photo_package::publish_pair(&pair, output_image)?;
+        (
+            members.image,
+            members.video,
+            Some(output_image.to_path_buf()),
+        )
+    } else {
+        let staging = tempfile::Builder::new()
+            .prefix(".xdremux-live-photo-")
+            .tempdir_in(parent)
+            .map_err(|error| RuntimeError::external("Live Photo staging directory", error))?;
+        let temporary_image = staging.path().join("capture.heic");
+        let temporary_video = staging.path().join("capture.mov");
         write_synced_new(&temporary_image, &still.bytes)?;
         write_synced_new(&temporary_video, &movie)?;
-        publish_live_photo_pair(
+        if let Err(error) = publish_live_photo_pair(
             &temporary_image,
             &temporary_video,
             output_image,
             &output_video,
-        )
-        .map_err(|error| RuntimeError::external("Live Photo pair publication", error))?;
-        Ok(())
-    })();
-    if publish_result.is_err() {
-        let _ = fs::remove_file(&temporary_image);
-        let _ = fs::remove_file(&temporary_video);
-    }
-    publish_result?;
+        ) {
+            let retained = error.partial_output().is_some().then(|| staging.keep());
+            let mut error = RuntimeError::external("Live Photo pair publication", error);
+            if let Some(directory) = retained {
+                error.detail.push_str(&format!(
+                "; complete staged pair retained at {}; inspect both final entries before explicit recovery",
+                directory.display()
+            ));
+            }
+            return Err(error);
+        }
+        (output_image.to_path_buf(), output_video, None)
+    };
 
     Ok(LivePhotoFileReceipt {
-        image: output_image.to_path_buf(),
-        video: output_video,
+        image: image_path,
+        video: video_path,
+        package,
         content_identifier,
         still_time_seconds,
-        source_kind: asset.source_kind.as_str().to_owned(),
+        presentation,
+        presentation_inferred: photo.presentation_time().is_none(),
+        conversion_report,
+        source_kind: product_source_kind(asset).to_owned(),
         source_had_gain_map: still.had_gain_map,
-        removed_vendor_bytes: normalized_video.removed_vendor_bytes,
+        removed_vendor_bytes: photo
+            .resources()
+            .filter(|r| {
+                r.parent.is_none()
+                    && r.id != photo.still().id
+                    && r.id != photo.motion_video().id
+                    && r.role != ResourceRole::ContainerMetadata
+            })
+            .map(|r| r.extents.iter().map(|e| e.length() as usize).sum::<usize>())
+            .sum(),
     })
 }
 
@@ -523,34 +669,67 @@ mod tests {
     }
 
     #[test]
+    fn sef_hdr_without_a_mapped_gain_map_cannot_be_classified_as_sdr() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
+        let mut source = fs::read(path).unwrap();
+        let flag = b":MotionPhoto=\"1\"";
+        let start = source.windows(flag.len()).position(|w| w == flag).unwrap();
+        source[start + flag.len() - 2] = b'0';
+        let photo =
+            MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+        assert_eq!(photo.asset().dialect, VendorDialect::SamsungSef);
+        assert!(!source_declares_gain_map(photo.asset()));
+        let still = photo.still_bytes().unwrap();
+        let primary_end = jpeg_image_end(still, 0).unwrap();
+        assert!(validated_gain_jpeg(still, primary_end, photo.asset()).is_err());
+    }
+
+    #[test]
     fn candidate_scanner_ignores_unvalidated_jpeg_blobs() {
-        let asset = MotionPhotoAsset {
-            source_kind: MotionPhotoSourceKind::AndroidMotionPhotoV1,
-            items: vec![
-                xdremux_motion_photo::MotionPhotoItem {
-                    mime: "image/jpeg".to_owned(),
-                    semantic: "Primary".to_owned(),
-                    length: 0,
-                    padding: 0,
-                },
-                xdremux_motion_photo::MotionPhotoItem {
-                    mime: "image/jpeg".to_owned(),
-                    semantic: "GainMap".to_owned(),
-                    length: 4,
-                    padding: 0,
-                },
-                xdremux_motion_photo::MotionPhotoItem {
-                    mime: "video/mp4".to_owned(),
-                    semantic: "MotionPhoto".to_owned(),
-                    length: 100,
-                    padding: 0,
-                },
-            ],
-            still_resource_range: ByteRange::new(0, 8).unwrap(),
-            video_resource_range: ByteRange::new(8, 108).unwrap(),
-            presentation_timestamp_us: None,
-            presentation_source: None,
-            vendor_metadata: None,
+        use xdremux_motion_photo::{
+            AssetFormat, ByteRange, PairingMetadata, PhysicalLayout, Provenance, Resource,
+            ResourceId,
+        };
+        let resource = |id, role, range, name| Resource {
+            id: ResourceId(id),
+            role,
+            mime: "image/jpeg".into(),
+            source_index: 0,
+            extents: vec![range],
+            parent: None,
+            container_item_id: None,
+            relationship: None,
+            vendor_role: name,
+            provenance: Provenance::declared("test vector"),
+        };
+        let asset = MotionAsset {
+            layout: PhysicalLayout::AppendedResources,
+            format: AssetFormat::AndroidMotionPhoto,
+            dialect: VendorDialect::AndroidStandard,
+            provenance: Provenance::declared("test vector"),
+            sources: vec![],
+            still: resource(
+                0,
+                ResourceRole::PrimaryStill,
+                ByteRange::new(0, 8).unwrap(),
+                None,
+            ),
+            motion: resource(
+                1,
+                ResourceRole::PrimaryMotionVideo,
+                ByteRange::new(8, 108).unwrap(),
+                None,
+            ),
+            presentation: None,
+            pairing: PairingMetadata::default(),
+            containers: vec![],
+            auxiliary: vec![resource(
+                2,
+                ResourceRole::AuxiliaryImage,
+                ByteRange::new(4, 8).unwrap(),
+                Some("GainMap".into()),
+            )],
         };
         let data = [0xff, 0xd8, 0xff, 0xd9, 0xff, 0xd8, 0xff, 0xd9];
         assert!(validated_gain_jpeg(&data, 4, &asset).is_err());

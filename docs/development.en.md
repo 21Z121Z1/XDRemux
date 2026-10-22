@@ -44,9 +44,11 @@ Keep product intent at the top of this stack. Do not expose codec, camera-tail, 
 | `xdremux-runtime` | Filesystem execution, publication, batch reliability, recovery, and platform capability coordination. |
 | `xdremux-engine` | Product intent, conversion planning, capability requirements, platform-independent facts, and orchestration. |
 | `xdremux-source` / `xdremux-classification` | Source probing, asset identity, and classification. |
-| `xdremux-motion-photo` | Motion Photo parsing and Live Photo media semantics. |
+| `xdremux-motion-photo` | LibLivePhoto consumer facade, product geometry and pair publication. |
 | `xdremux-hdr` / `xdremux-metadata` | HDR/Gain Map math and metadata primitives. |
-| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container, HEIF, codec, JPEG/EXIF/TIFF/ISOBMFF primitives. |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Product container and codec operations; shared binary primitives come from `liblivephoto-format`. |
+
+See [LibLivePhoto integration](liblivephoto-integration.en.md) for the independent library boundary.
 
 A lower crate may provide a format primitive without making it a product mode. Runtime and engine own the decision to use that primitive.
 
@@ -68,6 +70,34 @@ For a sandboxed macOS app, prefer XPC when the Apple capability process needs se
 ImageIO auxiliary-resource probing is the first migrated operation. The Swift adapter reports only framework observations such as Gain Map, disparity, Portrait Effects Matte, and semantic mattes. Rust owns the rule that decides whether those facts satisfy the Portrait editing contract.
 
 SwiftPM contains only the adapter executable. Its build verifies the platform primitive boundary; Rust tests and Rust-driven consumer checks define the product contract.
+
+## macOS CLI packages
+
+The complete macOS product targets Apple silicon (arm64) on macOS 27 or newer.
+The App, Swift package and product archive use a macOS 27.0 deployment target;
+the adapter rejects unsupported hosts before advertising capabilities. The
+existing `rust-cli-core.yml` workflow builds one arm64 product package on the
+standard `xcode-27` runner using `scripts/distribution/`. It keeps the root Swift
+package and both native targets. Linux, Windows and macOS Rust core checks remain
+separate; they do not establish availability of the complete Apple product. Native dependencies are checksum-pinned; the archive includes
+their sources and license notices. The package contains the CLI, Apple adapter,
+and audited loader-relative dylib closure with ad-hoc signatures.
+
+Before upload, CI extracts the archive outside the checkout and invokes the
+packaged programs with `env -i` and a system-only `PATH`. It converts the real
+Samsung HEIF Motion Photo and an OPPO ProXDR fixture, validates the HEIC/MOV pair
+and HDR output, preserves input bytes, and rejects a second write to the pair.
+The dyld log must show the bundled libheif and no non-system library outside
+the package. Portable packaging tests run with
+`python3 -m unittest tests.test_macos_distribution`.
+
+This smoke check establishes packaged portable conversion on the supported
+arm64/macOS 27 host, not Apple editing capability. Styles/Texture and Cinematic
+still require their actual framework/runtime/hardware facts and separate native
+gates. No Intel product package is built. Individual APIs introduced before
+macOS 27 do not lower the complete product or private-SPI support boundary. Archives normalize timestamps
+and owners for fixed staged bytes; this is not a claim of compiler-level
+reproducibility. Packages are CI artifacts, not notarized releases.
 
 ## Python tooling
 
@@ -94,7 +124,7 @@ Training and evaluation scripts may remain in the Python research package becaus
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI shell, Xcode project, app tests, and app-owned build/test scripts. |
 | `tests/` | Python regression suites, validation-framework self-tests, and small synthetic fixtures; Rust tests remain with their crates. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
-| `scripts/` | [Repository automation](../scripts/README.en.md), grouped by CI, validation, Apple, diagnostics, and performance. |
+| `scripts/` | [Repository automation](../scripts/README.en.md), grouped by CI, validation, Apple, diagnostics, distribution, and performance. |
 | `docs/` | Current guidance; dated audits are isolated in `docs/history/`. |
 | `research/` | Isolated OPPO Styles, Texture Styles, video Styles, and Palette investigations. |
 | `benchmarks/` | Versioned performance baselines, separate from measurement scripts and generated reports. |

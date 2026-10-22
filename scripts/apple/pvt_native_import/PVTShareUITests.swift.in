@@ -1,0 +1,45 @@
+import XCTest
+
+// Only the exact bundle installed by this probe in its owned simulator.
+final class PVTShareUITests: XCTestCase {
+    func testWholePackageSystemShare() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(bundleIdentifier: "@@BUNDLE_ID@@")
+        defer { app.terminate() }
+        let predicate = NSPredicate(format: "identifier == %@ OR label IN %@",
+                                    "com.apple.UIKit.activity.SaveToCameraRoll",
+                                    ["Save Image", "Save Live Photo", "Save to Photos"])
+        for phase in ["share-control", "share-url", "share"] {
+            app.launchArguments = ["--phase", phase]
+            app.launch()
+            let share = app.buttons["share-pvt"]
+            XCTAssertTrue(share.waitForExistence(timeout: 20), "owned PVT share app did not launch")
+            share.tap()
+            // System activities can be accessibility cells rather than buttons.
+            let buttons = app.buttons.matching(predicate)
+            let cells = app.cells.matching(predicate)
+            let deadline = Date().addingTimeInterval(15)
+            while buttons.count == 0 && cells.count == 0 && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+            let candidates = buttons.count > 0 ? buttons : cells
+            print("PVT_SHARE_UI_OBSERVATION: phase=\(phase) save_candidates=\(candidates.count)")
+            if candidates.count == 0 || phase == "share-control" {
+                print("PVT_SHARE_UI_TREE: phase=\(phase)\n\(app.debugDescription)")
+                app.terminate()
+                continue
+            }
+            XCTAssertEqual(candidates.count, 1, "Ambiguous Photos save activities: \(app.debugDescription)")
+            print("PVT_SHARE_NATIVE_ACTIVITY: phase=\(phase) \(candidates.firstMatch.debugDescription)")
+            candidates.firstMatch.tap()
+            let result = app.staticTexts["share-result"]
+            let completed = NSPredicate(format: "label == %@", "completed")
+            expectation(for: completed, evaluatedWith: result)
+            waitForExpectations(timeout: 45)
+            print("PVT_SHARE_SYSTEM_COMPLETED: phase=\(phase); library admission still requires independent readback")
+            return
+        }
+        // The Python owner records non-PASS and stops this process group.
+        print("PVT_SHARE_UI_BLOCKED: no Photos save action for either whole-package representation")
+    }
+}

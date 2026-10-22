@@ -8,8 +8,8 @@ use crate::{Result, RuntimeError};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use xdremux_engine::{
-    apple_texture_property_list, apple_texture_tuning_profile, AppleTextureValue,
-    APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
+    apple_style_maker_apple_dictionary, apple_texture_property_list, apple_texture_tuning_profile,
+    AppleTextureValue, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
 };
 use xdremux_heif::TextureStyleMask;
 
@@ -63,6 +63,15 @@ fn statistics(report: &Value, required: bool) -> Result<Option<Value>> {
         if report[stage].as_i64() != Some(0) {
             return Err(invalid(format!("native {stage} did not succeed")));
         }
+    }
+    let gpu = &report["native_GPU_execution"];
+    if !gpu["failures"].as_array().is_some_and(Vec::is_empty)
+        || gpu["status"].as_i64().is_none()
+        || gpu["completed_command_buffers"].as_u64().is_none()
+    {
+        return Err(invalid(
+            "native GPU execution failed or its receipt is incomplete",
+        ));
     }
     if !truth(&report["native_statistics_operations_completed"])
         || report["terminal_queue_fence_status"].as_u64() != Some(4)
@@ -345,12 +354,13 @@ pub(super) fn validate_existing(executable: &Path, input: &Path) -> Result<()> {
     let temporary =
         tempfile::tempdir().map_err(|e| RuntimeError::external("Styles validation staging", e))?;
     let path = temporary.path().join("native-readback.json");
-    AppleAdapterClient::new(executable.to_path_buf()).texture_primitive(
-        "texture-readback",
-        input,
-        &path,
-        Value::Null,
+    let adapter = AppleAdapterClient::new(executable.to_path_buf());
+    let properties = adapter.imageio_image_properties(input)?;
+    crate::apple_styles::validate_maker_apple_properties(
+        &apple_style_maker_apple_dictionary(),
+        &properties.maker_apple_integer_dictionaries,
     )?;
+    adapter.texture_primitive("texture-readback", input, &path, Value::Null)?;
     let report = read(&path)?;
     let people = array(&report, "native_person_data_readback")?;
     let _ = metadata(people)?;
@@ -360,6 +370,207 @@ pub(super) fn validate_existing(executable: &Path, input: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn completed_statistics_report() -> Value {
+        json!({
+            "setup": 0,
+            "prewarm": 0,
+            "prepareToProcess:": 0,
+            "calculateStats": 0,
+            "process": 0,
+            "finishProcessing": 0,
+            "parameter_validation": 0,
+            "native_statistics_operations_completed": true,
+            "terminal_queue_fence_status": 4,
+            "image_upload_status": 4,
+            "calculateStats_command": {"status": 4},
+            "process_command": {"status": 4},
+            "image_pixels": {"nonfinite": 0},
+            "native_GPU_execution": {
+                "status": 0,
+                "completed_command_buffers": 0,
+                "failures": []
+            },
+            "native_call_order": ["setup", "prewarm", "prepareToProcess:",
+                "calculateStats", "process", "finishProcessing"],
+            "statistics_generation_completed": true,
+            "normalized_person_with_stats": {"imageStats": {"Mattify": {"SkipPerson": false}}}
+        })
+    }
+
+    #[test]
+    fn internal_gpu_failure_rejects_even_when_explicit_commands_completed() {
+        let mut report = completed_statistics_report();
+        assert_eq!(
+            statistics(&report, true).unwrap(),
+            Some(report["normalized_person_with_stats"].clone())
+        );
+        report["native_GPU_execution"]["failures"] =
+            json!([{"status": 5, "error": "native internal command failed"}]);
+        assert!(statistics(&report, true).is_err());
+        report["native_returned_empty_statistics"] = json!(true);
+        assert!(statistics(&report, false).is_err());
+    }
+
+    #[test]
+    fn missing_or_malformed_gpu_receipts_cannot_admit_optional_empty_statistics() {
+        let mut complete = completed_statistics_report();
+        complete["native_returned_empty_statistics"] = json!(true);
+        assert_eq!(statistics(&complete, false).unwrap(), None);
+        assert!(statistics(&complete, true).is_err());
+        for field in ["failures", "status", "completed_command_buffers"] {
+            let mut report = complete.clone();
+            report["native_GPU_execution"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(statistics(&report, false).is_err(), "missing {field}");
+        }
+        for receipt in [
+            Value::Null,
+            json!({"failures": false, "status": 0,
+            "completed_command_buffers": 0}),
+        ] {
+            let mut report = complete.clone();
+            report["native_GPU_execution"] = receipt;
+            assert!(statistics(&report, false).is_err());
+        }
+    }
+
+    fn texture_validation_fixture() -> Vec<u8> {
+        use xdremux_format::isobmff::{
+            make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
+            make_pitm_box, IlocEntry, IlocExtent, FTYP, IDAT, IPCO, IPRP, META,
+        };
+        use xdremux_format::FourCC;
+
+        let locations = [IlocEntry {
+            item_id: 1,
+            construction_method: 1,
+            data_reference_index: 0,
+            base_offset: 0,
+            extents: vec![IlocExtent {
+                index: None,
+                offset: 0,
+                length: 4,
+            }],
+        }];
+        let children = [
+            make_pitm_box(0, 1).unwrap(),
+            make_iinf_box(0, &[make_infe_box(1, FourCC::new(*b"hvc1"), 0).unwrap()]).unwrap(),
+            make_iloc_box(1, 4, 4, 0, 0, &locations).unwrap(),
+            make_box(
+                IPRP,
+                &[
+                    make_box(IPCO, &[]).unwrap(),
+                    make_ipma_box(0, 0, &[]).unwrap(),
+                ]
+                .concat(),
+            )
+            .unwrap(),
+            make_box(IDAT, b"base").unwrap(),
+        ]
+        .concat();
+        let source = [
+            make_box(FTYP, b"mif1\0\0\0\0mif1heic").unwrap(),
+            make_full_box(META, 0, 0, &children).unwrap(),
+        ]
+        .concat();
+        xdremux_heif::assemble_texture_styles_heif(&source, &metadata(&[]).unwrap(), &[]).unwrap()
+    }
+
+    #[test]
+    fn existing_styles_require_edit_state_even_when_texture_parser_would_admit() {
+        use std::collections::BTreeMap;
+        use std::os::unix::fs::PermissionsExt;
+
+        let temporary = tempfile::tempdir().unwrap();
+        let helper = temporary.path().join("fake-apple-adapter.py");
+        fs::write(
+            &helper,
+            r#"#!/usr/bin/env python3
+import hashlib, json, pathlib, sys
+assert sys.argv[1:] == ['--persistent-json-lines']
+root = pathlib.Path(sys.argv[0])
+with open(str(root) + '.launches', 'a') as log:
+    log.write('launch\n')
+for line in sys.stdin:
+    request = json.loads(line)
+    with open(str(root) + '.requests', 'a') as log:
+        log.write(request['operation'] + '\n')
+    if request['operation'] == 'imageio-image-properties':
+        properties = json.loads(pathlib.Path(str(root) + '.properties.json').read_text())
+        response = {'schema_version': 2, 'image_properties': properties}
+    elif request['operation'] == 'texture-readback':
+        data = pathlib.Path(request['input_path']).read_bytes()
+        facts = {'input_sha256': hashlib.sha256(data).hexdigest(), 'ImageIO_decoded': True,
+                 'asset_loaded': True, 'texture_properties_present': True,
+                 'semantic_properties_present': True, 'texture_person_count': 0,
+                 'native_person_data_readback': []}
+        pathlib.Path(request['output_path']).write_text(json.dumps(facts))
+        response = {'schema_version': 2}
+    else:
+        raise AssertionError(request['operation'])
+    print(json.dumps(response), flush=True)
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o755)).unwrap();
+        let input = temporary.path().join("existing.heic");
+        let bytes = texture_validation_fixture();
+        fs::write(&input, &bytes).unwrap();
+        let expected = apple_style_maker_apple_dictionary();
+        let mut missing_field = expected.clone();
+        missing_field.get_mut("84").unwrap().remove("8");
+        let mut wrong_field = expected.clone();
+        wrong_field.get_mut("84").unwrap().insert("8".to_owned(), 4);
+        let properties_path = helper.with_extension("py.properties.json");
+        for fields in [BTreeMap::new(), missing_field, wrong_field] {
+            fs::write(
+                &properties_path,
+                serde_json::to_vec(&json!({
+                    "width": 1, "height": 1, "maker_apple_integer_dictionaries": fields
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            let error = crate::validate_apple_styles_file(&helper, &input).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("ImageIO did not retain MakerApple"),
+                "{error}"
+            );
+        }
+        fs::write(
+            &properties_path,
+            serde_json::to_vec(&json!({
+                "width": 1, "height": 1, "maker_apple_integer_dictionaries": expected
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        crate::validate_apple_styles_file(&helper, &input).unwrap();
+        let requests = fs::read_to_string(helper.with_extension("py.requests")).unwrap();
+        assert_eq!(
+            requests.lines().collect::<Vec<_>>(),
+            [
+                "imageio-image-properties",
+                "imageio-image-properties",
+                "imageio-image-properties",
+                "imageio-image-properties",
+                "texture-readback"
+            ]
+        );
+        let launches = fs::read_to_string(helper.with_extension("py.launches")).unwrap();
+        assert_eq!(
+            launches.lines().count(),
+            4,
+            "the successful check must reuse one adapter process"
+        );
+        assert_eq!(fs::read(&input).unwrap(), bytes);
+    }
+
     #[test]
     fn missing_texture_and_partial_gpu_work_fail_before_publication() {
         assert!(statistics(&json!({"statistics_generation_completed":true}), true).is_err());

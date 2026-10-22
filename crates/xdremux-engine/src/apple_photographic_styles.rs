@@ -72,8 +72,6 @@ pub struct AppleStyleGlobalToneCurve {
     pub linear_samples: Vec<f32>,
     pub fit_rmse: f64,
     pub populated_bins: usize,
-    pub source_feature: f32,
-    pub clamped_source_feature: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -216,19 +214,65 @@ impl fmt::Display for AppleStyleDataError {
 
 impl Error for AppleStyleDataError {}
 
+/// Apple Log constants from the macOS 26A434 exponential decoder.
+///
+/// `_appleLogToLinear` and `sw_appleLogToLinear` always take this branch.
+/// The second compare in the CI kernel tests the constant positive toe
+/// threshold, so the quadratic toe is never selected. `G` in
+/// `L = (2^((code - C) / A) - B) / G` is 1 for the transfer itself. Styles
+/// still divides by `baseline_exposure` before encoding; that division is not
+/// a second `G`.
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_A: f64 = 0.085_504_792_630_672_45;
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_B: f64 = 0.009_640_520_438_551_903;
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_C: f64 = 0.693_369_448_184_967;
+
+/// Encode one linear sample as an Apple Log code in \[0, 1\].
+///
+/// This is the exact inverse of [`apple_log_decode`]. Values that would fall
+/// below code 0, including a non-positive `linear + B`, clamp to 0. Values
+/// above the code-1 linear value clamp to 1. The camera-side encoder toe is
+/// unverified and is not applied: the macOS consumer decoder does not invert
+/// it.
+pub fn apple_log_encode(linear: f64) -> f64 {
+    let lifted = linear + APPLE_LOG_B;
+    if lifted.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+        return 0.0;
+    }
+    (APPLE_LOG_A * lifted.log2() + APPLE_LOG_C).clamp(0.0, 1.0)
+}
+
+/// Decode one Apple Log code with the macOS exponential branch.
+///
+/// `L = (2^((code - C) / A) - B) / G` with `G = 1`. Codes outside the stored
+/// \[0, 1\] range are clamped before the exponential, which is the code-range
+/// limit of this transfer. The CI kernel also clamps the linear result to
+/// caller-supplied bounds; those bounds are not separate numeric immediates
+/// of this decoder, and clamping the code keeps the result inside the range
+/// the encoder can store.
+pub fn apple_log_decode(code: f64) -> f64 {
+    let code = code.clamp(0.0, 1.0);
+    2.0_f64.powf((code - APPLE_LOG_C) / APPLE_LOG_A) - APPLE_LOG_B
+}
+
 /// Encode the reconstructed HDR reference for the Styles Linear Thumbnail.
 ///
-/// Apply the Apple Log transfer curve per channel after normalizing by plist
-/// key 4. The input remains in linear Display P3; this does not convert it to
-/// the BT.2020 gamut of Apple Log video. In particular, encoding_gain belongs
-/// to the renderer metadata and must not be applied a second time here.
+/// Divide each linear Display P3 channel by plist key 4, then apply Apple Log.
+/// The result is a 16-bit code in \[0, 65535\]. The input remains in linear
+/// Display P3; this does not convert it to the BT.2020 gamut of Apple Log
+/// video, and it does not replace Apple Log with sRGB, PQ, HLG, or linear.
+/// `encoding_gain` belongs to the renderer metadata and must not be applied a
+/// second time here.
 ///
-/// The current VideoToolbox primitive accepts RGB8 and encodes Main10 4:2:0.
-/// Quantize only after the log curve so HDR values above SDR white survive.
+/// Quantize to 16-bit only after the log curve so the Main10 encoder receives
+/// the Apple Log codes directly. An 8-bit quantization would leave most of the
+/// 10-bit HEVC range unused. HDR values above SDR white still survive.
 pub fn apple_style_linear_thumbnail_codes(
     hdr_rgb: &[f32],
     baseline_exposure: f32,
-) -> Result<Vec<u8>, AppleStyleDataError> {
+) -> Result<Vec<u16>, AppleStyleDataError> {
     if hdr_rgb.is_empty() || !hdr_rgb.len().is_multiple_of(3) {
         return Err(AppleStyleDataError::InvalidRgbRaster {
             actual: hdr_rgb.len(),
@@ -247,14 +291,8 @@ pub fn apple_style_linear_thumbnail_codes(
             // Float64 division also prevents finite f32 HDR/exposure pairs
             // from overflowing before the log compresses them.
             let linear = f64::from(value) / f64::from(baseline_exposure);
-            let code = if linear >= 0.01 {
-                0.085_504_79 * (linear + 0.009_640_52).log2() + 0.693_369_45
-            } else if linear >= -0.056_410_88 {
-                47.287_112_36 * (linear + 0.056_410_88).powi(2)
-            } else {
-                0.0
-            };
-            Ok((code.clamp(0.0, 1.0) * 255.0).round() as u8)
+            let code = apple_log_encode(linear);
+            Ok((code * 65_535.0).round() as u16)
         })
         .collect()
 }
@@ -351,109 +389,143 @@ pub fn apple_style_linear_metadata(
     })
 }
 
-/// Build the source-derived monotonic global tone curve used by Styles key 3.
+/// Build the shared per-channel global tone curve used by Styles key 3.
 ///
-/// The input/output arrays are paired luminance observations from one photo.
-/// Rust owns binning, endpoint anchoring, isotonic enforcement, the calibrated
-/// native-family curve fit, and the serialized 257-sample wire format. No
-/// Apple framework is needed for this policy operation.
-#[allow(clippy::excessive_precision)]
+/// `PISemanticStyleFilter` samples one 256-node curve independently on each
+/// channel. The x value is `min(E · S, 1)`, where `S` is the linear thumbnail
+/// after its base gain. These arrays are that code and the displayed primary
+/// channel, interleaved RGB, with no luminance reduction and no percentile
+/// normalization on either axis. `E` is the consumer's extra exposure and is
+/// not a source fact; callers pass the `S` they will hand to the consumer.
+///
+/// Empty bins are filled from neighboring observed means. The monotone
+/// projection is pool-adjacent-violators on those means. There is no parametric
+/// family and no forced `(0, 0)` or `(1, 1)` endpoint. The 516-byte wire layout
+/// is unchanged: a 257 count, 256 inverse-sRGB nodes on the existing 65534
+/// scale, and one repeated final node.
 pub fn apple_style_monotonic_global_tone_curve(
-    input_luminance: &[f32],
-    output_luminance: &[f32],
+    thumbnail_rgb: &[f32],
+    primary_rgb: &[f32],
 ) -> Result<AppleStyleGlobalToneCurve, AppleStyleDataError> {
-    if input_luminance.is_empty()
-        || input_luminance.len() != output_luminance.len()
-        || !input_luminance.iter().all(|value| value.is_finite())
-        || !output_luminance.iter().all(|value| value.is_finite())
+    if thumbnail_rgb.is_empty()
+        || thumbnail_rgb.len() != primary_rgb.len()
+        || !thumbnail_rgb
+            .len()
+            .is_multiple_of(APPLE_STYLE_CHANNEL_COUNT)
+        || thumbnail_rgb.iter().any(|value| !value.is_finite())
+        || primary_rgb.iter().any(|value| !value.is_finite())
     {
         return Err(AppleStyleDataError::InvalidRasterPair);
     }
 
     const SAMPLE_COUNT: usize = 256;
-    let input_white = apple_style_distribution(input_luminance)
-        .high_key
-        .max(1.0 / 4096.0) as f32;
-    let output_white = apple_style_distribution(output_luminance)
-        .high_key
-        .max(1.0 / 4096.0) as f32;
     let mut sums = vec![0.0_f64; SAMPLE_COUNT];
     let mut counts = vec![0.0_f64; SAMPLE_COUNT];
-    for (&input, &output) in input_luminance.iter().zip(output_luminance) {
-        let x = (input / input_white).clamp(0.0, 1.0);
-        let y = (output / output_white).clamp(0.0, 1.0);
-        let index = ((f64::from(x) * 255.0).round() as usize).min(SAMPLE_COUNT - 1);
-        sums[index] += f64::from(y);
+    for (&input, &output) in thumbnail_rgb.iter().zip(primary_rgb) {
+        let code = input.clamp(0.0, 1.0);
+        let target = output.clamp(0.0, 1.0);
+        let index = gtc_node_index(code);
+        sums[index] += f64::from(target);
         counts[index] += 1.0;
     }
     let populated_bins = counts.iter().filter(|count| **count > 0.0).count();
-    let populated_indices = counts
+    if populated_bins == 0 {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    let values = interpolate_observed_bins(&sums, &counts);
+    let fitted = isotonic_curve(&values, &counts)?;
+
+    let mut squared_error = 0.0_f64;
+    for (&input, &output) in thumbnail_rgb.iter().zip(primary_rgb) {
+        let predicted = f64::from(sample_gtc_linear(&fitted, input));
+        let expected = f64::from(output.clamp(0.0, 1.0));
+        let error = predicted - expected;
+        squared_error += error * error;
+    }
+    let finite_count = thumbnail_rgb.len();
+
+    let mut data = Vec::with_capacity(516);
+    data.extend_from_slice(&257_u16.to_le_bytes());
+    for linear in &fitted {
+        data.extend_from_slice(&encode_gtc_node(f64::from(*linear)).to_le_bytes());
+    }
+    let last = *fitted.last().unwrap_or(&0.0);
+    data.extend_from_slice(&encode_gtc_node(f64::from(last)).to_le_bytes());
+    Ok(AppleStyleGlobalToneCurve {
+        data,
+        linear_samples: fitted,
+        fit_rmse: (squared_error / finite_count.max(1) as f64).sqrt(),
+        populated_bins,
+    })
+}
+
+fn gtc_node_index(code: f32) -> usize {
+    let scaled = f16::from_f32(code.clamp(0.0, 1.0) * 255.0).to_f32();
+    scaled.round().clamp(0.0, 255.0) as usize
+}
+
+fn encode_gtc_node(linear: f64) -> u16 {
+    let encoded = srgb_encode(linear.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    (encoded * 65_534.0).round().clamp(0.0, 65_534.0) as u16
+}
+
+fn interpolate_observed_bins(sums: &[f64], counts: &[f64]) -> Vec<f64> {
+    let populated = counts
         .iter()
         .enumerate()
         .filter_map(|(index, count)| (*count > 0.0).then_some(index))
         .collect::<Vec<_>>();
-    let mut values = vec![0.0_f64; SAMPLE_COUNT];
-    if populated_indices.is_empty() {
-        for (index, value) in values.iter_mut().enumerate() {
-            *value = index as f64 / 255.0;
+    let mut values = vec![0.0_f64; sums.len()];
+    for (index, value) in values.iter_mut().enumerate() {
+        if counts[index] > 0.0 {
+            *value = sums[index] / counts[index];
+            continue;
         }
-    } else {
-        for index in 0..SAMPLE_COUNT {
-            if counts[index] > 0.0 {
-                values[index] = sums[index] / counts[index];
-                continue;
+        let lower = populated
+            .iter()
+            .copied()
+            .rev()
+            .find(|candidate| *candidate < index);
+        let upper = populated
+            .iter()
+            .copied()
+            .find(|candidate| *candidate > index);
+        *value = match (lower, upper) {
+            (Some(left), Some(right)) => {
+                let fraction = (index - left) as f64 / (right - left) as f64;
+                let left_value = sums[left] / counts[left];
+                let right_value = sums[right] / counts[right];
+                left_value * (1.0 - fraction) + right_value * fraction
             }
-            let lower = populated_indices
-                .iter()
-                .copied()
-                .rev()
-                .find(|candidate| *candidate < index);
-            let upper = populated_indices
-                .iter()
-                .copied()
-                .find(|candidate| *candidate > index);
-            values[index] = match (lower, upper) {
-                (Some(left), Some(right)) => {
-                    let fraction = (index - left) as f64 / (right - left) as f64;
-                    let left_value = sums[left] / counts[left];
-                    let right_value = sums[right] / counts[right];
-                    left_value * (1.0 - fraction) + right_value * fraction
-                }
-                (Some(left), None) => sums[left] / counts[left],
-                (None, Some(right)) => sums[right] / counts[right],
-                (None, None) => index as f64 / 255.0,
-            };
-        }
+            (Some(left), None) => sums[left] / counts[left],
+            (None, Some(right)) => sums[right] / counts[right],
+            (None, None) => 0.0,
+        };
     }
+    values
+}
 
-    #[derive(Debug, Clone, Copy)]
-    struct IsotonicBlock {
+fn isotonic_curve(values: &[f64], counts: &[f64]) -> Result<Vec<f32>, AppleStyleDataError> {
+    #[derive(Clone, Copy)]
+    struct Block {
         lower: usize,
         upper: usize,
         weight: f64,
         weighted_value: f64,
     }
-    impl IsotonicBlock {
+    impl Block {
         fn mean(self) -> f64 {
             self.weighted_value / self.weight.max(f64::MIN_POSITIVE)
         }
     }
-
-    let observation_count = counts.iter().sum::<f64>().max(1.0);
-    counts[0] += observation_count;
-    values[0] = 0.0;
-    counts[SAMPLE_COUNT - 1] += observation_count;
-    sums[SAMPLE_COUNT - 1] += observation_count;
-    values[SAMPLE_COUNT - 1] = 1.0;
-    let mut blocks = Vec::with_capacity(SAMPLE_COUNT);
-    for index in 0..SAMPLE_COUNT {
-        let weight = counts[index].max(1.0 / 1024.0);
-        let value = if counts[index] > 0.0 {
-            sums[index] / counts[index]
+    let mut blocks = Vec::with_capacity(values.len());
+    for (index, &value) in values.iter().enumerate() {
+        let weight = if counts[index] > 0.0 {
+            counts[index]
         } else {
-            values[index]
+            1.0
         };
-        blocks.push(IsotonicBlock {
+        blocks.push(Block {
             lower: index,
             upper: index,
             weight,
@@ -473,120 +545,49 @@ pub fn apple_style_monotonic_global_tone_curve(
             blocks.push(merged);
         }
     }
-    let mut source_shape = vec![0.0_f32; SAMPLE_COUNT];
+    let mut fitted = vec![0.0_f32; values.len()];
     for block in blocks {
         let value = block.mean().clamp(0.0, 1.0) as f32;
-        source_shape[block.lower..=block.upper].fill(value);
+        fitted[block.lower..=block.upper].fill(value);
     }
-    source_shape[0] = 0.0;
-    source_shape[SAMPLE_COUNT - 1] = 1.0;
-    for index in 1..SAMPLE_COUNT {
-        source_shape[index] = source_shape[index].max(source_shape[index - 1]);
+    for index in 1..fitted.len() {
+        fitted[index] = fitted[index].max(fitted[index - 1]);
     }
-
-    let source_feature = source_shape[8];
-    let clamped_source_feature = source_feature.clamp(0.036_004_916, 0.083_503_760);
-    let intercept = [
-        -0.084_157_526_f32,
-        -0.470_446_978,
-        0.214_894_906,
-        -0.094_378_520,
-        -1.243_283_963,
-        1.129_283_384,
-        1.872_334_583,
-        -2.067_420_023,
-        -1.213_296_907,
-        1.064_446_621,
-    ];
-    let slope = [
-        -0.102_652_002_f32,
-        -0.406_791_328,
-        -0.148_726_014,
-        0.719_434_204,
-        -1.434_380_301,
-        -2.721_594_413,
-        3.446_946_499,
-        4.109_380_580,
-        -3.075_442_484,
-        -2.993_801_587,
-    ];
-    let coefficients = intercept
-        .into_iter()
-        .zip(slope)
-        .map(|(intercept, slope)| intercept + clamped_source_feature * slope)
-        .collect::<Vec<_>>();
-    let mut fitted = vec![0.0_f32; SAMPLE_COUNT];
-    for index in 0..SAMPLE_COUNT {
-        let x = index as f32 / 255.0;
-        let t = 1.0 - 2.0 * x;
-        let endpoint_basis = x * (1.0 - x);
-        let mut t_power = 1.0;
-        let mut value = x;
-        for coefficient in &coefficients {
-            value += coefficient * endpoint_basis * t_power;
-            t_power *= t;
-        }
-        fitted[index] = value.clamp(0.0, 1.0);
-        if index > 0 {
-            fitted[index] = fitted[index].max(fitted[index - 1]);
-        }
-    }
-    fitted[0] = 0.0;
-    fitted[SAMPLE_COUNT - 1] = 1.0;
-
-    let mut squared_error = 0.0_f64;
-    let mut finite_count = 0_usize;
-    for (&input, &output) in input_luminance.iter().zip(output_luminance) {
-        let position = (f64::from((input / input_white).clamp(0.0, 1.0)) * 255.0).clamp(0.0, 255.0);
-        let lower = position.floor() as usize;
-        let upper = (lower + 1).min(255);
-        let fraction = position - lower as f64;
-        let predicted =
-            f64::from(fitted[lower]) * (1.0 - fraction) + f64::from(fitted[upper]) * fraction;
-        let expected = f64::from((output / output_white).clamp(0.0, 1.0));
-        let error = predicted - expected;
-        squared_error += error * error;
-        finite_count += 1;
-    }
-
-    let mut data = Vec::with_capacity(516);
-    data.extend_from_slice(&257_u16.to_le_bytes());
-    for linear in &fitted {
-        let encoded = srgb_encode(f64::from(*linear)).clamp(0.0, 1.0);
-        let value = (encoded * 65_534.0).round().clamp(0.0, 65_534.0) as u16;
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-    data.extend_from_slice(&65_534_u16.to_le_bytes());
-    Ok(AppleStyleGlobalToneCurve {
-        data,
-        linear_samples: fitted,
-        fit_rmse: (squared_error / finite_count.max(1) as f64).sqrt(),
-        populated_bins,
-        source_feature,
-        clamped_source_feature,
-    })
+    Ok(fitted)
 }
 
-/// Apply a serialized curve's linear samples to paired luminance values.
+/// Sample the 256 linear GTC nodes with the 26A434 half coordinate.
+///
+/// The consumer converts `code * 255` to half, promotes it back to float, and
+/// adds `0.5` before a clamp-to-edge texture fetch. Texel centers sit on that
+/// half-pixel grid, so the interpolation coordinate is the half-quantized code.
+pub fn sample_gtc_linear(samples: &[f32], code: f32) -> f32 {
+    if samples.len() != 256 {
+        return 0.0;
+    }
+    let scaled = f16::from_f32(code.clamp(0.0, 1.0) * 255.0)
+        .to_f32()
+        .clamp(0.0, 255.0);
+    let lower = scaled.floor() as usize;
+    let upper = (lower + 1).min(255);
+    let fraction = scaled - lower as f32;
+    samples[lower] * (1.0 - fraction) + samples[upper] * fraction
+}
+
+/// Apply the shared GTC to each channel code with the consumer's half coordinate.
 pub fn apple_style_apply_global_tone_curve(
-    luminance: &[f32],
+    codes: &[f32],
     samples: &[f32],
 ) -> Result<Vec<f32>, AppleStyleDataError> {
     if samples.len() != 256
         || !samples.iter().all(|value| value.is_finite())
-        || !luminance.iter().all(|value| value.is_finite())
+        || !codes.iter().all(|value| value.is_finite())
     {
         return Err(AppleStyleDataError::InvalidRasterPair);
     }
-    Ok(luminance
+    Ok(codes
         .iter()
-        .map(|value| {
-            let position = f64::from(value.clamp(0.0, 1.0)) * 255.0;
-            let lower = position.floor() as usize;
-            let upper = (lower + 1).min(255);
-            let fraction = position - lower as f64;
-            samples[lower] * (1.0 - fraction as f32) + samples[upper] * fraction as f32
-        })
+        .map(|value| sample_gtc_linear(samples, *value))
         .collect())
 }
 
@@ -1080,22 +1081,23 @@ pub fn apple_style_face_exposure_boost(
     }
 }
 
-/// Typed source and bounds for one source-derived style light map.
+/// Typed source for one 32×32 style control map.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AppleStyleLightMapRequest<'a> {
     pub luma: &'a [f32],
     pub width: usize,
     pub height: usize,
-    pub value_scale: f32,
-    pub value_offset: f32,
-    pub output_minimum: f32,
-    pub output_maximum: f32,
     pub storage_orientation: u8,
 }
 
-/// Build one source-derived 32x32 Float16 light map in primary-item storage
-/// order. The aggregation grid and all eight EXIF orientation mappings match
-/// the existing producer contract; non-finite source samples fail closed.
+/// Build one 32×32 Float16 control map in primary-item storage order.
+///
+/// The stored value is the area mean of the guide in that cell. The 26A434
+/// consumer upsamples `c` and `d` with its own guided filter (`r = 1`,
+/// `eps ≈ 0.05`) and then forms `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`.
+/// This map is not that upsample and it is not multiplied onto luminance.
+/// No scale or offset is applied: those constants are not source facts, and
+/// the later functions that consume `q` are not inverted here.
 pub fn apple_style_light_map(
     request: &AppleStyleLightMapRequest<'_>,
 ) -> Result<Vec<u8>, AppleStyleDataError> {
@@ -1106,11 +1108,6 @@ pub fn apple_style_light_map(
     if request.width == 0
         || request.height == 0
         || request.luma.len() != expected_count
-        || !request.value_scale.is_finite()
-        || !request.value_offset.is_finite()
-        || !request.output_minimum.is_finite()
-        || !request.output_maximum.is_finite()
-        || request.output_minimum > request.output_maximum
         || !(1..=8).contains(&request.storage_orientation)
     {
         if !(1..=8).contains(&request.storage_orientation) {
@@ -1149,9 +1146,7 @@ pub fn apple_style_light_map(
                 }
             }
             let average = (sum / count as f64) as f32;
-            let scaled = (average * request.value_scale + request.value_offset)
-                .clamp(request.output_minimum, request.output_maximum);
-            let encoded = f16::from_f32(scaled);
+            let encoded = f16::from_f32(average);
             if !encoded.to_f32().is_finite() {
                 return Err(AppleStyleDataError::NonFiniteLightMapValue {
                     index: target_y * side + target_x,
@@ -1643,6 +1638,337 @@ fn write_fixed_width(output: &mut Vec<u8>, value: u64, width: usize) {
     output.extend_from_slice(&value.to_be_bytes()[8 - width..]);
 }
 
+/// Render parameters for the verified semantic-tone stage.
+///
+/// `tone_mix` is `g` in `T = mix(X, GTC(X), g)`. The LTM and highlight values
+/// are `l` and `h` in the background and foreground branches. `person_matte`
+/// is `m`. These are consumer render parameters. This struct does not map a
+/// Photos Tone or Color slider position onto them; that mapping is not a
+/// source fact.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleSemanticTone {
+    pub exposure: f64,
+    pub tone_mix: f64,
+    pub background_ltm: f64,
+    pub foreground_ltm: f64,
+    pub background_highlight: f64,
+    pub foreground_highlight: f64,
+    pub person_matte: f64,
+}
+
+/// Evaluate one channel of the 26A434 semantic-tone stage.
+///
+/// `X = min(E · S, 1)`, `T = mix(X, GTC(X), g)`, then the ratio `T / A` is
+/// mixed with the LTM and highlight parameters and multiplied back by `A`.
+/// Below `1/255` the ratio is cleared before those mixes. The threshold is
+/// evaluated in `f64`; the consumer's half subtraction is not reproduced.
+/// Color, saturation, skin, and selective-color stages are later in the
+/// shader and are not part of this result.
+pub fn apple_style_semantic_tone_channel(
+    primary: f64,
+    thumbnail: f64,
+    gtc_samples: &[f32],
+    tone: AppleStyleSemanticTone,
+) -> Result<f64, AppleStyleDataError> {
+    if gtc_samples.len() != 256
+        || gtc_samples.iter().any(|value| !value.is_finite())
+        || !primary.is_finite()
+        || !thumbnail.is_finite()
+        || !tone.exposure.is_finite()
+        || !tone.tone_mix.is_finite()
+        || !tone.background_ltm.is_finite()
+        || !tone.foreground_ltm.is_finite()
+        || !tone.background_highlight.is_finite()
+        || !tone.foreground_highlight.is_finite()
+        || !tone.person_matte.is_finite()
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    let x = (tone.exposure * thumbnail).min(1.0);
+    let gtc = f64::from(sample_gtc_linear(gtc_samples, x.clamp(0.0, 1.0) as f32));
+    let t = mix(x, gtc, tone.tone_mix);
+    let background =
+        semantic_tone_branch(primary, t, tone.background_ltm, tone.background_highlight);
+    let foreground =
+        semantic_tone_branch(primary, t, tone.foreground_ltm, tone.foreground_highlight);
+    Ok(mix(background, foreground, tone.person_matte))
+}
+
+fn semantic_tone_branch(primary: f64, tone_mapped: f64, ltm: f64, highlight: f64) -> f64 {
+    let ratio = if primary < (1.0 / 255.0) {
+        0.0
+    } else {
+        tone_mapped / primary
+    };
+    let lifted = mix(ratio, 1.0, ltm);
+    let recovered = mix(lifted, lifted.min(1.0), highlight);
+    recovered * primary
+}
+
+fn mix(start: f64, end: f64, weight: f64) -> f64 {
+    start * (1.0 - weight) + end * weight
+}
+
+/// Displayed primary and the image a remove-style revert should recover.
+///
+/// Both buffers are interleaved linear RGB at the same resolution. The revert
+/// processor reads the displayed primary. The polynomial is fit so that
+/// applying it to that primary approximates `recovered_rgb`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleRevertRequest<'a> {
+    pub width: usize,
+    pub height: usize,
+    pub styled_rgb: &'a [f32],
+    pub recovered_rgb: &'a [f32],
+}
+
+/// Fit key1 per 12×9 spotlight cell and per luminance plane.
+///
+/// The payload is x-major: `((x * 9 + y) * 8 + plane)`, then the existing
+/// 10×3 quadratic block `[1, R, G, B, R², RG, RB, G², GB, B²]`. Plane weights
+/// use `b = 0.5 * (mean + max)` and Gaussian centers `(k + 1) / 9` with
+/// `σ = 2.5`, which is the current `inputIsLinear = false` consumer. Spatial
+/// weights use the default spotlight coordinate. The solved value is the
+/// residual added to identity, so remove-style of an unchanged image stays the
+/// identity transform.
+///
+/// A plane whose samples do not identify a coefficient keeps that coefficient
+/// at the identity residual. The existing numerical ridge is only a stabilizer
+/// for that underdetermined case. It is not a scene calibration. Half rounding
+/// of the plane weight and the optional 3×3 spatial filter are not reproduced.
+pub fn apple_style_revert_local_data(
+    request: &AppleStyleRevertRequest<'_>,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    let pixel_count = request
+        .width
+        .checked_mul(request.height)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    let value_count = pixel_count
+        .checked_mul(APPLE_STYLE_CHANNEL_COUNT)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    if request.width == 0
+        || request.height == 0
+        || request.styled_rgb.len() != value_count
+        || request.recovered_rgb.len() != value_count
+        || request.styled_rgb.iter().any(|value| !value.is_finite())
+        || request.recovered_rgb.iter().any(|value| !value.is_finite())
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+
+    const CELLS: usize = APPLE_STYLE_GRID_WIDTH * APPLE_STYLE_GRID_HEIGHT * APPLE_STYLE_PLANE_COUNT;
+    let mut normal =
+        vec![0.0_f64; CELLS * APPLE_STYLE_POLYNOMIAL_COUNT * APPLE_STYLE_POLYNOMIAL_COUNT];
+    let mut rhs = vec![0.0_f64; CELLS * APPLE_STYLE_BLOCK_VALUE_COUNT];
+    let mut plane_weights = [0.0_f64; APPLE_STYLE_PLANE_COUNT];
+    for y in 0..request.height {
+        let row_weights = spotlight_weights(y, request.height, APPLE_STYLE_GRID_HEIGHT);
+        for x in 0..request.width {
+            let offset = (y * request.width + x) * APPLE_STYLE_CHANNEL_COUNT;
+            let styled = [
+                f64::from(request.styled_rgb[offset]),
+                f64::from(request.styled_rgb[offset + 1]),
+                f64::from(request.styled_rgb[offset + 2]),
+            ];
+            let recovered = [
+                f64::from(request.recovered_rgb[offset]),
+                f64::from(request.recovered_rgb[offset + 1]),
+                f64::from(request.recovered_rgb[offset + 2]),
+            ];
+            let basis = quadratic_basis(styled);
+            let mean = (styled[0] + styled[1] + styled[2]) / 3.0;
+            let peak = styled[0].max(styled[1]).max(styled[2]);
+            let brightness = 0.5 * (mean + peak);
+            let mut plane_sum = 0.0_f64;
+            for (plane, weight) in plane_weights.iter_mut().enumerate() {
+                let center = (plane as f64 + 1.0) / (APPLE_STYLE_PLANE_COUNT as f64 + 1.0);
+                let distance = (brightness - center) * APPLE_STYLE_PLANE_COUNT as f64;
+                *weight = (-0.5 * (distance / 2.5).powi(2)).exp();
+                plane_sum += *weight;
+            }
+            if plane_sum <= 0.0 {
+                continue;
+            }
+            let column_weights = spotlight_weights(x, request.width, APPLE_STYLE_GRID_WIDTH);
+            for &(cell_y, y_weight) in &row_weights {
+                for &(cell_x, x_weight) in &column_weights {
+                    let spatial = x_weight * y_weight;
+                    if spatial <= 0.0 {
+                        continue;
+                    }
+                    for (plane, plane_weight) in plane_weights.iter().copied().enumerate() {
+                        let weight = spatial * plane_weight / plane_sum;
+                        if weight <= 0.0 {
+                            continue;
+                        }
+                        let cell = ((cell_x * APPLE_STYLE_GRID_HEIGHT + cell_y)
+                            * APPLE_STYLE_PLANE_COUNT
+                            + plane)
+                            * APPLE_STYLE_POLYNOMIAL_COUNT;
+                        let rhs_cell = ((cell_x * APPLE_STYLE_GRID_HEIGHT + cell_y)
+                            * APPLE_STYLE_PLANE_COUNT
+                            + plane)
+                            * APPLE_STYLE_BLOCK_VALUE_COUNT;
+                        let normal_cell = &mut normal[cell * APPLE_STYLE_POLYNOMIAL_COUNT
+                            ..(cell + APPLE_STYLE_POLYNOMIAL_COUNT) * APPLE_STYLE_POLYNOMIAL_COUNT];
+                        let rhs_cell = &mut rhs[rhs_cell..rhs_cell + APPLE_STYLE_BLOCK_VALUE_COUNT];
+                        for (row, (normal_row, rhs_row)) in normal_cell
+                            .as_chunks_mut::<APPLE_STYLE_POLYNOMIAL_COUNT>()
+                            .0
+                            .iter_mut()
+                            .zip(rhs_cell.as_chunks_mut::<APPLE_STYLE_CHANNEL_COUNT>().0)
+                            .enumerate()
+                        {
+                            let weighted_basis = weight * basis[row];
+                            for (value, &column_basis) in
+                                normal_row[row..].iter_mut().zip(&basis[row..])
+                            {
+                                *value += weighted_basis * column_basis;
+                            }
+                            for (value, (&source, target)) in
+                                rhs_row.iter_mut().zip(styled.iter().zip(recovered))
+                            {
+                                *value += weighted_basis * (target - source);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut deltas = vec![0.0_f64; APPLE_STYLE_BYTE_COUNT / APPLE_STYLE_VALUE_BYTE_COUNT];
+    for cell_x in 0..APPLE_STYLE_GRID_WIDTH {
+        for cell_y in 0..APPLE_STYLE_GRID_HEIGHT {
+            for plane in 0..APPLE_STYLE_PLANE_COUNT {
+                let normal_base =
+                    ((cell_x * APPLE_STYLE_GRID_HEIGHT + cell_y) * APPLE_STYLE_PLANE_COUNT + plane)
+                        * APPLE_STYLE_POLYNOMIAL_COUNT
+                        * APPLE_STYLE_POLYNOMIAL_COUNT;
+                let mut matrix =
+                    vec![0.0_f64; APPLE_STYLE_POLYNOMIAL_COUNT * APPLE_STYLE_POLYNOMIAL_COUNT];
+                for row in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                    for column in 0..row {
+                        matrix[row * APPLE_STYLE_POLYNOMIAL_COUNT + column] =
+                            normal[normal_base + column * APPLE_STYLE_POLYNOMIAL_COUNT + row];
+                    }
+                    for column in row..APPLE_STYLE_POLYNOMIAL_COUNT {
+                        matrix[row * APPLE_STYLE_POLYNOMIAL_COUNT + column] =
+                            normal[normal_base + row * APPLE_STYLE_POLYNOMIAL_COUNT + column];
+                    }
+                }
+                let trace = (0..APPLE_STYLE_POLYNOMIAL_COUNT)
+                    .map(|term| matrix[term * APPLE_STYLE_POLYNOMIAL_COUNT + term])
+                    .sum::<f64>();
+                let ridge = (trace / APPLE_STYLE_POLYNOMIAL_COUNT as f64 * 1e-5).max(1e-9);
+                for term in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                    matrix[term * APPLE_STYLE_POLYNOMIAL_COUNT + term] +=
+                        ridge * f64::from((term >= 4) as u8 * 9 + 1);
+                }
+                for channel in 0..APPLE_STYLE_CHANNEL_COUNT {
+                    let rhs_base = ((cell_x * APPLE_STYLE_GRID_HEIGHT + cell_y)
+                        * APPLE_STYLE_PLANE_COUNT
+                        + plane)
+                        * APPLE_STYLE_BLOCK_VALUE_COUNT;
+                    let vector = (0..APPLE_STYLE_POLYNOMIAL_COUNT)
+                        .map(|term| rhs[rhs_base + term * APPLE_STYLE_CHANNEL_COUNT + channel])
+                        .collect::<Vec<_>>();
+                    let solution = solve_linear_system(&matrix, &vector)
+                        .unwrap_or_else(|_| vec![0.0; APPLE_STYLE_POLYNOMIAL_COUNT]);
+                    for (basis, value) in solution.into_iter().enumerate() {
+                        let bound = coefficient_bound(basis * APPLE_STYLE_CHANNEL_COUNT + channel);
+                        let index = style_coefficient_index(cell_x, cell_y, plane, basis, channel);
+                        deltas[index] = value.clamp(-bound, bound);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut result = Vec::with_capacity(APPLE_STYLE_BYTE_COUNT);
+    for x in 0..APPLE_STYLE_GRID_WIDTH {
+        for y in 0..APPLE_STYLE_GRID_HEIGHT {
+            for plane in 0..APPLE_STYLE_PLANE_COUNT {
+                for basis in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                    for channel in 0..APPLE_STYLE_CHANNEL_COUNT {
+                        let index = style_coefficient_index(x, y, plane, basis, channel);
+                        let identity = if IDENTITY_INDICES
+                            .contains(&((basis * APPLE_STYLE_CHANNEL_COUNT) + channel))
+                        {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        let value = identity + deltas[index] as f32;
+                        result.extend_from_slice(&f16::from_f32(value).to_le_bytes());
+                    }
+                }
+            }
+        }
+    }
+    validate_apple_style_data(&result)?;
+    Ok(result)
+}
+
+fn quadratic_basis(rgb: [f64; 3]) -> [f64; APPLE_STYLE_POLYNOMIAL_COUNT] {
+    let [red, green, blue] = rgb;
+    [
+        1.0,
+        red,
+        green,
+        blue,
+        red * red,
+        red * green,
+        red * blue,
+        green * green,
+        green * blue,
+        blue * blue,
+    ]
+}
+
+fn spotlight_weights(pixel: usize, extent: usize, count: usize) -> [(usize, f64); 2] {
+    let coordinate = spotlight_coordinate(pixel, extent, count) * count as f64;
+    let lower = coordinate.floor().clamp(0.0, (count - 1) as f64) as usize;
+    let upper = (lower + 1).min(count - 1);
+    let fraction = if lower == upper {
+        0.0
+    } else {
+        (coordinate - lower as f64).clamp(0.0, 1.0)
+    };
+    [(lower, 1.0 - fraction), (upper, fraction)]
+}
+
+fn spotlight_coordinate(pixel: usize, extent: usize, count: usize) -> f64 {
+    if extent == 0 || count == 0 {
+        return 0.0;
+    }
+    let cells = (extent as f64 / count as f64).ceil();
+    let pitch = if (cells as usize).is_multiple_of(2) {
+        cells
+    } else {
+        cells + 1.0
+    };
+    let first = pitch / 2.0 - 1.0;
+    let last = first + pitch * (count as f64 - 1.0);
+    let span = (pitch * (count as f64 - 1.0)).max(1.0);
+    let position = (pixel as f64).clamp(first, last);
+    (0.5 + (position - first) * (count as f64 - 1.0) / span) / count as f64
+}
+
+fn style_coefficient_index(
+    x: usize,
+    y: usize,
+    plane: usize,
+    basis: usize,
+    channel: usize,
+) -> usize {
+    (((x * APPLE_STYLE_GRID_HEIGHT + y) * APPLE_STYLE_PLANE_COUNT + plane)
+        * APPLE_STYLE_POLYNOMIAL_COUNT
+        + basis)
+        * APPLE_STYLE_CHANNEL_COUNT
+        + channel
+}
+
 /// Serialize bounded coefficient deltas over the verified identity payload.
 pub fn apple_style_data_from_coefficient_deltas(
     coefficient_deltas: &[f64],
@@ -1788,18 +2114,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn linear_thumbnail_uses_log_toe_and_preserves_hdr_above_sdr_white() {
-        let rgb = [-0.1, -0.056_410_88, 0.0, 0.01, 0.18, 1.0, 4.0, 16.0, 100.0];
-        assert_eq!(
-            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap(),
-            [0, 0, 38, 53, 125, 177, 220, 255, 255]
+    fn linear_thumbnail_log_round_trips_the_exponential_decoder() {
+        let mut worst = 0.0_f64;
+        for step in 0..=4_000 {
+            let linear = -0.005 + (11.5 - (-0.005)) * f64::from(step) / 4_000.0;
+            let code = apple_log_encode(linear);
+            if code <= 0.0 || code >= 1.0 {
+                continue;
+            }
+            let decoded = apple_log_decode(code);
+            worst = worst.max((decoded - linear).abs());
+        }
+        assert!(
+            worst <= 1.0e-5,
+            "Apple Log float round trip max abs {worst}"
+        );
+
+        // The former quadratic toe maps linear 0 to about 0.150. The
+        // exponential inverse maps it back to 0 and uses a different code.
+        let zero = apple_log_encode(0.0);
+        let quadratic_toe = 47.287_112_36 * (0.0_f64 + 0.056_410_88).powi(2);
+        assert!(
+            (zero - quadratic_toe).abs() > 1.0e-2,
+            "dark code {zero} still matches the unverified camera toe {quadratic_toe}"
+        );
+        assert!((apple_log_decode(zero) - 0.0).abs() <= 1.0e-5);
+        assert!((apple_log_decode(apple_log_encode(0.001)) - 0.001).abs() <= 1.0e-5);
+        assert!((apple_log_decode(apple_log_encode(0.009)) - 0.009).abs() <= 1.0e-5);
+
+        // Below linear + B the log is undefined. Clamp the code; do not use the toe.
+        assert_eq!(apple_log_encode(-0.05), 0.0);
+        assert_eq!(apple_log_encode(-0.1), 0.0);
+        let toe_at_dark = 47.287_112_36 * (-0.05_f64 + 0.056_410_88).powi(2);
+        assert!(toe_at_dark > 0.0);
+
+        let rgb = [-0.1_f32, 0.0, 0.001, 0.01, 0.18, 1.0, 4.0, 16.0, 100.0];
+        let codes = apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap();
+        assert_eq!(codes[0], 0);
+        assert_eq!(codes[7], u16::MAX);
+        assert_eq!(codes[8], u16::MAX);
+        let eight_bit = (apple_log_encode(0.18) * 255.0).round() as u16;
+        assert_ne!(
+            codes[4],
+            eight_bit << 8,
+            "16-bit Apple Log code collapsed to an 8-bit high byte"
         );
         // Normalizing by the same exposure used in the metadata must leave
         // the reference unchanged, including HDR channels above 1.0.
         let exposed = rgb.map(|value| value * 4.0);
         assert_eq!(
             apple_style_linear_thumbnail_codes(&exposed, 4.0).unwrap(),
-            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap()
+            codes
         );
     }
 
@@ -1884,38 +2249,128 @@ mod tests {
     }
 
     #[test]
-    fn source_derived_global_tone_curve_is_monotonic_and_not_identity_for_changed_scene() {
-        let input = (0..512)
-            .map(|index| index as f32 / 511.0)
-            .collect::<Vec<_>>();
-        let output = input
-            .iter()
-            .map(|value| (value.sqrt() * 0.92).clamp(0.0, 1.0))
-            .collect::<Vec<_>>();
-        let curve = apple_style_monotonic_global_tone_curve(&input, &output).unwrap();
+    fn source_derived_global_tone_curve_follows_channel_codes_without_percentile_scaling() {
+        let mut thumbnail = Vec::new();
+        let mut primary = Vec::new();
+        for index in 0..256 {
+            let code = index as f32 / 255.0;
+            let target = if code < 0.5 { 0.0 } else { code };
+            for _ in 0..3 {
+                thumbnail.push(code);
+                primary.push(target);
+            }
+        }
+        let curve = apple_style_monotonic_global_tone_curve(&thumbnail, &primary).unwrap();
         assert_eq!(curve.data.len(), 516);
         assert_eq!(curve.linear_samples.len(), 256);
         assert!(curve
             .linear_samples
             .windows(2)
             .all(|pair| pair[0] <= pair[1]));
-        assert_eq!(curve.linear_samples.first(), Some(&0.0));
-        assert_eq!(curve.linear_samples.last(), Some(&1.0));
         assert!(curve.populated_bins > 200);
         assert!(curve.fit_rmse.is_finite());
-        assert!(curve.source_feature.is_finite());
-        assert!(curve
-            .linear_samples
-            .iter()
-            .enumerate()
-            .any(|(index, value)| (*value - index as f32 / 255.0).abs() > 1e-4));
+        let dark = curve.linear_samples[gtc_node_index(0.2)];
+        let bright = curve.linear_samples[gtc_node_index(0.8)];
+        assert!(
+            dark < 0.05,
+            "dark code was rescaled or smoothed away: {dark}"
+        );
+        assert!(
+            (bright - 0.8).abs() < 0.05,
+            "bright code is not the primary code: {bright}"
+        );
         assert_ne!(curve.data, apple_style_identity_global_tone_curve());
+        assert!((curve.linear_samples[gtc_node_index(1.0)] - 1.0).abs() < 1e-3);
 
         let mapped =
-            apple_style_apply_global_tone_curve(&[0.0, 0.5, 1.0], &curve.linear_samples).unwrap();
-        assert_eq!(mapped.first(), Some(&0.0));
-        assert_eq!(mapped.last(), Some(&1.0));
-        assert!(mapped.windows(2).all(|pair| pair[0] <= pair[1]));
+            apple_style_apply_global_tone_curve(&[0.2, 0.8, 1.0], &curve.linear_samples).unwrap();
+        assert!(mapped[0] < 0.05);
+        assert!((mapped[1] - 0.8).abs() < 0.05);
+        assert!((mapped[2] - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn semantic_tone_at_neutral_ltm_ignores_thumbnail_and_curve() {
+        let mut flat = vec![0.25_f32; 256];
+        flat[255] = 1.0;
+        let neutral = AppleStyleSemanticTone {
+            exposure: 1.0,
+            tone_mix: 1.0,
+            background_ltm: 1.0,
+            foreground_ltm: 1.0,
+            background_highlight: 0.0,
+            foreground_highlight: 0.0,
+            person_matte: 0.0,
+        };
+        let from_thumbnail = apple_style_semantic_tone_channel(0.4, 0.1, &flat, neutral).unwrap();
+        let from_other = apple_style_semantic_tone_channel(0.4, 0.9, &flat, neutral).unwrap();
+        assert!((from_thumbnail - 0.4).abs() < 1e-12);
+        assert!((from_other - from_thumbnail).abs() < 1e-12);
+
+        let engaged = AppleStyleSemanticTone {
+            exposure: 1.0,
+            tone_mix: 1.0,
+            background_ltm: 0.0,
+            foreground_ltm: 0.0,
+            background_highlight: 0.0,
+            foreground_highlight: 0.0,
+            person_matte: 0.0,
+        };
+        let followed = apple_style_semantic_tone_channel(0.5, 0.25, &flat, engaged).unwrap();
+        assert!(
+            (followed - 0.25).abs() < 1e-6,
+            "full tone mix should follow GTC(X), got {followed}"
+        );
+        flat.fill(0.8);
+        let shifted = apple_style_semantic_tone_channel(0.5, 0.25, &flat, engaged).unwrap();
+        assert!(
+            (shifted - 0.8).abs() < 1e-3,
+            "GTC change was ignored: {shifted}"
+        );
+    }
+
+    #[test]
+    fn revert_key1_is_local_and_points_from_styled_primary_to_recovered_scene() {
+        assert_eq!(
+            style_coefficient_index(1, 0, 0, 0, 0),
+            APPLE_STYLE_GRID_HEIGHT * APPLE_STYLE_PLANE_COUNT * APPLE_STYLE_BLOCK_VALUE_COUNT
+        );
+        let width = 24;
+        let height = 18;
+        let mut styled = vec![0.0_f32; width * height * 3];
+        let mut recovered = vec![0.0_f32; width * height * 3];
+        for y in 0..height {
+            for x in 0..width {
+                let offset = (y * width + x) * 3;
+                let level = 0.25 + (x % 4) as f32 * 0.12 + (y % 3) as f32 * 0.08;
+                for channel in 0..3 {
+                    styled[offset + channel] = level;
+                    recovered[offset + channel] = if x < width / 2 { level - 0.05 } else { level };
+                }
+            }
+        }
+        let data = apple_style_revert_local_data(&AppleStyleRevertRequest {
+            width,
+            height,
+            styled_rgb: &styled,
+            recovered_rgb: &recovered,
+        })
+        .unwrap();
+        let read = |x, y, plane, basis, channel| {
+            let index = style_coefficient_index(x, y, plane, basis, channel);
+            f16::from_le_bytes([data[index * 2], data[index * 2 + 1]]).to_f32()
+        };
+        let left = read(0, 4, 3, 0, 0);
+        let right = read(11, 4, 3, 0, 0);
+        assert!(
+            left < -0.01,
+            "revert residual should darken the styled left side, got {left}"
+        );
+        assert!(
+            right > left + 0.01,
+            "right cell should not copy the left residual: left {left}, right {right}"
+        );
+        assert_ne!(data, apple_style_identity_data());
     }
 
     #[test]
@@ -2270,10 +2725,6 @@ mod tests {
                 luma: &luma,
                 width: side,
                 height: side,
-                value_scale: 1.0,
-                value_offset: 0.0,
-                output_minimum: 0.0,
-                output_maximum: 2_000.0,
                 storage_orientation: orientation,
             };
             let data = apple_style_light_map(&request).unwrap();
@@ -2296,10 +2747,6 @@ mod tests {
             luma: &[],
             width: 0,
             height: 0,
-            value_scale: 1.0,
-            value_offset: 0.0,
-            output_minimum: 0.0,
-            output_maximum: 1.0,
             storage_orientation: 1,
         };
         assert!(matches!(
@@ -2310,10 +2757,6 @@ mod tests {
             luma: &[0.0],
             width: 1,
             height: 1,
-            value_scale: 1.0,
-            value_offset: 0.0,
-            output_minimum: 0.0,
-            output_maximum: 1.0,
             storage_orientation: 9,
         };
         assert!(matches!(
@@ -2324,10 +2767,6 @@ mod tests {
             luma: &[f32::NAN],
             width: 1,
             height: 1,
-            value_scale: 1.0,
-            value_offset: 0.0,
-            output_minimum: 0.0,
-            output_maximum: 1.0,
             storage_orientation: 1,
         };
         assert!(matches!(

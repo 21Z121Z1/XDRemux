@@ -6,8 +6,8 @@ use xdremux_format::exif::read_item_payload;
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_ipma_box, make_iref_box,
     parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPRP,
-    IREF, MDAT, META,
+    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE,
+    IPCO, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{Cursor, Endian, FourCC};
 
@@ -98,6 +98,278 @@ fn xml(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+const NATIVE_SKIN_CARRIER: &[u8] = b"urn:com:apple:photo:2019:aux:semanticskinmatte";
+
+fn codec_auxiliary_property(codec: &ParsedMeta, id: u32) -> Result<&PropertyInfo> {
+    let owners = codec
+        .ipma
+        .entries
+        .iter()
+        .filter(|owner| owner.item_id == id)
+        .collect::<Vec<_>>();
+    let [owner] = owners.as_slice() else {
+        return Err(invalid(
+            "codec auxiliary properties are missing or ambiguous",
+        ));
+    };
+    let mut auxiliary = None;
+    for association in &owner.associations {
+        // Match the existing codec importer: index zero has no property.
+        if association.property_index == 0 {
+            continue;
+        }
+        let property = codec
+            .properties
+            .iter()
+            .find(|property| property.index == u32::from(association.property_index))
+            .ok_or_else(|| invalid("codec auxiliary property is unresolved"))?;
+        if property.kind == AUXC && auxiliary.replace(property).is_some() {
+            return Err(invalid("codec auxiliary has multiple auxC properties"));
+        }
+    }
+    auxiliary.ok_or_else(|| invalid("codec auxiliary has no auxC property"))
+}
+
+fn native_skin_carrier(data: &[u8], codec: &ParsedMeta) -> Result<(u32, BTreeSet<u32>)> {
+    let references = &codec
+        .iref
+        .as_ref()
+        .ok_or_else(|| invalid("mask has no references"))?
+        .entries;
+    let mut ids = BTreeSet::new();
+    for item in &codec.iinf.entries {
+        if !ids.insert(item.item_id) {
+            return Err(invalid("codec has duplicate item IDs"));
+        }
+    }
+    for edge in references {
+        if !ids.contains(&edge.from_item_id) || edge.to_item_ids.iter().any(|id| !ids.contains(id))
+        {
+            return Err(invalid("codec reference has an unknown item"));
+        }
+    }
+    let mut seen_aux = BTreeSet::new();
+    let mut mask = None;
+    let mut alpha = None;
+    for edge in references.iter().filter(|edge| edge.kind == AUXL) {
+        if !seen_aux.insert(edge.from_item_id)
+            || edge.from_item_id == codec.primary_item_id
+            || edge.to_item_ids != [codec.primary_item_id]
+        {
+            return Err(invalid(
+                "codec auxiliary has duplicate or unsupported primary relationships",
+            ));
+        }
+        let property = codec_auxiliary_property(codec, edge.from_item_id)?;
+        let (uri, subtype) = crate::semantic::auxiliary_type_bytes(data, property)?;
+        if uri == NATIVE_SKIN_CARRIER {
+            if !subtype.is_empty() {
+                return Err(invalid("native skin carrier subtype is unsupported"));
+            }
+            if mask.replace(edge.from_item_id).is_some() {
+                return Err(invalid("codec must contain exactly one native skin mask"));
+            }
+        } else if crate::semantic::is_alpha_type(uri) {
+            // This is the disposable codec primary's alpha, not a mask. Its
+            // subtype is opaque; none of its metadata or bytes become Texture
+            // resources. Product source alpha is preserved independently below.
+            if alpha.replace(edge.from_item_id).is_some() {
+                return Err(invalid("codec has multiple alpha resources"));
+            }
+        } else {
+            return Err(invalid("codec auxiliary role is unsupported"));
+        }
+    }
+    for owner in &codec.ipma.entries {
+        if owner.associations.iter().any(|association| {
+            codec.properties.iter().any(|property| {
+                property.index == u32::from(association.property_index) && property.kind == AUXC
+            })
+        }) && !seen_aux.contains(&owner.item_id)
+        {
+            return Err(invalid("codec auxiliary has no primary relationship"));
+        }
+    }
+    let root = mask.ok_or_else(|| invalid("codec must contain exactly one native skin mask"))?;
+    let mut background = BTreeSet::from([codec.primary_item_id]);
+    background.extend(crate::semantic::coded_image_items(
+        codec,
+        codec.primary_item_id,
+        "codec primary",
+    )?);
+    if let Some(alpha) = alpha {
+        let coded = crate::semantic::coded_image_items(codec, alpha, "codec alpha")?;
+        if background.contains(&alpha) || coded.iter().any(|id| background.contains(id)) {
+            return Err(invalid("codec alpha overlaps the primary graph"));
+        }
+        background.insert(alpha);
+        background.extend(coded);
+    }
+    let mut selected = BTreeSet::from([root]);
+    selected.extend(crate::semantic::coded_image_items(
+        codec,
+        root,
+        "native skin mask",
+    )?);
+    if !selected.is_disjoint(&background) {
+        return Err(invalid(
+            "native skin mask overlaps a codec background resource",
+        ));
+    }
+    for id in selected.iter().chain(background.iter()) {
+        if codec
+            .iloc
+            .entries
+            .iter()
+            .filter(|entry| entry.item_id == *id)
+            .count()
+            != 1
+            || codec
+                .ipma
+                .entries
+                .iter()
+                .filter(|entry| entry.item_id == *id)
+                .count()
+                != 1
+        {
+            return Err(invalid("codec image records are missing or ambiguous"));
+        }
+    }
+    for id in selected.iter().chain(background.iter()) {
+        let location = codec
+            .iloc
+            .entries
+            .iter()
+            .find(|entry| entry.item_id == *id)
+            .ok_or_else(|| invalid("codec image has no location"))?;
+        if location.data_reference_index != 0
+            || location.construction_method > 1
+            || read_item_payload(data, location, codec.idat.as_ref())?.is_empty()
+        {
+            return Err(invalid("codec image payload must be nonempty and local"));
+        }
+    }
+    for edge in references {
+        let from_mask = selected.contains(&edge.from_item_id);
+        let to_mask = edge.to_item_ids.iter().any(|id| selected.contains(id));
+        if (from_mask && !(edge.kind == DIMG || edge.kind == AUXL && edge.from_item_id == root))
+            || (to_mask
+                && !(edge.kind == DIMG && from_mask
+                    || edge.kind == CDSC
+                        && edge.to_item_ids == [root]
+                        && codec.iinf.entries.iter().any(|item| {
+                            item.item_id == edge.from_item_id && item.item_type == Some(MIME)
+                        })))
+        {
+            return Err(invalid(
+                "native skin mask has an unsupported resource relationship",
+            ));
+        }
+    }
+    Ok((root, selected))
+}
+
+fn codec_graph_error(error: HeifError, data: &[u8], codec: &ParsedMeta) -> HeifError {
+    // Temporary codec files disappear after failure. Emit only bounded IDs,
+    // fixed labels and subtype lengths; no media, metadata or unknown URIs.
+    let roots = codec.iref.as_ref().map_or_else(BTreeSet::new, |iref| {
+        iref.entries
+            .iter()
+            .filter(|edge| edge.kind == AUXL)
+            .map(|edge| edge.from_item_id)
+            .collect()
+    });
+    let resources = codec
+        .iinf
+        .entries
+        .iter()
+        .filter(|item| roots.contains(&item.item_id))
+        .chain(
+            codec
+                .iinf
+                .entries
+                .iter()
+                .filter(|item| !roots.contains(&item.item_id)),
+        )
+        .take(16)
+        .map(|item| {
+            let kind = match item.item_type {
+                Some(kind) if kind == FourCC::new(*b"hvc1") => "hvc1",
+                Some(kind) if kind == FourCC::new(*b"grid") => "grid",
+                Some(kind) if kind == MIME => "mime",
+                _ => "other",
+            };
+            let role = match codec_auxiliary_property(codec, item.item_id)
+                .and_then(|property| crate::semantic::auxiliary_type_bytes(data, property))
+            {
+                Ok((uri, subtype)) => format!(
+                    "{}:subtype_len={}",
+                    if uri == NATIVE_SKIN_CARRIER {
+                        "skin-carrier"
+                    } else if uri == b"urn:mpeg:hevc:2015:auxid:1" {
+                        "alpha-hevc"
+                    } else if uri == b"urn:mpeg:mpegB:cicp:systems:auxiliary:alpha" {
+                        "alpha-miaf"
+                    } else {
+                        "unknown"
+                    },
+                    subtype.len()
+                ),
+                Err(_) => "none-or-malformed".to_owned(),
+            };
+            format!("{}:{kind}:auxC=[{role}]", item.item_id)
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let references = codec.iref.as_ref().map_or_else(Vec::new, |iref| {
+        iref.entries
+            .iter()
+            .take(32)
+            .map(|edge| {
+                let kind = if edge.kind == AUXL {
+                    "auxl"
+                } else if edge.kind == DIMG {
+                    "dimg"
+                } else if edge.kind == CDSC {
+                    "cdsc"
+                } else {
+                    "other"
+                };
+                format!(
+                    "{kind}:{}->{:?}{}",
+                    edge.from_item_id,
+                    edge.to_item_ids.iter().take(8).collect::<Vec<_>>(),
+                    if edge.to_item_ids.len() > 8 {
+                        "+omitted"
+                    } else {
+                        ""
+                    }
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+    invalid(format!(
+        "{error}; native mask codec={{primary={},items={},resources=[{resources}]{},refs=[{}]{}}}",
+        codec.primary_item_id,
+        codec.iinf.entries.len(),
+        if codec.iinf.entries.len() > 16 {
+            ",omitted-resources"
+        } else {
+            ""
+        },
+        references.join(","),
+        if codec
+            .iref
+            .as_ref()
+            .is_some_and(|iref| iref.entries.len() > 32)
+        {
+            ",omitted-refs"
+        } else {
+            ""
+        }
+    ))
+}
+
 /// Copy every source item payload exactly, preserve all original references,
 /// and add a distinct FSINC descriptor for each actual native mask.
 pub fn assemble_texture_styles_heif(
@@ -175,30 +447,12 @@ pub fn assemble_texture_styles_heif(
             .iref
             .as_ref()
             .ok_or_else(|| invalid("mask has no references"))?;
-        let roots: Vec<_> = codec_refs
-            .entries
-            .iter()
-            .filter(|r| r.kind == AUXL && r.to_item_ids == [codec.primary_item_id])
-            .map(|r| r.from_item_id)
-            .collect();
-        if roots.len() != 1 {
-            return Err(invalid(
-                "codec must contain exactly one native auxiliary mask",
-            ));
-        }
-        let root = roots[0];
-        let mut selected = BTreeSet::from([root]);
-        loop {
-            let old = selected.len();
-            for r in &codec_refs.entries {
-                if r.kind == DIMG && selected.contains(&r.from_item_id) {
-                    selected.extend(r.to_item_ids.iter().copied());
-                }
-            }
-            if selected.len() == old {
-                break;
-            }
-        }
+        // The native producer encodes each measured L8 mask using ImageIO's
+        // SemanticSegmentationSkinMatte carrier (infer.m:218-230). The codec
+        // primary can separately carry alpha; only the typed skin graph is
+        // imported and assigned its requested Texture role.
+        let (root, selected) = native_skin_carrier(mask.codec, &codec)
+            .map_err(|error| codec_graph_error(error, mask.codec, &codec))?;
         let mut mapping = BTreeMap::new();
         for old in &selected {
             mapping.insert(*old, next);
@@ -490,61 +744,159 @@ mod tests {
     use super::*;
     use xdremux_format::isobmff::{make_infe_box, make_pitm_box};
 
+    const SKIN: &[u8] = b"urn:com:apple:photo:2019:aux:semanticskinmatte\0";
+    const ALPHA: &[u8] = b"urn:mpeg:hevc:2015:auxid:1\0";
+    const ISO_GAIN: &[u8] = b"urn:iso:std:iso:ts:21496:-1\0";
+    const PERSON: &str = "tag:apple.com,2026:photo:aux:semanticpersonmatte";
+
     fn fixture(aux: bool) -> Vec<u8> {
-        let mut infos = vec![make_infe_box(1, FourCC::new(*b"hvc1"), 0).unwrap()];
-        let mut locations = vec![IlocEntry {
+        fixture_roles(if aux { &[(2, SKIN)] } else { &[] }, None, &[])
+    }
+
+    fn fixture_roles(
+        roles: &[(u32, &[u8])],
+        grid_root: Option<u32>,
+        extra: &[IrefEntry],
+    ) -> Vec<u8> {
+        let hvc1 = FourCC::new(*b"hvc1");
+        let grid = FourCC::new(*b"grid");
+        let mut items = vec![(
+            1,
+            if grid_root == Some(1) { grid } else { hvc1 },
+            b"base".to_vec(),
+        )];
+        let mut properties = vec![
+            make_box(
+                FourCC::new(*b"hvcC"),
+                &[1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            )
+            .unwrap(),
+            xdremux_format::isobmff::make_ispe_box(4, 2).unwrap(),
+            make_full_box(FourCC::new(*b"pixi"), 0, 0, &[1, 8]).unwrap(),
+        ];
+        let coded = || {
+            [1, 2, 3]
+                .into_iter()
+                .map(|property_index| IpmaAssociation {
+                    property_index,
+                    essential: true,
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut owners = vec![IpmaEntry {
             item_id: 1,
-            construction_method: 1,
-            data_reference_index: 0,
-            base_offset: 0,
-            extents: vec![IlocExtent {
-                index: None,
-                offset: 0,
-                length: 4,
-            }],
+            associations: coded(),
         }];
-        let mut data = b"base".to_vec();
-        let mut properties = Vec::new();
-        let mut owners = Vec::new();
         let mut refs = Vec::new();
-        if aux {
-            infos.push(make_infe_box(2, FourCC::new(*b"hvc1"), 1).unwrap());
+        for (id, uri) in roles {
+            let payload = if *uri == SKIN {
+                b"mask".as_slice()
+            } else if *uri == ISO_GAIN {
+                b"gain".as_slice()
+            } else {
+                b"alpha".as_slice()
+            };
+            items.push((
+                *id,
+                if grid_root == Some(*id) { grid } else { hvc1 },
+                payload.to_vec(),
+            ));
+            properties.push(make_full_box(AUXC, 0, 0, uri).unwrap());
+            let mut associations = coded();
+            if *uri == SKIN {
+                associations.insert(
+                    0,
+                    IpmaAssociation {
+                        property_index: 0,
+                        essential: false,
+                    },
+                );
+            }
+            associations.push(IpmaAssociation {
+                property_index: u16::try_from(properties.len()).unwrap(),
+                essential: true,
+            });
+            owners.push(IpmaEntry {
+                item_id: *id,
+                associations,
+            });
+            let targets = if *uri == ISO_GAIN {
+                items.push((50, FourCC::new(*b"tmap"), b"tone-map".to_vec()));
+                owners.push(IpmaEntry {
+                    item_id: 50,
+                    associations: [2, 3]
+                        .into_iter()
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
+                });
+                refs.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: 50,
+                    to_item_ids: vec![1, *id],
+                });
+                vec![1, 50]
+            } else {
+                vec![1]
+            };
+            refs.push(IrefEntry {
+                kind: AUXL,
+                from_item_id: *id,
+                to_item_ids: targets,
+            });
+        }
+        if let Some(root) = grid_root {
+            items.iter_mut().find(|(id, _, _)| *id == root).unwrap().2 =
+                vec![0, 0, 0, 1, 0, 4, 0, 2];
+            for (id, payload) in [
+                (100 + root, b"first-coded-tile".as_slice()),
+                (200 + root, b"second-coded-tile"),
+            ] {
+                items.push((id, hvc1, payload.to_vec()));
+                owners.push(IpmaEntry {
+                    item_id: id,
+                    associations: coded(),
+                });
+            }
+            if let Some(edge) = extra
+                .iter()
+                .find(|edge| edge.kind == DIMG && edge.from_item_id == root)
+            {
+                items.iter_mut().find(|(id, _, _)| *id == root).unwrap().2[3] =
+                    u8::try_from(edge.to_item_ids.len() - 1).unwrap();
+            } else {
+                refs.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: root,
+                    to_item_ids: vec![100 + root, 200 + root],
+                });
+            }
+        }
+        refs.extend_from_slice(extra);
+        let mut data = Vec::new();
+        let mut infos = Vec::new();
+        let mut locations = Vec::new();
+        for (id, kind, payload) in items {
+            infos.push(make_infe_box(id, kind, u32::from(id != 1)).unwrap());
             locations.push(IlocEntry {
-                item_id: 2,
+                item_id: id,
                 construction_method: 1,
                 data_reference_index: 0,
                 base_offset: 0,
                 extents: vec![IlocExtent {
                     index: None,
-                    offset: 4,
-                    length: 4,
+                    offset: data.len() as u64,
+                    length: payload.len() as u64,
                 }],
             });
-            data.extend_from_slice(b"mask");
-            properties = make_full_box(
-                AUXC,
-                0,
-                0,
-                b"urn:com:apple:photo:2019:aux:semanticskinmatte\0",
-            )
-            .unwrap();
-            owners.push(IpmaEntry {
-                item_id: 2,
-                associations: vec![IpmaAssociation {
-                    property_index: 1,
-                    essential: true,
-                }],
-            });
-            refs.push(IrefEntry {
-                kind: AUXL,
-                from_item_id: 2,
-                to_item_ids: vec![1],
-            });
+            data.extend(payload);
         }
         let iprp = make_box(
             IPRP,
             &[
-                make_box(IPCO, &properties).unwrap(),
+                make_box(IPCO, &properties.concat()).unwrap(),
                 make_ipma_box(0, 0, &owners).unwrap(),
             ]
             .concat(),
@@ -562,8 +914,330 @@ mod tests {
         [
             make_box(FTYP, b"mif1\0\0\0\0mif1heic").unwrap(),
             make_full_box(META, 0, 0, &children).unwrap(),
+            make_box(MDAT, &[]).unwrap(),
         ]
         .concat()
+    }
+
+    #[test]
+    fn native_skin_carrier_is_selected_among_alpha_without_changing_source_hdr_resources() {
+        let source = fixture_roles(&[(2, ALPHA), (3, ISO_GAIN)], None, &[]);
+        let hdr_before = crate::validate_gain_map_structure(&source).unwrap();
+        for (grid, alpha) in [
+            (None, ALPHA),
+            (Some(1), ALPHA),
+            (Some(3), ALPHA),
+            (
+                None,
+                b"urn:mpeg:mpegB:cicp:systems:auxiliary:alpha\0".as_slice(),
+            ),
+            (
+                None,
+                b"urn:mpeg:hevc:2015:auxid:1\0opaque-codec-alpha".as_slice(),
+            ),
+        ] {
+            let codec = fixture_roles(&[(2, alpha), (3, SKIN)], grid, &[]);
+            let masks = [TextureStyleMask {
+                auxiliary_type: PERSON,
+                codec: &codec,
+                instance_reference_key: None,
+            }];
+            let output =
+                assemble_texture_styles_heif(&source, b"bplist00measured", &masks).unwrap();
+            assert_eq!(
+                crate::validate_gain_map_structure(&output).unwrap(),
+                hdr_before
+            );
+            let (_, _, original) = meta(&source).unwrap();
+            let (_, _, actual) = meta(&output).unwrap();
+            for location in &original.iloc.entries {
+                let after = actual
+                    .iloc
+                    .entries
+                    .iter()
+                    .find(|item| item.item_id == location.item_id)
+                    .unwrap();
+                assert_eq!(
+                    read_item_payload(&source, location, original.idat.as_ref()).unwrap(),
+                    read_item_payload(&output, after, actual.idat.as_ref()).unwrap()
+                );
+            }
+            let original_refs = &original.iref.as_ref().unwrap().entries;
+            assert_eq!(
+                original_refs,
+                &actual.iref.as_ref().unwrap().entries[..original_refs.len()]
+            );
+            for owner in &original.ipma.entries {
+                let read = |data: &[u8], graph: &ParsedMeta, id: u32| {
+                    graph
+                        .ipma
+                        .entries
+                        .iter()
+                        .find(|item| item.item_id == id)
+                        .unwrap()
+                        .associations
+                        .iter()
+                        .map(|a| {
+                            (
+                                a.essential,
+                                data[graph
+                                    .properties
+                                    .iter()
+                                    .find(|p| p.index == u32::from(a.property_index))
+                                    .unwrap()
+                                    .box_range
+                                    .clone()]
+                                .to_vec(),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                };
+                assert_eq!(
+                    read(&source, &original, owner.item_id),
+                    read(&output, &actual, owner.item_id)
+                );
+            }
+            let root = actual
+                .iref
+                .as_ref()
+                .unwrap()
+                .entries
+                .iter()
+                .find(|edge| edge.kind == AUXL && edge.from_item_id > 50)
+                .unwrap()
+                .from_item_id;
+            let location = actual
+                .iloc
+                .entries
+                .iter()
+                .find(|item| item.item_id == root)
+                .unwrap();
+            assert_eq!(
+                read_item_payload(&output, location, actual.idat.as_ref()).unwrap(),
+                if grid == Some(3) {
+                    vec![0, 0, 0, 1, 0, 4, 0, 2]
+                } else {
+                    b"mask".to_vec()
+                }
+            );
+            if grid == Some(3) {
+                let edge = actual
+                    .iref
+                    .as_ref()
+                    .unwrap()
+                    .entries
+                    .iter()
+                    .find(|edge| edge.kind == DIMG && edge.from_item_id == root)
+                    .unwrap();
+                for (id, expected) in edge
+                    .to_item_ids
+                    .iter()
+                    .zip([b"first-coded-tile".as_slice(), b"second-coded-tile"])
+                {
+                    let location = actual
+                        .iloc
+                        .entries
+                        .iter()
+                        .find(|item| item.item_id == *id)
+                        .unwrap();
+                    assert_eq!(
+                        read_item_payload(&output, location, actual.idat.as_ref()).unwrap(),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn native_skin_carrier_rejects_unknown_ambiguous_or_overlapping_auxiliary_graphs() {
+        let source = fixture(false);
+        for case in [
+            "alpha only",
+            "unknown",
+            "empty type",
+            "unknown subtype",
+            "two masks",
+            "two alpha",
+            "duplicate item",
+            "duplicate auxl",
+            "foreign primary",
+            "direct derived",
+            "primary overlap",
+            "alpha overlap",
+            "unknown reference",
+        ] {
+            let mut roles = vec![(2, ALPHA), (3, SKIN)];
+            let mut extra = Vec::new();
+            let mut grid = None;
+            match case {
+                "alpha only" => {
+                    roles.pop();
+                }
+                "unknown" => roles[0].1 = b"urn:unknown:auxiliary\0",
+                "empty type" => roles[1].1 = b"\0",
+                "unknown subtype" => {
+                    roles[1].1 = b"urn:com:apple:photo:2019:aux:semanticskinmatte\0unknown"
+                }
+                "two masks" => roles[0].1 = SKIN,
+                "two alpha" => roles.push((4, ALPHA)),
+                "duplicate item" => roles.push((2, ALPHA)),
+                "duplicate auxl" => extra.push(IrefEntry {
+                    kind: AUXL,
+                    from_item_id: 3,
+                    to_item_ids: vec![1],
+                }),
+                "foreign primary" => extra.push(IrefEntry {
+                    kind: AUXL,
+                    from_item_id: 3,
+                    to_item_ids: vec![2],
+                }),
+                "direct derived" => extra.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: 3,
+                    to_item_ids: vec![2],
+                }),
+                "primary overlap" | "alpha overlap" => {
+                    grid = Some(3);
+                    extra.push(IrefEntry {
+                        kind: DIMG,
+                        from_item_id: 3,
+                        to_item_ids: vec![if case == "primary overlap" { 1 } else { 2 }],
+                    });
+                }
+                "unknown reference" => extra.push(IrefEntry {
+                    kind: FourCC::new(*b"thmb"),
+                    from_item_id: 3,
+                    to_item_ids: vec![999],
+                }),
+                _ => unreachable!(),
+            }
+            let codec = fixture_roles(&roles, grid, &extra);
+            let mask = TextureStyleMask {
+                auxiliary_type: PERSON,
+                codec: &codec,
+                instance_reference_key: None,
+            };
+            let expected = match case {
+                "alpha only" | "two masks" => "exactly one native skin mask",
+                "unknown" | "empty type" => "auxiliary role is unsupported",
+                "unknown subtype" => "skin carrier subtype is unsupported",
+                "two alpha" => "multiple alpha resources",
+                "duplicate item" => "duplicate item IDs",
+                "duplicate auxl" | "foreign primary" => "unsupported primary relationships",
+                "direct derived" => "has a dimg reference",
+                "primary overlap" | "alpha overlap" => "overlaps a codec background resource",
+                "unknown reference" => "reference has an unknown item",
+                _ => unreachable!(),
+            };
+            let error = assemble_texture_styles_heif(&source, b"bplist00measured", &[mask])
+                .err()
+                .unwrap_or_else(|| panic!("accepted {case}"))
+                .to_string();
+            assert!(error.contains(expected), "{case}: {error}");
+        }
+    }
+
+    #[test]
+    fn native_skin_carrier_rejects_malformed_or_ambiguous_auxc_properties() {
+        let source = fixture(false);
+        for case in [
+            "version",
+            "flags",
+            "unterminated",
+            "missing auxC",
+            "duplicate auxC",
+        ] {
+            let mut codec = fixture_roles(&[(2, ALPHA), (3, SKIN)], None, &[]);
+            let (_, header, mut parsed) = meta(&codec).unwrap();
+            let property = codec_auxiliary_property(&parsed, 3).unwrap().clone();
+            match case {
+                "version" => codec[property.box_range.start + 8] = 1,
+                "flags" => codec[property.box_range.start + 11] = 1,
+                "unterminated" => codec[property.box_range.end - 1] = b'X',
+                "missing auxC" => codec[property.box_range.start + 4..property.box_range.start + 8]
+                    .copy_from_slice(b"free"),
+                "duplicate auxC" => {
+                    let owner = parsed
+                        .ipma
+                        .entries
+                        .iter_mut()
+                        .find(|owner| owner.item_id == 3)
+                        .unwrap();
+                    owner.associations[0].property_index = u16::try_from(property.index).unwrap();
+                    let replacement = make_ipma_box(0, 0, &parsed.ipma.entries).unwrap();
+                    let iprp = parse_boxes(&codec, header.data_start + 4..header.data_end)
+                        .unwrap()
+                        .into_iter()
+                        .find(|child| child.kind == IPRP)
+                        .unwrap();
+                    let ipma = parse_boxes(&codec, iprp.payload_range())
+                        .unwrap()
+                        .into_iter()
+                        .find(|child| child.kind == xdremux_format::isobmff::IPMA)
+                        .unwrap();
+                    assert_eq!(replacement.len(), ipma.size);
+                    codec[ipma.box_range()].copy_from_slice(&replacement);
+                }
+                _ => unreachable!(),
+            }
+            let mask = TextureStyleMask {
+                auxiliary_type: PERSON,
+                codec: &codec,
+                instance_reference_key: None,
+            };
+            let error = assemble_texture_styles_heif(&source, b"bplist00measured", &[mask])
+                .err()
+                .unwrap_or_else(|| panic!("accepted {case}"))
+                .to_string();
+            let expected = match case {
+                "version" | "flags" => "invalid full-box header",
+                "unterminated" => "no terminated type",
+                "missing auxC" => "has no auxC property",
+                _ => "multiple auxC properties",
+            };
+            assert!(error.contains(expected), "{case}: {error}");
+        }
+    }
+
+    #[test]
+    fn native_skin_carrier_failure_reports_bounded_roles_and_references_without_opaque_bytes() {
+        let source = fixture(false);
+        let mut roles = vec![
+            (2, b"SECRET_UNKNOWN_URI\0SECRET_SUBTYPE".as_slice()),
+            (3, SKIN),
+        ];
+        roles.extend((4..35).map(|id| (id, ALPHA)));
+        let extra = (0..40)
+            .map(|_| IrefEntry {
+                kind: FourCC::new(*b"thmb"),
+                from_item_id: 2,
+                to_item_ids: (1..16).collect(),
+            })
+            .collect::<Vec<_>>();
+        let codec = fixture_roles(&roles, None, &extra);
+        let mask = TextureStyleMask {
+            auxiliary_type: PERSON,
+            codec: &codec,
+            instance_reference_key: None,
+        };
+        let error = assemble_texture_styles_heif(&source, b"bplist00SECRET_PLIST", &[mask])
+            .err()
+            .unwrap()
+            .to_string();
+        for expected in [
+            "native mask codec={primary=1",
+            "2:hvc1:auxC=[unknown:subtype_len=14]",
+            "3:hvc1:auxC=[skin-carrier:subtype_len=0]",
+            "4:hvc1:auxC=[alpha-hevc:subtype_len=0]",
+            "auxl:2->[1]",
+            "omitted-resources",
+            "omitted-refs",
+        ] {
+            assert!(error.contains(expected), "{error}");
+        }
+        assert!(!error.contains("SECRET"), "{error}");
+        assert!(error.len() < 8192, "diagnostic has {} bytes", error.len());
     }
 
     #[test]

@@ -22,9 +22,12 @@ pub struct GainMapStructure {
     pub primary_item_id: u32,
     pub tmap_item_id: u32,
     pub gain_map_item_id: u32,
+    /// Actual coded HEVC resource IDs in image order. A direct hvc1 Gain Map
+    /// contains its own item ID; a grid contains its dimg tile IDs.
     pub tile_item_ids: Vec<u32>,
     pub width: u32,
     pub height: u32,
+    /// Coded resource layout; direct hvc1 reports 1x1 without authoring a grid.
     pub rows: u32,
     pub columns: u32,
     pub channel_count: u8,
@@ -423,22 +426,10 @@ fn validate_meta_integrity<'a>(source: &[u8], meta: &'a ParsedMeta) -> Result<Me
     })
 }
 
-/// Validates the portable ISO-BMFF/HEVC structure emitted by XDRemux's direct
-/// tiled Gain Map writer. This intentionally does not claim Apple consumer
-/// recognition; ImageIO/Photos validation remains an Apple-platform gate.
-pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
-    let top = scan_top_level_boxes(source)?;
-    let _ftyp = one_top_level(&top.boxes, FTYP, "ftyp")?;
-    let meta_header = one_top_level(&top.boxes, META, "meta")?;
-    let _mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
-    let meta = parse_meta_box(source, meta_header)?;
-    let MetaIndex {
-        items,
-        locations,
-        ipma_by_item,
-        properties,
-    } = validate_meta_integrity(source, &meta)?;
-
+// Shared through structural validation with the Styles graph appender. Only tmap's
+// ordered dimg image relationship identifies the Gain Map; other auxl images
+// (alpha, semantic mattes, or Styles resources) never become candidates.
+fn gain_map_graph_roots(meta: &ParsedMeta) -> Result<(u32, u32)> {
     let tmap_items: Vec<_> = meta
         .iinf
         .entries
@@ -473,59 +464,121 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         )));
     }
     let gain_map_item_id = tmap_targets[1];
+    if gain_map_item_id == meta.primary_item_id
+        || gain_map_item_id == tmap_item_id
+        || tmap_item_id == meta.primary_item_id
+    {
+        return Err(invalid(
+            "primary, tmap, and Gain Map roles must use distinct item IDs",
+        ));
+    }
+    let gain_items = meta
+        .iinf
+        .entries
+        .iter()
+        .filter(|item| item.item_id == gain_map_item_id)
+        .collect::<Vec<_>>();
+    match gain_items.as_slice() {
+        [item] if matches!(item.item_type, Some(GRID) | Some(HVC1)) => {}
+        [_] => return Err(invalid("Gain Map image must be grid or hvc1")),
+        [] => {
+            return Err(invalid(format!(
+                "gain-map item {gain_map_item_id} is missing"
+            )))
+        }
+        _ => return Err(invalid("Gain Map item ID is ambiguous")),
+    }
+    Ok((tmap_item_id, gain_map_item_id))
+}
+
+/// Validate ISO-BMFF/HEVC Gain Map structure for direct hvc1 or tiled grid images.
+/// This does not claim Apple consumer recognition; ImageIO/Photos validation
+/// remains an Apple-platform gate.
+pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
+    let top = scan_top_level_boxes(source)?;
+    let _ftyp = one_top_level(&top.boxes, FTYP, "ftyp")?;
+    let meta_header = one_top_level(&top.boxes, META, "meta")?;
+    let _mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
+    let meta = parse_meta_box(source, meta_header)?;
+    let MetaIndex {
+        items,
+        locations,
+        ipma_by_item,
+        properties,
+    } = validate_meta_integrity(source, &meta)?;
+
+    let (tmap_item_id, gain_map_item_id) = gain_map_graph_roots(&meta)?;
+    let iref = meta
+        .iref
+        .as_ref()
+        .ok_or_else(|| invalid("tmap graph requires iref"))?;
     let gain_map_item = items
         .get(&gain_map_item_id)
         .copied()
         .ok_or_else(|| invalid(format!("gain-map item {gain_map_item_id} is missing")))?;
-    if gain_map_item.item_type != Some(GRID) {
-        return Err(invalid(format!(
-            "gain-map item {gain_map_item_id} is {:?}, expected grid",
-            gain_map_item.item_type
-        )));
-    }
-
     let gain_refs: Vec<_> = iref
         .entries
         .iter()
         .filter(|reference| reference.kind == DIMG && reference.from_item_id == gain_map_item_id)
         .collect();
-    if gain_refs.len() != 1 || gain_refs[0].to_item_ids.is_empty() {
-        return Err(invalid(format!(
-            "grid gain-map item {gain_map_item_id} must have exactly one non-empty dimg reference"
-        )));
-    }
-    let tile_item_ids = gain_refs[0].to_item_ids.clone();
-    let unique_tiles: HashSet<_> = tile_item_ids.iter().copied().collect();
-    if unique_tiles.len() != tile_item_ids.len() {
-        return Err(invalid("gain-map dimg reference repeats a tile item ID"));
-    }
-
     let gain_location = locations.get(&gain_map_item_id).copied().ok_or_else(|| {
         invalid(format!(
             "gain-map item {gain_map_item_id} has no iloc entry"
         ))
     })?;
-    let grid = parse_grid(&item_payload(source, meta.idat.as_ref(), gain_location)?)?;
-    let expected_tiles = grid
-        .rows
-        .checked_mul(grid.columns)
-        .ok_or_else(|| invalid("grid tile count overflows"))?;
-    if usize::try_from(expected_tiles).ok() != Some(tile_item_ids.len()) {
-        return Err(invalid(format!(
-            "grid declares {}x{} tiles but dimg contains {} items",
-            grid.rows,
-            grid.columns,
-            tile_item_ids.len()
-        )));
-    }
-
     let gain_ispe = associated_property(gain_map_item_id, ISPE, &ipma_by_item, &properties)?;
     let (ispe_width, ispe_height) = parse_ispe(source, gain_ispe)?;
-    if (ispe_width, ispe_height) != (grid.width, grid.height) {
-        return Err(invalid(format!(
-            "grid payload dimensions {}x{} disagree with ispe {}x{}",
-            grid.width, grid.height, ispe_width, ispe_height
-        )));
+    let (tile_item_ids, rows, columns) = match gain_map_item.item_type {
+        Some(GRID) => {
+            if gain_refs.len() != 1 || gain_refs[0].to_item_ids.is_empty() {
+                return Err(invalid(format!(
+                    "grid gain-map item {gain_map_item_id} must have exactly one non-empty dimg reference"
+                )));
+            }
+            let tile_item_ids = gain_refs[0].to_item_ids.clone();
+            let unique_tiles: HashSet<_> = tile_item_ids.iter().copied().collect();
+            if unique_tiles.len() != tile_item_ids.len() {
+                return Err(invalid("gain-map dimg reference repeats a tile item ID"));
+            }
+            let grid = parse_grid(&item_payload(source, meta.idat.as_ref(), gain_location)?)?;
+            let expected_tiles = grid
+                .rows
+                .checked_mul(grid.columns)
+                .ok_or_else(|| invalid("grid tile count overflows"))?;
+            if usize::try_from(expected_tiles).ok() != Some(tile_item_ids.len()) {
+                return Err(invalid(format!(
+                    "grid declares {}x{} tiles but dimg contains {} items",
+                    grid.rows,
+                    grid.columns,
+                    tile_item_ids.len()
+                )));
+            }
+            if (ispe_width, ispe_height) != (grid.width, grid.height) {
+                return Err(invalid(format!(
+                    "grid payload dimensions {}x{} disagree with ispe {}x{}",
+                    grid.width, grid.height, ispe_width, ispe_height
+                )));
+            }
+            (tile_item_ids, grid.rows, grid.columns)
+        }
+        Some(HVC1) => {
+            if !gain_refs.is_empty() {
+                return Err(invalid(
+                    "direct hvc1 Gain Map must not have a dimg reference",
+                ));
+            }
+            (vec![gain_map_item_id], 1, 1)
+        }
+        _ => return Err(invalid("Gain Map image must be grid or hvc1")),
+    };
+    if let Some(geometry) = crate::orientation::coded_geometry_if_present(source, &meta)? {
+        crate::orientation::require_coded_aspect(
+            geometry.width,
+            geometry.height,
+            ispe_width,
+            ispe_height,
+            "Gain Map",
+        )?;
     }
     let gain_pixi = associated_property(gain_map_item_id, PIXI, &ipma_by_item, &properties)?;
     let (channel_count, channel_bits) = parse_pixi(source, gain_pixi)?;
@@ -556,10 +609,37 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
                 tile_item.item_type
             )));
         }
-        let _ = locations
+        if *tile_item_id == meta.primary_item_id
+            || iref.entries.iter().any(|reference| {
+                reference.kind == DIMG
+                    && reference.from_item_id == meta.primary_item_id
+                    && reference.to_item_ids.contains(tile_item_id)
+            })
+        {
+            return Err(invalid(
+                "primary and Gain Map cannot share a coded resource",
+            ));
+        }
+        if iref
+            .entries
+            .iter()
+            .any(|reference| reference.kind == DIMG && reference.from_item_id == *tile_item_id)
+        {
+            return Err(invalid(format!(
+                "coded hvc1 item {tile_item_id} must not have a dimg reference"
+            )));
+        }
+        let location = locations
             .get(tile_item_id)
             .copied()
             .ok_or_else(|| invalid(format!("tile item {tile_item_id} has no iloc entry")))?;
+        // validate_meta_integrity has checked every extent against its actual
+        // backing bytes. Require nonempty coded data without copying payloads.
+        if location.extents.iter().all(|extent| extent.length == 0) {
+            return Err(invalid(format!(
+                "coded hvc1 item {tile_item_id} has an empty payload"
+            )));
+        }
         let _ = parse_ispe(
             source,
             associated_property(*tile_item_id, ISPE, &ipma_by_item, &properties)?,
@@ -607,10 +687,10 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         tmap_item_id,
         gain_map_item_id,
         tile_item_ids,
-        width: grid.width,
-        height: grid.height,
-        rows: grid.rows,
-        columns: grid.columns,
+        width: ispe_width,
+        height: ispe_height,
+        rows,
+        columns,
         channel_count,
         chroma_format_idc: codec.chroma_sampling.hevc_chroma_format_idc(),
         bit_depth: codec.luma_bit_depth,
@@ -646,6 +726,13 @@ mod tests {
         tile_extent_length: u64,
         grid_rows: u8,
         grid_columns: u8,
+        gain_item_type: FourCC,
+        primary_grid: bool,
+        gain_ispe_dimensions: (u32, u32),
+        gain_hvcc_count: usize,
+        gain_omit_property: Option<FourCC>,
+        gain_payload_length: Option<u64>,
+        extra_references: Vec<IrefEntry>,
     }
 
     impl Default for FixtureOptions {
@@ -661,6 +748,13 @@ mod tests {
                 tile_extent_length: 1,
                 grid_rows: 1,
                 grid_columns: 1,
+                gain_item_type: GRID,
+                primary_grid: false,
+                gain_ispe_dimensions: (4, 4),
+                gain_hvcc_count: 1,
+                gain_omit_property: None,
+                gain_payload_length: None,
+                extra_references: Vec::new(),
             }
         }
     }
@@ -682,10 +776,14 @@ mod tests {
     }
 
     fn fixture(options: FixtureOptions) -> Vec<u8> {
-        let primary_payload = [0xa1];
         let mut grid_payload = vec![0, 0, options.grid_rows - 1, options.grid_columns - 1];
         grid_payload.extend_from_slice(&4u16.to_be_bytes());
         grid_payload.extend_from_slice(&4u16.to_be_bytes());
+        let primary_payload = if options.primary_grid {
+            grid_payload.clone()
+        } else {
+            vec![0xa1]
+        };
         let tmap_payload = [0xb2];
         let tile_payload = [0xc3];
         let mut idat_payload = Vec::new();
@@ -698,7 +796,11 @@ mod tests {
         let tile_offset = idat_payload.len() as u64;
         idat_payload.extend_from_slice(&tile_payload);
 
-        let gain_ispe = make_ispe_box(4, 4).unwrap();
+        let gain_ispe = make_ispe_box(
+            options.gain_ispe_dimensions.0,
+            options.gain_ispe_dimensions.1,
+        )
+        .unwrap();
         let gain_pixi = pixi_box(options.gain_pixi_channels, options.gain_pixi_bit_depth);
         let tmap_ispe = make_ispe_box(4, 4).unwrap();
         let tmap_pixi = pixi_box(3, 8);
@@ -710,27 +812,46 @@ mod tests {
         );
         let mut ipco_payload = Vec::new();
         for property in [
-            &gain_ispe, &gain_pixi, &tmap_ispe, &tmap_pixi, &tile_ispe, &tile_hvcc,
+            &gain_ispe,
+            &gain_pixi,
+            &tmap_ispe,
+            &tmap_pixi,
+            &tile_ispe,
+            &tile_hvcc,
+            &tile_hvcc,
+            &make_ispe_box(4, 4).unwrap(),
         ] {
             ipco_payload.extend_from_slice(property);
         }
         let ipco = make_box(IPCO, &ipco_payload).unwrap();
+        let mut gain_associations = [(1, ISPE), (2, PIXI)]
+            .into_iter()
+            .filter(|(_, kind)| Some(*kind) != options.gain_omit_property)
+            .map(|(property_index, _)| IpmaAssociation {
+                property_index,
+                essential: false,
+            })
+            .collect::<Vec<_>>();
+        if options.gain_item_type == HVC1 && options.gain_omit_property != Some(HVCC) {
+            gain_associations.extend((0..options.gain_hvcc_count).map(|index| IpmaAssociation {
+                property_index: u16::try_from(6 + index).unwrap(),
+                essential: true,
+            }));
+        }
         let ipma = make_ipma_box(
             0,
             0,
             &[
                 IpmaEntry {
+                    item_id: PRIMARY_ID,
+                    associations: vec![IpmaAssociation {
+                        property_index: 8,
+                        essential: true,
+                    }],
+                },
+                IpmaEntry {
                     item_id: GAIN_ID,
-                    associations: vec![
-                        IpmaAssociation {
-                            property_index: 1,
-                            essential: false,
-                        },
-                        IpmaAssociation {
-                            property_index: 2,
-                            essential: false,
-                        },
-                    ],
+                    associations: gain_associations,
                 },
                 IpmaEntry {
                     item_id: TMAP_ID,
@@ -766,8 +887,13 @@ mod tests {
         let iprp = make_box(IPRP, &iprp_payload).unwrap();
 
         let infes = [
-            make_infe_box(PRIMARY_ID, HVC1, 0).unwrap(),
-            make_infe_box(GAIN_ID, GRID, 1).unwrap(),
+            make_infe_box(
+                PRIMARY_ID,
+                if options.primary_grid { GRID } else { HVC1 },
+                0,
+            )
+            .unwrap(),
+            make_infe_box(GAIN_ID, options.gain_item_type, 1).unwrap(),
             make_infe_box(TMAP_ID, TMAP, 0).unwrap(),
             make_infe_box(TILE_ID, HVC1, 1).unwrap(),
         ];
@@ -788,7 +914,7 @@ mod tests {
                     extents: vec![IlocExtent {
                         index: None,
                         offset: primary_offset,
-                        length: 1,
+                        length: primary_payload.len() as u64,
                     }],
                 },
                 IlocEntry {
@@ -799,7 +925,9 @@ mod tests {
                     extents: vec![IlocExtent {
                         index: None,
                         offset: gain_offset,
-                        length: grid_payload.len() as u64,
+                        length: options
+                            .gain_payload_length
+                            .unwrap_or(grid_payload.len() as u64),
                     }],
                 },
                 IlocEntry {
@@ -827,22 +955,20 @@ mod tests {
             ],
         )
         .unwrap();
-        let iref = make_iref_box(
-            0,
-            &[
-                IrefEntry {
-                    kind: DIMG,
-                    from_item_id: TMAP_ID,
-                    to_item_ids: options.tmap_targets,
-                },
-                IrefEntry {
-                    kind: DIMG,
-                    from_item_id: GAIN_ID,
-                    to_item_ids: options.gain_targets,
-                },
-            ],
-        )
-        .unwrap();
+        let mut references = vec![IrefEntry {
+            kind: DIMG,
+            from_item_id: TMAP_ID,
+            to_item_ids: options.tmap_targets,
+        }];
+        if options.gain_item_type == GRID || !options.gain_targets.is_empty() {
+            references.push(IrefEntry {
+                kind: DIMG,
+                from_item_id: GAIN_ID,
+                to_item_ids: options.gain_targets,
+            });
+        }
+        references.extend(options.extra_references);
+        let iref = make_iref_box(0, &references).unwrap();
         let idat = make_box(IDAT, &idat_payload).unwrap();
 
         let mut meta_payload = vec![0, 0, 0, 0];
@@ -853,6 +979,127 @@ mod tests {
         let ftyp = make_box(FTYP, b"mif1\0\0\0\0").unwrap();
         let mdat = make_box(MDAT, &[]).unwrap();
         [ftyp, meta, mdat].concat()
+    }
+
+    fn direct_gain_options() -> FixtureOptions {
+        FixtureOptions {
+            gain_item_type: HVC1,
+            gain_targets: Vec::new(),
+            ..FixtureOptions::default()
+        }
+    }
+
+    #[test]
+    fn direct_gain_map_reports_its_actual_coded_resource_and_precision() {
+        for (chroma, channels, depth) in [(0, 1, 8), (1, 3, 8), (2, 3, 10), (3, 3, 10)] {
+            let source = fixture(FixtureOptions {
+                gain_pixi_channels: channels,
+                hvcc_chroma: chroma,
+                gain_pixi_bit_depth: depth,
+                hvcc_luma_bit_depth: depth,
+                hvcc_chroma_bit_depth: depth,
+                ..direct_gain_options()
+            });
+            let actual = validate_gain_map_structure(&source).unwrap();
+            assert_eq!(actual.gain_map_item_id, GAIN_ID);
+            assert_eq!(actual.tile_item_ids, vec![GAIN_ID]);
+            assert_eq!(
+                (actual.width, actual.height, actual.rows, actual.columns),
+                (4, 4, 1, 1)
+            );
+            assert_eq!(actual.channel_count, channels);
+            assert_eq!(actual.chroma_format_idc, chroma);
+            assert_eq!(
+                (actual.luma_bit_depth, actual.chroma_bit_depth),
+                (depth, depth)
+            );
+        }
+    }
+
+    #[test]
+    fn direct_gain_map_rejects_incomplete_ambiguous_or_conflicting_resources() {
+        for case in [
+            "derived",
+            "empty derived",
+            "missing hvcC",
+            "duplicate hvcC",
+            "missing pixi",
+            "missing ispe",
+            "empty payload",
+            "outside payload",
+            "channels",
+            "precision",
+            "geometry",
+            "primary alias",
+            "primary coded alias",
+            "tmap alias",
+            "unknown type",
+            "unknown reference",
+            "duplicate tmap",
+        ] {
+            let mut options = direct_gain_options();
+            match case {
+                "derived" => options.gain_targets = vec![TILE_ID],
+                "empty derived" => options.extra_references.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: GAIN_ID,
+                    to_item_ids: Vec::new(),
+                }),
+                "missing hvcC" => options.gain_omit_property = Some(HVCC),
+                "duplicate hvcC" => options.gain_hvcc_count = 2,
+                "missing pixi" => options.gain_omit_property = Some(PIXI),
+                "missing ispe" => options.gain_omit_property = Some(ISPE),
+                "empty payload" => options.gain_payload_length = Some(0),
+                "outside payload" => options.gain_payload_length = Some(9999),
+                "channels" => options.hvcc_chroma = 0,
+                "precision" => options.gain_pixi_bit_depth = 10,
+                "geometry" => options.gain_ispe_dimensions = (4, 2),
+                "primary alias" => options.tmap_targets = vec![PRIMARY_ID, PRIMARY_ID],
+                "primary coded alias" => {
+                    options.primary_grid = true;
+                    options.extra_references.push(IrefEntry {
+                        kind: DIMG,
+                        from_item_id: PRIMARY_ID,
+                        to_item_ids: vec![GAIN_ID],
+                    });
+                }
+                "tmap alias" => options.tmap_targets = vec![PRIMARY_ID, TMAP_ID],
+                "unknown type" => options.gain_item_type = FourCC::new(*b"jpeg"),
+                "unknown reference" => options.extra_references.push(IrefEntry {
+                    kind: FourCC::new(*b"auxl"),
+                    from_item_id: GAIN_ID,
+                    to_item_ids: vec![99],
+                }),
+                "duplicate tmap" => options.extra_references.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: TMAP_ID,
+                    to_item_ids: vec![PRIMARY_ID, GAIN_ID],
+                }),
+                _ => unreachable!(),
+            }
+            let expected = match case {
+                "derived" | "empty derived" => "must not have a dimg reference",
+                "missing hvcC" => "missing hvcC",
+                "duplicate hvcC" => "more than one hvcC",
+                "missing pixi" => "missing pixi",
+                "missing ispe" => "missing ispe",
+                "empty payload" => "empty payload",
+                "outside payload" => "exceeds its backing storage",
+                "channels" => "implies 1",
+                "precision" => "disagree with hvcC",
+                "geometry" => "does not match primary coded orientation",
+                "primary alias" | "tmap alias" => "distinct item IDs",
+                "primary coded alias" => "cannot share a coded resource",
+                "unknown type" => "must be grid or hvc1",
+                "unknown reference" => "targets unknown item 99",
+                "duplicate tmap" => "exactly one dimg reference",
+                _ => unreachable!(),
+            };
+            let error = validate_gain_map_structure(&fixture(options))
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(expected), "{case}: {error}");
+        }
     }
 
     #[test]

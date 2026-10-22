@@ -26,6 +26,18 @@ XDRemux 只有一套产品栈：Rust `xdremux` CLI、runtime、engine 和媒体 
 
 先直接编写并定稿英文 canonical 文档，再把相同技术范围和限制翻译成中文。
 
+## 项目技能与自动检查
+
+按各自适用条件使用项目级 [pstack 流程](.agents/skills/pstack-workflow/SKILL.md)、[行为 TDD](.agents/skills/pstack-tdd/SKILL.md)、[工程原则](.agents/skills/pstack-engineering-principles/SKILL.md)、[审查](.agents/skills/pstack-review/SKILL.md)和[文字整理](.agents/skills/pstack-unslop/SKILL.md)。这些是固定版本的项目适配，不依赖 Cursor 运行环境。实际 CLI 验证与证据选择见 [XDRemux 验证](.agents/skills/xdremux-verify/SKILL.md)。
+
+| 契约 | 执行检查 |
+| --- | --- |
+| HDR 资源与方向变换关系 | HEIF/codec 图与 RGB16 回归；`ci.yml` 中的 ImageIO 回读。 |
+| 原生执行和编辑状态完整 | Texture 回执/状态回归及原生 consumer 检查。 |
+| 失败或并发发布保留媒体 | runtime batch 与 Live Photo 负例；App 模型测试。 |
+| 证据对应实际源码与环境 | 现有准确 HEAD 完成门禁；原生/真机结论必须在相应环境证明。 |
+| 可复用 CI 所有者 | 工作流配置测试要求产品检查归 `ci.yml`，实验归 `research.yml`。 |
+
 ## 研究生命周期
 
 产品实现、稳定研究证据和诊断 probe 是三类不同资产。每个实验都必须进入一种终态：

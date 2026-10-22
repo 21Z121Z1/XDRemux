@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "skill": "pstack-engineering-principles",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/principle-boundary-discipline/SKILL.md",
+      "git_blob": "dfe9a6fb0e5acd6ae43a41437ee0951adfe839cb",
+      "sha256": "62ac2862c2caa22dd14531f51c9c6bb445ceb198ca98a687e25b4d47c1f10a28",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/principle-boundary-discipline/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/principle-fix-root-causes/SKILL.md",
+      "git_blob": "14fc189fa1ec3fb1614b0a3c75557f92943d8f13",
+      "sha256": "8df3c8c3fe57eb0055a5c8efab8ab144557fdf301da70b1cdc77a3a3ef3f3052",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/principle-fix-root-causes/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/principle-subtract-before-you-add/SKILL.md",
+      "git_blob": "b8740ba6f06922d8e7ef3b23f9fb16e0fc4a876f",
+      "sha256": "8c93bb9d1a7f38e2ef37655d93f0e790fa59903105af3d500cc8a663ebe45f3f",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/principle-subtract-before-you-add/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/principle-test-behavior-not-implementation/SKILL.md",
+      "git_blob": "78c9389bfe707d6d56485ade32c59150958228f9",
+      "sha256": "f7223698623b6a26fea49c751e466b38e6691b1f32ce841d3983e7ffbe2b74a6",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/principle-test-behavior-not-implementation/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/principle-prove-it-works/SKILL.md",
+      "git_blob": "5dc14a3b06f9d579e5c17cd8a7242f432ddb3125",
+      "sha256": "ec79a15025bac8d33d62011c54f3b612733fd2a024e623b531b3637aa75070e2",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/principle-prove-it-works/SKILL.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md"
+  ],
+  "adaptation": "Consolidate five applicable principles. Explicitly retain media, file, helper, native-framework and final-byte validation boundaries, fail-closed behavior, public compatibility and publication safety."
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Research-only, byte-exact Styles v15 -> v16 single-variable carrier probe.
+"""Research-only, byte-exact Styles v15/v16 single-variable carrier probe.
 
 The version patch generates no Texture resources. It preserves resources that
 the input already contains. It is not a product converter or a Photos UI test.
@@ -12,9 +12,16 @@ import json
 from pathlib import Path
 import plistlib
 import struct
+import sys
+
+# Keep the original file entry point as well as `python -m` usable.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from scripts.diagnostics.inspect_oppo_heif import box_header
 
 
-def root_version_offset(plist: bytes) -> int:
+def root_version_offset(plist: bytes, expected_version: int = 15) -> int:
     if not plist.startswith(b"bplist00") or len(plist) < 40:
         raise ValueError("Styles payload is not a binary property list")
     offset_bytes, ref_bytes, count, root_index, table = struct.unpack(
@@ -61,27 +68,30 @@ def root_version_offset(plist: bytes) -> int:
         if plist[pos:pos + 2] != bytes((0x51, 0x30)):  # ASCII string "0"
             continue
         pos = offsets[value_index]
-        if plist[pos] != 0x10 or plist[pos + 1] != 15:
-            raise ValueError("Styles version is not a one-byte integer 15")
+        if plist[pos] != 0x10 or plist[pos + 1] != expected_version:
+            raise ValueError("Styles version is not the expected one-byte integer")
         return pos + 1
     raise ValueError("Styles root version key '0' was not found")
 
 
-def change_only_version(payload: bytes) -> bytes:
+def change_only_version(payload: bytes, target_version: int = 16) -> bytes:
+    if target_version not in (15, 16):
+        raise ValueError("Only v15/v16 version-byte probes are supported")
+    source_version = 15 if target_version == 16 else 16
     original = plistlib.loads(payload)
-    if not isinstance(original, dict) or original.get("0") != 15:
-        raise ValueError("Source Styles version is not 15")
+    if not isinstance(original, dict) or original.get("0") != source_version:
+        raise ValueError("Source Styles version differs from expected version")
     changed = bytearray(payload)
-    changed[root_version_offset(payload)] = 16
+    changed[root_version_offset(payload, source_version)] = target_version
     result = plistlib.loads(changed)
-    if result != {**original, "0": 16}:
+    if result != {**original, "0": target_version}:
         raise ValueError("Version patch changed an unrelated property-list field")
     if sum(a != b for a, b in zip(payload, changed)) != 1:
         raise ValueError("Version patch did not change exactly one byte")
     return bytes(changed)
 
 
-def patch_heic(source: bytes, inspection: dict) -> tuple[bytes, dict]:
+def _style_metadata_extent(source: bytes, inspection: dict) -> tuple[int, int]:
     items = [
         item for item in inspection["items"]
         if item.get("type") == "uri " and item.get("name") == "styleMetadata"
@@ -97,18 +107,38 @@ def patch_heic(source: bytes, inspection: dict) -> tuple[bytes, dict]:
         raise ValueError("Styles metadata is not local")
     extent = extents[0]
     method = location.get("construction_method", 1)
-    start = extent["offset"]  # The inspector already resolves base_offset.
+    offset, length = extent["offset"], extent["length"]
+    if not isinstance(offset, int) or not isinstance(length, int) or offset < 0 or length <= 0:
+        raise ValueError("Invalid Styles metadata extent")
+    start = offset  # The inspector already resolves base_offset.
+    limit = len(source)
     if method == 1:
         if len(idats) != 1:
             raise ValueError("Expected one idat box for an idat extent")
-        start += idats[0]["start"] + 8
+        kind, payload_start, limit, _ = box_header(source, idats[0]["start"], len(source))
+        if kind != "idat":
+            raise ValueError("Styles idat location does not identify an idat box")
+        start += payload_start
     elif method != 0:
         raise ValueError("Unsupported Styles construction method")
-    end = start + extent["length"]
-    if start < 0 or end > len(source) or start >= end:
+    end = start + length
+    if end > limit or start >= end:
         raise ValueError("Styles extent is outside the source container")
+    return start, end
+
+
+def style_metadata_payload(source: bytes, inspection: dict) -> bytes:
+    """Read the single Styles payload without assuming its storage method."""
+    start, end = _style_metadata_extent(source, inspection)
+    return source[start:end]
+
+
+def patch_heic(
+    source: bytes, inspection: dict, target_version: int = 16
+) -> tuple[bytes, dict]:
+    start, end = _style_metadata_extent(source, inspection)
     original = source[start:end]
-    changed = change_only_version(original)
+    changed = change_only_version(original, target_version)
     patched = source[:start] + changed + source[end:]
     if len(patched) != len(source):
         raise ValueError("A single-variable experiment cannot resize the HEIF")
@@ -120,8 +150,8 @@ def patch_heic(source: bytes, inspection: dict) -> tuple[bytes, dict]:
         "source_sha256": hashlib.sha256(source).hexdigest(),
         "candidate_sha256": hashlib.sha256(patched).hexdigest(),
         "changed_byte_offset": differences[0],
-        "before": 15,
-        "after": 16,
+        "before": 15 if target_version == 16 else 16,
+        "after": target_version,
         "other_bytes_identical": True,
         "scope": "structural/native-parser diagnostic, not active Photos editing",
     }
@@ -134,10 +164,11 @@ def main() -> None:
     parser.add_argument("--inspect", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--target-version", type=int, choices=(15, 16), default=16)
     args = parser.parse_args()
     source = args.input.read_bytes()
     inspection = json.loads(args.inspect.read_text(encoding="utf-8"))
-    changed, receipt = patch_heic(source, inspection)
+    changed, receipt = patch_heic(source, inspection, args.target_version)
     if args.output.exists() or args.report.exists():
         parser.error("Refusing to overwrite an existing output or report")
     args.output.write_bytes(changed)

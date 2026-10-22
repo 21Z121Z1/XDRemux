@@ -18,7 +18,7 @@ changed="$work/styles-v16-version-only.heic"
 XDREMUX_APPLE_ADAPTER="$adapter" "$cli" convert \
   --input "$fixture" --output "$original" --apple-styles
 python3 scripts/diagnostics/inspect_oppo_heif.py "$original" --json > "$work/inspect-v15.json"
-python3 research/oppo_styles/tools/probe_style_version.py \
+python3 -m research.oppo_styles.tools.probe_style_version \
   --input "$original" --inspect "$work/inspect-v15.json" \
   --output "$changed" --report "$work/byte-change.json"
 "$cli" validate "$original" >/dev/null

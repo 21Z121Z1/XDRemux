@@ -153,15 +153,17 @@ def load_plan(path: Path) -> dict[str, Any]:
 
 def enforce_evidence_policy(plan: dict[str, Any], files: list[str]) -> dict[str, bool]:
     kinds = {check["kind"] for check in plan["checks"]}
-    production_changed = any(
-        path.startswith(PRODUCTION_PREFIXES) or path in PRODUCT_BUILD_INPUTS for path in files
-    )
     build_changed = any(
         path in PRODUCT_BUILD_INPUTS
         or path.startswith(".cargo/")
+        or (path.startswith("scripts/distribution/")
+            and (Path(path).suffix in SOURCE_SUFFIXES or path.endswith(".json")))
         or (path.startswith(PRODUCTION_PREFIXES)
             and (Path(path).name in PRODUCT_BUILD_INPUTS or path.endswith(".pbxproj")))
         for path in files
+    )
+    production_changed = build_changed or any(
+        path.startswith(PRODUCTION_PREFIXES) for path in files
     )
     source_changed = build_changed or any(Path(path).suffix in SOURCE_SUFFIXES for path in files)
     if source_changed and "regression" not in kinds:

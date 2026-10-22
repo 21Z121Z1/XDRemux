@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "skill": "pstack-workflow",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/poteto-mode/SKILL.md",
+      "git_blob": "21993f546032ca37671d5f1caf39c9a82ab4fa9d",
+      "sha256": "2755f102e7a6d0496b429d1031a22fb353e1f3d523543367caeaae5c4ed6f544",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/poteto-mode/playbooks/investigation.md",
+      "git_blob": "cd119f04f23e0b7acb3f8cc5ba13ce4ab7aa6c7d",
+      "sha256": "dc66bcf6af3a074fc7f67aa5e12b93ef571a4fb4d8e17f2f1af5ae5359f42e46",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/poteto-mode/playbooks/investigation.md"
+    },
+    {
+      "path": "pstack/skills/poteto-mode/playbooks/bug-fix.md",
+      "git_blob": "b5de0bfa63add6ed38a38a8bd668cf36ac009c61",
+      "sha256": "66e26542dad131cfd7df80ac0cdf81ed4d85e7b5e3f0eb65b933888760c4831f",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/poteto-mode/playbooks/bug-fix.md"
+    },
+    {
+      "path": "pstack/skills/poteto-mode/playbooks/refactoring.md",
+      "git_blob": "c04b07eeb8b8fa651d080729363466ab73d2fe40",
+      "sha256": "0f5dd38113379ea8cf61e2182eca0a7478eea9a869eb40c2dddab3335aeca197",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "path": "pstack/skills/poteto-mode/playbooks/feature.md",
+      "git_blob": "eb1040cb2631f3eeacd8f9f6469d7e97277f24ef",
+      "sha256": "af8ce700b99953741cb547e34308fde0cf6b98ce67e1652c800d0deedf53aba1",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/poteto-mode/playbooks/feature.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md",
+    "references/playbooks.md",
+    "references/verification.md"
+  ],
+  "adaptation": "Use the available Codex tools, session permissions and inherited model settings. Keep four scoped playbooks, proportional planning, actual artifact verification and the existing completion gate. Remove automatic delegation, external actions, setup, commit/PR/shipping steps and dependency-plugin requirements."
+}

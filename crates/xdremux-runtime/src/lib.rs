@@ -10,8 +10,11 @@ mod batch;
 mod batch_checkpoint;
 mod categorize;
 mod live_photo;
+mod live_photo_package;
 mod oppo_portrait;
 mod oppo_tail;
+#[cfg(target_os = "macos")]
+mod system_heif_hdr;
 mod validation;
 
 #[cfg(target_os = "macos")]
@@ -35,7 +38,11 @@ pub fn validate_apple_styles_file(
 }
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
+pub use live_photo_package::validate_still_output_path;
+pub use live_photo_package::LivePhotoPackagePublicationError;
 pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflight};
+#[cfg(target_os = "macos")]
+pub use system_heif_hdr::SystemHeifHdrReport;
 pub use validation::{
     validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
@@ -207,6 +214,7 @@ impl PortableRuntime {
         use std::fs::File;
         use std::io::Read;
 
+        live_photo_package::validate_output_parent(output.as_ref())?;
         let input = input
             .as_ref()
             .canonicalize()
@@ -381,6 +389,30 @@ impl PortableRuntime {
         output: impl AsRef<Path>,
     ) -> Result<PhotographicStylesFileReceipt> {
         apple_styles::convert_file(self, executable, source, output)
+    }
+
+    /// Encode one SDR/HDR pair with Core Image's gain-map calculation.
+    ///
+    /// This is the opt-in measurement primitive. It does not publish a Styles
+    /// graph and it does not replace the default product encoder.
+    #[cfg(target_os = "macos")]
+    pub fn measure_system_heif_hdr_pair(
+        &self,
+        executable: impl AsRef<Path>,
+        sdr_linear: &[f32],
+        hdr_linear: &[f32],
+        width: u32,
+        height: u32,
+        output: impl AsRef<Path>,
+    ) -> Result<SystemHeifHdrReport> {
+        system_heif_hdr::measure_system_heif_hdr_pair(
+            executable.as_ref(),
+            sdr_linear,
+            hdr_linear,
+            width,
+            height,
+            output.as_ref(),
+        )
     }
 
     #[cfg(target_os = "macos")]
@@ -619,6 +651,7 @@ impl PortableRuntime {
     where
         Observe: FnMut(ExecutionStage),
     {
+        validate_still_output_path(output.as_ref())?;
         let prepared = self.analyze_proxdr(source)?;
         let capabilities = self.capability_inventory()?;
         let mut builder = ProXdrArtifactBuilder {
@@ -657,6 +690,7 @@ impl PortableRuntime {
             source,
             input.as_ref(),
             output.as_ref(),
+            xdremux_engine::LivePhotoOutput::Pair,
         )
     }
 
@@ -680,7 +714,14 @@ impl PortableRuntime {
                 "Apple Portrait and Photographic Styles intents apply to ProXDR still images and cannot be combined with Motion Photo conversion",
             ));
         }
-        self.convert_motion_photo_file(source, input, output)
+        live_photo::convert_motion_photo_file(
+            &self.jpeg,
+            &self.heif,
+            source,
+            input.as_ref(),
+            output.as_ref(),
+            request.live_photo_output,
+        )
     }
 
     /// Publish a Rust-assembled Photographic Styles graph as one atomic file.

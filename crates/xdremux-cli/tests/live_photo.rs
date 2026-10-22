@@ -67,7 +67,9 @@ fn exercise(relative: &str, expect_gain_map: bool) {
         validate_gain_map_structure(&still)
             .unwrap_or_else(|error| panic!("{relative}: final Gain Map graph invalid: {error}"));
     }
-    assert!(String::from_utf8(stdout).unwrap().contains(" + "));
+    let message = String::from_utf8(stdout).unwrap();
+    assert!(message.contains(" + "));
+    assert!(message.contains("source resources remain only in the original input"));
     fs::remove_dir_all(dir).unwrap();
 }
 

@@ -11,6 +11,7 @@ struct VideoToolboxMain10Request: Decodable {
     let rawWidth: UInt32
     let rawHeight: UInt32
     let rawBytesPerRow: UInt32
+    let rawComponentBits: UInt32
     let quality: Double
     let hvccPath: String
 
@@ -18,6 +19,7 @@ struct VideoToolboxMain10Request: Decodable {
         case rawWidth = "raw_width"
         case rawHeight = "raw_height"
         case rawBytesPerRow = "raw_bytes_per_row"
+        case rawComponentBits = "raw_component_bits"
         case quality
         case hvccPath = "hvcc_path"
     }
@@ -268,66 +270,135 @@ private let main10CompressionCallback: VTCompressionOutputCallback = {
     }
 }
 
+private func attachMain10ColorTags(_ buffer: CVPixelBuffer) {
+    let tags: [(CFString, CFString)] = [
+        (kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2),
+        (kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2),
+        (kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_601_4),
+    ]
+    for (key, value) in tags {
+        CVBufferSetAttachment(buffer, key, value, .shouldPropagate)
+    }
+}
+
+/// Copy 16-bit little-endian RGB Apple Log codes into a 16-bit RGBA buffer,
+/// then let VideoToolbox move those codes into 10-bit biplanar video-range
+/// YUV. The color tags stay the existing 709 / 709 / 601 identification.
+/// This is not an sRGB, PQ, HLG, or linear retag, and it does not quantize
+/// the codes to 8-bit before the Main10 encode.
 private func makeMain10PixelBuffer(
     data: Data,
     width: Int,
     height: Int,
     bytesPerRow: Int
 ) throws -> CVPixelBuffer {
+    guard width > 0, height > 0, width % 2 == 0, height % 2 == 0 else {
+        throw main10Error("raw RGB16 raster geometry must be non-zero and even")
+    }
     let expectedBytes = bytesPerRow.multipliedReportingOverflow(by: height)
     guard !expectedBytes.overflow, data.count == expectedBytes.partialValue else {
-        throw main10Error("raw RGB8 raster length does not match its geometry")
+        throw main10Error("raw RGB16 raster length does not match its geometry")
     }
-    guard bytesPerRow >= width * 3 else {
-        throw main10Error("raw RGB8 raster row is shorter than width * 3")
+    guard bytesPerRow >= width * 6 else {
+        throw main10Error("raw RGB16 raster row is shorter than width * 6")
     }
 
-    let attributes: CFDictionary = [
-        kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+    let sourceAttributes: CFDictionary = [
+        kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_64RGBALE,
         kCVPixelBufferWidthKey: width,
         kCVPixelBufferHeightKey: height,
         kCVPixelBufferIOSurfacePropertiesKey: [:],
     ] as CFDictionary
-    var pixelBuffer: CVPixelBuffer?
+    var sourceBuffer: CVPixelBuffer?
     try checkMain10Status(
         CVPixelBufferCreate(
             kCFAllocatorDefault,
             width,
             height,
-            kCVPixelFormatType_32BGRA,
-            attributes,
-            &pixelBuffer
+            kCVPixelFormatType_64RGBALE,
+            sourceAttributes,
+            &sourceBuffer
         ),
-        "CVPixelBufferCreate failed"
+        "CVPixelBufferCreate failed for 16-bit RGB"
     )
-    guard let pixelBuffer else {
+    guard let sourceBuffer else {
         throw main10Error("CVPixelBufferCreate returned nil")
     }
-
-    let lockStatus = CVPixelBufferLockBaseAddress(pixelBuffer, [])
-    try checkMain10Status(lockStatus, "CVPixelBufferLockBaseAddress failed")
-    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-    guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+    try checkMain10Status(
+        CVPixelBufferLockBaseAddress(sourceBuffer, []),
+        "CVPixelBufferLockBaseAddress failed"
+    )
+    var sourceLocked = true
+    defer {
+        if sourceLocked {
+            CVPixelBufferUnlockBaseAddress(sourceBuffer, [])
+        }
+    }
+    guard let baseAddress = CVPixelBufferGetBaseAddress(sourceBuffer) else {
         throw main10Error("VideoToolbox pixel buffer has no base address")
     }
-    let destination = baseAddress.assumingMemoryBound(to: UInt8.self)
-    let destinationBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+    let destination = baseAddress.assumingMemoryBound(to: UInt16.self)
+    let destinationBytesPerRow = CVPixelBufferGetBytesPerRow(sourceBuffer)
+    guard destinationBytesPerRow >= width * 8, destinationBytesPerRow % 2 == 0 else {
+        throw main10Error("16-bit RGBA pixel buffer row is shorter than width * 8")
+    }
     data.withUnsafeBytes { rawBuffer in
         let source = rawBuffer.baseAddress!.assumingMemoryBound(to: UInt8.self)
         for y in 0..<height {
             let sourceRow = source.advanced(by: y * bytesPerRow)
-            let destinationRow = destination.advanced(by: y * destinationBytesPerRow)
+            let destinationRow = destination.advanced(by: y * destinationBytesPerRow / 2)
             for x in 0..<width {
-                let sourcePixel = sourceRow.advanced(by: x * 3)
+                let sourcePixel = sourceRow.advanced(by: x * 6)
                 let destinationPixel = destinationRow.advanced(by: x * 4)
-                destinationPixel[0] = sourcePixel[2]
-                destinationPixel[1] = sourcePixel[1]
-                destinationPixel[2] = sourcePixel[0]
-                destinationPixel[3] = 0xff
+                destinationPixel[0] = UInt16(sourcePixel[0]) | (UInt16(sourcePixel[1]) << 8)
+                destinationPixel[1] = UInt16(sourcePixel[2]) | (UInt16(sourcePixel[3]) << 8)
+                destinationPixel[2] = UInt16(sourcePixel[4]) | (UInt16(sourcePixel[5]) << 8)
+                destinationPixel[3] = 0xffff
             }
         }
     }
-    return pixelBuffer
+    CVPixelBufferUnlockBaseAddress(sourceBuffer, [])
+    sourceLocked = false
+    attachMain10ColorTags(sourceBuffer)
+
+    let encodedAttributes: CFDictionary = [
+        kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+        kCVPixelBufferWidthKey: width,
+        kCVPixelBufferHeightKey: height,
+        kCVPixelBufferIOSurfacePropertiesKey: [:],
+    ] as CFDictionary
+    var encodedBuffer: CVPixelBuffer?
+    try checkMain10Status(
+        CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+            encodedAttributes,
+            &encodedBuffer
+        ),
+        "CVPixelBufferCreate failed for 10-bit video-range YUV"
+    )
+    guard let encodedBuffer else {
+        throw main10Error("CVPixelBufferCreate returned nil")
+    }
+    attachMain10ColorTags(encodedBuffer)
+    var transfer: VTPixelTransferSession?
+    try checkMain10Status(
+        VTPixelTransferSessionCreate(
+            allocator: kCFAllocatorDefault,
+            pixelTransferSessionOut: &transfer
+        ),
+        "VTPixelTransferSessionCreate failed"
+    )
+    guard let transfer else {
+        throw main10Error("VTPixelTransferSessionCreate returned nil")
+    }
+    try checkMain10Status(
+        VTPixelTransferSessionTransferImage(transfer, from: sourceBuffer, to: encodedBuffer),
+        "VTPixelTransferSessionTransferImage failed"
+    )
+    return encodedBuffer
 }
 
 /// Run exactly the non-tiled VideoToolbox Main10 primitive used by the
@@ -338,7 +409,10 @@ func encodeVideoToolboxMain10(
     configuration: VideoToolboxMain10Request
 ) throws -> VideoToolboxMain10Facts {
     guard configuration.rawWidth > 0, configuration.rawHeight > 0 else {
-        throw main10Error("raw RGB8 raster geometry must be non-zero")
+        throw main10Error("raw RGB16 raster geometry must be non-zero")
+    }
+    guard configuration.rawComponentBits == 16 else {
+        throw main10Error("VideoToolbox input must be 16-bit Apple Log RGB codes")
     }
     guard configuration.quality.isFinite, (0.0...1.0).contains(configuration.quality) else {
         throw main10Error("VideoToolbox quality must be finite and within 0 through 1")
@@ -349,8 +423,8 @@ func encodeVideoToolboxMain10(
     let width = Int(configuration.rawWidth)
     let height = Int(configuration.rawHeight)
     let bytesPerRow = Int(configuration.rawBytesPerRow)
-    guard width <= Int.max / 4, height <= Int.max / max(bytesPerRow, 1) else {
-        throw main10Error("raw RGB8 raster geometry overflows")
+    guard width <= Int.max / 8, height <= Int.max / max(bytesPerRow, 1) else {
+        throw main10Error("raw RGB16 raster geometry overflows")
     }
     let data = try Data(contentsOf: URL(fileURLWithPath: inputPath), options: [.mappedIfSafe])
     let pixelBuffer = try makeMain10PixelBuffer(

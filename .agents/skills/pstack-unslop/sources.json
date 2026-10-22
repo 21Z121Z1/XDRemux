@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "skill": "pstack-unslop",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/unslop/SKILL.md",
+      "git_blob": "97f5b6412148fa5b2a2fe478836fe8923ffa5cbb",
+      "sha256": "ccab208e315ce05e2fab8eeee2f7879f1289b5c6844840b2d307adf31c79144f",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/unslop/SKILL.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md"
+  ],
+  "adaptation": "Preserve meaning, evidence and technical identifiers. Apply style only to authored prose, with XDRemux bilingual documentation scope and exact machine-output/license exclusions."
+}

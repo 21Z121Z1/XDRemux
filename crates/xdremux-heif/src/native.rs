@@ -18,6 +18,7 @@ const TMAP: FourCC = FourCC::new(*b"tmap");
 const MIME: FourCC = FourCC::new(*b"mime");
 const ISPE: FourCC = FourCC::new(*b"ispe");
 const IROT: FourCC = FourCC::new(*b"irot");
+const IMIR: FourCC = FourCC::new(*b"imir");
 const COLR: FourCC = FourCC::new(*b"colr");
 const PIXI: FourCC = FourCC::new(*b"pixi");
 const AUXC: FourCC = FourCC::new(*b"auxC");
@@ -391,6 +392,14 @@ fn build_iprp(
     let mut next_property_index = u16::try_from(properties.len() + 1)
         .map_err(|_| invalid("source ipco property count exceeds u16"))?;
 
+    let geometry = crate::orientation::coded_geometry(source, meta)?;
+    crate::orientation::require_coded_aspect(
+        geometry.width,
+        geometry.height,
+        gain.gain_map_width,
+        gain.gain_map_height,
+        "Gain Map",
+    )?;
     let primary_ispe = associated_property_index(meta, meta.primary_item_id, ISPE)
         .ok_or_else(|| invalid("primary item has no ispe property association"))?;
     let irot = match associated_property_index(meta, meta.primary_item_id, IROT) {
@@ -401,6 +410,33 @@ fn build_iprp(
             &make_irot_box(0)?,
         )?,
     };
+    let (display_width, display_height) = crate::orientation::display_dimensions(
+        geometry.width,
+        geometry.height,
+        geometry.quarter_turns_ccw,
+    );
+    let tmap_ispe = if (display_width, display_height) == (geometry.width, geometry.height) {
+        primary_ispe
+    } else {
+        append_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            &make_ispe_box(display_width, display_height)?,
+        )?
+    };
+    // Apple and Samsung rotated photos declare the tone-map item at the
+    // display size with irot 0. The gain map keeps the primary irot and the
+    // coded pixel grid.
+    let tmap_irot = if geometry.quarter_turns_ccw == 0 {
+        irot
+    } else {
+        append_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            &make_irot_box(0)?,
+        )?
+    };
+    let imir = associated_property_index(meta, meta.primary_item_id, IMIR);
     let auxc = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -512,6 +548,27 @@ fn build_iprp(
             },
         ],
     });
+    if let Some(imir) = imir {
+        let associations = &mut ipma_entries
+            .last_mut()
+            .expect("gain-map ipma entry was just pushed")
+            .associations;
+        let position = if geometry.mirror_before_rotation {
+            associations
+                .iter()
+                .position(|association| association.property_index == irot)
+                .expect("primary irot association was just added")
+        } else {
+            associations.len()
+        };
+        associations.insert(
+            position,
+            IpmaAssociation {
+                property_index: imir,
+                essential: true,
+            },
+        );
+    }
     ipma_entries.push(IpmaEntry {
         item_id: graph.ids.tmap_id,
         associations: vec![
@@ -520,7 +577,7 @@ fn build_iprp(
                 essential: true,
             },
             IpmaAssociation {
-                property_index: primary_ispe,
+                property_index: tmap_ispe,
                 essential: false,
             },
             IpmaAssociation {
@@ -528,7 +585,7 @@ fn build_iprp(
                 essential: false,
             },
             IpmaAssociation {
-                property_index: irot,
+                property_index: tmap_irot,
                 essential: true,
             },
         ],

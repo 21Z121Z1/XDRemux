@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use xdremux_motion_photo::{
-    read_apple_content_identifier, read_live_photo_content_identifier, read_live_photo_still_time,
-    validate_live_photo_movie,
+    apple, read_apple_content_identifier, read_live_photo_content_identifier,
+    read_live_photo_still_time, validate_live_photo_movie, Input, MotionPhoto, ParseOptions,
 };
 use xdremux_runtime::PortableRuntime;
 
@@ -39,6 +39,16 @@ fn real_samsung_heif_motion_photo_becomes_valid_live_photo_pair() {
     assert_eq!(movie_id, receipt.content_identifier);
     let still_time = read_live_photo_still_time(&movie).unwrap().unwrap();
     assert!((still_time - receipt.still_time_seconds).abs() < 1.0 / 600.0);
+    let source_time = MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible())
+        .unwrap()
+        .presentation_time()
+        .unwrap();
+    assert!(!receipt.presentation_inferred);
+    assert!(receipt.presentation.equivalent(source_time));
+    assert!(apple::read_presentation(&movie)
+        .unwrap()
+        .unwrap()
+        .equivalent(source_time));
     validate_live_photo_movie(&movie, &movie_id, receipt.still_time_seconds).unwrap();
     assert_eq!(receipt.source_kind, "androidHeifMotionPhotoV1");
 

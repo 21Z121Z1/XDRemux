@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import fnmatch
 import re
 import unittest
 
@@ -18,6 +19,90 @@ CONCURRENCY = (
 
 
 class WorkflowConfigurationTests(unittest.TestCase):
+    @classmethod
+    def uploaded(cls, workflow: str, path: str) -> bool:
+        for step in re.split(r"(?m)^      - ", cls.workflow(workflow)):
+            if "uses: actions/upload-artifact@" not in step:
+                continue
+            match = re.search(r"(?m)^          path: (.+)$", step)
+            if match is None:
+                continue
+            if match[1] == "|":
+                patterns = re.findall(r"(?m)^            (\S.*)$", step[match.end():])
+            else:
+                patterns = [match[1]]
+            for pattern in patterns:
+                if path.startswith(pattern.rstrip("/") + "/") or fnmatch.fnmatchcase(path, pattern):
+                    return True
+        return False
+
+    def test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries(self):
+        for path in ("artifacts/product-integration/rust-tests.log",
+                     "artifacts/product-integration/texture/result.json",
+                     "artifacts/product-integration/orientation/expected.json",
+                     "artifacts/styles-acceptance/linear-thumbnail-roundtrip.json"):
+            with self.subTest(path=path):
+                self.assertTrue(self.uploaded("ci.yml", path))
+        for path in ("artifacts/product-integration/texture/case/styles-texture.heic",
+                     "artifacts/product-integration/texture/native/context/working.png",
+                     "artifacts/product-integration/texture/native/context/face.l8",
+                     "artifacts/product-integration/texture/native/context/stored-person-pixels.json",
+                     "artifacts/styles-acceptance/photo.heic"):
+            with self.subTest(path=path):
+                self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+
+    def test_research_uploads_keep_scores_without_photos_or_render_buffers(self):
+        for path in ("${{ runner.temp }}/styles-version-native.json",
+                     "artifacts/tone-response/report/tone-response.json",
+                     "artifacts/tone-response/asymmetry/asymmetry.json",
+                     "artifacts/system-heif-hdr-measurement/tone-shape.json",
+                     "artifacts/system-heif-hdr-measurement/tone/consumer-run.json",
+                     "artifacts/system-heif-hdr-measurement/tone/diagnostics/consumer.stderr.log"):
+            with self.subTest(path=path):
+                self.assertTrue(self.uploaded("research.yml", path))
+        for path in ("${{ runner.temp }}/styles-photos-import/styles-v15.heic",
+                     "artifacts/tone-response/generated/portrait.heic",
+                     "artifacts/tone-response/report/comparisons/portrait.png",
+                     "artifacts/tone-response/xdremux/photo/tone-0/renderer-0/_outputImageTexture.bin",
+                     "artifacts/tone-response/xdremux/photo/pixels.json",
+                     "artifacts/system-heif-hdr-measurement/lhdr-v1-01.system.heic",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/pixels.f32",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/tone-0/renderer-0/trace.json",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/tone-0/facts.json",
+                     "artifacts/system-heif-hdr-measurement/tone/consumer-compat/heif_dump.py"):
+            with self.subTest(path=path):
+                self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+
+    def test_pvt_native_import_uses_an_owned_simulator_and_keeps_only_receipts(self):
+        workflow = self.workflow("research.yml")
+        job = workflow.split("  pvt-native-import:\n", 1)[1]
+        self.assertIn("runs-on: xcode-27", job)
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", job)
+        self.assertIn("--expected-harness-head", job)
+        self.assertIn("--expected-product-head", job)
+        self.assertIn("PRODUCT_SOURCE_SHA: 8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a", job)
+        self.assertIn("path: harness-source", job)
+        self.assertIn("path: product-source", job)
+        self.assertIn("rust-src-dir: product-source", job)
+        self.assertIn("readiness_control.py", job)
+        self.assertNotIn("needs:", job, "control and product must execute in the same job")
+        self.assertIn("github.event.repository.private == false", job)
+        self.assertIn("github.event.repository.visibility == 'public'", job)
+        self.assertIn("--execute-owned-simulator", job)
+        self.assertNotIn("continue-on-error", job)
+        self.assertNotIn("|| true", job)
+        self.assertNotRegex(job, r"runs-on: .*-(?:large|xlarge)")
+        prefix = "${{ runner.temp }}/pvt-native-import/pvt-native-owned/"
+        for name in ("result.json", "baseline.json", "after.json", "share.json", "share-transfer.json", "test-share-ui.stderr"):
+            self.assertTrue(self.uploaded("research.yml", prefix + name))
+        for name in ("synthetic-motion.jpg", "synthetic.mp4", "capture.pvt/image.heic",
+                     "readback/resource-0.bin", "PVTReadback.app/Info.plist", "share-results.xcresult/Info.plist"):
+            self.assertFalse(self.uploaded("research.yml", prefix + name))
+        control_prefix = "${{ runner.temp }}/pvt-readiness-control/control-owned/"
+        self.assertTrue(self.uploaded("research.yml", control_prefix + "result.json"))
+        self.assertTrue(self.uploaded("research.yml", control_prefix + "control-listapps.stdout"))
+        self.assertFalse(self.uploaded("research.yml", control_prefix + "capture.pvt/image.heic"))
+
     @staticmethod
     def workflow(name: str) -> str:
         return (WORKFLOW_ROOT / name).read_text(encoding="utf-8")
@@ -91,7 +176,9 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "research.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
-        self.assertEqual(actual, expected)
+        self.assertEqual(actual, expected,
+                         "Use ci.yml for product regressions or research.yml for experiments; "
+                         "a new workflow needs a distinct maintained owner.")
 
     def test_research_evidence_is_read_only_exact_head_and_separate(self) -> None:
         workflow = self.workflow("research.yml")
@@ -151,6 +238,33 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("cargo clippy", workflow)
         self.assertNotIn("cargo fmt", workflow)
 
+    def test_macos_packages_share_portability_owner_and_require_relocated_runtime(self) -> None:
+        workflow = self.workflow("rust-cli-core.yml")
+        package_job = workflow.split("  macos-package:\n", 1)[1]
+        # Full product packages target Apple silicon/macOS 27; the portable
+        # Rust core keeps the three-OS job above.
+        self.assertIn("runs-on: xcode-27", package_job)
+        self.assertNotIn("matrix", package_job)
+        self.assertNotIn("x86_64", package_job)
+        self.assertNotIn("macos-26-intel", package_job)
+        self.assertIn('MACOSX_DEPLOYMENT_TARGET: "27.0"', package_job)
+        self.assertIn("--target aarch64-apple-darwin", package_job)
+        self.assertNotRegex(package_job, r"runs-on: .*-(?:large|xlarge)")
+        self.assertIn("swift build -c release --product xdremux-apple-adapter", package_job)
+        self.assertNotIn("platforms/apple", package_job)
+        self.assertIn("scripts/distribution/build_native.py", package_job)
+        self.assertIn("scripts/distribution/macos.py archive", package_job)
+        self.assertIn("scripts/distribution/smoke_macos.py", package_job)
+        self.assertIn('--fixtures "$GITHUB_WORKSPACE/fixtures"', package_job)
+        self.assertLess(package_job.index("scripts/distribution/smoke_macos.py"),
+                        package_job.index("actions/upload-artifact@"))
+        self.assertNotIn("continue-on-error", package_job)
+        self.assertNotIn("|| true", package_job)
+        for event in ("push", "pull_request"):
+            self.assertIn('"scripts/distribution/**"', self.event_block(workflow, event))
+            self.assertIn('"Package.swift"', self.event_block(workflow, event))
+            self.assertIn('"Sources/**"', self.event_block(workflow, event))
+
     def test_performance_workflow_does_not_duplicate_completion(self) -> None:
         workflow = self.workflow("performance.yml")
         self.assertIn("scripts/performance/benchmark_rust_product.py", workflow)
@@ -158,6 +272,51 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("scripts/ci/agent_completion_gate.py", workflow)
         self.assertNotIn("scripts/validation/check_rust_cli_smoke.sh", workflow)
         self.assertNotIn("XDRemuxAppModelTests", workflow)
+
+    def test_style_tone_sweep_is_read_only_and_pins_the_published_harness(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("runs-on: xcode-27", workflow)
+        self.assertIn("ref: 37dd551a949047ed14580efa0c0a2556922791b5", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("retention-days: 1", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
+        self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*\n\npermissions:")
+        for forbidden in (
+            "contents: write",
+            "secrets.",
+            "pull_request_target",
+            "git push",
+            "inputs:",
+            "agent_completion_gate.py",
+        ):
+            self.assertNotIn(forbidden, workflow)
+
+    def test_system_heif_hdr_api_probe_is_read_only(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("runs-on: xcode-27", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("retention-days: 1", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
+        self.assertIn("scripts/apple/probe_system_heif_hdr_api.sh", workflow)
+        self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*\n\npermissions:")
+        for forbidden in (
+            "contents: write",
+            "secrets.",
+            "pull_request_target",
+            "git push",
+            "inputs:",
+            "agent_completion_gate.py",
+        ):
+            self.assertNotIn(forbidden, workflow)
+
+    def test_oriented_imageio_readback_uses_the_product_exact_head(self) -> None:
+        workflow = self.workflow("ci.yml")
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", workflow)
+        self.assertIn("XDREMUX_ORIENTATION_OUTPUT:", workflow)
+        self.assertIn("scripts/apple/read_oriented_heif_imageio.swift", workflow)
+        self.assertIn("artifacts/product-integration/orientation/expected.json", workflow)
 
     def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")

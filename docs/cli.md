@@ -2,7 +2,9 @@
 
 [English](cli.en.md) | 简体中文
 
-XDRemux 的产品入口是一个跨平台 Rust CLI：`xdremux`。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
+XDRemux 的产品入口是 Rust `xdremux` CLI。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
+
+完整 Mac 产品交付面向 Apple silicon（`arm64`）和 macOS 27。底层 Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。核心构建或较旧的编译下限不证明 Styles SPI 或其他 Apple 原生功能可用。这些功能仍需文档规定的 macOS 27 SDK、运行时 API、硬件及独立原生验收检查。
 
 Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 只作为研究/训练工具。它们都不是第二套 XDRemux 实现，不再定义新的 CLI 产品语义或产品 policy。
 
@@ -23,6 +25,18 @@ xdremux --help
 xdremux convert --help
 ```
 
+## 终端语言
+
+使用 `xdremux --lang en --help` 或 `xdremux --lang zh-CN --help` 选择英文或
+简体中文终端显示。全局选项也可放在子命令后。选择顺序为 `--lang`、
+`XDREMUX_LANG`、`LC_ALL`、`LC_MESSAGES`、`LANG`，最后默认英文。忽略空环境变量。
+`zh_CN.UTF-8` 等受支持的 `zh` locale 选择简体中文；`C` 和 `POSIX` 选择英文。
+不支持的环境 locale 回退英文；显式指定不支持的 `--lang` 则返回用法错误。
+
+语言不改变 JSON 文档、命令/选项名称、枚举值、退出码或输入路径参数。
+翻译范围为人类可读帮助、标签和 CLI 持有的错误上下文。Clap 详细参数诊断和
+底层库/原生错误仍可能使用英文。
+
 ## `convert`
 
 标准转换不需要模式参数：
@@ -40,6 +54,37 @@ xdremux convert --input IMG_001.jpg
 ```
 
 XDRemux 会自动识别 Motion Photo，并发布匹配的 HEIC + MOV Live Photo pair。Motion Photo 不做原位转换；未指定输出时会选择不会与现有 HEIC/MOV 冲突的新文件名。
+
+### 可选 PVT 封装
+
+`convert` 和 `batch` 的 `--live-photo-output pair|pvt` 选择实况照片容器，默认仍为
+HEIC/HEIF + MOV 文件对。包输出示例：
+
+```bash
+xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
+xdremux validate capture.pvt --json
+```
+
+PVT 是真实目录，包含 `capture.heic`、`capture.mov` 和 `metadata.plist`；
+`PFVideoComplementMetadataVersionKey` 的值是字符串 `"1"`。封装保留已生成且已验证
+pair 的完整字节、配对标识和封面时间，不额外编码照片或重封装 MOV。原有媒体转换策略
+仍可能生成配对元数据或按需重编码照片；厂商资源遗漏继续报告，PVT 不等于无损转换。
+
+显式包目标必须以 `.pvt` 结尾；已有文件、目录或 symlink 均保留并拒绝覆盖。
+支持的 macOS/Linux 文件系统使用一次原子排他目录 rename 发布；平台或文件系统不支持时
+报错，不回退到覆盖式 rename。发布失败可能保留完整 staging 包并报告路径供显式恢复，
+不承诺断电持久性。将 ZIP 改名为 `.pvt` 会被拒绝。
+
+该选择只影响 Motion Photo。混合 batch 中普通 HDR 照片保持原有输出，不能把 HEIF
+伪装写到显式 `.pvt` 目标。batch JSON 将包目录列为一个输出；复用需要来源 checkpoint
+及容器一致，旧文件对或来源未知的有效包均不能替代当前 PVT 请求。
+
+本轮支持包输出和验证，`convert`、`batch` 和 `categorize` 不将已有 PVT 或其成员当作新源；目录扫描跳过整个包，
+输出和 checkpoint 写入也拒绝向已有包内部写入，包括通过别名访问的路径。
+
+App 提供同一选择并交给 Rust 创建；仅结构有效不足以接管已有包，已有包保持不变。
+当前结构测试不证明 Photos 导入或动态墙纸可用；不可访问的历史样本和先前导入反馈
+与本次实现分别列证据。
 
 ### OPPO 相册兼容
 
@@ -86,6 +131,8 @@ xdremux batch \
 
 常用参数：
 
+每个新转换的 Live Photo 批处理成功项在 JSON 中包含 `omitted_resource_count`，终端输出会报告非零遗漏。复用 checkpoint 不产生新转换报告，该字段为 `null`，不假定为零。规划后若其他写入者发布了相同输出，批处理发布会拒绝替换，保留已有文件。
+
 | 参数 | 作用 |
 | --- | --- |
 | `--input FILE` | 添加一个输入文件，可重复。 |
@@ -97,6 +144,7 @@ xdremux batch \
 | `--resume` | 依据 source provenance 恢复已完成工作。 |
 | `--skip-existing` | 只在 provenance 与输出身份都匹配时复用已有结果。 |
 | `--categorize` | 转换后直接按分类目录发布。 |
+| `--live-photo-output` | 选择默认实况照片文件对或真实 PVT 目录包。 |
 | `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
 | `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
 | `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
@@ -134,7 +182,7 @@ xdremux validate output.heic
 xdremux validate output.heic --json
 ```
 
-`validate` 自动识别并验证 ISO HDR HEIF 或 Live Photo pair，适合脚本和 CI 在转换后做独立检查。
+`validate` 自动识别并验证 ISO HDR HEIF、Live Photo pair 或支持的三成员 PVT 目录。包验证检查 XML 字符串版本 plist、无歧义的普通成员文件及现有配对标识、媒体和时间契约；缺失、嵌套、symlink、重复或损坏成员会被拒绝且保持原样。这是结构验证，不是 Photos 导入验收，适合脚本和 CI 的独立转换后检查。
 
 ## 电影效果视频意图（macOS）
 
