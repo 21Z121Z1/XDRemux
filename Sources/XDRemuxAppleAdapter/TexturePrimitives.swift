@@ -16,8 +16,6 @@ struct TexturePrimitiveRequest: Codable {
     }
 }
 
-// The runtime supplies the profile and coordinates all primitives. No HEIF
-// graph, feature routing, fallback, or publication policy enters this bridge.
 func runTexturePrimitive(
     operation: String, input: String, output: String,
     configuration: TexturePrimitiveRequest?

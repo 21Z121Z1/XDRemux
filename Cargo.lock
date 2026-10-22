@@ -921,6 +921,7 @@ version = "0.1.0"
 dependencies = [
  "liblivephoto",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

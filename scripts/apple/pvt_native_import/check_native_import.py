@@ -398,13 +398,15 @@ def select_device(runtimes, types):
                   and '.iOS-' in item.get('identifier', '') and int(item['version'].split('.')[0]) >= 17]
     candidates.sort(key=lambda item: tuple(int(x) for x in item['version'].split('.')), reverse=True)
     for runtime in candidates:
+        supported = {item['identifier'] for item in runtime.get('supportedDeviceTypes', [])}
         parts = [int(x) for x in runtime['version'].split('.')]
         encoded = parts[0] * 65536 + (parts[1] if len(parts) > 1 else 0) * 256 + (parts[2] if len(parts) > 2 else 0)
         compatible = [item for item in types['devicetypes'] if item.get('productFamily') == 'iPhone'
+                      and item['identifier'] in supported
                       and item.get('minRuntimeVersion', 0) <= encoded <= item.get('maxRuntimeVersion', 2**32)]
         if compatible:
             return runtime['identifier'], compatible[-1]['identifier']
-    raise Blocked('no installed available iOS runtime with a compatible iPhone device type; no runtime installation attempted')
+    raise Blocked('no installed available iOS runtime explicitly supports a compatible catalogued iPhone; no runtime installation attempted')
 
 
 def check_readback(baseline, after, expected_id, expected_hashes, cover_seconds):
@@ -636,9 +638,6 @@ def main():
                            '-module-cache-path', work / 'sdk-module-cache',
                            '-Xfrontend', '-debug-time-function-bodies',
                            '-Xfrontend', '-warn-long-function-bodies=500']
-        # Compile before boot: cold SDK imports should not compete with an
-        # idle simulator. Only cold module preparation gets a240s ceiling;
-        # actual reader120s and UI180s remain separate bounded operations.
         run('compile-sdk-canary', [*compile_command, source / 'SDKCompileProbe.swift', '-o', work / 'sdk-canary'], timeout=240)
         run('compile-reader', [*compile_command, source / 'ReadbackCore.swift', source / 'PVTReadback.swift',
                                '-o', app / 'PVTReadback'], timeout=120)

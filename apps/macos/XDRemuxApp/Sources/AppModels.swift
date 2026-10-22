@@ -1,9 +1,5 @@
 import Foundation
 
-// These are presentation-side models. Product policy and file semantics are
-// owned by the Rust CLI; the app keeps only the values needed to render a
-// queue, bind settings, and decode the CLI's stable JSON receipts.
-
 struct ConversionConfig: Sendable, Equatable {
     var outputDirectory: URL?
     var fileNameSuffix = "_iso"

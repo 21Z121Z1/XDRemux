@@ -13,6 +13,13 @@ JPEG、原始 EXIF 和 BMFF 基础类型。产品 codec profile 检查仍在本�
 旧名称通过不稳定的迁移 feature 重新导出。新格式操作应使用 `MotionPhoto`、
 `Input`、资源和 `MediaTime`，不得在 consumer crate 增加另一套 parser。
 
+本地 `copy_payload_range` 和 `copy_payload_range_with_options` helper 先在目标旁边
+暂存精确字节范围，完整复制并同步暂存文件后才替换目标。复制失败时保留输入及已有输出。
+若目标目录项参与输入路径的解析，则拒绝操作，包括该目录项的别名。独立硬链接或安全的
+目标 symlink 可以被替换，其指向的对象保持不变。区分别名可能需要目录读取权限；
+该检查失败时，两个已有目录项均保持完整。调用方必须在复制期间保持路径解析稳定。
+该契约不承诺断电持久性。
+
 公共 pair 发布 helper 在成功和失败时都保留调用方所有的 staging 文件，允许使用
 同一文件系统的子目录。helper 不替换或删除最终路径。第二个成员发布失败时，
 `PairPublicationError::partial_output()` 返回 partial 路径；其他 writer 可能已修改

@@ -15,6 +15,16 @@ no-clobber pair publication. Its legacy names re-export an unstable migration fe
 New product format operations must use `MotionPhoto`, `Input`, resources and
 `MediaTime`. Do not add an independent parser to the consumer crate.
 
+The local `copy_payload_range` and `copy_payload_range_with_options` helpers
+stage an exact byte range beside the destination. They replace the destination
+only after the copy completes and the staged file is synchronized. A failed
+copy preserves the input and any existing output. A destination entry used to
+resolve the input path is rejected, including aliases of that entry. A distinct
+hard link or safe destination symlink can be replaced without changing its
+target. Distinguishing aliases can require directory read permission; if that
+check fails, both entries remain intact. Callers must keep path resolution stable
+during the copy. This contract does not promise power-loss durability.
+
 The public pair publication helper keeps caller-owned staging files on success
 and failure, including staging in a same-filesystem child directory. It never
 replaces or unlinks final paths. A second-member failure exposes the partial

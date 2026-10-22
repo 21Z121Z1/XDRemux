@@ -63,7 +63,6 @@ static NSDictionary *BufferFacts(CVPixelBufferRef buffer) {
     size_t width = CVPixelBufferGetWidth(buffer), height = CVPixelBufferGetHeight(buffer);
     size_t rowBytes = CVPixelBufferGetBytesPerRow(buffer);
     const uint8_t *bytes = CVPixelBufferGetBaseAddress(buffer);
-    // The raw hash includes row padding; its scope is explicit.
     NSString *digest = bytes ? SHA([NSData dataWithBytes:bytes length:rowBytes * height]) : @"";
     NSMutableDictionary *result = [@{
         @"available": @YES, @"width": @(width), @"height": @(height), @"bytes_per_row": @(rowBytes),
