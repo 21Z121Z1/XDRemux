@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 liblivephoto = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "794ab552596db0f66095600d23cf7937a631b9ec", features = ["xdremux-compat"] }
+tempfile = "=3.27.0"
 
 [dev-dependencies]
 serde_json = "1.0"
