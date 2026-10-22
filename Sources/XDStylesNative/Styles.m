@@ -215,6 +215,18 @@ static NSDictionary *Readback(NSDictionary *request) {
     CGSize size=CGSizeMake([request[@"width"] doubleValue],[request[@"height"] doubleValue]);
     CGColorSpaceRef linear=CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearDisplayP3);
     CIContext *context=Context(linear);
+    if(request[@"target_headroom"]) {
+        double headroom=[request[@"target_headroom"]doubleValue];
+        Require(isfinite(headroom)&&headroom>=1,@"Invalid requested readback headroom");
+        CIImage *gain=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
+            options:@{kCIImageApplyOrientationProperty:@NO,kCIImageAuxiliaryHDRGainMap:@YES}];
+        Require(gain!=nil,@"Cannot decode encoded HDR Gain Map");
+        CIImage *image=[Image(path) imageByApplyingGainMap:gain headroom:(float)headroom];
+        Require(image!=nil,@"Cannot apply encoded HDR Gain Map");
+        NSDictionary *facts=Render(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"]);
+        CGColorSpaceRelease(linear);
+        return @{@"schema_version":@2,@"target":facts,@"requested_headroom":@(headroom),@"hdr_content_headroom":@(image.contentHeadroom)};
+    }
     NSDictionary *sdr=Render(Canvas(Image(path),size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"]);
     CIImage *hdr=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
         options:@{kCIImageApplyOrientationProperty:@NO,kCIImageExpandToHDR:@YES}];

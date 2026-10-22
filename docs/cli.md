@@ -32,7 +32,7 @@ xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
 
 重复 `--input` 可以批量处理，已有输出目录不会被替换。`--max-edge` 限制处理及 Gain Map 分辨率，最终 SDR 主图保留原始分辨率和压缩数据。命令返回 JSON；所需内嵌资源或原生能力不可用时明确报错。支持版本、输出文件、验证及限制见[摄影风格 HDR 重建](styles-reconstruction.md)。
 
-`--display-headroom 2`、`4` 或 `8` 可从重建的场景参考生成单独的显示目标。它使用独立的影调／皮肤／色度方法，参考原 SDR 颜色和关联的语义权重。输出目录为 `.display-<headroom>x.reconstructed`，增加 `display_linear.exr`，`hdr.heic` 承载该显示目标并保留 SDR。不要求采用苹果编辑器坐标体系。
+`--display-headroom 2`、`4` 或 `8` 可从重建的场景参考生成单独的显示目标。它使用共同的场景参考 8x 主目标，随 headroom 减弱粗尺度空间补偿代理，并用关联的语义权重保护原图色度。同一份编码文件会检查七档 headroom。输出目录为 `.display-<headroom>x.reconstructed`，增加 `display_linear.exr`，`hdr.heic` 承载该显示目标并保留 SDR。不要求采用苹果编辑器坐标体系。
 
 ## `convert`
 

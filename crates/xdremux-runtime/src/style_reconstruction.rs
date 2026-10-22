@@ -11,8 +11,8 @@ use xdremux_engine::{
 };
 use xdremux_format::ChromaSampling;
 use xdremux_hdr::{
-    display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, render_styles_display,
-    DisplayMethods, LinearPixel,
+    display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, DisplayFamily,
+    DisplayFamilyPolicy, DisplayMethods, LinearPixel,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, extract_style_display_mattes,
@@ -350,6 +350,59 @@ fn display_matte(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn verify_display_family(
+    client: &AppleAdapterClient,
+    input: &Path,
+    work: &Path,
+    scene: &[LinearPixel],
+    sdr: &[LinearPixel],
+    skin: &[f32],
+    foreground: &[f32],
+    size: (usize, usize),
+    family: &DisplayFamily,
+    methods: DisplayMethods,
+    capacity: u32,
+) -> Result<Value> {
+    let (w, h) = size;
+    let mut rows = Vec::new();
+    for requested in [1f32, 1.5, 2., 3., 4., 6., 8.] {
+        let target_headroom = requested.min(capacity as f32);
+        let expected = family
+            .render(scene, sdr, skin, foreground, w, h, target_headroom, methods)
+            .map_err(|e| RuntimeError::external("display family target", e))?;
+        let native=client.styles_primitive(&json!({"schema_version":2,"operation":"styles-readback",
+            "input_path":input,"output_path":work,"width":w,"height":h,"target_headroom":requested}))?;
+        if geometry(&native["target"])? != (w, h) {
+            return Err(error("display family consumer geometry changed"));
+        }
+        let actual = read_pixels(&work.join("published_target.f32"), w * h)?;
+        let metrics = hdr_transport_metrics(&expected.pixels, &actual)?;
+        // Native log-gain application, codec transport, range projection and
+        // clipped extended SDR all remain in these errors, including black.
+        if metrics["mean_abs_ev"].as_f64().is_none_or(|e| e > 0.05) {
+            return Err(error(format!(
+                "same-file display family error exceeds 0.05 EV at {requested}x: {metrics}"
+            )));
+        }
+        let schedule = family
+            .schedule(target_headroom)
+            .map_err(|e| RuntimeError::external("display schedule", e))?;
+        rows.push(
+            json!({"requested_headroom":requested,"target_headroom":target_headroom,
+            "master_weight":schedule.master_weight,"carrier_weight":target_headroom.log2()/(capacity as f32).log2(),"retained_local":schedule.retained_local,
+            "unconstrained_retained_local":schedule.unconstrained_retained_local,
+            "target_range_limited_fraction":expected.range_limited_fraction,
+            "negative_sdr_pixel_fraction":expected.negative_sdr_fraction,
+            "native":native,"transport_and_projection":metrics}),
+        );
+    }
+    Ok(
+        json!({"same_encoded_file":true,"method":"native CIImage imageByApplyingGainMap:headroom: on encoded auxiliary",
+        "mean_abs_ev_limit":0.05,"rows":rows,"physical_HDR_visual_acceptance":false}),
+    )
+}
+
 /// Create a new, manifest-last output bundle. Existing files/directories are
 /// never replaced. A failed invocation removes only the directory it reserved.
 pub fn reconstruct_styles_hdr(
@@ -438,6 +491,7 @@ pub fn reconstruct_styles_hdr_with_display(
             &reconstructed.pixels,
         )?;
         let mut display_pixels = None;
+        let mut display_context = None;
         let mut display_facts = Value::Null;
         if let Some(display) = display_plan {
             let (skin, foreground) = extract_style_display_mattes(&source)
@@ -446,33 +500,53 @@ pub fn reconstruct_styles_hdr_with_display(
             let (foreground, foreground_facts) =
                 display_matte(&client, foreground, dir, "foreground", w, h)?;
             let [mb, mf, ab, ask, sb, sh, cg, fp] = display.methods;
-            let result = render_styles_display(
+            let methods = DisplayMethods {
+                mids_background: mb,
+                mids_foreground: mf,
+                anchor_background: ab,
+                anchor_skin: ask,
+                skin_brightness: sb,
+                skin_highlight: sh,
+                chroma_gain: cg,
+                foreground_chroma_protection: fp,
+            };
+            let family = DisplayFamily::analyze(
                 &reconstructed.pixels,
                 &sdr,
-                &skin,
-                &foreground,
                 w,
                 h,
-                display.headroom,
-                DisplayMethods {
-                    mids_background: mb,
-                    mids_foreground: mf,
-                    anchor_background: ab,
-                    anchor_skin: ask,
-                    skin_brightness: sb,
-                    skin_highlight: sh,
-                    chroma_gain: cg,
-                    foreground_chroma_protection: fp,
+                DisplayFamilyPolicy {
+                    analysis_edge: display.analysis_edge,
+                    local_limit_ev: display.local_limit_ev,
                 },
             )
-            .map_err(|e| RuntimeError::external("independent HDR methods", e))?;
-            display_facts = json!({"algorithm":"decomposed-tonal-opponent-chroma-v1","headroom":display.headroom,
-                "exposure_ev":result.exposure_ev,"target_max_rgb":result.maximum_rgb,"methods":{
+            .map_err(|e| RuntimeError::external("display family analysis", e))?;
+            let result = family
+                .render(
+                    &reconstructed.pixels,
+                    &sdr,
+                    &skin,
+                    &foreground,
+                    w,
+                    h,
+                    display.headroom as f32,
+                    methods,
+                )
+                .map_err(|e| RuntimeError::external("display family rendering", e))?;
+            display_facts = json!({"algorithm":"scene-gap-coupled-log-family-v2","headroom":display.headroom,
+                "family_master_headroom":8,"exposure_ev":family.exposure_ev,"target_max_rgb":result.maximum_rgb,
+                "target_range_limited_fraction":result.range_limited_fraction,"methods":{
                     "mids_background":mb,"mids_foreground":mf,"anchor_background":ab,"anchor_skin":ask,
                     "skin_brightness":sb,"skin_highlight":sh,"chroma_gain":cg,"foreground_chroma_protection":fp},
                 "masks":[skin_facts,foreground_facts],"runtime_raw_inputs":0,"native_editor_parameters_used":false,"native_output_ratio_used":false,
-                "working_domain":"explicit component-linear Display P3; global headroom normalization for bounded leaves",
-                "guide":"own area-luminance log Gaussian sigma2 at long edge up to1024; not native guide equivalence",
+                "working_domain":"component-linear Display P3; offset-log RGB family, common 8x scene-derived global endpoint",
+                "local_compensation":{"scene_range_ev":family.scene_range_ev,"sdr_global_range_ev":family.sdr_global_range_ev,
+                    "range_gap_proxy_ev":family.range_gap_ev,"residual_rms_ev":family.local_rms_ev,
+                    "residual_limit_ev":display.local_limit_ev,"limited_fraction":family.limited_fraction,
+                    "analysis_edge":display.analysis_edge,"monotone_curve":family.curve,
+                    "schedule":"1-log2(headroom)/max(3,range_gap_proxy_ev)",
+                    "attribution":"bounded coarse SDR spatial residual against monotone scene-to-SDR fit; proxy, not capture-ISP inversion"},
+                "guide":"area luminance; joint bilateral residual sigma spatial4/range0.5 at long edge up to512; scene-edge-aware upsampling",
                 "color":"extended source SDR relative opponent chroma, fixed post-tone luminance and gamut fit",
                 "texture":"source detail and original texture metadata retained; texture renderer not rerun",
                 "physical_HDR_visual_acceptance":false});
@@ -489,6 +563,7 @@ pub fn reconstruct_styles_hdr_with_display(
             )?;
             display_facts["exr"] = encoded;
             display_pixels = Some(result.pixels);
+            display_context = Some((family, skin, foreground, methods));
         }
         let heic = hdr_gain_map(
             &client,
@@ -500,6 +575,21 @@ pub fn reconstruct_styles_hdr_with_display(
             (w, h),
             display_headroom,
         )?;
+        if let Some((family, skin, foreground, methods)) = display_context {
+            display_facts["headroom_validation"] = verify_display_family(
+                &client,
+                &output.join("hdr.heic"),
+                dir,
+                &reconstructed.pixels,
+                &sdr,
+                &skin,
+                &foreground,
+                (w, h),
+                &family,
+                methods,
+                display_headroom.unwrap(),
+            )?;
+        }
         let reverse = encode(
             &client,
             &dir.join("unstyled.f32"),

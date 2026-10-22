@@ -6,11 +6,14 @@ This runner also checks the requested outcome, source/output integrity and
 refusal to replace an existing bundle. It is not a physical display test.
 """
 import argparse
+import array
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 
 
 def sha(path):
@@ -21,6 +24,34 @@ def sha(path):
     return digest.hexdigest()
 
 
+def read_target(adapter, path, directory, width, height, headroom):
+    request = dict(schema_version=2, operation="styles-readback", input_path=str(path),
+                   output_path=str(directory), width=width, height=height,
+                   target_headroom=headroom)
+    result = subprocess.run([str(adapter)], input=json.dumps(request), text=True,
+                            capture_output=True, check=True, timeout=300)
+    facts = json.loads(result.stdout)
+    assert facts["target"]["width"] == width and facts["target"]["height"] == height
+    values = array.array("f")
+    values.frombytes((directory / "published_target.f32").read_bytes())
+    assert len(values) == width * height * 4
+    assert all(math.isfinite(v) for v in values)
+    return values
+
+
+def compare_luminance(a, b):
+    errors = []
+    for i in range(0, len(a), 4):
+        ya = a[i]*.22897456 + a[i+1]*.69173855 + a[i+2]*.07928691
+        yb = b[i]*.22897456 + b[i+1]*.69173855 + b[i+2]*.07928691
+        if ya > 1e-4:
+            errors.append(abs(math.log2(max(yb, 1e-8) / ya)))
+    assert errors
+    errors.sort()
+    return dict(mean_abs_ev=sum(errors)/len(errors), p99_abs_ev=errors[int((len(errors)-1)*.99)],
+                max_abs_ev=errors[-1], pixels=len(errors), global_exposure_removed=False)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
@@ -29,7 +60,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-edge", type=int, default=1024)
     parser.add_argument("--headrooms", type=int, nargs="+", choices=[2, 4, 8], default=[2, 4, 8])
+    parser.add_argument("--check-coupling", action="store_true",
+                        help="Compare separately encoded 2x/4x endpoints to the same 8x file")
     args = parser.parse_args()
+    if args.check_coupling:
+        assert sorted(args.headrooms) == [2, 4, 8]
     binary, adapter = args.binary.resolve(), args.adapter.resolve()
     inputs = [path.resolve() for path in args.input]
     before = {str(path): sha(path) for path in inputs}
@@ -53,6 +88,8 @@ def main():
             display = report["display"]
             carrier = report["outputs"]["hdr.heic"]
             assert display["headroom"] == headroom
+            assert display["algorithm"] == "scene-gap-coupled-log-family-v2"
+            assert display["family_master_headroom"] == 8
             assert display["runtime_raw_inputs"] == 0
             assert not display["native_editor_parameters_used"]
             assert not display["native_output_ratio_used"]
@@ -62,6 +99,17 @@ def main():
             assert abs(carrier["consumer_content_headroom"] - headroom) <= 1e-5
             assert carrier["hdr_target_mae_ev"] <= .15
             assert display["exr"]["readback_mae_ev"] <= .005
+            family = display["headroom_validation"]
+            assert family["same_encoded_file"]
+            assert [r["requested_headroom"] for r in family["rows"]] == [1, 1.5, 2, 3, 4, 6, 8]
+            previous = 1
+            for row in family["rows"]:
+                assert row["target_headroom"] == min(headroom, row["requested_headroom"])
+                assert 0 <= row["retained_local"] <= previous
+                previous = row["retained_local"]
+                assert abs(row["carrier_weight"] - math.log2(row["target_headroom"])/math.log2(headroom)) < 1e-6
+                assert row["transport_and_projection"]["mean_abs_ev"] <= .05
+                assert row["transport_and_projection"]["nonfinite_rgb_components"] == 0
             assert report["source_sha256"] == before[report["source"]]
             path = Path(item["output"]) / "hdr.heic"
             assert sha(path) == carrier["sha256"]
@@ -74,6 +122,22 @@ def main():
                              output=str(path), sha256=carrier["sha256"],
                              scene=report["scene"], display=display, carrier=carrier))
         first_command = first_command or command
+    coupling = []
+    if args.check_coupling:
+        with tempfile.TemporaryDirectory(prefix=".coupling-", dir=args.output) as scratch:
+            directory = Path(scratch)
+            for source in inputs:
+                variants = {r["headroom"]: r for r in rows if r["input"] == str(source)}
+                width, height = variants[8]["scene"]["width"], variants[8]["scene"]["height"]
+                for h in [2, 4]:
+                    own = read_target(adapter, Path(variants[h]["output"]), directory, width, height, h)
+                    same = read_target(adapter, Path(variants[8]["output"]), directory, width, height, h)
+                    metrics = compare_luminance(own, same)
+                    # Codec quantization and range projection remain in this
+                    # comparison. No median exposure is subtracted.
+                    assert metrics["mean_abs_ev"] <= .03, metrics
+                    coupling.append(dict(source=str(source), headroom=h, metrics=metrics,
+                                         same_file_sha256=variants[8]["sha256"]))
     published = {row["output"]: sha(row["output"]) for row in rows}
     repeated = subprocess.run(first_command, env=env, capture_output=True, text=True, timeout=120)
     assert repeated.returncode != 0
@@ -83,6 +147,7 @@ def main():
     result = dict(passed=True, head=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                   binary_sha256=sha(binary), adapter_sha256=sha(adapter),
                   max_edge=args.max_edge, original_hashes=before, rows=rows,
+                  coupling=coupling,
                   existing_bundle_refusal=True, physical_HDR_visual_acceptance=False)
     (args.output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(dict(passed=True, photos=len(inputs), profiles=len(rows),

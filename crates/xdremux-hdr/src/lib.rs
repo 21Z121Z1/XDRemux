@@ -1,11 +1,16 @@
 #![forbid(unsafe_code)]
 
+mod display_family;
 mod display_methods;
 mod edr;
 mod error;
 mod gainmap;
 mod info;
 mod scene_reconstruction;
+pub use display_family::{
+    DisplayFamily, DisplayFamilyPolicy, DisplayFamilyTarget, DisplaySchedule,
+    DISPLAY_FAMILY_HEADROOM, DISPLAY_FAMILY_OFFSET,
+};
 pub use display_methods::{
     render_display_pixel, render_styles_display, DisplayMethods, DisplayTarget,
 };

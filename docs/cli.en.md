@@ -32,7 +32,7 @@ xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
 
 Repeat `--input` for a batch. Existing bundles are never replaced. `--max-edge` limits processing and Gain Map resolution; the final SDR primary keeps its original resolution and compressed bytes. The command returns JSON and fails explicitly when required embedded resources or native capabilities are unavailable. See [Photographic Styles HDR reconstruction](styles-reconstruction.en.md) for supported versions, output files, validation, and limits.
 
-`--display-headroom 2`, `4`, or `8` selects a separate display rendering from the reconstructed scene reference. It uses independent tonal/skin/chroma methods with the source SDR color reference and linked semantic weights. Each result has a `.display-<headroom>x.reconstructed` bundle and an additional `display_linear.exr`; `hdr.heic` carries that display target while preserving SDR. No Apple editor coordinate system is required.
+`--display-headroom 2`, `4`, or `8` selects a separate display rendering from the reconstructed scene reference. It uses a common scene-derived 8x master, reduces a coarse spatial-compensation proxy with headroom, and protects source chroma with linked semantic weights. The same encoded file is checked at seven headrooms. Each result has a `.display-<headroom>x.reconstructed` bundle and an additional `display_linear.exr`; `hdr.heic` carries that display target while preserving SDR. No Apple editor coordinate system is required.
 
 ## `convert`
 

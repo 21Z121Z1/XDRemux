@@ -22,17 +22,22 @@ pub fn plan_style_reconstruction(max_edge: u32) -> Result<StyleReconstructionPla
 pub struct StyleDisplayPlan {
     pub headroom: u32,
     pub methods: [f32; 8],
+    pub analysis_edge: usize,
+    pub local_limit_ev: f32,
 }
 
 pub fn plan_style_display(headroom: u32) -> Result<StyleDisplayPlan, &'static str> {
     if ![2, 4, 8].contains(&headroom) {
         return Err("display headroom must be 2, 4 or 8");
     }
-    // mids background/foreground, SDR chroma anchor background/skin,
-    // skin brightness/highlight, chroma gain, foreground protection.
+    // Creative chroma and skin protection stay separate from range-dependent
+    // spatial compensation. Independent tonal leaves remain available to
+    // research callers, but are not added to this family's range budget.
     Ok(StyleDisplayPlan {
         headroom,
-        methods: [0.08, 0.04, 0.75, 0.95, -0.03, 0., 0.98, 0.85],
+        methods: [0., 0., 0.75, 0.95, 0., 0., 0.98, 0.85],
+        analysis_edge: 512,
+        local_limit_ev: 1.5,
     })
 }
 
@@ -51,7 +56,19 @@ mod tests {
     #[test]
     fn display_outcome_has_an_explicit_supported_headroom() {
         for h in [2, 4, 8] {
-            assert_eq!(plan_style_display(h).unwrap().headroom, h);
+            let plan = plan_style_display(h).unwrap();
+            assert_eq!(plan.headroom, h);
+            assert_eq!(
+                [
+                    plan.methods[0],
+                    plan.methods[1],
+                    plan.methods[4],
+                    plan.methods[5]
+                ],
+                [0.; 4]
+            );
+            assert_eq!(plan.analysis_edge, 512);
+            assert!(plan.local_limit_ev > 0.);
         }
         for h in [0, 1, 3, 16] {
             assert!(plan_style_display(h).is_err());
