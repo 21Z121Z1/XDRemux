@@ -1,4 +1,4 @@
-"""One same-job readiness control, then at most one unchanged pinned PVT probe."""
+"""One same-job readiness control, then at most one current-HEAD PVT probe."""
 import argparse
 import hashlib
 import importlib.util
@@ -14,7 +14,6 @@ import tempfile
 import time
 import uuid
 
-PRODUCT_SHA = '8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a'
 NATIVE_PASS = 'native-direct-pvt-import-and-readback-pass'
 
 
@@ -98,7 +97,7 @@ def run_control(run, choose_device, report, name, device_root):
     return facts
 
 
-def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root):
+def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head):
     report.update(control_prewarms_core_simulator=True, product_probe_invocations=0,
                   experimental_condition='control may warm CoreSimulator/runtime; not a cold-start fix or fresh-VM claim')
     control = run_control(run, choose_device, report, control_name, device_root)
@@ -112,7 +111,7 @@ def run_control_and_probe(run, choose_device, invoke_probe, report, control_name
         report['product_result'] = native
         if not isinstance(native, dict):
             raise ReadinessBlocked('product receipt is not an object')
-        valid = (code == 0 and native.get('head') == PRODUCT_SHA and native.get('status') == NATIVE_PASS
+        valid = (code == 0 and native.get('head') == expected_head and native.get('status') == NATIVE_PASS
                  and native.get('cleanup_status') == 'completed'
                  and native.get('synthetic_input_unchanged') is True and native.get('package_bytes_unchanged') is True
                  and native.get('selected_runtime') == control['selected_runtime']
@@ -134,47 +133,34 @@ def checkout_facts(repo, expected):
     return {'head': head, 'tree': tree, 'status': status}
 
 
-def product_equivalence(harness, product):
-    # This experiment intentionally pins an unchanged product. Future product
-    # changes must update that reviewed binding, rather than test old bytes.
+def source_bindings(repo):
     trees = {}
     for path in ('Cargo.toml', 'Cargo.lock', 'Package.swift', 'crates', 'Sources', 'apps', 'fixtures'):
-        ids = [subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD:' + path],
-                                       text=True, timeout=10).strip() for repo in (harness, product)]
-        if ids[0] != ids[1]:
-            raise ReadinessBlocked('harness product differs from the pinned source: ' + path)
-        trees[path] = ids[0]
-    paths = subprocess.check_output(['git', '-C', str(product), 'ls-files', 'scripts/apple/pvt_native_import'],
+        trees[path] = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD:' + path],
+                                              text=True, timeout=10).strip()
+    paths = subprocess.check_output(['git', '-C', str(repo), 'ls-files', 'scripts/apple/pvt_native_import'],
                                     text=True, timeout=10).splitlines()
-    probes = {}
-    for path in paths:
-        hashes = [hashlib.sha256((repo / path).read_bytes()).hexdigest() for repo in (harness, product)]
-        if hashes[0] != hashes[1]:
-            raise ReadinessBlocked('original product probe differs from the pinned source: ' + path)
-        probes[path] = hashes[0]
-    return {'product_trees': trees, 'unchanged_original_probe_files': probes}
+    return {'product_trees': trees,
+            'probe_files_sha256': {path: hashlib.sha256((repo / path).read_bytes()).hexdigest() for path in paths}}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--harness-repo', type=Path, required=True)
-    parser.add_argument('--expected-harness-head', required=True)
-    parser.add_argument('--product-repo', type=Path, required=True)
-    parser.add_argument('--expected-product-head', required=True)
+    parser.add_argument('--repo', type=Path, required=True)
+    parser.add_argument('--expected-head', required=True)
     parser.add_argument('--output-root', type=Path, required=True)
     parser.add_argument('--product-output-root', type=Path, required=True)
     parser.add_argument('--execute-owned-simulator', action='store_true')
     args = parser.parse_args()
-    args.harness_repo = args.harness_repo.resolve()
-    args.product_repo = args.product_repo.resolve()
+    args.repo = args.repo.resolve()
     args.output_root = args.output_root.resolve()
     args.product_output_root = args.product_output_root.resolve()
     for output in (args.output_root, args.product_output_root):
-        if output.is_relative_to(args.harness_repo) or output.is_relative_to(args.product_repo):
-            parser.error('receipts must be outside both source checkouts')
+        if output.is_relative_to(args.repo):
+            parser.error('receipts must be outside the source checkout')
     args.output_root.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='control-', dir=args.output_root))
-    report = {'status': 'not-executed', 'commands': [], 'product_source_sha': PRODUCT_SHA,
+    report = {'status': 'not-executed', 'commands': [], 'expected_head': args.expected_head,
               'control_stdout_path': str(work / 'control-listapps.stdout'), 'work': str(work),
               'host': {'node': platform.node(), 'os': platform.system(), 'arch': platform.machine(), 'pid': os.getpid()},
               'job': {key: os.environ.get(key) for key in ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_JOB', 'RUNNER_NAME')},
@@ -184,21 +170,15 @@ def main():
         pending.write_text(json.dumps(report, indent=2) + '\n')
         pending.replace(work / 'result.json')
     try:
-        harness, product = args.harness_repo.resolve(), args.product_repo.resolve()
-        if args.expected_product_head != PRODUCT_SHA or harness == product:
-            raise ReadinessBlocked('separate checkouts and the pinned8d6product source are required')
-        report['harness_source'] = checkout_facts(harness, args.expected_harness_head)
-        report['product_source'] = checkout_facts(product, PRODUCT_SHA)
-        report['equivalence'] = product_equivalence(harness, product)
-        for output in (args.output_root.resolve(), args.product_output_root.resolve()):
-            if output.is_relative_to(harness) or output.is_relative_to(product):
-                raise ReadinessBlocked('receipts must be outside both source checkouts')
+        report['source'] = checkout_facts(args.repo, args.expected_head)
+        report['source_bindings'] = source_bindings(args.repo)
         if args.product_output_root.exists() or args.product_output_root.is_symlink():
             raise ReadinessBlocked('product output root already exists; never reuse an old receipt')
-        probe_path = product / 'scripts/apple/pvt_native_import/check_native_import.py'
+        probe_path = args.repo / 'scripts/apple/pvt_native_import/check_native_import.py'
         report['product_probe_sha256'] = hashlib.sha256(probe_path.read_bytes()).hexdigest()
-        spec = importlib.util.spec_from_file_location('pvt_pinned_product_probe', probe_path)
-        probe = importlib.util.module_from_spec(spec); spec.loader.exec_module(probe)
+        spec = importlib.util.spec_from_file_location('pvt_current_product_probe', probe_path)
+        probe = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(probe)
         if not args.execute_owned_simulator or platform.system() != 'Darwin' or platform.machine() != 'arm64':
             raise ReadinessBlocked('owned execution requires the authorized arm64/macOS host')
 
@@ -207,7 +187,7 @@ def main():
             report['commands'].append(record)
             save_report()
             try:
-                record.update(probe.run_owned_process(argv, harness, work / (name + '.stdout'),
+                record.update(probe.run_owned_process(argv, args.repo, work / (name + '.stdout'),
                                                      work / (name + '.stderr'), timeout=timeout))
             except OSError as error:
                 record.update(outcome='not-started', error=str(error))
@@ -222,15 +202,13 @@ def main():
         def invoke_probe():
             save_report()
             args.product_output_root.mkdir(parents=True, exist_ok=False)
-            command = [sys.executable, str(probe_path), '--repo', str(product), '--cli',
-                       str(product / 'target/debug/xdremux'), '--expected-head', PRODUCT_SHA,
+            command = [sys.executable, str(probe_path), '--repo', str(args.repo), '--cli',
+                       str(args.repo / 'target/debug/xdremux'), '--expected-head', args.expected_head,
                        '--output-root', str(args.product_output_root), '--execute-owned-simulator']
             report['product_command'] = command
             started = time.monotonic()
             with (work / 'product-probe.stdout').open('wb') as stdout, (work / 'product-probe.stderr').open('wb') as stderr:
-                # The unchanged probe owns its own budgets/device/cleanup. This
-                # synchronous local call stays in the same job after control.
-                result = subprocess.run(command, cwd=product, env={**os.environ, 'CARGO_TARGET_DIR': str(product / 'target')},
+                result = subprocess.run(command, cwd=args.repo, env={**os.environ, 'CARGO_TARGET_DIR': str(args.repo / 'target')},
                                         stdout=stdout, stderr=stderr)
             report['product_duration_seconds'] = time.monotonic() - started
             receipts = list(args.product_output_root.glob('pvt-native-*/result.json'))
@@ -241,7 +219,8 @@ def main():
 
         run_control_and_probe(run, probe.select_device, invoke_probe, report,
                               'pvt-readiness-control-' + uuid.uuid4().hex,
-                              Path.home() / 'Library/Developer/CoreSimulator/Devices')
+                              Path.home() / 'Library/Developer/CoreSimulator/Devices',
+                              expected_head=args.expected_head)
     except (ReadinessBlocked, OSError, ValueError, RuntimeError) as error:
         report.update(status='experiment-blocked', reason=str(error))
     except Exception as error:

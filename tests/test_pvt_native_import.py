@@ -265,8 +265,10 @@ class PVTNativeImportTests(unittest.TestCase):
             probe.wrap_motion_photo(b"not-jpeg", movie)
 
     def test_only_an_installed_compatible_runtime_is_selected(self):
-        runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-0", "version": "27.0"},
-                                 {"isAvailable": False, "identifier": "com.apple.iOS-28-0", "version": "28.0"}]}
+        runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-0", "version": "27.0",
+                                  "supportedDeviceTypes": [{"identifier": "phone"}]},
+                                 {"isAvailable": False, "identifier": "com.apple.iOS-28-0", "version": "28.0",
+                                  "supportedDeviceTypes": [{"identifier": "phone"}]}]}
         types = {"devicetypes": [{"productFamily": "iPhone", "identifier": "phone", "minRuntimeVersion": 27 * 65536}]}
         self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-0", "phone"))
         with self.assertRaises(probe.Blocked):
@@ -275,6 +277,60 @@ class PVTNativeImportTests(unittest.TestCase):
             probe.select_device({"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-16-0", "version": "16.0"}]}, types)
         with self.assertRaises(probe.Blocked):
             probe.select_device(runtimes, {"devicetypes": []})
+
+    def test_runtime_support_limits_the_global_version_compatible_phones(self):
+        runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-1", "version": "27.1",
+                                  "supportedDeviceTypes": [{"identifier": "iPhone-Duo"}]}]}
+        types = {"devicetypes": [
+            {"productFamily": "iPhone", "identifier": "iPhone-Duo", "minRuntimeVersion": 27 * 65536},
+            {"productFamily": "iPhone", "identifier": "iPhone-11", "minRuntimeVersion": 13 * 65536,
+             "maxRuntimeVersion": 2 ** 32 - 1}]}
+        self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-1", "iPhone-Duo"))
+
+    def test_missing_or_empty_explicit_support_never_infers_a_supported_pair(self):
+        types = {"devicetypes": [{"productFamily": "iPhone", "identifier": "phone",
+                                 "minRuntimeVersion": 17 * 65536}]}
+        for support in ({}, {"supportedDeviceTypes": []}):
+            with self.subTest(support=support):
+                runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-0",
+                                          "version": "27.0", **support}]}
+                with self.assertRaises(probe.Blocked):
+                    probe.select_device(runtimes, types)
+
+    def test_newer_runtime_without_a_catalogued_supported_iphone_allows_an_older_pair(self):
+        older = {"isAvailable": True, "identifier": "com.apple.iOS-27-0", "version": "27.0",
+                 "supportedDeviceTypes": [{"identifier": "phone"}]}
+        types = {"devicetypes": [{"productFamily": "iPhone", "identifier": "phone"},
+                                 {"productFamily": "iPad", "identifier": "tablet"}]}
+        for supported in ([], [{"identifier": "uncatalogued"}], [{"identifier": "tablet"}]):
+            with self.subTest(supported=supported):
+                runtimes = {"runtimes": [older, {"isAvailable": True, "identifier": "com.apple.iOS-27-1",
+                                                "version": "27.1", "supportedDeviceTypes": supported}]}
+                self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-0", "phone"))
+
+    def test_explicit_runtime_support_does_not_override_version_bounds(self):
+        runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-1", "version": "27.1",
+                                  "supportedDeviceTypes": [{"identifier": "phone"}]}]}
+        encoded = 27 * 65536 + 256
+        for minimum, maximum, accepted in ((encoded, encoded, True), (encoded + 1, 2 ** 32 - 1, False),
+                                           (0, encoded - 1, False)):
+            with self.subTest(minimum=minimum, maximum=maximum):
+                types = {"devicetypes": [{"productFamily": "iPhone", "identifier": "phone",
+                                         "minRuntimeVersion": minimum, "maxRuntimeVersion": maximum}]}
+                if accepted:
+                    self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-1", "phone"))
+                else:
+                    with self.assertRaises(probe.Blocked):
+                        probe.select_device(runtimes, types)
+
+    def test_latest_runtime_preference_uses_numeric_versions_and_existing_device_order(self):
+        runtimes = {"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-27-2", "version": "27.2",
+                                  "supportedDeviceTypes": [{"identifier": "first"}, {"identifier": "last"}]},
+                                 {"isAvailable": True, "identifier": "com.apple.iOS-27-10", "version": "27.10",
+                                  "supportedDeviceTypes": [{"identifier": "first"}, {"identifier": "last"}]}]}
+        types = {"devicetypes": [{"productFamily": "iPhone", "identifier": "first"},
+                                 {"productFamily": "iPhone", "identifier": "last"}]}
+        self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-10", "last"))
 
 
 if __name__ == "__main__":

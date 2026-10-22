@@ -75,6 +75,8 @@ macOS 27 性能基线保留原始测量值。`apple-styles` 场景允许历史�
 
 ## 研究回归证据
 
-唯一可复用的 `research.yml` 工作流持有可移植研究测试、原生 carrier 回读、固定版本的 Photographic Styles tone 扫描，以及临时 system HEIF HDR 测量。各 job 使用只读权限并检出准确的 PR 或 main SHA。手动重放不接受替代源码或 secret。原生 tone 与 system HEIF job 使用标准 `xcode-27` runner，测量 artifact 保留一天。它们不提供 `exact-head`，也不能证明 Photos 编辑、滑块响应、保存重开或 Gallery 接受情况。
+唯一可复用的 `research.yml` 工作流持有可移植研究测试、原生 carrier 回读、固定版本的 Photographic Styles tone 扫描、临时 system HEIF HDR 测量和 PVT 接受探针。各 job 使用只读权限并检出准确的 PR 或 main SHA。手动重放不接受替代源码或 secret。原生 tone 与 system HEIF job 使用标准 `xcode-27` runner，测量 artifact 保留一天。它们不提供 `exact-head`，也不能证明 Photos 编辑、滑块响应、保存重开或 Gallery 接受情况。
+
+PVT job 的就绪控制与产品探针使用同一份干净检出。选择的 iPhone 必须在目标 runtime 的显式支持列表中，且满足机型的 runtime 版本范围。创建模拟器前还会独立检查支持列表。只有本次创建的控制模拟器通过检查且已确认删除后，才最多运行一次产品探针。产品回执必须绑定同一源码 SHA、runtime 和机型。控制通过不代表 PVT 已被接受；接受结论需要整个包的身份校验和独立 PhotoKit 回读。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
 
 实验命令和晋升条件放在对应代码附近，不为每个假设新建工作流。产品方向回读在 `ci.yml` 中运行，与 Rust 产品测试使用同一准确 SHA，由 ImageIO 读取合成方向 HEIF 及其预期几何。

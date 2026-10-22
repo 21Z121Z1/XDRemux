@@ -82,11 +82,20 @@ Current technical documentation follows the [technical writing guide](../style-g
 
 A single reusable `research.yml` workflow owns portable research tests, native
 carrier readback, the pinned Photographic Styles tone sweep, and the provisional
-system HEIF HDR measurement. Its jobs use the exact pull-request or main SHA
+system HEIF HDR measurement and PVT admission probe. Its jobs use the exact pull-request or main SHA
 with read-only permissions. A manual replay accepts no alternate source or secrets.
 The native tone and system HEIF jobs use the standard `xcode-27` runner and retain
 measurement artifacts for one day. Their results do not supply `exact-head` or
 establish Photos editing, slider response, save/reopen, or Gallery acceptance.
+
+The PVT job uses one clean checkout for its readiness control and product probe.
+It selects an iPhone that the chosen runtime explicitly supports and that meets
+the device type's runtime version bounds. An independent membership check runs
+before simulator creation. The product probe runs at most once, after the owned
+control simulator has passed and its deletion is verified. Its receipt must bind
+the same source SHA, runtime and device type. A passing control does not prove
+PVT admission. Admission requires whole-package identity and independent PhotoKit
+readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 
 Keep experiment commands and promotion criteria beside their code rather than
 creating a workflow per hypothesis. Product orientation readback runs inside

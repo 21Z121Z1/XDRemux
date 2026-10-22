@@ -144,56 +144,46 @@ finally:
 
 This recipe proves the exercised binary's portable conversion and structural pair validation. It does not decode the pair in Apple frameworks, import it into Photos, prove all source codecs, test interrupted publication, or establish final-HEAD acceptance. For broader Motion Photo changes, use the existing `scripts/validation/check_rust_motion_photo_real_fixtures.sh` and the owning negative tests. Do not weaken a failed journey for a missing encoder or dependency.
 
-For direct PVT package admission, the `pvt-native-import` job in `research.yml`
-runs one same-job control through `readiness_control.py` on the public repository's
-existing standard `xcode-27` runner. Separate checkouts bind the exact harness
-head and product `8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a`. Product owner trees and
-all original probe files must match before native effects. The control uses the
-pinned selector/runtime support table, boots one owned simulator with a180s
-bootstatus budget, and submits exactly one20s `listapps` request. Its reply must
-parse as a bundle dictionary. Shutdown/delete target only that control UUID;
-one device-list response and absent host device directory must confirm cleanup.
-Any failed precheck or uncertain cleanup stops without running the product.
-This preflight may warm CoreSimulator; it is not a cold-start repair or proof of
-a fresh VM. Control and product are sequential calls inside one job, not `needs`.
+For direct PVT package admission, use an arm64 macOS host with the required
+Xcode SDK and iOS simulator runtime. From a clean committed checkout, run:
 
-Only after a successful cleaned control, the unchanged pinned
-`scripts/apple/pvt_native_import/check_native_import.py` runs once. It builds
-the pinned source CLI and generates geometric media. Within that probe it first
-compiles a cold SDK canary (240 seconds) and the actual reader (120 seconds)
-before creating or booting a simulator. Cold module setup retains toolchain/SDK
-identity and ten-second snapshots of only its owned compiler process group;
-timeout stops that group and remains non-PASS. After boot, bounded read-only
-app-inventory queries establish that the installation service answers. The
-probe submits at most one 120-second install and checks registration, app/data
-containers, bundle identity and the installed executable hash. A client timeout
-stays recorded; only independently verified matching installed bytes allow
-continuation. Unknown state is observed with bounded reads, never a second
-install. On installation-service failure, diagnostics use the host rather
-than the unresponsive device's `simctl spawn`: five-second process and VM queries
-retain selected CoreSimulator service names/states/CPU/RSS and host page counts.
-These snapshots do not establish a cause or per-process device ownership.
-Owned device metadata and a
-64KiB device-log tail use no-follow bounded regular-file reads, and a
-five-second host log query filters the exact owned UUID. Diagnostic failure
-retains the original service failure; host boot/process facts do not prove
-application readiness. Runtime/type capability facts remain available in the
-receipt without changing device selection. It then establishes a read-only
-PhotoKit baseline. It transports the whole
-validated directory unchanged into that app. A synthetic `UIImage` control
-checks save-action availability without saving it. The probe then offers the
-whole directory URL and, if no save action exists, an explicit
-`com.apple.live-photo` file representation. It records the SDK's extension/URL
-types and automatic item-provider registrations without inventing a PVT UTI.
-XCUITest selects only an unambiguous Photos save activity inside the exact
-created simulator, at most once. Missing activities stop the owned UI process
-group promptly and remain non-PASS. The system callback, phase-bound whole
-package input hashes (offered URL or requested file) and independent PhotoKit
-asset/resource/identifier/cover/hash readback are all required. A UI callback
-alone is not admission. The known unsupported `simctl addmedia` directory route
-is not repeated; decomposed-member import and PhotoKit pair creation are not
-substitutes. Only fixed text receipts leave the runner; media and UI result
-bundles stay local. Missing runtime, SDK, permission, save-action locator,
-native acceptance, readback or cleanup remains non-PASS. This probes the iOS
-simulator sharing path, not macOS Photos library selection, physical-device
-Photos editing or dynamic wallpaper eligibility.
+```bash
+pvt_repo="$(git rev-parse --show-toplevel)"
+pvt_head="$(git rev-parse HEAD)"
+pvt_proof="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-pvt-proof.XXXXXX")"
+python3 scripts/apple/pvt_native_import/readiness_control.py \
+  --repo "$pvt_repo" \
+  --expected-head "$pvt_head" \
+  --output-root "$pvt_proof/control" \
+  --product-output-root "$pvt_proof/product" \
+  --execute-owned-simulator
+```
+
+The `pvt-native-import` job in `research.yml` runs this same control and product
+sequence against one exact PR or main checkout. The receipt records the full
+source SHA, source tree, product owner trees and probe-file hashes. Both output
+roots must be outside the checkout; the product root must not already exist.
+
+The selector intersects runtime-supported device identifiers with version-compatible
+iPhones. The readiness control independently checks membership before creating
+its own simulator. It boots that simulator, reads the installed-app inventory
+once, and verifies deletion in both the device registry and host directory.
+Only a passed and cleaned control permits one product probe. The product receipt
+must match the same SHA, runtime and device type. The control can warm
+CoreSimulator; it does not prove a cold-start repair or Photos admission.
+
+The product probe builds the current CLI, generates synthetic media, compiles the
+SDK canary and reader, then uses its own simulator. It verifies installed app
+identity and establishes a read-only PhotoKit baseline before offering the whole
+validated PVT directory through system sharing. Admission requires the system
+callback, phase-bound whole-package input hashes, and independent PhotoKit
+asset, resource, identifier, cover-time and exported-byte readback. A callback,
+decomposed-member import or PhotoKit pair creation cannot substitute for these
+checks. Runtime, build, inventory, install, permission, save-action, readback and
+cleanup failures remain non-PASS under the probe's existing process budgets.
+
+Retain the control and product `result.json` receipts and their diagnostics.
+Only the workflow's listed text diagnostics leave the runner; generated media
+and UI result bundles stay local. This checks the iOS simulator sharing path.
+It does not establish macOS Photos library behavior, physical-device Photos
+editing or dynamic wallpaper eligibility.
