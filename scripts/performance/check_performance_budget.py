@@ -117,12 +117,15 @@ def main() -> int:
             failures.append(f"missing benchmark case {name}")
             continue
 
+        case_wall_fraction = finite_number(
+            reference_raw.get("wall_fraction", wall_fraction), f"{name} wall_fraction"
+        )
         checks = (
             (
                 "median_wall_seconds",
                 finite_number(reference_raw.get("median_wall_seconds"), f"{name} median reference"),
                 finite_number(current.get("median_wall_seconds"), f"{name} median current"),
-                wall_fraction,
+                case_wall_fraction,
                 wall_absolute,
                 "s",
             ),
@@ -130,7 +133,7 @@ def main() -> int:
                 "p95_wall_seconds",
                 finite_number(reference_raw.get("p95_wall_seconds"), f"{name} p95 reference"),
                 finite_number(current.get("p95_wall_seconds"), f"{name} p95 current"),
-                wall_fraction,
+                case_wall_fraction,
                 wall_absolute,
                 "s",
             ),

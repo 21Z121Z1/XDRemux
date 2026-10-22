@@ -27,6 +27,10 @@ parser test 不是真机测试。
 
 完整产品门禁面向 arm64/macOS 27：App、adapter、解包运行、原媒体保全、HDR/Styles 和性能检查均保留。Linux、Windows、macOS 的 Rust 核心测试继续执行，Intel 产品包不再属于分发范围。范围调整不把原生缺测、操作失败或未验设备行为变成通过。
 
+macOS 27 性能基线保留原始测量值。`apple-styles` 场景允许历史中位数和 p95 耗时的两倍，
+用于容纳 Linear Thumbnail 缩小前的全分辨率 HDR 重建。该场景的 RSS 和 helper 启动次数限制保持不变，
+其他场景继续使用公共耗时容差。参见[版本化预算](../../benchmarks/macos27-arm64-product-baseline.json)。
+
 使用最小但完整的证据集。
 
 - 纯文档修改：文档 policy 和链接检查。

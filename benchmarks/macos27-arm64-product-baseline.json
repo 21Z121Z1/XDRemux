@@ -55,7 +55,9 @@
     "apple-styles": {
       "median_wall_seconds": 8.690738750000037,
       "p95_wall_seconds": 11.411910766899974,
-      "max_peak_rss_mib": 1089.09375
+      "max_peak_rss_mib": 1089.09375,
+      "wall_fraction": 1.0,
+      "wall_budget_reason": "Allow full-resolution HDR reconstruction before Linear Thumbnail reduction within twice the measured historical wall times. RSS and helper-launch budgets retain their existing limits."
     }
   },
   "apple_adapter_process_launches": {

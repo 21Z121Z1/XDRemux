@@ -27,6 +27,12 @@ A container parser pass is not proof that a gallery renders the result correctly
 
 The complete product gate targets arm64/macOS 27: App, adapter, relocated package, media preservation, HDR/Styles and performance checks remain required. Linux, Windows and macOS Rust core tests remain enabled. Intel product-package checks are outside the supported delivery scope. This scope does not turn missing native data, failed operations or untested device behavior into a pass.
 
+The macOS 27 performance reference preserves its original measurements. The
+`apple-styles` case allows twice the historical median and p95 wall times to
+accommodate full-resolution HDR reconstruction before Linear Thumbnail reduction.
+Its RSS and helper-launch limits remain unchanged. Other workloads retain the
+shared wall-time tolerance. See the [versioned budget](../../benchmarks/macos27-arm64-product-baseline.json).
+
 Use the smallest complete evidence set.
 
 - Documentation-only change: documentation policy and link checks.
