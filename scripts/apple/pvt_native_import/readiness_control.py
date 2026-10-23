@@ -56,7 +56,8 @@ def run_control(run, choose_device, report, name, device_root, *, capture_diagno
         owned = parsed
         facts['owned_udid'] = owned
         stages.record('readiness', 'observed', 'owned_uuid_received', owned_udid=owned)
-        run('control-boot', ['xcrun', 'simctl', 'boot', owned])
+        # Let the monitor initiate startup; a preceding boot can leave it
+        # observing an already-Booted device instead of the startup sequence.
         run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
         stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1

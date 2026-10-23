@@ -90,6 +90,27 @@ class ControlModel:
 
 
 class ReadinessControlTests(unittest.TestCase):
+    def test_boot_monitor_starts_the_owned_device_before_inventory(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw))
+            model.execute()
+            boot_commands = [(argv, timeout) for _, argv, timeout in model.commands
+                             if argv[2] in ('boot', 'bootstatus')]
+            self.assertEqual(boot_commands, [
+                (['xcrun', 'simctl', 'bootstatus', model.uuid, '-b'], 180)])
+            names = [name for name, _, _ in model.commands]
+            self.assertLess(names.index('control-bootstatus'), names.index('control-listapps'))
+
+    def test_boot_monitor_failure_cleans_up_without_inventory_or_product(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw), 'control-bootstatus')
+            model.execute()
+            self.assertEqual(model.probes, 0)
+            self.assertEqual(model.report['control']['listapps_attempts'], 0)
+            self.assertEqual(model.report['status'], 'control-environment-blocked')
+            self.assertFalse(any(argv[2] in ('boot', 'listapps') for _, argv, _ in model.commands))
+            model.assert_control_cleaned()
+
     def test_main_persists_failed_control_diagnostics_without_running_product(self):
         repo = Path(control.__file__).resolve().parents[3]
         with tempfile.TemporaryDirectory() as raw:

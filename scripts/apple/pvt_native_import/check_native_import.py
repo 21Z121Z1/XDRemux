@@ -736,7 +736,7 @@ def main():
         owned_udid = str(uuid.UUID(result.stdout.decode().strip())).upper()
         report['owned_udid'] = owned_udid
         (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
-        run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
+        # Start and monitor with one bounded command, as in the control.
         run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
         install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
