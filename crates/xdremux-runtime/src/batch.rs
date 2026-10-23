@@ -64,6 +64,7 @@ impl Default for BatchExecutionOptions {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CinematicFocalLength {
+    Automatic,
     Assumed(f32),
     CameraEstimate(PathBuf),
 }
@@ -76,7 +77,7 @@ pub struct CinematicEnvelopeOptions {
 impl Default for CinematicEnvelopeOptions {
     fn default() -> Self {
         Self {
-            focal_length: CinematicFocalLength::Assumed(24.0),
+            focal_length: CinematicFocalLength::Automatic,
             aperture: 2.8,
         }
     }

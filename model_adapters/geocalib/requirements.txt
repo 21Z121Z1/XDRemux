@@ -1,3 +1,4 @@
+# Isolated model dependencies; not the XDRemux research Python package.
 geocalib @ https://github.com/cvg/GeoCalib/archive/1dedb29f94fc11b896c5f572005978aeebccd67f.tar.gz
 torch==2.14.1
 torchvision==0.29.1

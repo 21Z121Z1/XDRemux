@@ -81,8 +81,9 @@ pub use capabilities::{
     RasterDecoderCapabilities,
 };
 pub use cinematic_camera::{
-    CinematicCameraError, CinematicCameraEstimate, CinematicCameraEstimator,
-    CinematicCameraIntrinsics, CinematicCameraSample, CinematicCameraSummary,
+    resolve_recorded_cinematic_focal_length, CinematicCameraError, CinematicCameraEstimate,
+    CinematicCameraEstimator, CinematicCameraIntrinsics, CinematicCameraSample,
+    CinematicCameraSummary,
 };
 pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,

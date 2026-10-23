@@ -88,7 +88,7 @@ struct ProductConversionArgs {
     /// Infer pending Cinematic editing metadata for ordinary video (macOS 27).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles"])]
     apple_cinematic: bool,
-    /// Assumed 35mm-equivalent focal length for Cinematic input without camera geometry.
+    /// Override recorded/automatically estimated Cinematic 35mm-equivalent focal length.
     #[arg(long, value_name = "MM", requires = "apple_cinematic")]
     focal_length_35mm: Option<f32>,
     /// Assumed capture aperture for Cinematic rendering metadata.
@@ -133,8 +133,9 @@ impl ProductConversionArgs {
 
     fn cinematic_options(&self) -> xdremux_runtime::CinematicEnvelopeOptions {
         xdremux_runtime::CinematicEnvelopeOptions {
-            focal_length: xdremux_runtime::CinematicFocalLength::Assumed(
-                self.focal_length_35mm.unwrap_or(24.0),
+            focal_length: self.focal_length_35mm.map_or(
+                xdremux_runtime::CinematicFocalLength::Automatic,
+                xdremux_runtime::CinematicFocalLength::Assumed,
             ),
             aperture: self.aperture.unwrap_or(2.8),
         }
@@ -922,6 +923,11 @@ fn run_cinematic_envelope(
                         estimate.estimator, estimate.sample_count
                     );
                 }
+                let _ = writeln!(
+                    stdout,
+                    "focal-length-source: {}",
+                    receipt.focal_length_source.as_str()
+                );
                 let _ = writeln!(
                     stdout,
                     "{}",
@@ -1777,6 +1783,22 @@ mod tests {
 {help}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn cinematic_defaults_to_automatic_camera_on_both_entry_points() {
+        for command in ["convert", "batch"] {
+            let cli = parse(&[command, "--input", "clip.mov", "--apple-cinematic"]);
+            let options = match cli.command {
+                RootCommand::Convert(args) => args.cinematic_options(),
+                RootCommand::Batch(args) => args.product.cinematic_options(),
+                _ => panic!("conversion expected"),
+            };
+            assert_eq!(
+                options.focal_length,
+                xdremux_runtime::CinematicFocalLength::Automatic
+            );
         }
     }
 

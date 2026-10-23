@@ -53,6 +53,32 @@ impl fmt::Display for CinematicCameraError {
 
 impl std::error::Error for CinematicCameraError {}
 
+/// Resolve explicit 35mm-equivalent observations, never physical lens focal lengths.
+/// EXIF uses zero to denote an unknown equivalent. Conflicting nonzero observations
+/// cannot establish the fixed camera required by the pending Cinematic envelope.
+pub fn resolve_recorded_cinematic_focal_length(
+    equivalents: &[f64],
+) -> Result<Option<f32>, CinematicCameraError> {
+    let mut selected: Option<f64> = None;
+    for &value in equivalents {
+        if value == 0.0 {
+            continue;
+        }
+        if !value.is_finite() || !(1.0..=300.0).contains(&value) {
+            return Err(CinematicCameraError(
+                "recorded 35mm-equivalent focal length must be finite and between 1 and 300",
+            ));
+        }
+        if selected.is_some_and(|first| (value - first).abs() > 0.001) {
+            return Err(CinematicCameraError(
+                "recorded 35mm-equivalent focal lengths disagree; specify a fixed focal length explicitly",
+            ));
+        }
+        selected = selected.or(Some(value));
+    }
+    Ok(selected.map(|value| value as f32))
+}
+
 fn hex_digest(value: &str, length: usize) -> bool {
     value.len() == length
         && value
@@ -169,6 +195,22 @@ impl CinematicCameraEstimate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recorded_equivalent_requires_one_known_fixed_value() {
+        assert_eq!(resolve_recorded_cinematic_focal_length(&[]).unwrap(), None);
+        assert_eq!(
+            resolve_recorded_cinematic_focal_length(&[0.0]).unwrap(),
+            None
+        );
+        assert_eq!(
+            resolve_recorded_cinematic_focal_length(&[0.0, 70.0, 70.0]).unwrap(),
+            Some(70.0)
+        );
+        for values in [vec![35.0, 70.0], vec![f64::NAN], vec![-1.0], vec![301.0]] {
+            assert!(resolve_recorded_cinematic_focal_length(&values).is_err());
+        }
+    }
 
     fn intrinsics() -> CinematicCameraIntrinsics {
         CinematicCameraIntrinsics {

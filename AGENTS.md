@@ -2,7 +2,7 @@
 
 English | [简体中文](AGENTS.zh-CN.md)
 
-XDRemux has one product stack: the Rust `xdremux` CLI, runtime, engine, and media crates. Swift is only the narrow Apple framework adapter. Python is research and training tooling.
+XDRemux has one product stack: the Rust `xdremux` CLI, runtime, engine, and media crates. Swift is only the narrow Apple framework adapter. Python provides research/training tooling and isolated model primitives under `model_adapters/`. Model primitives return observations; camera selection, admission and conversion policy remain in Rust.
 
 Read [development](docs/development.en.md) for ownership, [testing policy](docs/quality/testing.en.md) for evidence selection, [validation](docs/validation/README.en.md) for exact-HEAD receipts, and [Apple features](docs/apple-features.en.md) for the platform boundary.
 

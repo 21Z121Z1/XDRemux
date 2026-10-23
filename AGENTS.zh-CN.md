@@ -2,7 +2,7 @@
 
 [English](AGENTS.md) | 简体中文
 
-XDRemux 只有一套产品栈：Rust `xdremux` CLI、runtime、engine 和媒体 crate。Swift 只保留窄 Apple framework adapter。Python 只用于研究和训练。
+XDRemux 只有一套产品栈：Rust `xdremux` CLI、runtime、engine 和媒体 crate。Swift 只保留窄 Apple framework adapter。Python 提供研究/训练工具，以及 `model_adapters/` 下独立的模型原语。模型原语只返回观测；相机选择、准入和转换 policy 仍由 Rust 持有。
 
 所有权见[开发文档](docs/development.md)，证据选择见[测试政策](docs/quality/testing.md)，准确 `HEAD` 回执见[验证文档](docs/validation/README.md)，平台边界见 [Apple 功能](docs/apple-features.md)。
 

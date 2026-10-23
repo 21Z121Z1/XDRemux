@@ -52,13 +52,22 @@ fn cinematic_preflight_preserves_existing_files_and_rejects_invalid_parameters()
 }
 
 fn helper(root: &Path, behavior: &str) -> std::path::PathBuf {
+    if !root.join("exiftool").exists() {
+        let metadata = root.join("exiftool");
+        fs::write(
+            &metadata,
+            "#!/bin/sh\nprintf '%s\\n' '[{\"ExifIFD:Main:FocalLengthIn35mmFormat\":24}]'\n",
+        )
+        .unwrap();
+        fs::set_permissions(metadata, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let path = root.join("adapter.py");
     let script = format!(
         r#"#!/usr/bin/python3
 import json, pathlib, sys
 for line in sys.stdin:
     request = json.loads(line)
-    pathlib.Path(request['output_path']).write_bytes(b'candidate')
+    pathlib.Path(request['output_path']).write_text(str(request['cinematic_envelope']['focal_length_35mm']))
     if '{behavior}' == 'source-change':
         pathlib.Path(request['input_path']).write_bytes(b'changed source')
     response = {{'schema_version': 2, 'cinematic_envelope': {{
@@ -187,6 +196,217 @@ fn camera_estimate(root: &Path, input: &Path) -> std::path::PathBuf {
     let path = root.join("camera.json");
     fs::write(&path, serde_json::to_vec(&estimate).unwrap()).unwrap();
     path
+}
+
+fn camera_tools(root: &Path, input: &Path, metadata: &str) {
+    let metadata_script = format!("#!/usr/bin/python3\nprint({metadata:?})\n");
+    let path = root.join("exiftool");
+    fs::write(&path, metadata_script).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    let estimate = camera_estimate(root, input);
+    let path = root.join("xdremux-geocalib");
+    fs::write(&path, format!(
+        "#!/usr/bin/python3\nimport pathlib,sys\npathlib.Path({:?}).write_text('called')\npathlib.Path(sys.argv[sys.argv.index('--output')+1]).write_bytes(pathlib.Path({:?}).read_bytes())\n",
+        root.join("model-called"), estimate
+    )).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+#[test]
+fn automatic_cinematic_prefers_recorded_equivalent_and_only_estimates_when_missing() {
+    for (metadata, expected, estimates) in [
+        (
+            r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":70}]"#,
+            70.0,
+            false,
+        ),
+        (
+            r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#,
+            70.0,
+            false,
+        ),
+        (r#"[{}]"#, 35.0, true),
+        (r#"[{"ExifIFD:Main:FocalLength":8.5}]"#, 35.0, true),
+        (
+            r#"[{"ExifIFD:Doc1:FocalLengthIn35mmFormat":24}]"#,
+            35.0,
+            true,
+        ),
+        (
+            r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":0}]"#,
+            35.0,
+            true,
+        ),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = source(temp.path());
+        camera_tools(temp.path(), &input, metadata);
+        let output = temp.path().join("pending.mov");
+        let receipt = PortableRuntime::new()
+            .generate_cinematic_envelope_file(
+                helper(temp.path(), "valid"),
+                &input,
+                &output,
+                &CinematicEnvelopeOptions::default(),
+            )
+            .unwrap();
+        assert_eq!(receipt.focal_length_35mm, expected, "{metadata}");
+        assert_eq!(
+            temp.path().join("model-called").exists(),
+            estimates,
+            "{metadata}"
+        );
+        assert_eq!(receipt.camera_estimate.is_some(), estimates);
+        assert_eq!(
+            receipt.focal_length_source.as_str(),
+            if estimates {
+                "geocalib"
+            } else {
+                "recorded-metadata"
+            }
+        );
+        assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
+    }
+}
+
+#[test]
+fn automatic_cinematic_fails_without_guessing_and_cleans_model_staging() {
+    for scenario in [
+        "conflict",
+        "malformed-tag",
+        "metadata-failure",
+        "model-failure",
+        "missing-model",
+        "wrong-source",
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = source(temp.path());
+        let metadata = match scenario {
+            "conflict" => {
+                r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":70,"VideoKeys:Main:FocalLengthIn35mmFormat":35}]"#
+            }
+            "malformed-tag" => r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":"bad"}]"#,
+            _ => "[{}]",
+        };
+        camera_tools(temp.path(), &input, metadata);
+        let expected = match scenario {
+            "conflict" => "disagree",
+            "malformed-tag" => "invalid numeric",
+            "metadata-failure" => {
+                fs::write(temp.path().join("exiftool"), "#!/bin/sh\nexit 2\n").unwrap();
+                "helper exit status"
+            }
+            "model-failure" => {
+                fs::write(temp.path().join("xdremux-geocalib"), "#!/bin/sh\nexit 3\n").unwrap();
+                "helper exit status"
+            }
+            "missing-model" => {
+                // An existing but nonexecutable sibling prevents PATH fallback.
+                fs::set_permissions(
+                    temp.path().join("xdremux-geocalib"),
+                    fs::Permissions::from_mode(0o600),
+                )
+                .unwrap();
+                "Cinematic GeoCalib"
+            }
+            _ => {
+                fs::write(&input, b"different source").unwrap();
+                "SHA-256 does not match"
+            }
+        };
+        let output = temp.path().join("pending.mov");
+        let error = PortableRuntime::new()
+            .generate_cinematic_envelope_file(
+                helper(temp.path(), "valid"),
+                &input,
+                &output,
+                &CinematicEnvelopeOptions::default(),
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains(expected), "{scenario}: {error}");
+        assert!(!output.exists());
+        assert_eq!(
+            fs::read(&input).unwrap(),
+            if scenario == "wrong-source" {
+                b"different source".as_slice()
+            } else {
+                b"protected source bytes".as_slice()
+            }
+        );
+        assert!(!fs::read_dir(temp.path()).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".xdremux-cinematic-")));
+        if matches!(scenario, "conflict" | "malformed-tag" | "metadata-failure") {
+            assert!(!temp.path().join("model-called").exists());
+        }
+    }
+}
+
+#[test]
+fn explicit_cinematic_focal_bypasses_both_automatic_tools() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = source(temp.path());
+    let adapter = helper(temp.path(), "valid");
+    fs::write(temp.path().join("exiftool"), "#!/bin/sh\nexit 2\n").unwrap();
+    let receipt = PortableRuntime::new()
+        .generate_cinematic_envelope_file(
+            adapter,
+            &input,
+            temp.path().join("pending.mov"),
+            &CinematicEnvelopeOptions {
+                focal_length: CinematicFocalLength::Assumed(70.0),
+                aperture: 2.8,
+            },
+        )
+        .unwrap();
+    assert_eq!(receipt.focal_length_35mm, 70.0);
+    assert_eq!(receipt.focal_length_source.as_str(), "explicit");
+}
+
+#[test]
+fn cinematic_batch_resolves_each_camera_independently_in_serial_and_parallel() {
+    use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
+    use xdremux_runtime::{BatchExecutionOptions, BatchItem};
+    for jobs in [1, 2] {
+        let temp = tempfile::tempdir().unwrap();
+        let estimated = source(temp.path());
+        let recorded = temp.path().join("recorded.mov");
+        fs::write(&recorded, b"a distinct camera source").unwrap();
+        camera_tools(temp.path(), &estimated, "[{}]");
+        fs::write(temp.path().join("exiftool"), r#"#!/usr/bin/python3
+import json,sys
+print(json.dumps([{'VideoKeys:Main:FocalLengthIn35mmFormat':70}] if sys.argv[-1].endswith('/recorded.mov') else [{}]))
+"#).unwrap();
+        let estimated_output = temp.path().join("estimated-pending.mov");
+        let recorded_output = temp.path().join("recorded-pending.mov");
+        let receipt = PortableRuntime::new().convert_batch_with_options(
+            vec![
+                BatchItem::new(&estimated, &estimated_output),
+                BatchItem::new(&recorded, &recorded_output),
+            ],
+            ConversionRequest {
+                apple_features: AppleFeatureRequest {
+                    cinematic: true,
+                    ..AppleFeatureRequest::default()
+                },
+                ..ConversionRequest::default()
+            },
+            &BatchExecutionOptions {
+                jobs,
+                apple_adapter_executable: Some(helper(temp.path(), "valid")),
+                ..BatchExecutionOptions::default()
+            },
+        );
+        assert!(receipt.failures.is_empty(), "{:?}", receipt.failures);
+        assert_eq!(receipt.successes.len(), 2);
+        assert_eq!(fs::read_to_string(estimated_output).unwrap(), "35.0");
+        assert_eq!(fs::read_to_string(recorded_output).unwrap(), "70.0");
+        assert!(temp.path().join("model-called").exists());
+        assert_eq!(fs::read(estimated).unwrap(), b"protected source bytes");
+        assert_eq!(fs::read(recorded).unwrap(), b"a distinct camera source");
+    }
 }
 
 #[test]

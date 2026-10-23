@@ -9,6 +9,8 @@ mod apple_texture;
 mod batch;
 mod batch_checkpoint;
 mod categorize;
+#[cfg(target_os = "macos")]
+mod cinematic_camera;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
@@ -28,6 +30,8 @@ pub use batch_checkpoint::{
     motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
     MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
 };
+#[cfg(target_os = "macos")]
+pub use cinematic_camera::CinematicFocalLengthSource;
 
 #[cfg(target_os = "macos")]
 pub fn validate_apple_styles_file(
@@ -173,6 +177,7 @@ pub struct CinematicEnvelopeFileReceipt {
     pub output: PathBuf,
     pub processed_frames: u64,
     pub camera_estimate: Option<xdremux_engine::CinematicCameraSummary>,
+    pub focal_length_source: CinematicFocalLengthSource,
     pub focal_length_35mm: f32,
     pub aperture: f32,
     pub disparity_track_written: bool,
@@ -288,48 +293,22 @@ impl PortableRuntime {
             source_digest.update(&buffer[..count]);
         }
         let original_digest = source_digest.finalize();
-        let (focal_length_35mm, camera_estimate) = match &options.focal_length {
-            CinematicFocalLength::Assumed(focal) => (*focal, None),
-            CinematicFocalLength::CameraEstimate(path) => {
-                let file = File::open(path)
-                    .map_err(|error| RuntimeError::external("Cinematic camera estimate", error))?;
-                let mut bytes = Vec::new();
-                file.take(1_048_577)
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| {
-                        RuntimeError::external("Cinematic camera estimate read", error)
-                    })?;
-                if bytes.len() > 1_048_576 {
-                    return Err(RuntimeError::new(
-                        "Cinematic camera estimate",
-                        "estimate exceeds 1 MiB",
-                    ));
-                }
-                let estimate: xdremux_engine::CinematicCameraEstimate =
-                    serde_json::from_slice(&bytes).map_err(|error| {
-                        RuntimeError::external("Cinematic camera estimate JSON", error)
-                    })?;
-                let source_hash: String = original_digest
-                    .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect();
-                if estimate.source_sha256 != source_hash {
-                    return Err(RuntimeError::new(
-                        "Cinematic camera estimate",
-                        "source SHA-256 does not match the input video",
-                    ));
-                }
-                let summary = estimate
-                    .resolve()
-                    .map_err(|error| RuntimeError::external("Cinematic camera estimate", error))?;
-                (summary.focal_length_35mm, Some(summary))
-            }
-        };
-
         let staging = tempfile::Builder::new()
             .prefix(".xdremux-cinematic-")
             .tempdir_in(&output_parent)
             .map_err(|error| RuntimeError::external("Cinematic staging", error))?;
+        let source_hash: String = original_digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let camera = cinematic_camera::resolve(
+            executable.as_ref(),
+            &input,
+            staging.path(),
+            &options.focal_length,
+            &source_hash,
+        )?;
+        let focal_length_35mm = camera.focal;
         let candidate = staging.path().join("pending-cinematic.mov");
         let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
         let facts =
@@ -373,7 +352,8 @@ impl PortableRuntime {
         Ok(CinematicEnvelopeFileReceipt {
             output,
             processed_frames: facts.processed_frames,
-            camera_estimate,
+            camera_estimate: camera.estimate,
+            focal_length_source: camera.source,
             focal_length_35mm: facts.focal_length_35mm,
             aperture: facts.aperture,
             disparity_track_written: facts.disparity_track_written,

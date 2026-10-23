@@ -2,7 +2,7 @@
 
 English | [简体中文](development.md)
 
-XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is limited to the Apple framework adapter, and Python is research/training tooling rather than a second XDRemux runtime.
+XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is limited to the Apple framework adapter. Python supplies research/training tooling and isolated model primitives, without owning conversion policy or a second XDRemux runtime.
 
 For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
@@ -114,12 +114,15 @@ Research dependencies currently include `Pillow` and `numpy`. The optional `trai
 
 Training and evaluation scripts may remain in the Python research package because they are tooling, not a second XDRemux implementation.
 
+The separate `model_adapters/geocalib/` component is a runtime ML primitive, outside the research package. Rust invokes the installed `xdremux-geocalib` helper through a bounded process boundary. It returns observations only; the engine owns their interpretation and admission. See [installation and the observation contract](../model_adapters/geocalib/README.en.md). Product archives do not include its Python environment, weights, FFmpeg or ExifTool. Automatic Cinematic input requires those local dependencies; explicit focal input bypasses them. No conversion downloads models automatically.
+
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
 | `crates/` | Canonical Rust product stack. |
 | `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
+| `model_adapters/` | Isolated local ML primitives returning observations to Rust; no conversion policy. |
 | `xdremux_py/` | Research/training tooling; no product CLI or converter. |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI shell, Xcode project, app tests, and app-owned build/test scripts. |
 | `tests/` | Python regression suites, validation-framework self-tests, and small synthetic fixtures; Rust tests remain with their crates. |
@@ -130,7 +133,7 @@ Training and evaluation scripts may remain in the Python research package becaus
 | `benchmarks/` | Versioned performance baselines, separate from measurement scripts and generated reports. |
 | `research/oppo_styles/models/` | Optional research models and model documentation. |
 
-New user-visible behavior belongs in Rust. Swift changes must remain framework primitives, and Python changes must remain research tooling.
+New user-visible behavior belongs in Rust. Swift changes must remain framework primitives. Python changes must remain research tooling or isolated model primitives returning facts to Rust.
 
 ## Apple helper lifecycle
 

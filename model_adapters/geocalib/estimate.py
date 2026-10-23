@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record GeoCalib pinhole observations for the Rust Cinematic camera boundary."""
+"""GeoCalib model primitive: return pinhole observations to the Rust runtime."""
 
 from __future__ import annotations
 

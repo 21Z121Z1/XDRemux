@@ -2,7 +2,7 @@
 
 [English](development.en.md) | 简体中文
 
-XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `xdremux` 二进制程序。新的产品行为必须进入 Rust。Swift 只保留 Apple framework adapter，Python 只保留研究/训练工具，不再构成第二套 XDRemux runtime。
+XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `xdremux` 二进制程序。新的产品行为必须进入 Rust。Swift 只保留 Apple framework adapter。Python 提供研究/训练工具和独立模型原语，不持有转换 policy，也不构成第二套 XDRemux runtime。
 
 面向用户的命令行行为见 [CLI 参考](cli.md)。
 
@@ -107,12 +107,15 @@ python -m unittest tests.test_apple_reverse_key1_training
 
 训练和评估脚本可以继续使用 Python，因为它们属于研究工具，而不是第二套 XDRemux 实现。
 
+独立的 `model_adapters/geocalib/` 组件是 runtime ML 原语，不属于研究 package。Rust 通过有时限的进程边界调用已安装的 `xdremux-geocalib` helper。它只返回观测，由 engine 持有解释与准入。见[安装及观测约定](../model_adapters/geocalib/README.md)。产品压缩包不包含其 Python 环境、权重、FFmpeg 或 ExifTool。Cinematic 自动输入需要这些本地依赖，显式焦距则绕过它们。转换不会自动下载模型。
+
 ## 仓库结构
 
 | 路径 | 用途 |
 | --- | --- |
 | `crates/` | Canonical Rust 产品栈。 |
 | `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
+| `model_adapters/` | 向 Rust 返回观测的独立本地 ML 原语，不持有转换 policy。 |
 | `xdremux_py/` | 研究/训练工具；没有产品 CLI 或 converter。 |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI 界面、Xcode 工程、App 测试与 App 自有的构建和测试脚本。 |
 | `tests/` | Python 回归测试、验证框架自测与小型合成 fixture；Rust 测试仍与所属 crate 放在一起。 |
@@ -123,7 +126,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `benchmarks/` | 版本化性能基线，与测量脚本及生成的报告分开存放。 |
 | `research/oppo_styles/models/` | 可选研究模型和模型文档。 |
 
-新的用户可见行为进入 Rust。Swift 改动必须保持 framework primitive 边界，Python 改动必须保持研究工具边界。
+新的用户可见行为进入 Rust。Swift 改动必须保持 framework primitive 边界。Python 改动必须保持研究工具或向 Rust 返回事实的独立模型原语边界。
 
 ## Apple helper 生命周期
 
