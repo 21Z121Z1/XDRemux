@@ -14,6 +14,13 @@ import tempfile
 import time
 import uuid
 
+if __package__:
+    from .observations import PVTStages
+    from .owned_cleanup import cleanup_owned_simulator
+else:
+    from observations import PVTStages
+    from owned_cleanup import cleanup_owned_simulator
+
 NATIVE_PASS = 'native-direct-pvt-import-and-readback-pass'
 
 
@@ -22,8 +29,9 @@ class ReadinessBlocked(RuntimeError):
 
 
 def run_control(run, choose_device, report, name, device_root):
+    stages = PVTStages(report.get('expected_head'), name, ('readiness',))
     facts = {'name': name, 'status': 'pending', 'listapps_attempts': 0,
-             'cleanup_status': 'not-created'}
+             'cleanup_status': 'not-created', 'stage_observations': stages.facts}
     report['control'] = facts
     owned = None
     ready = False
@@ -31,6 +39,7 @@ def run_control(run, choose_device, report, name, device_root):
     try:
         if not re.fullmatch(r'pvt-readiness-control-[0-9a-f]{32}', name):
             raise ReadinessBlocked('control name does not belong to this invocation')
+        stages.record('readiness', 'started', 'runtime_catalog_requested')
         runtimes = json.loads(run('control-runtimes', ['xcrun', 'simctl', 'list', 'runtimes', '--json']).stdout)
         types = json.loads(run('control-device-types', ['xcrun', 'simctl', 'list', 'devicetypes', '--json']).stdout)
         runtime, device = choose_device(runtimes, types)
@@ -38,6 +47,7 @@ def run_control(run, choose_device, report, name, device_root):
         if not any(row.get('identifier') == device for row in supported):
             raise ReadinessBlocked('selected runtime does not explicitly list the selected device type')
         facts.update(selected_runtime=runtime, selected_device_type=device)
+        stages.record('readiness', 'observed', 'supported_pair_selected', runtime=runtime, device_type=device)
         create_submitted = True
         raw = run('control-create', ['xcrun', 'simctl', 'create', name, device, runtime]).stdout.decode().strip()
         parsed = str(uuid.UUID(raw)).upper()
@@ -45,9 +55,12 @@ def run_control(run, choose_device, report, name, device_root):
             raise ReadinessBlocked('control create did not return one canonical UUID')
         owned = parsed
         facts['owned_udid'] = owned
+        stages.record('readiness', 'observed', 'owned_uuid_received', owned_udid=owned)
         run('control-boot', ['xcrun', 'simctl', 'boot', owned])
         run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
+        stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1
+        stages.record('readiness', 'observed', 'inventory_submitted')
         result = run('control-listapps', ['xcrun', 'simctl', 'listapps', owned], timeout=20)
         if result.returncode:
             raise ReadinessBlocked('control inventory returned nonzero')
@@ -64,32 +77,19 @@ def run_control(run, choose_device, report, name, device_root):
         if not isinstance(bundles, dict) or any(not isinstance(k, str) or not isinstance(v, dict) for k, v in bundles.items()):
             raise ReadinessBlocked('control inventory is not a bundle dictionary')
         facts.update(bundle_count=len(bundles), inventory_stdout_sha256=hashlib.sha256(result.stdout).hexdigest())
+        stages.record('readiness', 'completed', 'inventory_parsed', bundle_count=len(bundles))
         ready = True
     except (ReadinessBlocked, RuntimeError, OSError, ValueError, KeyError, StopIteration) as error:
         facts['reason'] = str(error)
     finally:
+        stages.stop_active(timed_out=any(row.get('outcome') == 'uncertain-after-timeout' for row in report.get('commands', [])))
         if owned:
-            cleanup = []
-            for action, verb in [('control-shutdown', 'shutdown'), ('control-delete', 'delete')]:
-                try:
-                    result = run(action, ['xcrun', 'simctl', verb, owned], required=False)
-                    cleanup.append(result.returncode == 0)
-                except (ReadinessBlocked, RuntimeError, OSError) as error:
-                    facts[action + '_error'] = str(error)
-                    cleanup.append(False)
-            try:
-                result = run('control-cleanup-verification', ['xcrun', 'simctl', 'list', 'devices', '--json'], timeout=20)
-                devices = json.loads(result.stdout)['devices']
-                if not isinstance(devices, dict) or any(not isinstance(rows, list) for rows in devices.values()):
-                    raise ReadinessBlocked('cleanup verification is not a device dictionary')
-                ids = [row['udid'].upper() for rows in devices.values() for row in rows]
-                absent = owned not in ids and not (device_root / owned).exists() and not (device_root / owned).is_symlink()
-                facts['cleanup_absence_verified'] = absent
-                cleanup.append(result.returncode == 0 and absent)
-            except (ReadinessBlocked, RuntimeError, OSError, ValueError, KeyError, TypeError, AttributeError) as error:
-                facts['cleanup_verification_error'] = str(error)
-                cleanup.append(False)
-            facts['cleanup_status'] = 'verified-absent' if all(cleanup) else 'uncertain'
+            cleanup = cleanup_owned_simulator(run, owned,
+                {'owned_udid': owned, 'source_head': report.get('expected_head'), 'session_id': name},
+                device_root, prefix='control', command_records=report.get('commands', []))
+            facts['cleanup_observations'] = cleanup
+            facts['cleanup_absence_verified'] = cleanup['absence']['verified_absent']
+            facts['cleanup_status'] = 'verified-absent' if cleanup['accepted'] else 'uncertain'
         elif create_submitted:
             # No UUID means no safe target to guess, delete or retry.
             facts['cleanup_status'] = 'creation-outcome-uncertain'
@@ -118,6 +118,8 @@ def run_control_and_probe(run, choose_device, invoke_probe, report, control_name
                  and native.get('selected_device_type') == control['selected_device_type'])
         report.update(status=NATIVE_PASS if valid else 'product-probe-not-accepted',
                       product_native_status=native.get('status'), product_native_reason=native.get('reason'))
+        report['product_observations'] = {key: native[key] for key in ('session_id', 'stage_observations', 'share_observations')
+                                          if key in native}
     except (ReadinessBlocked, OSError, ValueError) as error:
         report.update(status='product-probe-not-accepted', reason=str(error))
 
@@ -176,14 +178,16 @@ def main():
             raise ReadinessBlocked('product output root already exists; never reuse an old receipt')
         probe_path = args.repo / 'scripts/apple/pvt_native_import/check_native_import.py'
         report['product_probe_sha256'] = hashlib.sha256(probe_path.read_bytes()).hexdigest()
-        spec = importlib.util.spec_from_file_location('pvt_current_product_probe', probe_path)
+        module_name = __package__ + '.pvt_current_product_probe' if __package__ else 'pvt_current_product_probe'
+        spec = importlib.util.spec_from_file_location(module_name, probe_path)
         probe = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(probe)
         if not args.execute_owned_simulator or platform.system() != 'Darwin' or platform.machine() != 'arm64':
             raise ReadinessBlocked('owned execution requires the authorized arm64/macOS host')
 
         def run(name, argv, *, timeout=60, required=True):
-            argv = list(map(str, argv)); record = {'name': name, 'argv': argv, 'timeout_seconds': timeout}
+            argv = list(map(str, argv)); record = {'name': name, 'argv': argv, 'timeout_seconds': timeout,
+                                                  'started_monotonic_seconds': time.monotonic()}
             report['commands'].append(record)
             save_report()
             try:
