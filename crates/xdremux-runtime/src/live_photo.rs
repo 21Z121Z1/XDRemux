@@ -23,14 +23,15 @@ use xdremux_metadata::{
 };
 use xdremux_motion_photo::{
     apple, build_live_photo_jpeg_exif, companion_video_path, parse_first_lpex_object,
-    presentation_geometry, product_source_kind, publish_live_photo_pair,
-    resolve_live_photo_still_time, write_live_photo_heif_still, ConversionReport, Disposition,
-    Input, MediaTime, MotionAsset, MotionPhoto, PairingMetadata, ParseOptions,
-    PreservationEvidence, RelationshipKind, ResourceConversion, ResourceRole, TargetProfile,
-    VendorDialect,
+    presentation_geometry, product_source_kind, resolve_live_photo_still_time,
+    write_live_photo_heif_still, ConversionReport, Disposition, Input, MediaTime, MotionAsset,
+    MotionPhoto, PairingMetadata, ParseOptions, PreservationEvidence, RelationshipKind,
+    ResourceConversion, ResourceRole, TargetProfile, VendorDialect,
 };
 
 use crate::{Result, RuntimeError};
+
+mod pair_publication;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LivePhotoFileReceipt {
@@ -559,77 +560,37 @@ pub(crate) fn convert_motion_photo_file(
         presentation_geometry(metadata.as_ref()),
     )
     .map_err(|error| RuntimeError::external("Live Photo MOV", error))?;
-    let pair = MotionPhoto::parse(
-        Input::ApplePair {
-            still: &still.bytes,
-            movie: &movie,
-        },
-        ParseOptions::strict(),
-    )
-    .map_err(|error| RuntimeError::external("Live Photo pair validation", error))?;
-    if !pair
-        .presentation_time()
-        .is_some_and(|time| time.equivalent(presentation))
-    {
-        return Err(RuntimeError::new(
-            "Live Photo pair validation",
-            "exact presentation time changed",
-        ));
-    }
-
-    if pair.asset().pairing.identifier.as_deref() != Some(content_identifier.as_str()) {
-        return Err(RuntimeError::new(
-            "Live Photo pair validation",
-            "pairing identifier changed",
-        ));
-    }
-
-    let source_media = apple::media_payloads(primary_video)
-        .map_err(|error| RuntimeError::external("source Motion Photo media validation", error))?;
-    let output_media = apple::media_payloads(&movie)
-        .map_err(|error| RuntimeError::external("Live Photo media validation", error))?;
-    if source_media != output_media {
-        return Err(RuntimeError::new(
-            "Live Photo media validation",
-            "compressed video/audio mdat payload changed during MOV remux",
-        ));
-    }
-
-    let conversion_report =
-        product_conversion_report(&photo, &content_identifier, still.had_gain_map)?;
-    let (image_path, video_path, package) = if format == LivePhotoOutput::Pvt {
+    let had_gain_map = still.had_gain_map;
+    let (image_path, video_path, package, conversion_report) = if format == LivePhotoOutput::Pvt {
+        let pair = pair_publication::check_pair(
+            &still.bytes,
+            &movie,
+            primary_video,
+            &content_identifier,
+            presentation,
+        )?;
+        let conversion_report =
+            product_conversion_report(&photo, &content_identifier, had_gain_map)?;
         let members = crate::live_photo_package::publish_pair(&pair, output_image)?;
         (
             members.image,
             members.video,
             Some(output_image.to_path_buf()),
+            conversion_report,
         )
     } else {
-        let staging = tempfile::Builder::new()
-            .prefix(".xdremux-live-photo-")
-            .tempdir_in(parent)
-            .map_err(|error| RuntimeError::external("Live Photo staging directory", error))?;
-        let temporary_image = staging.path().join("capture.heic");
-        let temporary_video = staging.path().join("capture.mov");
-        write_synced_new(&temporary_image, &still.bytes)?;
-        write_synced_new(&temporary_video, &movie)?;
-        if let Err(error) = publish_live_photo_pair(
-            &temporary_image,
-            &temporary_video,
-            output_image,
-            &output_video,
-        ) {
-            let retained = error.partial_output().is_some().then(|| staging.keep());
-            let mut error = RuntimeError::external("Live Photo pair publication", error);
-            if let Some(directory) = retained {
-                error.detail.push_str(&format!(
-                "; complete staged pair retained at {}; inspect both final entries before explicit recovery",
-                directory.display()
-            ));
-            }
-            return Err(error);
-        }
-        (output_image.to_path_buf(), output_video, None)
+        let pair = pair_publication::CheckedPair::check(
+            still.bytes,
+            movie,
+            primary_video,
+            &content_identifier,
+            presentation,
+        )?;
+        let conversion_report =
+            product_conversion_report(&photo, &content_identifier, had_gain_map)?;
+        let members = pair_publication::publish(pair, output_image)
+            .map_err(pair_publication::PublicationFailure::into_runtime_error)?;
+        (members.image, members.video, None, conversion_report)
     };
 
     Ok(LivePhotoFileReceipt {
@@ -642,7 +603,7 @@ pub(crate) fn convert_motion_photo_file(
         presentation_inferred: photo.presentation_time().is_none(),
         conversion_report,
         source_kind: product_source_kind(asset).to_owned(),
-        source_had_gain_map: still.had_gain_map,
+        source_had_gain_map: had_gain_map,
         removed_vendor_bytes: photo
             .resources()
             .filter(|r| {

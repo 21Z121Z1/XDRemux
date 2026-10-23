@@ -29,9 +29,19 @@ The public pair publication helper keeps caller-owned staging files on success
 and failure, including staging in a same-filesystem child directory. It never
 replaces or unlinks final paths. A second-member failure exposes the partial
 output path through `PairPublicationError::partial_output()`; that path is not
-authority to delete an entry that another writer may have changed. The runtime
-retains its private staging directory on this error. The reconciliation helper
-preserves unknown partial/invalid pairs and all sidecars. See the
+authority to delete an entry that another writer may have changed. This mechanical
+helper has no source or expected-identity inputs and does not perform the runtime's
+complete product validation. The reconciliation helper preserves unknown
+partial/invalid pairs and all sidecars.
+
+The private runtime pair publisher accepts owned bytes only after strict pair
+validation, checks of expected identity and exact presentation time, and equality
+of compressed source and output movie payloads. It owns staging and synchronization.
+It checks staged and final bytes against the immutable buffers with bounded reads. A second-member publication
+failure or final-byte readback failure retains complete staging and records the
+observed final entries for explicit recovery. These observations do not authorize
+deletion. Callers must keep path resolution stable; the checks do not prevent an
+active same-user writer from changing files after readback. See the
 [publication and recovery contract](architecture.en.md#publication) for filesystem
 requirements and the two-file transaction boundary.
 
