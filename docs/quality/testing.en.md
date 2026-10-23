@@ -97,6 +97,11 @@ the same source SHA, runtime and device type. A passing control does not prove
 PVT admission. Admission requires whole-package identity and independent PhotoKit
 readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 
+The control submits one application-inventory query with a 120-second deadline.
+A timeout keeps readiness blocked and collects bounded host diagnostics for the
+owned simulator before cleanup. These diagnostics do not establish readiness or
+Photos admission.
+
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence
