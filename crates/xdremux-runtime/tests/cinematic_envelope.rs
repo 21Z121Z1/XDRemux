@@ -3,7 +3,7 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use xdremux_runtime::PortableRuntime;
+use xdremux_runtime::{CinematicEnvelopeOptions, CinematicFocalLength, PortableRuntime};
 
 fn source(root: &Path) -> std::path::PathBuf {
     let path = root.join("source.mov");
@@ -19,7 +19,12 @@ fn cinematic_preflight_preserves_existing_files_and_rejects_invalid_parameters()
     fs::write(&output, b"existing output").unwrap();
     let runtime = PortableRuntime::new();
     let error = runtime
-        .generate_cinematic_envelope_file("/must-not-execute", &input, &output, 24.0, 2.8)
+        .generate_cinematic_envelope_file(
+            "/must-not-execute",
+            &input,
+            &output,
+            &CinematicEnvelopeOptions::default(),
+        )
         .unwrap_err();
     assert!(error.to_string().contains("refusing to replace"));
     assert_eq!(fs::read(&output).unwrap(), b"existing output");
@@ -31,7 +36,15 @@ fn cinematic_preflight_preserves_existing_files_and_rejects_invalid_parameters()
     ] {
         let target = temp.path().join("invalid.mov");
         assert!(runtime
-            .generate_cinematic_envelope_file("/must-not-execute", &input, &target, focal, aperture)
+            .generate_cinematic_envelope_file(
+                "/must-not-execute",
+                &input,
+                &target,
+                &CinematicEnvelopeOptions {
+                    focal_length: CinematicFocalLength::Assumed(focal),
+                    aperture
+                }
+            )
             .is_err());
         assert!(!target.exists());
     }
@@ -50,7 +63,7 @@ for line in sys.stdin:
         pathlib.Path(request['input_path']).write_bytes(b'changed source')
     response = {{'schema_version': 2, 'cinematic_envelope': {{
         'processed_frames': 0 if '{behavior}' == 'zero-frames' else 1,
-        'focal_length_35mm': 24, 'aperture': 2.8,
+        'focal_length_35mm': 24 if '{behavior}' == 'wrong-camera' else request['cinematic_envelope']['focal_length_35mm'], 'aperture': request['cinematic_envelope']['aperture'],
         'disparity_track_written': '{behavior}' == 'raster-depth'
     }}}}
     print(json.dumps(response), flush=True)
@@ -69,7 +82,12 @@ fn cinematic_rejects_incomplete_adapter_output_and_removes_staging() {
         let output = temp.path().join("pending.mov");
         let adapter = helper(temp.path(), behavior);
         let error = PortableRuntime::new()
-            .generate_cinematic_envelope_file(adapter, &input, &output, 24.0, 2.8)
+            .generate_cinematic_envelope_file(
+                adapter,
+                &input,
+                &output,
+                &CinematicEnvelopeOptions::default(),
+            )
             .unwrap_err();
         let expected = match behavior {
             "zero-frames" => "without processing a video frame",
@@ -92,7 +110,12 @@ fn cinematic_rejects_misnamed_output_before_adapter_execution() {
     let input = source(temp.path());
     let output = temp.path().join("image.heic");
     let error = PortableRuntime::new()
-        .generate_cinematic_envelope_file("/must-not-execute", &input, &output, 24.0, 2.8)
+        .generate_cinematic_envelope_file(
+            "/must-not-execute",
+            &input,
+            &output,
+            &CinematicEnvelopeOptions::default(),
+        )
         .unwrap_err();
     assert!(error.to_string().contains(".mov extension"));
     assert!(!output.exists());
@@ -138,5 +161,123 @@ fn cinematic_batch_routes_video_intent_and_rejects_incomplete_output() {
         assert!(!output.exists() && !second_output.exists());
         assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
         assert_eq!(fs::read(second_input).unwrap(), b"protected second source");
+    }
+}
+
+fn camera_estimate(root: &Path, input: &Path) -> std::path::PathBuf {
+    use sha2::{Digest, Sha256};
+    let hash: String = Sha256::digest(fs::read(input).unwrap())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let estimate = serde_json::json!({
+        "schema_version": 1,
+        "source_sha256": hash,
+        "estimator": {"name": "test-camera", "revision": "b".repeat(40), "weights_sha256": "c".repeat(64)},
+        "samples": (0..3).map(|i| serde_json::json!({
+            "time_seconds": i,
+            "intrinsics": {
+                "image_size": [3600, 2400],
+                "focal_length_pixels": [3500, 3500],
+                "principal_point_pixels": [1800, 1200],
+                "focal_uncertainty_pixels": 35
+            }
+        })).collect::<Vec<_>>()
+    });
+    let path = root.join("camera.json");
+    fs::write(&path, serde_json::to_vec(&estimate).unwrap()).unwrap();
+    path
+}
+
+#[test]
+fn cinematic_estimate_reaches_adapter_and_keeps_source_bound() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = source(temp.path());
+    let estimate = camera_estimate(temp.path(), &input);
+    let options = CinematicEnvelopeOptions {
+        focal_length: CinematicFocalLength::CameraEstimate(estimate),
+        aperture: 4.0,
+    };
+    let output = temp.path().join("pending.mov");
+    let adapter = helper(temp.path(), "valid");
+    let receipt = PortableRuntime::new()
+        .generate_cinematic_envelope_file(&adapter, &input, &output, &options)
+        .unwrap();
+    assert_eq!(receipt.focal_length_35mm, 35.0);
+    assert_eq!(receipt.aperture, 4.0);
+    assert_eq!(receipt.camera_estimate.unwrap().sample_count, 3);
+    assert_eq!(fs::read(&input).unwrap(), b"protected source bytes");
+
+    fs::write(&input, b"different video").unwrap();
+    let wrong = temp.path().join("wrong-source.mov");
+    let error = PortableRuntime::new()
+        .generate_cinematic_envelope_file("/must-not-execute", &input, &wrong, &options)
+        .unwrap_err();
+    assert!(error.to_string().contains("SHA-256 does not match"));
+    assert!(!wrong.exists());
+}
+
+#[test]
+fn cinematic_rejects_unsafe_estimates_before_native_effects() {
+    for scenario in [
+        "uncertain",
+        "changing",
+        "malformed",
+        "oversized",
+        "wrong-camera",
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = source(temp.path());
+        let estimate = camera_estimate(temp.path(), &input);
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(&estimate).unwrap()).unwrap();
+        let expected = match scenario {
+            "uncertain" => {
+                value["samples"][0]["intrinsics"]["focal_uncertainty_pixels"] =
+                    serde_json::json!(701);
+                "uncertainty"
+            }
+            "changing" => {
+                value["samples"][2]["intrinsics"]["focal_length_pixels"] =
+                    serde_json::json!([7000, 7000]);
+                "disagree"
+            }
+            "wrong-camera" => "do not match",
+            _ => "camera estimate",
+        };
+        fs::write(
+            &estimate,
+            match scenario {
+                "malformed" => b"invalid JSON".to_vec(),
+                "oversized" => vec![b' '; 1_048_577],
+                _ => serde_json::to_vec(&value).unwrap(),
+            },
+        )
+        .unwrap();
+        let output = temp.path().join("pending.mov");
+        let adapter = if scenario == "wrong-camera" {
+            helper(temp.path(), scenario)
+        } else {
+            temp.path().join("must-not-execute")
+        };
+        let error = PortableRuntime::new()
+            .generate_cinematic_envelope_file(
+                &adapter,
+                &input,
+                &output,
+                &CinematicEnvelopeOptions {
+                    focal_length: CinematicFocalLength::CameraEstimate(estimate),
+                    aperture: 2.8,
+                },
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains(expected), "{scenario}: {error}");
+        assert!(!output.exists());
+        assert_eq!(fs::read(&input).unwrap(), b"protected source bytes");
+        assert!(!fs::read_dir(temp.path()).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".xdremux-cinematic-")));
     }
 }

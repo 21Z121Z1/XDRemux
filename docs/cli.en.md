@@ -217,6 +217,9 @@ For this intent, batch directory discovery selects MOV, MP4, M4V, AVI, and MKV c
 
 `--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. Supplying either parameter requires `--apple-cinematic`. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
 
+
+`convert --cinematic-camera-estimate camera.json` can use source-bound camera observations instead of the default focal assumption. An explicit `--focal-length-35mm` takes priority. Rust rejects uncertain or inconsistent observations before native generation. This initial option is for fixed-view clips and is not available on `batch`. The optional [GeoCalib research tool](../research/cinematic_camera/README.en.md) records pixel intrinsics and uncertainty; Rust owns focal selection. It does not recover capture aperture or focus distance.
+
 ## Product intent versus implementation detail
 
 The normal CLI exposes only product intents that change the result a user actually wants. Source recognition, reconstruction algorithms, Gain Map layout, metadata routing, camera-tail handling, and codec/backend selection are engine/runtime decisions derived from the input and available platform capabilities.

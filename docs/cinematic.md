@@ -18,6 +18,8 @@ xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 
 `--focal-length-35mm MM` 设置每帧使用的焦距假设，默认为 24，允许范围是 1 到 300。`--aperture F` 默认为 2.8，允许范围是 1 到 64。两个值都必须有限，显式传入任一参数都需要 `--apple-cinematic`。缺少相机几何信息时，它们是生成元数据使用的拍摄假设，不是实测光学属性。
 
+`convert --cinematic-camera-estimate camera.json` 可提供绑定源视频的针孔相机观测。Rust 检查来源、不确定度和一致性，再选择一个恒定的有效视角等效焦距。显式 `--focal-length-35mm` 会覆盖估计，且不读取估计文件。两者均未指定时仍采用 24 mm。首版仅支持 `convert` 的固定视角片段，不估计变焦时间线。详见[相机观测约定和 GeoCalib 工具](../research/cinematic_camera/README.md)。
+
 ## 处理所需的最低信息
 
 推理前会先解码视频。即使编码受支持，普通视频仍需要有效的 Cinematic 封装。在已测试的公共路径中，封装包含全局 `com.apple.quicktime.cinematic-video` 数据、具有有效检测 ID 和对焦决策的逐帧 cinematography，以及具有相机几何假设的逐帧 rendering。视频和元数据必须描述相同的可见时间线。`needsPreprocessing` 不要求已有栅格视差轨道。
@@ -39,7 +41,7 @@ xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 
 全局渲染数据使用兼容的虚拟拍摄配置和渲染版本 5。硬件/传感器字段、虚拟传感器区域及由亮度推导的场景照度代理值都是合成值，不能恢复原相机标定、防抖裁切或原始对焦选择。输出不会复制任何原生样本的 Cinematic 载荷或视差轨道。
 
-生成器保持输入的焦距假设不变，不从图像运动推理光学变焦或绝对视场角。原始 Cinematic 几何、视差图和对焦决策仅作为诊断参考。主体连续性使用独立的选择规则，不复现 Apple 封闭的自动选焦算法，也不保证与原相机的对焦决策一致。
+生成器保持选定的焦距不变。可选的外部观测从采样图像估计有效视场；原生生成器不推理光学变焦，也不恢复物理相机标定。原始 Cinematic 几何、视差图和对焦决策仅作为诊断参考。主体连续性使用独立的选择规则，不复现 Apple 封闭的自动选焦算法，也不保证与原相机的对焦决策一致。
 
 Rust CLI 仍是产品入口。Swift/Objective-C adapter 执行 Apple 框架操作。输出是独立文件。
 

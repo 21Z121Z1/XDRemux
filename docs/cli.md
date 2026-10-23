@@ -204,6 +204,9 @@ xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jo
 
 `--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8，显式传入任一参数都需要 `--apple-cinematic`。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
 
+
+`convert --cinematic-camera-estimate camera.json` 可使用绑定源视频的相机观测替代默认焦距假设，显式 `--focal-length-35mm` 优先。Rust 在原生生成前拒绝不确定或不一致的观测。首版适用于固定视角片段，`batch` 不提供此选项。可选的 [GeoCalib 研究工具](../research/cinematic_camera/README.md) 记录像素内参和不确定度，由 Rust 选择焦距。它不能恢复拍摄光圈或对焦距离。
+
 ## 产品意图与实现细节
 
 普通 CLI 只暴露会改变用户所需结果的产品意图。源结构识别、重建算法、Gain Map layout、metadata routing、camera tail 和 codec/backend 选择由 engine/runtime 根据输入与平台能力决定，不要求最终用户配置。

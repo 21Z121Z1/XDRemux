@@ -8,6 +8,7 @@ mod apple_portrait_geometry;
 mod apple_scene;
 mod apple_texture;
 mod capabilities;
+mod cinematic_camera;
 mod execution;
 mod product_policy;
 mod provisional_guided_filter;
@@ -78,6 +79,10 @@ pub use apple_scene::{
 pub use capabilities::{
     CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,
     RasterDecoderCapabilities,
+};
+pub use cinematic_camera::{
+    CinematicCameraError, CinematicCameraEstimate, CinematicCameraEstimator,
+    CinematicCameraIntrinsics, CinematicCameraSample, CinematicCameraSummary,
 };
 pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
