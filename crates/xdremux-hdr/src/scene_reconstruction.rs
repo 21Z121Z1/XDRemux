@@ -314,7 +314,17 @@ fn interpolate_adjustment(
                 let range = (field.guide[i].max(1e-8) / primary_y).log2();
                 let distance = (x as f32 - fx).powi(2) + (y as f32 - fy).powi(2);
                 let q = (-0.5 * distance - 2. * range * range).exp();
-                sum += q * field.strength[i] * (delta - original_gain);
+                let mut strength = field.strength[i];
+                if field.detail[i] > 0. && !field.photometric[i] {
+                    // Reliable shape alone may protect a matching background,
+                    // but is not permission to rewrite the foreground tone.
+                    let a = ((primary_y.log2() - field.surface_sdr[i]).abs()
+                        / field.background_tolerance_ev
+                        - 1.)
+                        .clamp(0., 1.);
+                    strength *= 1. - a * a * (3. - 2. * a);
+                }
+                sum += q * strength * (delta - original_gain);
                 let relative = hdr_y / field.surface_hdr[i].max(1e-8);
                 // Preserve the background's original fine texture; reconstruct
                 // genuine stroke contrast with a monotone, spatially aligned
@@ -358,6 +368,7 @@ mod tests {
             contrast_limit: 4.,
             minimum_detail_correlation: 0.5,
             maximum_detail_fit_error_ev: 0.1,
+            minimum_structure_correlation: 0.9,
             edge_ev: 0.1,
             flat_ev: 0.075,
             limit_ev: 0.25,
@@ -786,6 +797,41 @@ mod tests {
         assert_eq!(field.metrics.regions, 0);
         assert_eq!(field.metrics.detail_fraction, 0.);
         assert!(field.strength.iter().all(|s| *s == 0.));
+    }
+    #[test]
+    fn background_only_evidence_cannot_author_a_foreground_tone() {
+        let field = crate::scene_guidance::GuidanceAdjustment {
+            values: vec![Some(0.); 16],
+            strength: vec![1.; 16],
+            detail: vec![1.; 16],
+            surface_hdr: vec![0.2; 16],
+            surface_sdr: vec![0.2f32.log2(); 16],
+            photometric: vec![false; 16],
+            background_tolerance_ev: 0.1,
+            contrast: vec![1.; 16],
+            guide: vec![0.2; 16],
+            metrics: SceneGuidanceMetrics {
+                width: 4,
+                height: 4,
+                regions: 1,
+                region_fraction: 1.,
+                detail_fraction: 1.,
+                detail_seed_candidates: 1,
+                detail_seed_accepted: 1,
+                detail_seed_photometric: 0,
+                adjustment_rms_ev: 0.,
+                maximum_adjustment_ev: 0.,
+            },
+        };
+        let evaluate = |sdr_y| {
+            interpolate_adjustment(&field, (4, 4), (8, 8), (sdr_y, sdr_y), 0.7, (0.25, 1.5))
+        };
+        assert!((evaluate(0.2) + 0.7).abs() < 1e-5);
+        for foreground in [0.05, 0.8, 2.] {
+            assert!(evaluate(foreground).abs() < 1e-6);
+        }
+        let transition = evaluate(0.2 * 2f32.powf(0.15));
+        assert!(transition > -0.7 && transition < 0.);
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {

@@ -495,6 +495,7 @@ pub fn reconstruct_styles_hdr_with_display(
                 contrast_limit: plan.guidance_contrast_limit,
                 minimum_detail_correlation: plan.guidance_minimum_detail_correlation,
                 maximum_detail_fit_error_ev: plan.guidance_maximum_detail_fit_error_ev,
+                minimum_structure_correlation: plan.guidance_minimum_structure_correlation,
                 edge_ev: plan.guidance_edge_ev,
                 flat_ev: plan.guidance_flat_ev,
                 limit_ev: plan.guidance_limit_ev,
@@ -632,7 +633,7 @@ pub fn reconstruct_styles_hdr_with_display(
         if hash_file(&input)? != source_hash {
             return Err(error("source changed during processing"));
         }
-        let guidance_report = json!({"algorithm":"bounded-base-guided-region-gain-v4",
+        let guidance_report = json!({"algorithm":"bounded-base-guided-region-gain-v5",
                     "width":reconstructed.guidance.width,"height":reconstructed.guidance.height,
                     "analysis_edge":plan.guidance_analysis_edge,
                     "guide":"full-resolution linear SDR base",
@@ -645,10 +646,13 @@ pub fn reconstruct_styles_hdr_with_display(
                     "minimum_gain_support":plan.guidance_minimum_gain_support,"detail_contrast_limit":plan.guidance_contrast_limit,
                     "minimum_detail_correlation":plan.guidance_minimum_detail_correlation,
                     "maximum_detail_fit_error_ev":plan.guidance_maximum_detail_fit_error_ev,
+                    "minimum_structure_correlation":plan.guidance_minimum_structure_correlation,
                     "detail_seed_candidates":reconstructed.guidance.detail_seed_candidates,"detail_seed_accepted":reconstructed.guidance.detail_seed_accepted,
-                    "detail_model":"positive local affine fit with primary blur candidates 0/1/2; alternating-pixel validation and background-anchor check; no registration search",
+                    "detail_seed_photometric":reconstructed.guidance.detail_seed_photometric,
+                    "detail_seed_background_only":reconstructed.guidance.detail_seed_accepted-reconstructed.guidance.detail_seed_photometric,
+                    "detail_model":"positive local affine fit with primary blur candidates 0/1/2; alternate-pixel validation for foreground tone; strong structural-only evidence protects matching background without rewriting foreground; no registration search",
                     "adjustment_rms_ev":reconstructed.guidance.adjustment_rms_ev,"maximum_adjustment_ev":reconstructed.guidance.maximum_adjustment_ev});
-        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v5",
+        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v6",
             "source":input,"source_sha256":source_hash,"source_preserved":true,
             "resources":{"metadata_item_id":resources.metadata_item_id,"linear_thumbnail_item_id":resources.linear_thumbnail_item_id,"delta_map_item_id":resources.delta_map_item_id},
             "native":native,"scene":{"width":w,"height":h,"color_space":"extended-linear Display P3","exposure_ev":reconstructed.exposure_ev,

@@ -19,6 +19,7 @@ pub struct SceneGuidancePolicy {
     pub contrast_limit: f32,
     pub minimum_detail_correlation: f32,
     pub maximum_detail_fit_error_ev: f32,
+    pub minimum_structure_correlation: f32,
 }
 
 #[derive(Debug)]
@@ -30,6 +31,7 @@ pub struct SceneGuidanceMetrics {
     pub detail_fraction: f32,
     pub detail_seed_candidates: usize,
     pub detail_seed_accepted: usize,
+    pub detail_seed_photometric: usize,
     pub adjustment_rms_ev: f32,
     pub maximum_adjustment_ev: f32,
 }
@@ -39,6 +41,9 @@ pub(super) struct GuidanceAdjustment {
     pub strength: Vec<f32>,
     pub detail: Vec<f32>,
     pub surface_hdr: Vec<f32>,
+    pub surface_sdr: Vec<f32>,
+    pub photometric: Vec<bool>,
+    pub background_tolerance_ev: f32,
     pub contrast: Vec<f32>,
     pub guide: Vec<f32>,
     pub metrics: SceneGuidanceMetrics,
@@ -74,6 +79,8 @@ pub(super) fn validate(policy: SceneGuidancePolicy) -> Result<()> {
         || !(0.25..=0.95).contains(&policy.minimum_detail_correlation)
         || !policy.maximum_detail_fit_error_ev.is_finite()
         || !(0.01..=0.2).contains(&policy.maximum_detail_fit_error_ev)
+        || !policy.minimum_structure_correlation.is_finite()
+        || !(0.8..=0.99).contains(&policy.minimum_structure_correlation)
         || policy.detail_limit_ev < policy.limit_ev
     {
         return Err(invalid("unsupported stabilization policy"));
@@ -108,12 +115,13 @@ struct DetailModel {
     slope: f32,
     intercept: f32,
     error_ev: f32,
+    correlation: f32,
 }
 
 // Account for a small unknown thumbnail blur before estimating contrast.
 // Fitting alternate pixels and checking the rest rejects unrelated structure;
 // no shifted model is searched, so registration errors do not become a fit.
-fn detail_model(
+fn detail_models(
     primary: &[Vec<f32>],
     scene: &[f32],
     valid: &[bool],
@@ -121,10 +129,10 @@ fn detail_model(
     point: (usize, usize),
     radius: usize,
     policy: SceneGuidancePolicy,
-) -> Option<DetailModel> {
+) -> Vec<DetailModel> {
     let (w, h) = geometry;
     let (x, y) = point;
-    let mut best: Option<DetailModel> = None;
+    let mut models = Vec::new();
     for plane in primary {
         let (mut n, mut sx, mut sy, mut sxx, mut syy, mut sxy) = (0f64, 0., 0., 0., 0., 0.);
         let mut total = 0;
@@ -183,18 +191,16 @@ fn detail_model(
             }
         }
         let error_ev = (error / count.max(1) as f64).sqrt() as f32;
-        if count >= 8
-            && error_ev <= policy.maximum_detail_fit_error_ev
-            && best.as_ref().is_none_or(|m| error_ev < m.error_ev)
-        {
-            best = Some(DetailModel {
+        if count >= 8 && error_ev.is_finite() {
+            models.push(DetailModel {
                 slope: slope as f32,
                 intercept: intercept as f32,
                 error_ev,
+                correlation: (covariance / (vx * vy).sqrt()) as f32,
             });
         }
     }
-    best
+    models
 }
 
 fn blur_primary(input: &[f32], valid: &[bool], w: usize, h: usize, radius: usize) -> Vec<f32> {
@@ -550,7 +556,7 @@ pub(super) fn adjustment(
             if !small[i] {
                 continue;
             }
-            let Some(model) = detail_model(
+            let models = detail_models(
                 &primary_models,
                 &scene_scaled,
                 &valid,
@@ -558,9 +564,10 @@ pub(super) fn adjustment(
                 (x, y),
                 detail_radius,
                 policy,
-            ) else {
+            );
+            if models.is_empty() {
                 continue;
-            };
+            }
             let mut nearest = None;
             let mut distance = usize::MAX;
             for j in y.saturating_sub(merge)..=(y + merge).min(ah - 1) {
@@ -570,20 +577,40 @@ pub(super) fn adjustment(
                     };
                     let region = &regions[id];
                     let gain = region.gain.exp2();
-                    let contrast = model.slope / gain;
-                    let anchor = model.slope * surface_hdr[i] + model.intercept;
                     if surface[i] < region.lo - policy.edge_ev
                         || surface[i] > region.hi + policy.edge_ev
-                        || !(1. / policy.contrast_limit..=policy.contrast_limit).contains(&contrast)
-                        || anchor <= 0.
-                        || (anchor / (surface_hdr[i] * gain)).log2().abs()
-                            > policy.maximum_detail_fit_error_ev
                     {
                         continue;
                     }
+                    let choice = models
+                        .iter()
+                        .filter_map(|model| {
+                            let contrast = model.slope / gain;
+                            let anchor = model.slope * surface_hdr[i] + model.intercept;
+                            if anchor <= 0.
+                                || !(1. / policy.contrast_limit..=policy.contrast_limit)
+                                    .contains(&contrast)
+                            {
+                                return None;
+                            }
+                            let error = (anchor / (surface_hdr[i] * gain)).log2().abs();
+                            let photometric = error <= policy.maximum_detail_fit_error_ev
+                                && model.error_ev <= policy.maximum_detail_fit_error_ev;
+                            let background_only = error <= policy.limit_ev
+                                && model.correlation >= policy.minimum_structure_correlation;
+                            (photometric || background_only).then_some((
+                                if photometric { contrast } else { 1. },
+                                photometric,
+                                model.error_ev,
+                            ))
+                        })
+                        .min_by(|a, b| b.1.cmp(&a.1).then(a.2.total_cmp(&b.2)));
+                    let Some((contrast, photometric, _)) = choice else {
+                        continue;
+                    };
                     let d = x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2);
                     if d < distance && d <= merge * merge {
-                        nearest = Some((id, contrast));
+                        nearest = Some((id, contrast, photometric));
                         distance = d;
                     }
                 }
@@ -592,8 +619,13 @@ pub(super) fn adjustment(
         }
     }
     let detail_seed_accepted = seeds.iter().filter(|v| v.is_some()).count();
+    let detail_seed_photometric = seeds
+        .iter()
+        .filter(|v| v.is_some_and(|(_, _, p)| p))
+        .count();
     let mut detail = vec![0.; data.len()];
     let mut contrast = vec![1.; data.len()];
+    let mut photometric = vec![false; data.len()];
     for y in 0..ah {
         for x in 0..aw {
             let i = y * aw + x;
@@ -605,7 +637,7 @@ pub(super) fn adjustment(
             let mut distance = usize::MAX;
             for j in y.saturating_sub(outer)..=(y + outer).min(ah - 1) {
                 for k in x.saturating_sub(outer)..=(x + outer).min(aw - 1) {
-                    let Some((id, c)) = seeds[j * aw + k] else {
+                    let Some((id, c, trusted)) = seeds[j * aw + k] else {
                         continue;
                     };
                     let region = &regions[id];
@@ -616,18 +648,19 @@ pub(super) fn adjustment(
                     }
                     let d = x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2);
                     if d < distance && d < outer * outer {
-                        nearest = Some((id, c));
+                        nearest = Some((id, c, trusted));
                         distance = d;
                     }
                 }
             }
-            if let Some((id, c)) = nearest {
+            if let Some((id, c, trusted)) = nearest {
                 let a = (2. - (distance as f32).sqrt() / detail_radius as f32).clamp(0., 1.);
                 let a = a * a * (3. - 2. * a);
                 values[i] = Some(regions[id].gain);
                 strength[i] = strength[i].max(a);
                 detail[i] = a;
                 contrast[i] = c;
+                photometric[i] = trusted;
             }
         }
     }
@@ -637,6 +670,9 @@ pub(super) fn adjustment(
         strength,
         detail,
         surface_hdr,
+        surface_sdr: surface,
+        photometric,
+        background_tolerance_ev: policy.edge_ev,
         contrast,
         guide,
         metrics: SceneGuidanceMetrics {
@@ -647,6 +683,7 @@ pub(super) fn adjustment(
             detail_fraction,
             detail_seed_candidates,
             detail_seed_accepted,
+            detail_seed_photometric,
             adjustment_rms_ev: 0.,
             maximum_adjustment_ev: 0.,
         },
