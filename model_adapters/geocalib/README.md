@@ -61,3 +61,5 @@ equivalent_mm = hypot(36, 24) / hypot(width / fx, height / fy)
 准入使用的源哈希与 runtime 在发布前复查的是同一个哈希。Runtime 还要求 adapter 报告的焦距和光圈符合请求。已有输出保护和原生待处理状态校验仍属于转换流程。模型执行、Rust 准入、原生预处理和 Photos 编辑是不同证据层。新的估计或成功生成待处理 MOV 不能证明模糊质量改善，也不能证明物理相机参数准确。
 
 GeoCalib 由其作者维护，见 [cvg/GeoCalib](https://github.com/cvg/GeoCalib)、[代码许可证](https://github.com/cvg/GeoCalib/blob/1dedb29f94fc11b896c5f572005978aeebccd67f/LICENSE) 和[权重许可证](https://github.com/cvg/GeoCalib/blob/1dedb29f94fc11b896c5f572005978aeebccd67f/LICENSE-WEIGHTS)。XDRemux 产品包不分发该模型。
+
+安装后的 launcher 使用 Python 隔离模式（`-I`），保留所选虚拟环境，同时从导入搜索路径排除当前目录、`PYTHONPATH` 和用户级 site-packages。每次 FFprobe/FFmpeg 调用限时 60 秒，stdout 与 stderr 分别设限。FFprobe 只请求所需相机与时长字段，输出最多 64 KiB；解码 PNG 最多 16 MiB；诊断最多 64 KiB。超限时估计失败，并终止和回收子进程。这些传输边界不验证模型精度。

@@ -66,6 +66,7 @@ pub(crate) fn resolve(
                         "-n",
                         "-a",
                         "-G1:3:4",
+                        "-HandlerType",
                         "-FocalLengthIn35mmFormat",
                         "--",
                     ])
@@ -151,8 +152,41 @@ fn recorded_focal(bytes: &[u8]) -> Result<Option<f32>> {
             })?;
         equivalents.push(value);
     }
-    resolve_recorded_cinematic_focal_length(&equivalents)
-        .map_err(|error| RuntimeError::external("Cinematic focal metadata", error))
+    let focal = resolve_recorded_cinematic_focal_length(&equivalents)
+        .map_err(|error| RuntimeError::external("Cinematic focal metadata", error))?;
+    if focal.is_some() {
+        // VideoKeys identifies a metadata namespace, not its owning track. The
+        // native adapter processes the first video track, so an unbound recorded
+        // equivalent is safe only when the main asset has exactly one video track.
+        let mut video_tracks = std::collections::BTreeSet::new();
+        for (key, value) in &facts[0] {
+            let groups = key.split(':').collect::<Vec<_>>();
+            if groups.last() != Some(&"HandlerType")
+                || !groups.contains(&"Main")
+                || !groups[0].strip_prefix("Track").is_some_and(|number| {
+                    !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit())
+                })
+            {
+                continue;
+            }
+            let handler = value.as_str().ok_or_else(|| {
+                RuntimeError::new(
+                    "Cinematic focal metadata",
+                    format!("invalid track handler in {key}"),
+                )
+            })?;
+            if handler == "vide" {
+                video_tracks.insert(groups[0]);
+            }
+        }
+        if video_tracks.len() != 1 {
+            return Err(RuntimeError::new(
+                "Cinematic focal metadata",
+                "recorded focal length requires exactly one verified video track; specify a fixed focal length explicitly",
+            ));
+        }
+    }
+    Ok(focal)
 }
 
 fn read_estimate(
@@ -287,6 +321,55 @@ fn run_tool(command: &mut Command, context: &'static str, timeout: Duration) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recorded_equivalent_requires_one_verified_video_track() {
+        for metadata in [
+            // Only the second video track has the tag. ExifTool's VideoKeys
+            // group does not retain that ownership, so it must not be selected.
+            r#"[{"Track1:Main:HandlerType":"vide","Track2:Main:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#,
+            r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#,
+            r#"[{"Track1:Doc1:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#,
+            r#"[{"Track1:Main:HandlerType":"soun","ExifIFD:Main:FocalLengthIn35mmFormat":70}]"#,
+        ] {
+            let error = recorded_focal(metadata.as_bytes()).unwrap_err();
+            assert!(
+                error.to_string().contains("exactly one verified video track"),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn recorded_equivalent_accepts_one_video_with_other_tracks_and_duplicate_observations() {
+        let metadata = br#"[{
+            "Track1:Main:HandlerType":"vide",
+            "Track1:Main:Copy1:HandlerType":"vide",
+            "Track2:Main:HandlerType":"soun",
+            "Track3:Main:HandlerType":"meta",
+            "Track4:Doc1:HandlerType":"vide",
+            "VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm",
+            "ExifIFD:Main:FocalLengthIn35mmFormat":70
+        }]"#;
+        assert_eq!(recorded_focal(metadata).unwrap(), Some(70.0));
+        let malformed =
+            br#"[{"Track1:Main:HandlerType":7,"VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#;
+        assert!(recorded_focal(malformed)
+            .unwrap_err()
+            .to_string()
+            .contains("invalid track handler"));
+    }
+
+    #[test]
+    fn missing_equivalent_keeps_model_fallback_available_without_quicktime_track_facts() {
+        for metadata in [
+            "[{}]",
+            r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":0}]"#,
+            r#"[{"ExifIFD:Doc1:FocalLengthIn35mmFormat":70}]"#,
+        ] {
+            assert_eq!(recorded_focal(metadata.as_bytes()).unwrap(), None);
+        }
+    }
 
     #[test]
     fn camera_tools_bound_lifetime_and_both_pipes() {

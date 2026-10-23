@@ -56,7 +56,7 @@ fn helper(root: &Path, behavior: &str) -> std::path::PathBuf {
         let metadata = root.join("exiftool");
         fs::write(
             &metadata,
-            "#!/bin/sh\nprintf '%s\\n' '[{\"ExifIFD:Main:FocalLengthIn35mmFormat\":24}]'\n",
+            "#!/bin/sh\nprintf '%s\\n' '[{\"Track1:Main:HandlerType\":\"vide\",\"ExifIFD:Main:FocalLengthIn35mmFormat\":24}]'\n",
         )
         .unwrap();
         fs::set_permissions(metadata, fs::Permissions::from_mode(0o700)).unwrap();
@@ -67,6 +67,7 @@ fn helper(root: &Path, behavior: &str) -> std::path::PathBuf {
 import json, pathlib, sys
 for line in sys.stdin:
     request = json.loads(line)
+    pathlib.Path(__file__).with_name('adapter-called').write_text('called')
     pathlib.Path(request['output_path']).write_text(str(request['cinematic_envelope']['focal_length_35mm']))
     if '{behavior}' == 'source-change':
         pathlib.Path(request['input_path']).write_bytes(b'changed source')
@@ -199,7 +200,9 @@ fn camera_estimate(root: &Path, input: &Path) -> std::path::PathBuf {
 }
 
 fn camera_tools(root: &Path, input: &Path, metadata: &str) {
-    let metadata_script = format!("#!/usr/bin/python3\nprint({metadata:?})\n");
+    let metadata_script = format!(
+        "#!/usr/bin/python3\nimport pathlib,sys\nassert '-HandlerType' in sys.argv\npathlib.Path(__file__).with_name('metadata-called').write_text('called')\nprint({metadata:?})\n"
+    );
     let path = root.join("exiftool");
     fs::write(&path, metadata_script).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
@@ -216,12 +219,12 @@ fn camera_tools(root: &Path, input: &Path, metadata: &str) {
 fn automatic_cinematic_prefers_recorded_equivalent_and_only_estimates_when_missing() {
     for (metadata, expected, estimates) in [
         (
-            r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":70}]"#,
+            r#"[{"Track1:Main:HandlerType":"vide","ExifIFD:Main:FocalLengthIn35mmFormat":70}]"#,
             70.0,
             false,
         ),
         (
-            r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#,
+            r#"[{"Track1:Main:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#,
             70.0,
             false,
         ),
@@ -274,6 +277,8 @@ fn automatic_cinematic_fails_without_guessing_and_cleans_model_staging() {
     for scenario in [
         "conflict",
         "malformed-tag",
+        "second-video-only",
+        "missing-track-facts",
         "metadata-failure",
         "model-failure",
         "missing-model",
@@ -286,12 +291,21 @@ fn automatic_cinematic_fails_without_guessing_and_cleans_model_staging() {
                 r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":70,"VideoKeys:Main:FocalLengthIn35mmFormat":35}]"#
             }
             "malformed-tag" => r#"[{"ExifIFD:Main:FocalLengthIn35mmFormat":"bad"}]"#,
+            // Synthetic ExifTool protocol facts: only the second video track
+            // contains 70 mm, but VideoKeys does not expose its owning track.
+            "second-video-only" => {
+                r#"[{"Track1:Main:HandlerType":"vide","Track2:Main:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#
+            }
+            "missing-track-facts" => {
+                r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#
+            }
             _ => "[{}]",
         };
         camera_tools(temp.path(), &input, metadata);
         let expected = match scenario {
             "conflict" => "disagree",
             "malformed-tag" => "invalid numeric",
+            "second-video-only" | "missing-track-facts" => "exactly one verified video track",
             "metadata-failure" => {
                 fs::write(temp.path().join("exiftool"), "#!/bin/sh\nexit 2\n").unwrap();
                 "helper exit status"
@@ -338,8 +352,16 @@ fn automatic_cinematic_fails_without_guessing_and_cleans_model_staging() {
             .file_name()
             .to_string_lossy()
             .starts_with(".xdremux-cinematic-")));
-        if matches!(scenario, "conflict" | "malformed-tag" | "metadata-failure") {
+        if matches!(
+            scenario,
+            "conflict"
+                | "malformed-tag"
+                | "second-video-only"
+                | "missing-track-facts"
+                | "metadata-failure"
+        ) {
             assert!(!temp.path().join("model-called").exists());
+            assert!(!temp.path().join("adapter-called").exists());
         }
     }
 }
@@ -366,6 +388,34 @@ fn explicit_cinematic_focal_bypasses_both_automatic_tools() {
 }
 
 #[test]
+fn explicit_cinematic_focal_bypasses_ambiguous_multi_video_metadata() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = source(temp.path());
+    camera_tools(
+        temp.path(),
+        &input,
+        r#"[{"Track1:Main:HandlerType":"vide","Track2:Main:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#,
+    );
+    let receipt = PortableRuntime::new()
+        .generate_cinematic_envelope_file(
+            helper(temp.path(), "valid"),
+            &input,
+            temp.path().join("pending.mov"),
+            &CinematicEnvelopeOptions {
+                focal_length: CinematicFocalLength::Assumed(35.0),
+                aperture: 2.8,
+            },
+        )
+        .unwrap();
+    assert_eq!(receipt.focal_length_35mm, 35.0);
+    assert_eq!(receipt.focal_length_source.as_str(), "explicit");
+    assert!(!temp.path().join("metadata-called").exists());
+    assert!(!temp.path().join("model-called").exists());
+    assert!(temp.path().join("adapter-called").exists());
+    assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
+}
+
+#[test]
 fn cinematic_batch_resolves_each_camera_independently_in_serial_and_parallel() {
     use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
     use xdremux_runtime::{BatchExecutionOptions, BatchItem};
@@ -377,7 +427,7 @@ fn cinematic_batch_resolves_each_camera_independently_in_serial_and_parallel() {
         camera_tools(temp.path(), &estimated, "[{}]");
         fs::write(temp.path().join("exiftool"), r#"#!/usr/bin/python3
 import json,sys
-print(json.dumps([{'VideoKeys:Main:FocalLengthIn35mmFormat':70}] if sys.argv[-1].endswith('/recorded.mov') else [{}]))
+print(json.dumps([{'Track1:Main:HandlerType':'vide','VideoKeys:Main:FocalLengthIn35mmFormat':70}] if sys.argv[-1].endswith('/recorded.mov') else [{}]))
 "#).unwrap();
         let estimated_output = temp.path().join("estimated-pending.mov");
         let recorded_output = temp.path().join("recorded-pending.mov");

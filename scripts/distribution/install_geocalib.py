@@ -28,8 +28,10 @@ def install(python: Path, weights: Path, bin_dir: Path) -> Path:
     delimiter = "XDREMUX_GEOCALIB_MODEL_SOURCE"
     if delimiter in source.splitlines():
         raise ValueError("unexpected model source delimiter")
+    # Isolated mode excludes CWD, PYTHONPATH and user-site imports while retaining
+    # packages in the selected venv. Keep the venv interpreter path above intact.
     # One self-contained helper; no live dependency on the source checkout.
-    launcher = (f"#!/bin/sh\nexec {shlex.quote(str(python))} - --weights "
+    launcher = (f"#!/bin/sh\nexec {shlex.quote(str(python))} -I - --weights "
                 f"{shlex.quote(str(weights))} \"$@\" <<'{delimiter}'\n{source}\n{delimiter}\n")
     output = bin_dir / "xdremux-geocalib"
     temporary = None

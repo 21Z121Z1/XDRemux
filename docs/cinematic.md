@@ -18,6 +18,8 @@ xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 
 `convert` 和 `batch` 都会自动选择焦距输入。显式 `--focal-length-35mm MM` 优先；否则 Rust 通过 ExifTool 读取固定的已记录 35mm 等效焦距，没有已知值时运行已安装的 GeoCalib helper。不再默认填入 24 mm。只有主资源上明确的等效焦距标签合格：EXIF/XMP `FocalLengthIn35mmFormat` 和 QuickTime `camera.focal_length.35mm_equivalent`。物理 `FocalLength`、镜头名称、合成字段和嵌入缩略图信息不合格。EXIF 零值表示未知。多个已知值须在 0.001 mm 内一致；格式错误或冲突会失败，需显式指定焦距。
 
+接受已记录焦距前，Rust 还要求 ExifTool 确认主资源恰好有一条视频轨道。`VideoKeys` 是元数据命名空间，不标识所属轨道，而原生 adapter 处理第一条视频轨道。因此，多视频轨或轨道事实缺失时，会在模型或原生执行前拒绝已记录元数据选择；焦距值一致也不能证明轨道绑定。显式焦距输入绕过此检查。没有已知记录值时，保留现有的 GeoCalib 回退路径。
+
 焦距必须有限且处于 1 至 300 mm。`--aperture F` 仍是独立拍摄假设，默认为 2.8，允许有限的 1 至 64。显式传入任一参数都需要 `--apple-cinematic`。记录的等效焦距可能没有计入防抖裁切；模型估计的是有效视角等效值，也可能出错。两者都不能恢复拍摄光圈或对焦距离。
 
 GeoCalib 独立估计五个采样帧，再拟合共享固定视角相机。Rust 在原生生成前检查来源、源哈希、不确定度和跨帧一致性。依赖缺失、模型错误或估计被拒绝时会失败，不发布 MOV，也不代入猜测焦距。首版模型路径支持正方形像素的固定视角 SDR 视频，不估计变焦时间线。批量处理中每个输入独立解析。仅供 `convert` 的 `--cinematic-camera-estimate camera.json` 仍是高于自动元数据/模型选择的显式源绑定观测；显式焦距优先级更高，且此时不读取 JSON。

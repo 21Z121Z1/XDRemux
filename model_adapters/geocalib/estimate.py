@@ -10,13 +10,65 @@ import io
 import json
 import math
 import os
+import selectors
 import tempfile
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 GEOCALIB_WEIGHTS_SHA256 = "86d6aeacd8bbd974c59ce39f61854e00d36911c732ad89be471476fd708722ac"
 GEOCALIB_REVISION = "1dedb29f94fc11b896c5f572005978aeebccd67f"
+
+
+PROBE_OUTPUT_LIMIT = 64 * 1024
+FRAME_OUTPUT_LIMIT = 16 * 1024 * 1024
+DIAGNOSTIC_OUTPUT_LIMIT = 64 * 1024
+
+
+def run_bounded(command: list[str], *, stdout_limit: int, stderr_limit: int = DIAGNOSTIC_OUTPUT_LIMIT,
+                timeout: float = 60) -> subprocess.CompletedProcess:
+    """Drain both POSIX pipes within byte and wall-clock limits, always reaping."""
+    if stdout_limit < 0 or stderr_limit < 0 or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("invalid subprocess limits")
+    deadline = time.monotonic() + timeout
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    stdout = bytearray()
+    stderr = bytearray()
+    try:
+        with selectors.DefaultSelector() as selector:
+            for stream, name, buffer, limit in [(process.stdout, "stdout", stdout, stdout_limit),
+                                                 (process.stderr, "stderr", stderr, stderr_limit)]:
+                os.set_blocking(stream.fileno(), False)
+                selector.register(stream, selectors.EVENT_READ, (name, buffer, limit))
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                for key, _ in selector.select(remaining):
+                    name, buffer, limit = key.data
+                    chunk = os.read(key.fd, min(65536, limit - len(buffer) + 1))
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                    elif len(buffer) + len(chunk) > limit:
+                        raise ValueError(f"{Path(command[0]).name} {name} exceeded {limit} bytes")
+                    else:
+                        buffer.extend(chunk)
+            # EOF alone does not mean the child exited; retain the same deadline.
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            process.wait(timeout=remaining)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        process.stdout.close()
+        process.stderr.close()
+    result = subprocess.CompletedProcess(command, process.returncode, bytes(stdout), bytes(stderr))
+    result.check_returncode()
+    return result
 
 
 def digest(path: Path) -> str:
@@ -25,10 +77,11 @@ def digest(path: Path) -> str:
 
 
 def source_duration(path: Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_streams",
-         "-show_format", "-of", "json", str(path)],
-        check=True, capture_output=True, timeout=60,
+    result = run_bounded(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=duration,sample_aspect_ratio,color_transfer:stream_disposition=attached_pic:format=duration",
+         "-of", "json", str(path)],
+        stdout_limit=PROBE_OUTPUT_LIMIT,
     )
     facts = json.loads(result.stdout)
     streams = facts.get("streams", [])
@@ -99,12 +152,12 @@ def estimate(input_path: Path, weights: Path, count: int) -> dict:
     images = []
     for index in range(count):
         time = duration * (index + 0.5) / count
-        decoded = subprocess.run(
+        decoded = run_bounded(
             ["ffmpeg", "-v", "error", "-ss", str(time), "-i", str(input_path),
              "-map", "0:v:0", "-frames:v", "1", "-vf",
              "scale=w='min(1280,iw)':h='min(1280,ih)':force_original_aspect_ratio=decrease",
              "-f", "image2pipe", "-vcodec", "png", "pipe:1"],
-            check=True, capture_output=True, timeout=60,
+            stdout_limit=FRAME_OUTPUT_LIMIT,
         )
         with Image.open(io.BytesIO(decoded.stdout)) as frame:
             image = torch.from_numpy(np.array(frame.convert("RGB"), copy=True)).permute(2, 0, 1).float() / 255
