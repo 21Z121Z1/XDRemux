@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "research/**"
+      - "fixtures/proxdr/**"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/**"
       - "xdremux_py/**"
       - "tests/**"
       - "scripts/**"
@@ -14,6 +17,9 @@ on:
   pull_request:
     paths:
       - "research/**"
+      - "fixtures/proxdr/**"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/**"
       - "xdremux_py/**"
       - "tests/**"
       - "scripts/**"
@@ -124,3 +130,247 @@ jobs:
             ${{ runner.temp }}/texture-probe-build/*.stderr
           if-no-files-found: error
           retention-days: 7
+
+  styles-version-control:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install native HEIF provider
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+      - name: Compare version-only Styles metadata in Apple native parsers
+        env:
+          XDREMUX_STYLE_VERSION_PROBE_REPORT: ${{ runner.temp }}/styles-version-native.json
+          XDREMUX_STYLE_VERSION_PROBE_MEDIA_DIR: ${{ runner.temp }}/styles-photos-import
+        run: bash scripts/apple/check_styles_version_hypothesis.sh
+      - name: Verify iPhone Photos import media artifact
+        run: |
+          test -s "$RUNNER_TEMP/styles-photos-import/styles-v15.heic"
+          test -s "$RUNNER_TEMP/styles-photos-import/styles-v16-version-only.heic"
+          test -s "$RUNNER_TEMP/styles-photos-import/native-result.json"
+          test -s "$RUNNER_TEMP/styles-photos-import/README.txt"
+      # Generate and validate both media locally; export only native facts.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: styles-version-only-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/styles-version-native.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  style-tone-response:
+    runs-on: xcode-27
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out the published consumer model
+        uses: actions/checkout@v7
+        with:
+          repository: 21Z121Z1/Photographic_Style_Research
+          ref: 37dd551a949047ed14580efa0c0a2556922791b5
+          path: consumer-research
+          persist-credentials: false
+
+      - name: Install the HEVC provider and the sweep packages
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+          # xcode-27 Python is externally managed, so the harness packages stay in a job venv.
+          python3 -m venv "$RUNNER_TEMP/tone-venv"
+          "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
+          echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Test tone measurement failure handling
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+        run: python3 -m unittest tests.test_style_tone_response -v
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Build the Rust CLI and the Apple adapter
+        shell: bash
+        run: |
+          cargo build --locked -p xdremux-cli
+          swift build --product xdremux-apple-adapter
+          test -x target/debug/xdremux
+          test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
+
+      - name: Render tone sweeps
+        shell: bash
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+          TONE_OUT: ${{ github.workspace }}/artifacts/tone-response
+          XDREMUX_CLI: ${{ github.workspace }}/target/debug/xdremux
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          XDREMUX_APPLE_ADAPTER="$adapter" \
+            bash scripts/apple/run_style_tone_sweep.sh
+
+      - name: Upload tone response
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: style-tone-response
+          if-no-files-found: warn
+          retention-days: 1
+          path: |
+            artifacts/tone-response/host.txt
+            artifacts/tone-response/apple-report/tone-response.json
+            artifacts/tone-response/apple-report/tone-response.md
+            artifacts/tone-response/report/tone-response.json
+            artifacts/tone-response/report/tone-response.md
+            artifacts/tone-response/asymmetry/asymmetry.json
+            artifacts/tone-response/apple/consumer-run.json
+            artifacts/tone-response/apple/diagnostics/*.log
+            artifacts/tone-response/xdremux/consumer-run.json
+            artifacts/tone-response/xdremux/diagnostics/*.log
+
+  system-heif-hdr-api:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Read the SDK HEIF HDR surface
+        shell: bash
+        run: bash scripts/apple/probe_system_heif_hdr_api.sh "$GITHUB_WORKSPACE/artifacts/system-heif-hdr-api"
+
+      - name: Install the HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/tone-venv"
+          "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
+          echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Build the CLI and the Apple adapter
+        shell: bash
+        run: |
+          cargo build --locked -p xdremux-cli
+          swift build --product xdremux-apple-adapter
+          test -x target/debug/xdremux
+          test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
+
+      - name: Round-trip a synthetic SDR and linear HDR pair
+        shell: bash
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+            cargo test --locked -p xdremux-runtime --test system_heif_hdr -- --nocapture
+
+      - name: Check out the published consumer model
+        uses: actions/checkout@v7
+        with:
+          repository: 21Z121Z1/Photographic_Style_Research
+          ref: 37dd551a949047ed14580efa0c0a2556922791b5
+          path: consumer-research
+          persist-credentials: false
+
+      - name: Test System tone measurement failure handling
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+        run: python3 -m unittest tests.test_style_tone_response -v
+
+      - name: Encode one fixture and score the three-tone sweep
+        shell: bash
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+          SYSTEM_HDR_OUT: ${{ github.workspace }}/artifacts/system-heif-hdr-measurement
+          XDREMUX_CLI: ${{ github.workspace }}/target/debug/xdremux
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          XDREMUX_APPLE_ADAPTER="$adapter" \
+            bash scripts/apple/measure_system_heif_hdr.sh
+
+      - name: Upload SDK HEIF HDR surface
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-heif-hdr-api
+          if-no-files-found: warn
+          retention-days: 1
+          path: artifacts/system-heif-hdr-api/
+
+      - name: Upload system gain-map measurement
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-heif-hdr-measurement
+          if-no-files-found: warn
+          retention-days: 1
+          path: |
+            artifacts/system-heif-hdr-measurement/host.txt
+            artifacts/system-heif-hdr-measurement/lhdr-v1-01.system-hdr.json
+            artifacts/system-heif-hdr-measurement/tone-shape.json
+            artifacts/system-heif-hdr-measurement/tone/consumer-run.json
+            artifacts/system-heif-hdr-measurement/tone/diagnostics/*.log
+
+  pvt-native-import:
+    if: ${{ github.event.repository.visibility == 'public' && github.event.repository.private == false }}
+    runs-on: xcode-27
+    timeout-minutes: 25
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+      - name: Install the portable HEVC provider
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: One same-job readiness control then the current-HEAD whole-PVT probe
+        run: |
+          python3 "$GITHUB_WORKSPACE/scripts/apple/pvt_native_import/readiness_control.py" \
+            --repo "$GITHUB_WORKSPACE" \
+            --expected-head "$EXPECTED_HEAD" \
+            --output-root "$RUNNER_TEMP/pvt-readiness-control" \
+            --product-output-root "$RUNNER_TEMP/pvt-native-import" \
+            --execute-owned-simulator
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: pvt-native-import-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/pvt-readiness-control/control-*/result.json
+            ${{ runner.temp }}/pvt-readiness-control/control-*/*.stdout
+            ${{ runner.temp }}/pvt-readiness-control/control-*/*.stderr
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/result.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/baseline.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/after.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/share.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/share-transfer.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/share-types.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.processes.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stdout
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stderr
+          if-no-files-found: warn
+          retention-days: 1

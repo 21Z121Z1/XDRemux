@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   macos-product:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -63,6 +63,8 @@ jobs:
 
       - name: Test canonical Rust product stack
         shell: bash
+        env:
+          XDREMUX_ORIENTATION_OUTPUT: ${{ github.workspace }}/artifacts/product-integration/orientation
         run: |
           cargo test --locked --workspace --all-targets \
             2>&1 | tee artifacts/product-integration/rust-tests.log
@@ -121,13 +123,33 @@ jobs:
           python3 scripts/apple/check_rust_cli_oppo_portrait.py \
             2>&1 | tee artifacts/product-integration/oppo-native-portrait.log
 
-      - name: Verify Rust-driven Photographic Styles path
+      - name: Verify oriented HEIF with ImageIO
         shell: bash
+        run: |
+          swift scripts/apple/read_oriented_heif_imageio.swift \
+            artifacts/product-integration/orientation/oriented-gain-map.heic \
+            artifacts/product-integration/orientation/expected.json \
+            | tee artifacts/product-integration/orientation/imageio.json
+
+      - name: Verify Rust-driven Photographic Styles path and produce diagnostics
+        shell: bash
+        env:
+          XDREMUX_STYLES_ACCEPTANCE_DIR: ${{ github.workspace }}/artifacts/styles-acceptance
         run: |
           bash scripts/apple/check_rust_style_consumer.sh \
             2>&1 | tee artifacts/product-integration/apple-styles.log
 
       - name: Build and exercise macOS app against Rust CLI
+        # Both public CLI entries and the app's same Styles switch must reach
+        # original native Texture production and final-file readback.
+        # Keep this separate from generic HDR/container validation.
+        shell: bash
+        run: |
+          python3 scripts/apple/check_texture_styles.py --skip-build \
+            --output artifacts/product-integration/texture \
+            2>&1 | tee artifacts/product-integration/texture.log
+
+      - name: Build and exercise macOS app models against Rust CLI
         shell: bash
         env:
           XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
@@ -172,4 +194,18 @@ jobs:
           name: xdremux-rust-product-integration
           if-no-files-found: warn
           retention-days: 14
-          path: artifacts/product-integration/
+          # Native media and pixel dictionaries remain runner-local.
+          path: |
+            artifacts/product-integration/*.log
+            artifacts/product-integration/**/*.log
+            artifacts/product-integration/orientation/*.json
+            artifacts/product-integration/texture/result.json
+
+      - name: Upload HDR-first Linear Thumbnail diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xdremux-hdr-first-styles-diagnostics
+          retention-days: 14
+          if-no-files-found: warn
+          path: artifacts/styles-acceptance/linear-thumbnail-roundtrip.json

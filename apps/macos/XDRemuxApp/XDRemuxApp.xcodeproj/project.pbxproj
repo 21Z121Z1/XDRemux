@@ -284,7 +284,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxApp;
 				SDKROOT = macosx;
 			};
@@ -299,7 +300,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
 				SDKROOT = macosx;
 			};
@@ -320,7 +322,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxApp;
 				SDKROOT = macosx;
 			};
@@ -397,7 +400,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
 				SDKROOT = macosx;
 			};
@@ -467,7 +471,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
 				SDKROOT = macosx;
 			};
@@ -482,7 +487,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = arm64;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
 				SDKROOT = macosx;
 			};

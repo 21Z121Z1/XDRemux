@@ -33,6 +33,8 @@ CLAUDE.md
 HANDOFF.md
 Makefile
 skills/
+!.agents/skills/
+!.agents/skills/**
 **/MIGRATION_PLAN.md
 apk_analysis_results/
 evals/

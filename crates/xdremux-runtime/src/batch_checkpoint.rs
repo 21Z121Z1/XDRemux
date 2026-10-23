@@ -31,6 +31,12 @@ struct CheckpointItem {
     output_image_path: String,
     #[serde(rename = "outputVideoPath", alias = "output_video_path")]
     output_video_path: String,
+    #[serde(
+        rename = "outputPackagePath",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    output_package_path: Option<String>,
     status: String,
     #[serde(rename = "inputSize", alias = "input_size", default)]
     input_size: Option<u64>,
@@ -128,6 +134,7 @@ impl MotionPhotoCheckpoint {
         Ok(Some(ReusableMotionPhoto {
             image: PathBuf::from(&item.output_image_path),
             video: PathBuf::from(&item.output_video_path),
+            package: item.output_package_path.as_ref().map(PathBuf::from),
             asset_identifier,
         }))
     }
@@ -137,6 +144,7 @@ impl MotionPhotoCheckpoint {
 pub(crate) struct ReusableMotionPhoto {
     pub image: PathBuf,
     pub video: PathBuf,
+    pub package: Option<PathBuf>,
     pub asset_identifier: String,
 }
 
@@ -176,6 +184,7 @@ pub(crate) struct MotionPhotoCheckpointWriter {
 
 impl MotionPhotoCheckpointWriter {
     pub(crate) fn open(path: &Path) -> Result<Self> {
+        crate::live_photo_package::validate_output_parent(path)?;
         if let Some(parent) = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
@@ -223,6 +232,7 @@ impl MotionPhotoCheckpointWriter {
         image: &Path,
         video: &Path,
         signature: &SourceSignature,
+        package: Option<&Path>,
         outcome: CheckpointOutcome<'_>,
     ) -> Result<()> {
         let input = canonical_existing(source)?;
@@ -234,6 +244,11 @@ impl MotionPhotoCheckpointWriter {
             source_relative_path: None,
             output_image_path: path_string(&output_image),
             output_video_path: path_string(&output_video),
+            output_package_path: package
+                .map(canonical_or_absolute)
+                .transpose()?
+                .as_deref()
+                .map(path_string),
             status: outcome.status().to_owned(),
             input_size: Some(signature.size),
             input_mtime_ns: signature.mtime_ns,
@@ -394,6 +409,7 @@ mod tests {
                 &image,
                 &video,
                 &signature,
+                None,
                 CheckpointOutcome::Success("ASSET-ID"),
             )
             .unwrap();
@@ -428,6 +444,7 @@ mod tests {
                 &image,
                 &video,
                 &original,
+                None,
                 CheckpointOutcome::Success("ASSET-ID"),
             )
             .unwrap();

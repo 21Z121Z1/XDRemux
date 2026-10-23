@@ -11,14 +11,21 @@ mod apple_photographic_styles;
 mod apple_portrait;
 mod apple_portrait_geometry;
 mod apple_scene;
+mod apple_texture;
 mod capabilities;
 mod execution;
 mod product_policy;
+mod provisional_guided_filter;
 mod source_profile;
 
 use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
+
+pub use apple_texture::{
+    apple_texture_property_list, apple_texture_tuning_profile, AppleTextureTuningProfile,
+    AppleTextureValue, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
+};
 
 pub use apple::{
     fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask, AppleGainMapFacts,
@@ -35,23 +42,25 @@ pub use apple_auxiliary::{
     APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE,
 };
 pub use apple_photographic_styles::{
-    apple_style_apply_global_tone_curve, apple_style_data_apply_coefficient_deltas,
-    apple_style_data_from_coefficient_deltas, apple_style_data_from_parameters,
-    apple_style_data_sha256, apple_style_distribution, apple_style_face_exposure_boost,
-    apple_style_fit_global_polynomial, apple_style_identity_data,
+    apple_log_decode, apple_log_encode, apple_style_apply_global_tone_curve,
+    apple_style_data_apply_coefficient_deltas, apple_style_data_from_coefficient_deltas,
+    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_distribution,
+    apple_style_face_exposure_boost, apple_style_fit_global_polynomial, apple_style_identity_data,
     apple_style_identity_global_tone_curve, apple_style_light_map, apple_style_linear_metadata,
-    apple_style_linear_thumbnail_codes, apple_style_monotonic_global_tone_curve,
-    apple_style_polynomial_basis, apple_style_property_list, apple_style_solve_refinement_update,
-    resolve_apple_style_scene_type, validate_apple_style_data, AppleStyleDataError,
-    AppleStyleDataFacts, AppleStyleDistribution, AppleStyleGlobalToneCurve,
+    apple_style_linear_thumbnail_codes, apple_style_maker_apple_dictionary,
+    apple_style_monotonic_global_tone_curve, apple_style_polynomial_basis,
+    apple_style_property_list, apple_style_revert_local_data, apple_style_semantic_tone_channel,
+    apple_style_solve_refinement_update, resolve_apple_style_scene_type, validate_apple_style_data,
+    AppleStyleDataError, AppleStyleDataFacts, AppleStyleDistribution, AppleStyleGlobalToneCurve,
     AppleStyleLightMapRequest, AppleStyleLinearMetadata, AppleStylePropertyListRequest,
-    AppleStyleSampledJacobian, AppleStyleScalarRow, AppleStyleSceneClass, AppleStyleSceneDecision,
-    AppleStyleSceneScores, AppleStyleStatistics, APPLE_STYLE_BLOCK_VALUE_COUNT,
-    APPLE_STYLE_BYTE_COUNT, APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT,
-    APPLE_STYLE_GRID_WIDTH, APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_LIGHT_MAP_BYTE_COUNT,
-    APPLE_STYLE_LIGHT_MAP_SIDE, APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT,
-    APPLE_STYLE_REFINEMENT_EPSILON, APPLE_STYLE_REFINEMENT_MAX_PIXELS,
-    APPLE_STYLE_REFINEMENT_PARAMETER_COUNT, APPLE_STYLE_TILE_COUNT,
+    AppleStyleRevertRequest, AppleStyleSampledJacobian, AppleStyleScalarRow, AppleStyleSceneClass,
+    AppleStyleSceneDecision, AppleStyleSceneScores, AppleStyleSemanticTone, AppleStyleStatistics,
+    APPLE_LOG_A, APPLE_LOG_B, APPLE_LOG_C, APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT,
+    APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH,
+    APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_LIGHT_MAP_BYTE_COUNT, APPLE_STYLE_LIGHT_MAP_SIDE,
+    APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT, APPLE_STYLE_REFINEMENT_EPSILON,
+    APPLE_STYLE_REFINEMENT_MAX_PIXELS, APPLE_STYLE_REFINEMENT_PARAMETER_COUNT,
+    APPLE_STYLE_TILE_COUNT,
 };
 pub use apple_portrait::{
     build_apple_portrait_rendering_parameters, AppleRendDocument, AppleRendError, AppleRendRecord,
@@ -80,6 +89,12 @@ pub use execution::{
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
 pub use product_policy::resolve_product_gain_map_encode_profile;
+pub use provisional_guided_filter::{
+    content_headroom_from_linear, encode_display_p3_rgba8, linear_difference, pack_linear_rgba_f16,
+    provisional_guided_filter, unpack_linear_rgb_f16, LinearDifference,
+    ProvisionalGuidedFilterError, PROVISIONAL_GUIDED_EPSILON, PROVISIONAL_GUIDED_RADIUS,
+    PROVISIONAL_HDR_LOCAL_WEIGHT, PROVISIONAL_SDR_LOCAL_WEIGHT,
+};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
@@ -96,11 +111,32 @@ pub enum OutputIntent {
 pub struct AppleFeatureRequest {
     pub photographic_styles: bool,
     pub portrait: bool,
+    pub cinematic: bool,
 }
 
 impl AppleFeatureRequest {
     pub const fn any(self) -> bool {
-        self.photographic_styles || self.portrait
+        self.photographic_styles || self.portrait || self.cinematic
+    }
+}
+
+/// Container choice for Live Photos; ordinary still/video policy is unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LivePhotoOutput {
+    #[default]
+    Pair,
+    Pvt,
+}
+
+impl std::str::FromStr for LivePhotoOutput {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "pair" => Ok(Self::Pair),
+            "pvt" => Ok(Self::Pvt),
+            _ => Err("Live Photo output must be pair or pvt"),
+        }
     }
 }
 
@@ -108,6 +144,7 @@ impl AppleFeatureRequest {
 pub struct ConversionRequest {
     pub output: OutputIntent,
     pub apple_features: AppleFeatureRequest,
+    pub live_photo_output: LivePhotoOutput,
 }
 
 impl ConversionRequest {
@@ -118,9 +155,11 @@ impl ConversionRequest {
     pub const fn oppo_gallery_compatible() -> Self {
         Self {
             output: OutputIntent::OppoGallery,
+            live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
                 portrait: false,
+                cinematic: false,
             },
         }
     }
@@ -339,6 +378,12 @@ pub fn plan_conversion(
         ));
     }
 
+    if request.apple_features.cinematic {
+        return Err(PlannerError::IncompatibleProductIntents(
+            "Cinematic metadata requires a video conversion path",
+        ));
+    }
+
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -502,19 +547,23 @@ mod tests {
             AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             AppleFeatureRequest {
                 photographic_styles: false,
                 portrait: true,
+                cinematic: false,
             },
             AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: true,
+                cinematic: false,
             },
         ] {
             let request = ConversionRequest {
                 output: OutputIntent::OppoGallery,
                 apple_features,
+                ..ConversionRequest::default()
             };
             assert_eq!(
                 plan_conversion(&analysis, request, &capabilities),
@@ -543,6 +592,28 @@ mod tests {
     }
 
     #[test]
+    fn cinematic_intent_is_not_silently_ignored_by_the_still_planner() {
+        let request = ConversionRequest {
+            apple_features: AppleFeatureRequest {
+                cinematic: true,
+                ..AppleFeatureRequest::default()
+            },
+            ..ConversionRequest::default()
+        };
+        assert!(request.apple_features.any());
+        let analysis = ConversionAnalysis {
+            gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+        };
+        let capabilities = capability_inventory([layout(ChromaSampling::Yuv444, 8)]);
+        assert_eq!(
+            plan_conversion(&analysis, request, &capabilities),
+            Err(PlannerError::IncompatibleProductIntents(
+                "Cinematic metadata requires a video conversion path"
+            ))
+        );
+    }
+
+    #[test]
     fn planner_rejects_requested_apple_feature_without_its_adapter() {
         let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = capability_inventory([target]);
@@ -553,6 +624,7 @@ mod tests {
             apple_features: AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             ..ConversionRequest::default()
         };
@@ -574,6 +646,7 @@ mod tests {
             apple_features: AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             ..ConversionRequest::default()
         };

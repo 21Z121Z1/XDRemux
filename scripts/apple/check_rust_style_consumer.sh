@@ -17,9 +17,15 @@ cargo build --locked -p xdremux-cli
 cli="$repo_root/target/debug/xdremux"
 test -x "$cli"
 
+test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
+trap 'rm -rf "$test_root"' EXIT
+
 # Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
 # conversions. This fails if the producer writes SDR codes as the reference.
+# Native Main10/Log roundtrip tests run with isolated temporary output.
+# Test media are not Photos acceptance files and must not enter the artifact.
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+XDREMUX_TEST_STYLES_REPORT="$test_root/thumbnail-report" \
   cargo test --locked -p xdremux-runtime --lib \
   real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
 
@@ -29,8 +35,44 @@ XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
 fixture="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic"
 test -s "$fixture"
 
-test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
-trap 'rm -rf "$test_root"' EXIT
+# Capture effective HEVC format-description tags from the native encoder.
+# The probe feeds 16-bit codes, the same width as the Styles thumbnail path,
+# and still expects the existing 709 / 709 / 601 identification. It does not
+# retag the carrier. Comparison to an Apple-authored thumbnail is still needed.
+python3 - "$adapter" "$test_root" <<'PY'
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+adapter, root = sys.argv[1:]
+root = Path(root)
+raw = root / "color-probe-rgb16.bin"
+# Mid-gray little-endian RGB u16. The value is only a legal 16-bit code;
+# the probe checks encoder color tags, not the Apple Log curve.
+raw.write_bytes(bytes([0x00, 0x80, 0x00, 0x80, 0x00, 0x80]) * (64 * 64))
+request = {
+    "schema_version": 2,
+    "operation": "videotoolbox-encode-main10",
+    "input_path": str(raw),
+    "output_path": str(root / "color-probe.hevc"),
+    "video_toolbox_main10": {
+        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 384,
+        "raw_component_bits": 16,
+        "quality": 0.85, "hvcc_path": str(root / "color-probe.hvcc"),
+    },
+}
+process = subprocess.run(
+    [adapter], input=(json.dumps(request) + "\n").encode(),
+    check=True, capture_output=True,
+)
+facts = json.loads(process.stdout)["video_toolbox_main10"]
+for name in ("color_primaries", "transfer_function", "ycbcr_matrix"):
+    print("styles-main10-observed-%s=%s" % (name, facts.get(name, "<unspecified>")))
+assert (root / "color-probe.hevc").stat().st_size > 0
+assert (root / "color-probe.hvcc").stat().st_size > 0
+PY
+
 output="$test_root/rust-styles.heic"
 inspect="$test_root/inspect.json"
 batch_output_dir="$test_root/batch"
@@ -73,6 +115,11 @@ def request(operation, path):
     return json.loads(result.stdout)
 
 for output in outputs:
+    properties = request("imageio-image-properties", output)["image_properties"]
+    smart_style = properties.get("maker_apple_integer_dictionaries", {}).get("84", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    if any(smart_style.get(key) != value for key, value in expected.items()):
+        raise SystemExit(f"{output}: ImageIO did not retain SmartStyle MakerApple 84: {smart_style!r}")
     auxiliary = request("imageio-auxiliary-facts", output)["auxiliary"]
     required = [
         "iso_gain_map",
@@ -91,6 +138,7 @@ for output in outputs:
     print(
         "rust-styles-consumer-pass: "
         f"output={output} "
+        f"maker_apple_84={smart_style!r} "
         f"iso_gain_map={auxiliary['iso_gain_map']} "
         f"portrait_effects_matte={auxiliary['portrait_effects_matte']} "
         f"skin_matte={auxiliary['skin_matte']} "
@@ -130,6 +178,7 @@ import json
 import plistlib
 import struct
 import sys
+from scripts.diagnostics.inspect_oppo_heif import boxes, payload_for_item
 
 output, inspect_path, batch_output, batch_inspect_path = sys.argv[1:]
 
@@ -140,12 +189,12 @@ def read_style_plist(path, inspect_path):
         for item in report["items"]
         if item.get("type") == "uri " and item.get("name") == "styleMetadata"
     )
-    idat = next(child for child in report["meta_children"] if child["type"] == "idat")
-    extent = metadata["location"]["extents"][0]
     with open(path, "rb") as stream:
         data = stream.read()
-    start = idat["start"] + 8 + extent["offset"]
-    payload = data[start : start + extent["length"]]
+    meta = next(box for box in boxes(data, 0, len(data)) if box["type"] == "meta")
+    children = boxes(data, meta["payload_start"] + 4, meta["end"])
+    idat = next((child for child in children if child["type"] == "idat"), None)
+    payload = payload_for_item(data, metadata["location"], idat)
     return plistlib.loads(payload)
 
 def srgb_encode(linear):
@@ -175,3 +224,47 @@ for path, inspect_path in ((output, inspect_path), (batch_output, batch_inspect_
         f"scene_type={plist['5']}"
     )
 PY
+
+# Keep the actual v15 product carrier as a diagnostic, including its native
+# Texture resources. Version-only experiments have their own research owner.
+if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
+  acceptance="$XDREMUX_STYLES_ACCEPTANCE_DIR"
+  mkdir -p "$acceptance"
+  master="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic"
+  target="$acceptance/uhdr-master-v2-01-apple-styles-v15.heic"
+  test ! -e "$target"
+  XDREMUX_APPLE_ADAPTER="$adapter" \
+    "$cli" convert --input "$master" --output "$target" --apple-styles
+  test -s "$target"
+  XDREMUX_APPLE_ADAPTER="$adapter" "$cli" validate "$target" --apple-styles >/dev/null
+
+  inspection="$test_root/master-inspect.json"
+  python3 scripts/diagnostics/inspect_oppo_heif.py "$target" --json > "$inspection"
+  python3 - "$target" "$inspection" <<'PY'
+import hashlib
+import json
+import pathlib
+import plistlib
+import sys
+
+from research.oppo_styles.tools.probe_style_version import style_metadata_payload
+
+heic = pathlib.Path(sys.argv[1])
+inspection = json.loads(pathlib.Path(sys.argv[2]).read_text())
+raw = heic.read_bytes()
+plist = plistlib.loads(style_metadata_payload(raw, inspection))
+if plist.get("0") != 15:
+    raise SystemExit(f"not the product v15 Styles carrier: {plist.get('0')!r}")
+if len(plist.get("1", b"")) != 51840 or len(plist.get("3", b"")) != 516:
+    raise SystemExit("Styles payload missing expected key1 or GTC")
+print(f"v15-product-diagnostic: file={heic.name} bytes={len(raw)} "
+      f"sha256={hashlib.sha256(raw).hexdigest()} "
+      "Photos Tone/Color admission remains UNVERIFIED")
+PY
+  cp "$test_root/thumbnail-report/linear-thumbnail-roundtrip.json" "$acceptance/"
+  files=( "$acceptance"/* )
+  if [[ "${#files[@]}" -ne 2 || ! -s "$target" || ! -s "$acceptance/linear-thumbnail-roundtrip.json" ]]; then
+    echo "Only the final diagnostic HEIC and native thumbnail report may enter this artifact" >&2
+    exit 1
+  fi
+fi

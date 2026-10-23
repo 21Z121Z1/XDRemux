@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "packages": {
+    "libde265": {
+      "version": "1.1.2",
+      "url": "https://github.com/strukturag/libde265/releases/download/v1.1.2/libde265-1.1.2.tar.gz",
+      "sha256": "eaacd1943ab0c452c19f6136a36ca227e6b761b39a81eaca8454d48c147e1f67",
+      "license": "LGPL-3.0-or-later"
+    },
+    "x265": {
+      "version": "4.3",
+      "url": "https://github.com/Multicorewareinc/x265/releases/download/4.3/x265_4.3.tar.gz",
+      "sha256": "83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121",
+      "license": "GPL-2.0-or-later"
+    },
+    "libwebp": {
+      "version": "1.6.0",
+      "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz",
+      "sha256": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564",
+      "license": "BSD-3-Clause"
+    },
+    "libheif": {
+      "version": "1.23.4",
+      "url": "https://github.com/strukturag/libheif/releases/download/v1.23.4/libheif-1.23.4.tar.gz",
+      "sha256": "d0c02b4b0e978f34a1974b6f3eea7975a537bf7a9195ffeea38e7242ff316fdd",
+      "license": "LGPL-3.0-or-later"
+    }
+  }
+}

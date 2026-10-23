@@ -6,12 +6,15 @@ XDRemux converts supported vendor HDR photos to ISO/TS 21496-1 HDR HEIC and supp
 
 There is one product entry point: the Rust `xdremux` CLI. Input type, source generation, HDR/Gain Map structure, and Motion Photo routing are detected automatically.
 
+The complete Mac product targets Apple silicon (`arm64`) and macOS 27. The Rust core retains Linux, Windows, and macOS builds and portable tests. Those core checks do not establish the complete Apple feature set on each platform.
+
 ## What it does
 
 | Input / intent | Result |
 | --- | --- |
 | ProXDR photo | ISO/TS 21496-1 HDR HEIC |
-| Supported Motion Photo | Apple Live Photo HEIC + MOV |
+| Supported Motion Photo | Apple Live Photo HEIC + MOV (default) |
+| `--live-photo-output pvt` | Optional real PVT directory containing the validated pair |
 | `--oppo-compatible` | ProXDR output intended for OPPO Gallery |
 | `categorize` / `batch --categorize` | Asset-type and capture-mode folders |
 | `inspect` / `validate` | Source inspection and independent output validation |
@@ -21,6 +24,7 @@ The normal path has no device-generation, codec, Gain Map layout, camera-tail, o
 ## Build
 
 A current Rust toolchain and a libheif installation with HEVC support are required for the portable conversion stack.
+The commands below build that Rust core. The Mac product package also includes the Apple adapter and uses Xcode 27 with a macOS 27 deployment target. See [development](docs/development.en.md) for packaging and the separate native acceptance gates.
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git

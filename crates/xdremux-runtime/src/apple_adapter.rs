@@ -18,6 +18,8 @@ use xdremux_format::FourCC;
 
 use crate::{Result, RuntimeError};
 
+pub(super) mod texture;
+
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -36,6 +38,7 @@ pub(super) struct AppleImageProperties {
     pub digital_zoom_ratio: Option<f64>,
     pub lens_model: Option<String>,
     pub f_number: Option<f64>,
+    pub maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,6 +58,14 @@ pub(super) struct AppleVideoToolboxMain10Facts {
     pub hvcc_length: usize,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct AppleCinematicEnvelopeFacts {
+    pub processed_frames: u64,
+    pub focal_length_35mm: f32,
+    pub aperture: f32,
+    pub disparity_track_written: bool,
+}
+
 pub(super) struct AppleVideoToolboxMain10Encode<'a> {
     pub input: &'a Path,
     pub output_annex_b: &'a Path,
@@ -62,6 +73,8 @@ pub(super) struct AppleVideoToolboxMain10Encode<'a> {
     pub width: u32,
     pub height: u32,
     pub bytes_per_row: u32,
+    /// Bits per RGB component in the input file. Styles sends 16-bit Apple Log codes.
+    pub component_bits: u32,
     pub quality: f64,
 }
 
@@ -313,6 +326,51 @@ impl AppleAdapterClient {
         Ok(self.capabilities()?.photographic_styles)
     }
 
+    pub(super) fn generate_cinematic_envelope(
+        &self,
+        input: &Path,
+        output: &Path,
+        focal_length_35mm: f32,
+        aperture: f32,
+    ) -> Result<AppleCinematicEnvelopeFacts> {
+        let request = CinematicEnvelopeAdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "cinematic-envelope",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            cinematic_envelope: CinematicEnvelopeWire {
+                focal_length_35mm,
+                aperture,
+            },
+        };
+        let bytes = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Cinematic adapter request encoding", error))?;
+        let output_bytes = self.invoke(&bytes, Duration::from_secs(3600))?;
+        let response: CinematicEnvelopeAdapterResponse = serde_json::from_slice(&output_bytes)
+            .map_err(|error| {
+                RuntimeError::external("Cinematic adapter response decoding", error)
+            })?;
+        validate_schema(response.schema_version)?;
+        if response.cinematic_envelope.processed_frames == 0 {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "adapter completed without processing a video frame",
+            ));
+        }
+        if response.cinematic_envelope.disparity_track_written {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "pending Cinematic envelope unexpectedly materialized a disparity track",
+            ));
+        }
+        Ok(AppleCinematicEnvelopeFacts {
+            processed_frames: response.cinematic_envelope.processed_frames,
+            focal_length_35mm: response.cinematic_envelope.focal_length_35mm,
+            aperture: response.cinematic_envelope.aperture,
+            disparity_track_written: response.cinematic_envelope.disparity_track_written,
+        })
+    }
+
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
@@ -463,22 +521,33 @@ impl AppleAdapterClient {
         &self,
         encode: &AppleVideoToolboxMain10Encode<'_>,
     ) -> Result<AppleVideoToolboxMain10Facts> {
-        if encode.width == 0 || encode.height == 0 {
+        if encode.width == 0
+            || encode.height == 0
+            || !encode.width.is_multiple_of(2)
+            || !encode.height.is_multiple_of(2)
+        {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "raster geometry must be non-zero",
+                "raster geometry must be non-zero and even",
             ));
         }
-        let minimum_row = encode.width.checked_mul(3).ok_or_else(|| {
+        if encode.component_bits != 16 {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "raster must be 16-bit RGB Apple Log codes",
+            ));
+        }
+        let bytes_per_pixel = 6_u32;
+        let minimum_row = encode.width.checked_mul(bytes_per_pixel).ok_or_else(|| {
             RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "RGB8 row geometry overflows",
+                "RGB16 row geometry overflows",
             )
         })?;
         if encode.bytes_per_row < minimum_row {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "RGB8 row is shorter than width * 3",
+                "RGB16 row is shorter than width * 6",
             ));
         }
         if !encode.quality.is_finite() || !(0.0..=1.0).contains(&encode.quality) {
@@ -496,6 +565,7 @@ impl AppleAdapterClient {
                 raw_width: encode.width,
                 raw_height: encode.height,
                 raw_bytes_per_row: encode.bytes_per_row,
+                raw_component_bits: encode.component_bits,
                 quality: encode.quality,
                 hvcc_path: input_path(encode.output_hvcc)?,
             },
@@ -525,11 +595,91 @@ impl AppleAdapterClient {
         Ok(facts)
     }
 
+    /// Ask Core Image to calculate a gain map from an SDR primary and a linear
+    /// HDR image. Raster selection and headroom stay in Rust.
+    pub(super) fn coreimage_write_heif_hdr(
+        &self,
+        encode: &SystemHeifHdrWrite<'_>,
+    ) -> Result<SystemHeifHdrFacts> {
+        validate_system_heif_geometry(encode.width, encode.height, encode.content_headroom)?;
+        expect_raster_file(
+            encode.sdr_rgba8,
+            encode.width,
+            encode.height,
+            4,
+            "SDR RGBA8",
+        )?;
+        expect_raster_file(
+            encode.hdr_rgba_f16,
+            encode.width,
+            encode.height,
+            8,
+            "HDR RGBAh",
+        )?;
+        let request = SystemHeifHdrWriteRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "coreimage-write-heif-hdr",
+            output_path: input_path(encode.output)?,
+            system_heif_hdr: SystemHeifHdrWriteWire {
+                sdr_path: input_path(encode.sdr_rgba8)?,
+                hdr_path: input_path(encode.hdr_rgba_f16)?,
+                readback_path: input_path(encode.readback)?,
+                width: encode.width,
+                height: encode.height,
+                content_headroom: encode.content_headroom,
+                gain_map_as_rgb: encode.gain_map_as_rgb,
+            },
+        };
+        decode_system_heif_hdr(
+            self.invoke(
+                &serde_json::to_vec(&request).map_err(|error| {
+                    RuntimeError::external("Apple adapter request encoding", error)
+                })?,
+                APPLE_COMPUTE_TIMEOUT,
+            )?,
+        )
+    }
+
+    /// Read the gain-map auxiliary images and the HDR rendition back from a
+    /// HEIF Core Image or Styles assembly already wrote.
+    pub(super) fn imageio_read_system_hdr(
+        &self,
+        input: &Path,
+        readback: &Path,
+    ) -> Result<SystemHeifHdrFacts> {
+        let request = SystemHeifHdrReadRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-read-system-hdr",
+            input_path: input_path(input)?,
+            system_heif_hdr: SystemHeifHdrReadWire {
+                readback_path: input_path(readback)?,
+            },
+        };
+        decode_system_heif_hdr(
+            self.invoke(
+                &serde_json::to_vec(&request).map_err(|error| {
+                    RuntimeError::external("Apple adapter request encoding", error)
+                })?,
+                APPLE_COMPUTE_TIMEOUT,
+            )?,
+        )
+    }
+
     pub(super) fn imageio_write_auxiliary(
         &self,
         input: &Path,
         output: &Path,
         payloads: &[AppleAuxiliaryPayload],
+    ) -> Result<()> {
+        self.imageio_write_auxiliary_with_properties(input, output, payloads, BTreeMap::new())
+    }
+
+    pub(super) fn imageio_write_auxiliary_with_properties(
+        &self,
+        input: &Path,
+        output: &Path,
+        payloads: &[AppleAuxiliaryPayload],
+        maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
     ) -> Result<()> {
         if payloads.is_empty() {
             return Err(RuntimeError::new(
@@ -556,6 +706,7 @@ impl AppleAdapterClient {
             input_path: input_path(input)?,
             output_path: input_path(output)?,
             auxiliary_payloads: wire_payloads,
+            maker_apple_integer_dictionaries,
         };
         let request = serde_json::to_vec(&request)
             .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
@@ -1127,6 +1278,107 @@ struct AdapterRequest {
     lossy_quality: Option<f64>,
 }
 
+#[derive(Debug)]
+pub(super) struct SystemHeifHdrWrite<'a> {
+    pub output: &'a Path,
+    pub sdr_rgba8: &'a Path,
+    pub hdr_rgba_f16: &'a Path,
+    pub readback: &'a Path,
+    pub width: u32,
+    pub height: u32,
+    pub content_headroom: f32,
+    pub gain_map_as_rgb: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct SystemHeifHdrFacts {
+    pub width: u32,
+    pub height: u32,
+    pub content_headroom_sent: Option<f32>,
+    pub decoded_content_headroom: f32,
+    pub decoded_width: u32,
+    pub decoded_height: u32,
+    pub readback_byte_count: usize,
+    pub gain_map_as_rgb: Option<bool>,
+    pub apple_hdr_gain_map: SystemHeifAuxiliaryPlane,
+    pub iso_gain_map: SystemHeifAuxiliaryPlane,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SystemHeifAuxiliaryPlane {
+    pub present: bool,
+    pub pixel_format: Option<u32>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+fn validate_system_heif_geometry(width: u32, height: u32, content_headroom: f32) -> Result<()> {
+    if width == 0 || height == 0 || !width.is_multiple_of(2) || !height.is_multiple_of(2) {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            "raster geometry must be non-zero and even",
+        ));
+    }
+    let unknown = content_headroom.abs() <= f32::EPSILON;
+    if !content_headroom.is_finite() || (!unknown && content_headroom < 1.0) {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            "content headroom must be 0 or at least 1",
+        ));
+    }
+    Ok(())
+}
+
+fn expect_raster_file(
+    path: &Path,
+    width: u32,
+    height: u32,
+    bytes_per_pixel: u64,
+    label: &str,
+) -> Result<()> {
+    let length = fs::metadata(path)
+        .map_err(|error| RuntimeError::external("system HEIF HDR encode", error))?
+        .len();
+    let expected = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|pixels| pixels.checked_mul(bytes_per_pixel))
+        .ok_or_else(|| {
+            RuntimeError::new("system HEIF HDR encode", "raster byte count overflows")
+        })?;
+    if length != expected {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            format!("{label} has {length} bytes; expected {expected}"),
+        ));
+    }
+    Ok(())
+}
+
+fn decode_system_heif_hdr(output: Vec<u8>) -> Result<SystemHeifHdrFacts> {
+    let response: SystemHeifHdrResponse = serde_json::from_slice(&output)
+        .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+    validate_schema(response.schema_version)?;
+    let facts = response.system_heif_hdr;
+    if facts.decoded_width == 0 || facts.decoded_height == 0 || facts.readback_byte_count == 0 {
+        return Err(RuntimeError::new(
+            "system HEIF HDR readback",
+            format!("adapter returned empty HDR geometry: {facts:?}"),
+        ));
+    }
+    Ok(SystemHeifHdrFacts {
+        width: facts.width,
+        height: facts.height,
+        content_headroom_sent: facts.content_headroom_sent,
+        decoded_content_headroom: facts.decoded_content_headroom,
+        decoded_width: facts.decoded_width,
+        decoded_height: facts.decoded_height,
+        readback_byte_count: facts.readback_byte_count,
+        gain_map_as_rgb: facts.gain_map_as_rgb,
+        apple_hdr_gain_map: facts.apple_hdr_gain_map.into(),
+        iso_gain_map: facts.iso_gain_map.into(),
+    })
+}
+
 #[derive(Debug, Serialize)]
 struct VideoToolboxMain10Request {
     schema_version: u32,
@@ -1141,8 +1393,80 @@ struct VideoToolboxMain10Wire {
     raw_width: u32,
     raw_height: u32,
     raw_bytes_per_row: u32,
+    raw_component_bits: u32,
     quality: f64,
     hvcc_path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrWriteRequest {
+    schema_version: u32,
+    operation: &'static str,
+    output_path: String,
+    system_heif_hdr: SystemHeifHdrWriteWire,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrWriteWire {
+    sdr_path: String,
+    hdr_path: String,
+    readback_path: String,
+    width: u32,
+    height: u32,
+    content_headroom: f32,
+    gain_map_as_rgb: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrReadRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    system_heif_hdr: SystemHeifHdrReadWire,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrReadWire {
+    readback_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifHdrResponse {
+    schema_version: u32,
+    system_heif_hdr: SystemHeifHdrWireFacts,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifHdrWireFacts {
+    width: u32,
+    height: u32,
+    content_headroom_sent: Option<f32>,
+    decoded_content_headroom: f32,
+    decoded_width: u32,
+    decoded_height: u32,
+    readback_byte_count: usize,
+    gain_map_as_rgb: Option<bool>,
+    apple_hdr_gain_map: SystemHeifAuxiliaryPlaneWire,
+    iso_gain_map: SystemHeifAuxiliaryPlaneWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifAuxiliaryPlaneWire {
+    present: bool,
+    pixel_format: Option<u32>,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+impl From<SystemHeifAuxiliaryPlaneWire> for SystemHeifAuxiliaryPlane {
+    fn from(value: SystemHeifAuxiliaryPlaneWire) -> Self {
+        Self {
+            present: value.present,
+            pixel_format: value.pixel_format,
+            width: value.width,
+            height: value.height,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -1155,12 +1479,43 @@ struct EncodeSourceImageRequest {
 }
 
 #[derive(Debug, Serialize)]
+struct CinematicEnvelopeAdapterRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    cinematic_envelope: CinematicEnvelopeWire,
+}
+
+#[derive(Debug, Serialize)]
+struct CinematicEnvelopeWire {
+    focal_length_35mm: f32,
+    aperture: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeAdapterResponse {
+    schema_version: u32,
+    cinematic_envelope: CinematicEnvelopeResponseFacts,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeResponseFacts {
+    processed_frames: u64,
+    focal_length_35mm: f32,
+    aperture: f32,
+    disparity_track_written: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct WriteAuxiliaryRequest {
     schema_version: u32,
     operation: &'static str,
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1399,6 +1754,8 @@ struct ImagePropertiesWire {
     digital_zoom_ratio: Option<f64>,
     lens_model: Option<String>,
     f_number: Option<f64>,
+    #[serde(default)]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 impl From<ImagePropertiesWire> for AppleImageProperties {
@@ -1412,6 +1769,7 @@ impl From<ImagePropertiesWire> for AppleImageProperties {
             digital_zoom_ratio: value.digital_zoom_ratio,
             lens_model: value.lens_model,
             f_number: value.f_number,
+            maker_apple_integer_dictionaries: value.maker_apple_integer_dictionaries,
         }
     }
 }

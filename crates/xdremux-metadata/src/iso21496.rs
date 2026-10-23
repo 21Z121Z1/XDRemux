@@ -93,37 +93,89 @@ fn append_native_signed_rational(value: f64, output: &mut Vec<u8>) -> Result<()>
     Ok(())
 }
 
-fn canonical_first_channel_values(info: &[f64]) -> Result<[f64; 7]> {
+fn canonical_channel_values(info: &[f64], channel: usize) -> Result<[f64; 5]> {
     require_info_floats(info)?;
+    let gain_min_ratio = info[channel];
+    let gain_max_ratio = info[4 + channel];
+    let gamma = info[7 + channel];
+    let base_offset = info[10 + channel];
+    let alternate_offset = info[13 + channel];
+    if !gain_min_ratio.is_finite()
+        || gain_min_ratio <= 0.0
+        || !gain_max_ratio.is_finite()
+        || gain_max_ratio <= 0.0
+        || gain_max_ratio < gain_min_ratio
+        || !gamma.is_finite()
+        || gamma <= 0.0
+        || !base_offset.is_finite()
+        || !alternate_offset.is_finite()
+    {
+        return Err(MetadataError::invalid(
+            "ISO 21496 tmap",
+            format!("invalid gain-map parameters for channel {channel}"),
+        ));
+    }
     Ok([
-        swift_max(swift_max(info[16], 1.0).log2(), 0.0),
-        swift_max(info[17], 1.0).log2(),
-        swift_max(swift_max(info[0], 1.0).log2(), 0.0),
-        swift_max(info[4], 1.0).log2(),
-        info[7],
-        info[10],
-        info[13],
+        gain_min_ratio.log2(),
+        gain_max_ratio.log2(),
+        gamma,
+        base_offset,
+        alternate_offset,
     ])
 }
 
-/// Generate the 62-byte Apple/ImageIO tmap payload used by the current Swift core.
+fn canonical_first_channel_values(info: &[f64]) -> Result<[f64; 7]> {
+    let [gain_min, gain_max, gamma, base_offset, alt_offset] = canonical_channel_values(info, 0)?;
+    Ok([
+        swift_max(swift_max(info[16], 1.0).log2(), 0.0),
+        swift_max(info[17], 1.0).log2(),
+        gain_min,
+        gain_max,
+        gamma,
+        base_offset,
+        alt_offset,
+    ])
+}
+
+/// Generate an ISO 21496-1:2025 GainMapMetadata payload inside HEIF tmap.
+///
+/// A single set of metadata applies to RGB gain-map pixels when the three
+/// parameter sets agree. Distinct RGB parameters require the multichannel flag.
 pub fn make_apple_tmap_payload(info: &[f64]) -> Result<Vec<u8>> {
-    let values = canonical_first_channel_values(info)?;
-    let mut output = vec![0, 0, 0, 0, 0, 0x40];
-    for value in values {
-        append_imageio_rational(value, &mut output);
+    make_apple_tmap_payload_with_colour_space(info, true)
+}
+
+/// As above, using the source's declared gain-map application colour space.
+pub fn make_apple_tmap_payload_with_colour_space(
+    info: &[f64],
+    use_base_colour_space: bool,
+) -> Result<Vec<u8>> {
+    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
+    let channels = [
+        canonical_channel_values(info, 0)?,
+        canonical_channel_values(info, 1)?,
+        canonical_channel_values(info, 2)?,
+    ];
+    let multichannel = channels[1] != channels[0] || channels[2] != channels[0];
+    let flags = if multichannel { 0x80 } else { 0 } | if use_base_colour_space { 0x40 } else { 0 };
+    let mut output = vec![0, 0, 0, 0, 0, flags];
+    append_imageio_rational(cap_min, &mut output);
+    append_imageio_rational(cap_max, &mut output);
+    for [gain_min, gain_max, gamma, base_offset, alt_offset] in
+        channels.into_iter().take(if multichannel { 3 } else { 1 })
+    {
+        for value in [gain_min, gain_max, gamma, base_offset, alt_offset] {
+            append_imageio_rational(value, &mut output);
+        }
     }
-    debug_assert_eq!(output.len(), 62);
+    debug_assert_eq!(output.len(), if multichannel { 142 } else { 62 });
     Ok(output)
 }
 
-/// Generate the 142-byte multichannel ImageIO-native tmap compatibility payload.
-///
-/// The current Swift implementation intentionally repeats the proven first-channel
-/// values across all three channels rather than consuming per-channel variants.
+/// Generate a 142-byte three-channel ImageIO-native compatibility payload.
+/// Unlike the historical writer, preserve each channel's actual parameters.
 pub fn make_imageio_native_tmap_payload(info: &[f64]) -> Result<Vec<u8>> {
-    let [cap_min, cap_max, gain_min, gain_max, gamma, base_offset, alt_offset] =
-        canonical_first_channel_values(info)?;
+    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
 
     let mut output = Vec::with_capacity(142);
     output.push(0);
@@ -133,7 +185,9 @@ pub fn make_imageio_native_tmap_payload(info: &[f64]) -> Result<Vec<u8>> {
     append_native_unsigned_rational(cap_min, &mut output)?;
     append_native_unsigned_rational(cap_max, &mut output)?;
 
-    for _ in 0..3 {
+    for channel in 0..3 {
+        let [gain_min, gain_max, gamma, base_offset, alt_offset] =
+            canonical_channel_values(info, channel)?;
         append_native_signed_rational(gain_min, &mut output)?;
         append_native_signed_rational(gain_max, &mut output)?;
         append_native_unsigned_rational(gamma, &mut output)?;
@@ -144,7 +198,8 @@ pub fn make_imageio_native_tmap_payload(info: &[f64]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-/// Restore the three reserved ISO GainMapMetadata bytes omitted by ImageIO.
+/// Legacy padded metadata helper retained for compatibility with older diagnostics.
+/// Its three inserted bytes are NOT part of ISO 21496-1:2025 Annex C.2.2.
 pub fn make_strict_tmap_payload(payload: &[u8]) -> Result<Vec<u8>> {
     if payload.len() != 62 && payload.len() != 142 {
         return Err(MetadataError::invalid(
@@ -243,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn distinct_channels_are_preserved_in_xmp_but_not_first_channel_tmap() {
+    fn distinct_channels_are_preserved_in_xmp_and_tmap() {
         let info = [
             1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06,
             1.5, 6.5, 2.0, 0.0,
@@ -251,8 +306,35 @@ mod tests {
         let xmp = String::from_utf8(make_hdrgm_xmp(&info).unwrap()).unwrap();
         assert!(xmp.contains("0.321928 0.584963 0.807355"));
         assert!(xmp.contains("2.000000 2.321928 2.584963"));
-        let first_channel_only = make_apple_tmap_payload(&info).unwrap();
-        assert_eq!(first_channel_only.len(), 62);
+        let multichannel = make_apple_tmap_payload(&info).unwrap();
+        assert_eq!(multichannel.len(), 142);
+        assert_eq!(multichannel[5], 0xc0);
+    }
+
+    #[test]
+    fn reversed_per_channel_gain_ranges_are_rejected_by_both_tmap_writers() {
+        // Ratios below unity and equal bounds are valid; only reversed ranges fail.
+        for channel in 0..3 {
+            let mut info = canonical_sample();
+            info[channel] = 4.0;
+            info[4 + channel] = 2.0;
+            assert!(make_apple_tmap_payload(&info).is_err(), "channel {channel}");
+            assert!(
+                make_imageio_native_tmap_payload(&info).is_err(),
+                "channel {channel}"
+            );
+
+            info[4 + channel] = info[channel];
+            assert!(make_apple_tmap_payload(&info).is_ok(), "channel {channel}");
+            assert!(
+                make_imageio_native_tmap_payload(&info).is_ok(),
+                "channel {channel}"
+            );
+
+            info[channel] = 0.5;
+            info[4 + channel] = 1.0;
+            assert!(make_apple_tmap_payload(&info).is_ok(), "channel {channel}");
+        }
     }
 
     #[test]

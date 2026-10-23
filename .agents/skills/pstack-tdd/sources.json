@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "skill": "pstack-tdd",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/tdd/SKILL.md",
+      "git_blob": "ca6f24c963001d9d518db2936dfe3d12f29b4e94",
+      "sha256": "eeb868e2dfebee528d730a67d7b17498fac4bb85dec2e38bc5c5176aca4d5d2f",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/tdd/SKILL.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md"
+  ],
+  "adaptation": "Keep the cheap-local-test trigger and actual failing-before/passing-after sequence. Preserve XDRemux native/wire/publication contracts. State missing baseline evidence. No automatic commits."
+}

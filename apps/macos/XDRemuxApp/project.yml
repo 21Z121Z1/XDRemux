@@ -5,7 +5,7 @@ targets:
   XDRemuxApp:
     type: application
     platform: macOS
-    deploymentTarget: 15.0
+    deploymentTarget: 27.0
     sources:
       - path: Sources
       - path: Assets.xcassets
@@ -44,6 +44,7 @@ targets:
           cp "${adapter_binary}" "${helper_directory}/xdremux-apple-adapter"
           chmod 755 "${helper_directory}/xdremux" "${helper_directory}/xdremux-apple-adapter"
     settings:
+      ARCHS: arm64
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"
       ENABLE_APP_SANDBOX: NO
@@ -54,7 +55,7 @@ targets:
   XDRemuxAppModelTests:
     type: tool
     platform: macOS
-    deploymentTarget: 15.0
+    deploymentTarget: 27.0
     sources:
       - path: Sources
         excludes:
@@ -64,11 +65,12 @@ targets:
           - XDRemuxApp.swift
       - path: Tests/XDRemuxAppModelTests.swift
     settings:
+      ARCHS: arm64
       CODE_SIGN_IDENTITY: "-"
   XDRemuxAppConversionSmoke:
     type: tool
     platform: macOS
-    deploymentTarget: 15.0
+    deploymentTarget: 27.0
     sources:
       - path: Sources
         excludes:
@@ -80,4 +82,5 @@ targets:
           - XDRemuxViewModel.swift
       - path: Tests/XDRemuxAppConversionSmoke.swift
     settings:
+      ARCHS: arm64
       CODE_SIGN_IDENTITY: "-"

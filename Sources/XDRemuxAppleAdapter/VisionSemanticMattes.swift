@@ -33,11 +33,6 @@ private let supportedSemanticRoles: Set<String> = [
     "sky",
 ]
 
-// Primitive contract: XDRemux exposes one person-segmentation primitive and
-// that primitive always asks Vision for its accurate result. This is not an
-// adaptive product policy or user-selectable quality setting. If multiple
-// quality levels ever become product-visible, the versioned Rust-owned adapter
-// request must carry that selection instead of adding Swift-side heuristics.
 private let personSegmentationPrimitiveQuality: VNGeneratePersonSegmentationRequest.QualityLevel = .accurate
 
 private func writeSemanticMask(

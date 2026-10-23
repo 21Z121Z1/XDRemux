@@ -44,9 +44,11 @@ portable providers + platform adapters
 | `xdremux-runtime` | 文件系统执行、publication、批处理可靠性、恢复以及平台能力协调。 |
 | `xdremux-engine` | 产品意图、转换规划、能力要求、平台无关事实和 orchestration。 |
 | `xdremux-source` / `xdremux-classification` | 输入探测、资产身份和分类。 |
-| `xdremux-motion-photo` | Motion Photo 解析和 Live Photo 媒体语义。 |
+| `xdremux-motion-photo` | LibLivePhoto consumer facade、产品几何和 pair 发布。 |
 | `xdremux-hdr` / `xdremux-metadata` | HDR / Gain Map 数学和 metadata primitive。 |
-| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container、HEIF、codec、JPEG/EXIF/TIFF/ISOBMFF primitive。 |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | 产品 container 和 codec 操作；共享二进制基础类型来自 `liblivephoto-format`。 |
+
+独立库边界见 [LibLivePhoto 接入契约](liblivephoto-integration.md)。
 
 下层 crate 可以提供格式 primitive，但这不意味着它成为一个产品模式。是否使用该 primitive 由 runtime 和 engine 决定。
 
@@ -68,6 +70,27 @@ portable providers + platform adapters
 ImageIO auxiliary-resource probing 是第一项迁移后的真实 operation。Swift adapter 只报告 Gain Map、disparity、Portrait Effects Matte、semantic matte 等 framework observation；是否满足 Portrait 编辑资源契约由 Rust 决定。
 
 SwiftPM 只包含 adapter executable。它的构建验证 platform primitive boundary；产品契约由 Rust tests 和 Rust-driven consumer checks 定义。
+
+## macOS CLI 包
+
+完整 macOS 产品要求 Apple 芯片（arm64）和 macOS 27 或更新版本。App、Swift package
+与产品归档统一使用 macOS 27.0 deployment target；adapter 在报告 capability 前拒绝不支持
+的 host。现有 `rust-cli-core.yml` 使用标准 `xcode-27` runner 和 `scripts/distribution/`
+构建单一 arm64 产品包，保留根 Swift package 与两个 native target。Linux、Windows、macOS
+的 Rust 核心检查独立保留，不证明完整 Apple 产品在这些 host 上可用。原生依赖固定 checksum；
+归档包含依赖源代码和许可文本。包内含 CLI、Apple adapter 和经过校验的
+loader-relative dylib 闭包，使用 ad-hoc 签名。
+
+上传前，CI 在 checkout 外解包，以 `env -i` 和仅含系统目录的 `PATH` 启动包内程序。
+它转换真实 Samsung HEIF Motion Photo 和 OPPO ProXDR fixture，验证 HEIC/MOV pair
+与 HDR 输出，检查源字节不变，并拒绝第二次写入现有 pair。dyld 日志必须显示包内
+libheif，且不能从包外加载非系统库。可移植打包测试使用
+`python3 -m unittest tests.test_macos_distribution`。
+
+该 smoke 检查只证明支持的 arm64/macOS 27 host 上包内可移植转换，不证明 Apple 编辑能力。
+Styles/Texture 和 Cinematic 仍需真实 framework/runtime/硬件事实及独立原生 gate。
+不再构建 Intel 产品包；个别 API 早于 macOS 27 引入不降低完整产品或私有 SPI 的支持下限。归档对固定 staging 字节规范化时间戳和 owner，
+不声称编译器级构建可复现。包是 CI artifact，不是 notarized release。
 
 ## Python 工具
 
@@ -94,7 +117,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI 界面、Xcode 工程、App 测试与 App 自有的构建和测试脚本。 |
 | `tests/` | Python 回归测试、验证框架自测与小型合成 fixture；Rust 测试仍与所属 crate 放在一起。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
-| `scripts/` | 按 CI、validation、Apple、diagnostics、performance 分类的[仓库自动化](../scripts/README.md)。 |
+| `scripts/` | 按 CI、validation、Apple、diagnostics、distribution、performance 分类的[仓库自动化](../scripts/README.md)。 |
 | `docs/` | 当前指导文档；带日期的审计记录单独放在 `docs/history/`。 |
 | `research/` | 隔离的 OPPO Styles、Texture Styles、视频 Styles 与 Palette 研究。 |
 | `benchmarks/` | 版本化性能基线，与测量脚本及生成的报告分开存放。 |

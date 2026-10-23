@@ -1,9 +1,5 @@
 import Foundation
 
-// These are presentation-side models. Product policy and file semantics are
-// owned by the Rust CLI; the app keeps only the values needed to render a
-// queue, bind settings, and decode the CLI's stable JSON receipts.
-
 struct ConversionConfig: Sendable, Equatable {
     var outputDirectory: URL?
     var fileNameSuffix = "_iso"
@@ -12,6 +8,7 @@ struct ConversionConfig: Sendable, Equatable {
     var categorizeOutputByCaptureMode = false
     var applePhotographicStyles = false
     var applePortrait = false
+    var livePhotoOutput: LivePhotoOutput = .pair
 
     var appleFeaturesEnabled: Bool {
         applePhotographicStyles || applePortrait
@@ -25,6 +22,13 @@ struct ConversionConfig: Sendable, Equatable {
             }
         }
     }
+}
+
+enum LivePhotoOutput: String, CaseIterable, Identifiable, Sendable, Hashable {
+    case pair
+    case pvt
+
+    var id: String { rawValue }
 }
 
 enum PhotoAssetType: String, CaseIterable, Identifiable, Sendable, Equatable {

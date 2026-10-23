@@ -26,6 +26,24 @@ Read [development](docs/development.en.md) for ownership, [testing policy](docs/
 
 Write the English canonical document first. Finalize it before translating the same scope and limits into Chinese.
 
+## Project skills and enforced checks
+
+Use the scoped [pstack workflow](.agents/skills/pstack-workflow/SKILL.md),
+[behavioral TDD](.agents/skills/pstack-tdd/SKILL.md),
+[engineering principles](.agents/skills/pstack-engineering-principles/SKILL.md),
+[review](.agents/skills/pstack-review/SKILL.md), and
+[prose cleanup](.agents/skills/pstack-unslop/SKILL.md) when their descriptions apply.
+Use [XDRemux verification](.agents/skills/xdremux-verify/SKILL.md) for real CLI journeys and evidence selection.
+They are pinned project adaptations, not Cursor runtime dependencies.
+
+| Contract | Enforcement |
+| --- | --- |
+| HDR resource and transform relationships | HEIF/codec graph and RGB16 regressions; ImageIO readback in `ci.yml`. |
+| Complete native execution and edit state | Texture receipt/state regressions and native consumer checks. |
+| Failed or competing publication preserves media | Runtime batch and Live Photo negative tests; app model tests. |
+| Evidence names its actual source and host | Existing exact-HEAD completion gate; native/device claims require that environment. |
+| Reusable CI owners | Workflow configuration tests direct product checks to `ci.yml` and experiments to `research.yml`. |
+
 ## Research lifecycle
 
 Product implementation, durable research evidence, and diagnostic probes are different assets. Each experiment must end in one state:

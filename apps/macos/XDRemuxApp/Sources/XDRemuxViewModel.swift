@@ -45,12 +45,14 @@ enum OutputPlanStatus: String, Sendable, Equatable {
     case willOverwriteExisting
     case skipsExistingValidOutput
     case duplicateOutput
+    case overwritesInput
     case inputMissing
     case outputParentIsFile
+    case existingPackage
 
     var blocksConversion: Bool {
         switch self {
-        case .duplicateOutput, .inputMissing, .outputParentIsFile:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
             return true
         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
             return false
@@ -227,8 +229,6 @@ final class XDRemuxViewModel {
 
     private var processTask: Task<Void, Never>?
     private var importTask: Task<Void, Never>?
-    /// Bumped by every import. A scan that resumes after being superseded uses
-    /// it to detect that the state it would publish is no longer the truth.
     private var importGeneration = 0
 
     func addFiles(from urls: [URL]) {
@@ -270,8 +270,6 @@ final class XDRemuxViewModel {
             }
         }.value
 
-        // A newer import already owns the UI; publishing this one's queue items
-        // or terminal state here would clobber the scan the user is watching.
         guard generation == importGeneration else { return 0 }
 
         if Task.isCancelled {
@@ -439,14 +437,21 @@ final class XDRemuxViewModel {
     }
 
     private func markDuplicateOutputPlans() {
+        let protectedInputKeys = Set(queue.flatMap { Self.fileKeys($0.inputURL) })
         var indexesByOutput: [String: [Int]] = [:]
         for index in queue.indices where queue[index].status == .pending || queue[index].status == .failed || queue[index].status == .cancelled {
-            indexesByOutput[Self.pathKey(queue[index].outputURL), default: []].append(index)
+            let output = queue[index].outputURL
+            if !Self.fileKeys(output).isDisjoint(with: protectedInputKeys) {
+                queue[index].outputPlanStatus = .overwritesInput
+            }
+            indexesByOutput[Self.resolvedPathKey(output), default: []].append(index)
         }
 
         for (_, indexes) in indexesByOutput where indexes.count > 1 {
             for index in indexes {
-                queue[index].outputPlanStatus = .duplicateOutput
+                if queue[index].outputPlanStatus != .overwritesInput {
+                    queue[index].outputPlanStatus = .duplicateOutput
+                }
             }
         }
     }
@@ -478,7 +483,7 @@ final class XDRemuxViewModel {
 
         let runnableItems = queue.compactMap { item -> WorkItem? in
             guard item.status == .pending, !item.outputPlanStatus.blocksConversion else { return nil }
-            return WorkItem(id: item.id, inputURL: item.inputURL, outputURL: item.outputURL)
+            return WorkItem(id: item.id, inputURL: item.inputURL, outputURL: item.outputURL, assetType: item.assetType)
         }
 
         guard !runnableItems.isEmpty else {
@@ -488,8 +493,6 @@ final class XDRemuxViewModel {
             return
         }
 
-        // Queue structure is immutable while processing (`canEditQueue == false`), so build the
-        // UUID projection once instead of rescanning the whole value array for every result.
         var queueIndexByID: [UUID: Int] = [:]
         queueIndexByID.reserveCapacity(queue.count)
         for index in queue.indices {
@@ -497,6 +500,7 @@ final class XDRemuxViewModel {
         }
 
         let runConfig = config
+        let protectedInputKeys = Set(queue.flatMap { Self.fileKeys($0.inputURL) })
         let fileSizes = runnableItems.map { Self.fileSize($0.inputURL) }
         let concurrencyLimit = Self.effectiveConcurrency(
             configuredLimit: runConfig.maxConcurrentJobs,
@@ -523,7 +527,7 @@ final class XDRemuxViewModel {
                 currentFileName = item.inputURL.lastPathComponent
                 active += 1
                 group.addTask {
-                    Self.convertOne(item, config: runConfig)
+                    Self.convertOne(item, config: runConfig, protectedInputKeys: protectedInputKeys)
                 }
             }
 
@@ -613,6 +617,7 @@ final class XDRemuxViewModel {
         let id: UUID
         let inputURL: URL
         let outputURL: URL
+        let assetType: PhotoAssetType
     }
 
     nonisolated private struct QueueWorkResult: Sendable {
@@ -622,15 +627,15 @@ final class XDRemuxViewModel {
         let finishedAt: Date
     }
 
-    nonisolated private static func convertOne(_ item: WorkItem, config: ConversionConfig) -> QueueWorkResult {
+    nonisolated private static func convertOne(_ item: WorkItem, config: ConversionConfig, protectedInputKeys: Set<String>) -> QueueWorkResult {
         autoreleasepool {
             if Task.isCancelled {
                 return QueueWorkResult(id: item.id, status: .cancelled, errorMessage: nil, finishedAt: Date())
             }
 
             do {
-                if config.skipExisting, AppConversionEngine.isValidOutput(item.outputURL, config: config) {
-                    return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
+                guard fileKeys(item.outputURL).isDisjoint(with: protectedInputKeys) else {
+                    throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(item.outputURL.path)")
                 }
                 let disposition = try prepareOutputForConversion(
                     inputURL: item.inputURL,
@@ -644,7 +649,9 @@ final class XDRemuxViewModel {
                     try convertReplacingExistingOutput(
                         inputURL: item.inputURL,
                         outputURL: item.outputURL,
-                        config: config
+                        config: config,
+                        assetType: item.assetType,
+                        protectedInputKeys: protectedInputKeys
                     )
                 } else {
                     try AppConversionEngine.convert(inputURL: item.inputURL, outputURL: item.outputURL, config: config)
@@ -666,6 +673,9 @@ final class XDRemuxViewModel {
         let fileManager = FileManager.default
 
         for url in urls {
+            guard url.pathExtension.lowercased() != "pvt",
+                  url.resolvingSymlinksInPath().pathExtension.lowercased() != "pvt",
+                  !hasPVTPackageAncestor(url) else { continue }
             var isDirectory: ObjCBool = false
             if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
                 if isDirectory.boolValue {
@@ -674,8 +684,12 @@ final class XDRemuxViewModel {
                         includingPropertiesForKeys: [.isRegularFileKey],
                         options: [.skipsHiddenFiles]
                     ) {
-                        for case let fileURL as URL in enumerator where fileURL.pathExtension.lowercased() == "heic" {
-                            heicURLs.append(fileURL)
+                        for case let fileURL as URL in enumerator {
+                            if fileURL.pathExtension.lowercased() == "pvt" {
+                                enumerator.skipDescendants()
+                            } else if fileURL.pathExtension.lowercased() == "heic", !hasPVTPackageAncestor(fileURL) {
+                                heicURLs.append(fileURL)
+                            }
                         }
                     }
                 } else if url.pathExtension.lowercased() == "heic" {
@@ -693,6 +707,7 @@ final class XDRemuxViewModel {
         captureMode: OppoCaptureMode?,
         assetType: PhotoAssetType
     ) -> URL {
+        let packageOutput = assetType == .livePhoto && config.livePhotoOutput == .pvt
         let categoryComponents = config.categorizeOutputByCaptureMode
             ? [assetType.folderName, captureMode?.folderName ?? PhotoFolderProjection.unclassifiedFolderName]
             : []
@@ -705,17 +720,69 @@ final class XDRemuxViewModel {
 
         if let outputDirectory = config.outputDirectory {
             return projectedDirectory(from: outputDirectory)
-                .appendingPathComponent(inputURL.lastPathComponent)
+                .appendingPathComponent(
+                    packageOutput ? inputURL.deletingPathExtension().lastPathComponent + ".pvt" : inputURL.lastPathComponent,
+                    isDirectory: packageOutput
+                )
         }
 
         let suffix = config.fileNameSuffix.isEmpty ? "_iso" : config.fileNameSuffix
         let stem = inputURL.deletingPathExtension().lastPathComponent
         let parent = projectedDirectory(from: inputURL.deletingLastPathComponent())
-        return parent.appendingPathComponent("\(stem)\(suffix).heic")
+        return parent.appendingPathComponent("\(stem)\(suffix).\(packageOutput ? "pvt" : "heic")", isDirectory: packageOutput)
+    }
+
+    nonisolated private static func pathEntryExists(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
+    // PVT is opaque to the app. Never scan it or create output beneath it,
+    // including when an ordinary-looking directory aliases a package.
+    nonisolated private static func hasPVTPackageAncestor(_ url: URL) -> Bool {
+        func containsPackageComponent(_ path: URL) -> Bool {
+            path.pathComponents.contains { ($0 as NSString).pathExtension.lowercased() == "pvt" }
+        }
+        let path = url.standardizedFileURL
+        if containsPackageComponent(path.deletingLastPathComponent()) { return true }
+
+        // New output leaves may not exist. Resolve existing ancestors rather
+        // than depending on whole-path resolution through missing components.
+        var candidate = path
+        while candidate.path != "/" {
+            if pathEntryExists(candidate),
+               containsPackageComponent(candidate.resolvingSymlinksInPath().standardizedFileURL) {
+                return true
+            }
+            let parent = candidate.deletingLastPathComponent()
+            guard parent.path != candidate.path else { break }
+            candidate = parent
+        }
+        return false
+    }
+
+    nonisolated private static func packageBlocksOutput(_ outputURL: URL) -> Bool {
+        let namesPackage = outputURL.pathExtension.lowercased() == "pvt"
+            || outputURL.resolvingSymlinksInPath().pathExtension.lowercased() == "pvt"
+        return hasPVTPackageAncestor(outputURL) || (namesPackage && pathEntryExists(outputURL))
     }
 
     nonisolated private static func pathKey(_ url: URL) -> String {
         url.standardizedFileURL.path
+    }
+
+    nonisolated private static func resolvedPathKey(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    nonisolated private static func fileKeys(_ url: URL) -> Set<String> {
+        var keys: Set<String> = ["path:\(resolvedPathKey(url))"]
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path),
+           let device = attributes[.systemNumber] as? NSNumber,
+           let inode = attributes[.systemFileNumber] as? NSNumber {
+            keys.insert("inode:\(device):\(inode)")
+        }
+        return keys
     }
 
     nonisolated private static func outputPlanStatus(
@@ -727,6 +794,7 @@ final class XDRemuxViewModel {
         guard fileManager.fileExists(atPath: inputURL.path) else {
             return .inputMissing
         }
+        if packageBlocksOutput(outputURL) { return .existingPackage }
 
         let parentURL = outputURL.deletingLastPathComponent()
         var isDirectory: ObjCBool = false
@@ -748,10 +816,14 @@ final class XDRemuxViewModel {
         switch item.outputPlanStatus {
         case .duplicateOutput:
             return "输出路径冲突: \(item.outputURL.path)"
+        case .overwritesInput:
+            return "输出路径会覆盖已导入的原始文件: \(item.outputURL.path)"
         case .inputMissing:
             return "输入文件不存在: \(item.inputURL.path)"
         case .outputParentIsFile:
             return "输出目录位置是文件，无法写入: \(item.outputURL.deletingLastPathComponent().path)"
+        case .existingPackage:
+            return "已有 PVT 包不能复用、替换或添加成员，请选择新的输出路径：\(item.outputURL.path)"
         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
             return ""
         }
@@ -763,6 +835,9 @@ final class XDRemuxViewModel {
         config: ConversionConfig
     ) throws -> OutputPreparationDisposition {
         let fileManager = FileManager.default
+        if packageBlocksOutput(outputURL) {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("不能复用、替换或向已有 PVT 包内写入，请选择新的输出路径。")
+        }
         guard pathKey(inputURL) != pathKey(outputURL) else {
             return .ready
         }
@@ -780,13 +855,28 @@ final class XDRemuxViewModel {
     nonisolated private static func convertReplacingExistingOutput(
         inputURL: URL,
         outputURL: URL,
-        config: ConversionConfig
+        config: ConversionConfig,
+        assetType: PhotoAssetType,
+        protectedInputKeys: Set<String>
     ) throws {
+        guard assetType != .livePhoto else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("已有实况照片输出需要成对发布，请选择新的输出路径。")
+        }
         let staging = outputURL
             .deletingLastPathComponent()
             .appendingPathComponent(".xdremux-\(UUID().uuidString).heic")
-        defer { try? FileManager.default.removeItem(at: staging) }
+        let stagingMovie = staging.deletingPathExtension().appendingPathExtension("mov")
+        defer {
+            try? FileManager.default.removeItem(at: staging)
+            try? FileManager.default.removeItem(at: stagingMovie)
+        }
         try AppConversionEngine.convert(inputURL: inputURL, outputURL: staging, config: config)
+        guard !FileManager.default.fileExists(atPath: stagingMovie.path) else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("Rust 返回了实况照片资源对，请选择新的输出路径。")
+        }
+        guard fileKeys(outputURL).isDisjoint(with: protectedInputKeys) else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(outputURL.path)")
+        }
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: staging)
     }
 

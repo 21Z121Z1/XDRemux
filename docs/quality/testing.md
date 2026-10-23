@@ -25,6 +25,12 @@ parser test 不是真机测试。
 
 ## 最低验证要求
 
+完整产品门禁面向 arm64/macOS 27：App、adapter、解包运行、原媒体保全、HDR/Styles 和性能检查均保留。Linux、Windows、macOS 的 Rust 核心测试继续执行，Intel 产品包不再属于分发范围。范围调整不把原生缺测、操作失败或未验设备行为变成通过。
+
+macOS 27 性能基线保留原始测量值。`apple-styles` 场景允许历史中位数和 p95 耗时的两倍，
+用于容纳 Linear Thumbnail 缩小前的全分辨率 HDR 重建。该场景的 RSS 和 helper 启动次数限制保持不变，
+其他场景继续使用公共耗时容差。参见[版本化预算](../../benchmarks/macos27-arm64-product-baseline.json)。
+
 使用最小但完整的证据集。
 
 - 纯文档修改：文档 policy 和链接检查。
@@ -47,6 +53,10 @@ parser test 不是真机测试。
 
 不要再把所有真实样本描述为 private。部分旧 ProXDR、只可真机验证和 Apple feature 样本仍可能位于仓库之外或保持私有。
 
+原生检查可以在 runner 内生成媒体和像素缓冲。Actions 自动上传只包含明确命名的诊断报告、
+哈希和日志，不包含原片、转换后的人像、渲染对比图或像素字典。测试仍须完成媒体生成、
+原生回读和失败断言；收窄上传边界，不跳过检查。需要设备验证时，在本地生成 Photos 导入文件。
+
 ## 依赖真机的结论
 
 涉及 Apple Photos 编辑、OPPO 相册显示或其他设备 UI 的结论，需要来自对应环境的证据。
@@ -65,8 +75,10 @@ parser test 不是真机测试。
 
 ## 研究回归证据
 
-唯一可复用的 `research.yml` 工作流负责可移植研究测试和原生载体回读。
-它按研究路径过滤，在 PR 或 main 的精确 SHA 上以只读权限运行，既不写入
-仓库引用，也不提供产品 `exact-head` 检查。研究通过不代表假设晋升，
-也不证明 Photos/Gallery 真机验收。实验命令与晋升门槛放在对应代码旁，
-不要为每个实验新增一次性工作流。
+唯一可复用的 `research.yml` 工作流持有可移植研究测试、原生 carrier 回读、固定版本的 Photographic Styles tone 扫描、临时 system HEIF HDR 测量和 PVT 接受探针。各 job 使用只读权限并检出准确的 PR 或 main SHA。手动重放不接受替代源码或 secret。原生 tone 与 system HEIF job 使用标准 `xcode-27` runner，测量 artifact 保留一天。它们不提供 `exact-head`，也不能证明 Photos 编辑、滑块响应、保存重开或 Gallery 接受情况。
+
+PVT job 的就绪控制与产品探针使用同一份干净检出。选择的 iPhone 必须在目标 runtime 的显式支持列表中，且满足机型的 runtime 版本范围。创建模拟器前还会独立检查支持列表。只有本次创建的控制模拟器通过检查且已确认删除后，才最多运行一次产品探针。产品回执必须绑定同一源码 SHA、runtime 和机型。控制通过不代表 PVT 已被接受；接受结论需要整个包的身份校验和独立 PhotoKit 回读。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
+
+PVT 阶段观察绑定源码和本次会话，并在各自标明的进程时钟内保留单调时间。未开始或超时的阶段不会产生接受结论。cleanup 命令结果与独立观察到的资源缺席是不同事实；后续缺席观察不会改写原回执的失败或不确定状态。控制包装层用 `status` 保留整次运行的接受状态，用 `product_observations` 保留原生事实；清理失败不会抹去已验证的准入观察。可移植事件测试和历史回放只验证 harness 报告行为。声明变更后的原生 runner 可运行，需要一次本次持有模拟器的实际执行；Photos 接受结论仍需完整保存和独立回读路径。
+
+实验命令和晋升条件放在对应代码附近，不为每个假设新建工作流。产品方向回读在 `ci.yml` 中运行，与 Rust 产品测试使用同一准确 SHA，由 ImageIO 读取合成方向 HEIF 及其预期几何。

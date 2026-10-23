@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "skill": "pstack-review",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/interrogate/SKILL.md",
+      "git_blob": "94946d22d8bf896bfcc2c54d363df5af3d17b4ca",
+      "sha256": "a16dfe179005abc22a4651b82f25b0c8ab953284276efe4e6dc341958fb63647",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/interrogate/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/interrogate/references/reviewer-prompt.md",
+      "git_blob": "ef7bff3d77c35a0af2a9947187ccee15465657f4",
+      "sha256": "f6005cc2b535006fca97a96c5bfda49df57312eedf1ffd8d1aaaf3eb33817c25",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/interrogate/references/reviewer-prompt.md"
+    },
+    {
+      "path": "pstack/skills/interrogate/references/rubric.md",
+      "git_blob": "8dab195ab840554bfe5e74e9b5ca0d9edbe9b496",
+      "sha256": "0f9c6bdb0b96e26dbde5f6407f417e0c02f54080e7a1268d8994f3c3ec6c5ac0",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/interrogate/references/rubric.md"
+    },
+    {
+      "path": "pstack/skills/interrogate/references/code-quality-review.md",
+      "git_blob": "16581250d81044c7e80fe234c4970a3f7b7fc98a",
+      "sha256": "79162fda183eafd40d51661fbb5e151c7ba250f89e506ba17f5bd135dcbd50a8",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/interrogate/references/code-quality-review.md"
+    },
+    {
+      "path": "pstack/skills/interrogate/references/lead-judgment.md",
+      "git_blob": "3b41346c9c3f5c35453d34f1c77374b7e9346aa9",
+      "sha256": "355f5195a76bc75a655125292369f2a8231a2b61fabe5188d8f1386060922b87",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/interrogate/references/lead-judgment.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md",
+    "references/code-quality-review.md",
+    "references/lead-judgment.md",
+    "references/reviewer-prompt.md",
+    "references/rubric.md"
+  ],
+  "adaptation": "Replace runtime-specific reviewer/model setup with available authorized independent review or labeled author review. Preserve four relative references. Remove mandatory model diversity and hard line-count blockers; preserve concrete correctness and maintained-complexity findings. No automatic fixes or external posting."
+}

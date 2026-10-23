@@ -1,4 +1,5 @@
 import Foundation
+import Dispatch
 
 /// The macOS app is a presentation shell around the canonical Rust product.
 ///
@@ -38,6 +39,24 @@ enum RustCLIClient {
         let standardError: String
     }
 
+    private final class PipeCapture: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+
+        func read(_ handle: FileHandle) {
+            let captured = handle.readDataToEndOfFile()
+            lock.lock()
+            data = captured
+            lock.unlock()
+        }
+
+        var text: String {
+            lock.lock()
+            defer { lock.unlock() }
+            return String(data: data, encoding: .utf8) ?? ""
+        }
+    }
+
     private struct CategorizeReceipt: Decodable {
         let items: [CategorizeItem]
     }
@@ -75,13 +94,25 @@ enum RustCLIClient {
             "--output", outputURL.path,
         ]
         arguments.append(contentsOf: try productArguments(for: config))
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         _ = try run(arguments)
     }
 
-    static func isValidOutput(_ outputURL: URL) -> Bool {
+    static func isValidOutput(_ outputURL: URL, config: ConversionConfig = ConversionConfig()) -> Bool {
+        // This predicate authorizes app reuse, not just structural validity.
+        // The app has no durable source provenance for an existing package.
+        guard outputURL.pathExtension.lowercased() != "pvt" else { return false }
         guard FileManager.default.fileExists(atPath: outputURL.path) else { return false }
+        // Rust has no output validator for these intents yet. Generic HDR
+        // validation cannot establish that their requested resources survived.
+        guard !config.applePortrait, !config.oppoGalleryCompatibilityEnabled else { return false }
         do {
-            _ = try run(["validate", outputURL.path])
+            var arguments = ["validate", outputURL.path]
+            if config.applePhotographicStyles { arguments.append("--apple-styles") }
+            _ = try run(arguments)
             return true
         } catch {
             return false
@@ -163,16 +194,18 @@ enum RustCLIClient {
             )
         }
 
+        var arguments: [String] = []
+        if config.livePhotoOutput != .pair {
+            arguments.append(contentsOf: ["--live-photo-output", config.livePhotoOutput.rawValue])
+        }
         if config.applePhotographicStyles {
-            return ["--apple-styles"]
+            arguments.append("--apple-styles")
+        } else if config.applePortrait {
+            arguments.append("--apple-portrait")
+        } else if config.oppoGalleryCompatibilityEnabled {
+            arguments.append("--oppo-compatible")
         }
-        if config.applePortrait {
-            return ["--apple-portrait"]
-        }
-        if config.oppoGalleryCompatibilityEnabled {
-            return ["--oppo-compatible"]
-        }
-        return []
+        return arguments
     }
 
     private static func run(
@@ -200,20 +233,25 @@ enum RustCLIClient {
         } catch {
             throw ClientError.launchFailed(error.localizedDescription)
         }
+        let standardOutput = PipeCapture()
+        let standardError = PipeCapture()
+        let readers = DispatchGroup()
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            standardOutput.read(stdout.fileHandleForReading)
+            readers.leave()
+        }
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            standardError.read(stderr.fileHandleForReading)
+            readers.leave()
+        }
         process.waitUntilExit()
-
-        let standardOutput = String(
-            data: stdout.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let standardError = String(
-            data: stderr.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
+        readers.wait()
         let result = CommandResult(
             status: process.terminationStatus,
-            standardOutput: standardOutput,
-            standardError: standardError
+            standardOutput: standardOutput.text,
+            standardError: standardError.text
         )
         guard result.status == 0 || allowNonZeroOutput else {
             let message = result.standardError

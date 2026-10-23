@@ -60,6 +60,7 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
     assert_eq!(first["failed"], 0);
     assert_eq!(first["successes"][0]["kind"], "live-photo");
     assert_eq!(first["successes"][0]["status"], "converted");
+    assert!(first["successes"][0]["omitted_resource_count"].is_u64());
 
     let image = PathBuf::from(first["successes"][0]["outputs"][0].as_str().unwrap());
     let video = PathBuf::from(first["successes"][0]["outputs"][1].as_str().unwrap());
@@ -92,6 +93,7 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
     assert_eq!(second["skipped_existing"], 1);
     assert_eq!(second["failed"], 0);
     assert_eq!(second["successes"][0]["status"], "skipped-existing");
+    assert!(second["successes"][0]["omitted_resource_count"].is_null());
     assert_eq!(fs::read(&image).unwrap(), before_image);
     assert_eq!(fs::read(&video).unwrap(), before_video);
 

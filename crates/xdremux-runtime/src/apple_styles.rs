@@ -1,17 +1,22 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
 
 use sha2::{Digest, Sha256};
 use xdremux_codec::{EncodedHevcResource, HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
 use xdremux_engine::{
-    apple_style_apply_global_tone_curve, apple_style_data_from_coefficient_deltas,
-    apple_style_distribution, apple_style_face_exposure_boost, apple_style_fit_global_polynomial,
+    apple_style_apply_global_tone_curve, apple_style_distribution, apple_style_face_exposure_boost,
     apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
-    apple_style_monotonic_global_tone_curve, apple_style_property_list,
-    resolve_apple_style_scene_type, AppleL8Mask, AppleStyleGlobalToneCurve,
-    AppleStyleLightMapRequest, AppleStyleLinearMetadata, AppleStylePropertyListRequest,
-    AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    apple_style_maker_apple_dictionary, apple_style_monotonic_global_tone_curve,
+    apple_style_property_list, apple_style_revert_local_data, resolve_apple_style_scene_type,
+    AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
+    AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
+    APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+};
+use xdremux_hdr::{
+    area_resize_linear_rgb, iso_gain_application_for_alternate, reconstruct_scene_linear_hdr,
+    GainMapCodes, SceneLinearRgb,
 };
 
 use crate::apple_adapter::{AppleAdapterClient, AppleVideoToolboxMain10Encode};
@@ -31,14 +36,22 @@ const STYLE_DELTA_ROWS_LANDSCAPE: u32 = 5;
 const STYLE_DELTA_COLUMNS_LANDSCAPE: u32 = 6;
 const STYLE_DELTA_ROWS_PORTRAIT: u32 = 6;
 const STYLE_DELTA_COLUMNS_PORTRAIT: u32 = 5;
-const STYLE_TONE_LIGHT_MAP_SCALE: f32 = 0.713_723_82;
-const STYLE_TONE_LIGHT_MAP_OFFSET: f32 = 0.025_543_4;
-const STYLE_LINEAR_LIGHT_MAP_SCALE: f32 = 0.939_421_03;
-const STYLE_LINEAR_LIGHT_MAP_OFFSET: f32 = 0.064_942_95;
-const STYLE_TONE_LIGHT_MAP_MINIMUM: f32 = 0.040_740_967;
-const STYLE_TONE_LIGHT_MAP_MAXIMUM: f32 = 0.761_230_47;
-const STYLE_LINEAR_LIGHT_MAP_MINIMUM: f32 = 0.040_740_967;
-const STYLE_LINEAR_LIGHT_MAP_MAXIMUM: f32 = 0.758_300_8;
+
+fn profile_start() -> Option<Instant> {
+    std::env::var("XDREMUX_STYLES_PROFILE")
+        .is_ok_and(|value| value == "1")
+        .then(Instant::now)
+}
+
+fn profile_stage(profile: &mut Option<Instant>, stage: &'static str) {
+    if let Some(started) = profile {
+        eprintln!(
+            "xdremux_styles_profile stage={stage} seconds={:.9}",
+            started.elapsed().as_secs_f64()
+        );
+        *started = Instant::now();
+    }
+}
 
 // Apple ImageIO accepts the Styles auxiliary graph only when these resources
 // use the Main10 4:2:0 contract. These bytes are the checked-in neutral Style
@@ -102,6 +115,7 @@ pub(crate) fn convert_file(
     source: &[u8],
     output: impl AsRef<Path>,
 ) -> Result<PhotographicStylesFileReceipt> {
+    let mut profile = profile_start();
     let output = output.as_ref();
     let parent = publication_parent(output);
     if !parent.is_dir() {
@@ -111,6 +125,7 @@ pub(crate) fn convert_file(
         ));
     }
     let prepared = runtime.analyze_proxdr(source)?;
+    profile_stage(&mut profile, "source_analysis");
 
     let staging = tempfile::Builder::new()
         .prefix(".xdremux-styles-")
@@ -122,11 +137,33 @@ pub(crate) fn convert_file(
     // Build the standard HDR base in memory so an in-place Styles conversion
     // cannot publish an intermediate file. The request is intentionally
     // feature-neutral: this operation owns the Styles graph separately.
-    let base = runtime
+    let product_base = runtime
         .convert_proxdr_bytes(source, xdremux_engine::ConversionRequest::default(), |_| {})?
         .bytes;
+    let mut system_encoded = if crate::system_heif_hdr::requested()? {
+        Some(crate::system_heif_hdr::encode_system_base(
+            runtime,
+            executable.as_ref(),
+            &product_base,
+            &prepared.scale,
+            prepared.analysis.gain_map.channels,
+            staging.path(),
+            output,
+        )?)
+    } else {
+        None
+    };
+    let carrier_report = system_encoded
+        .as_ref()
+        .map(|encoded| encoded.report_path.clone());
+    let base = if let Some(encoded) = system_encoded.as_mut() {
+        std::mem::take(&mut encoded.bytes)
+    } else {
+        product_base
+    };
     fs::write(&base_path, &base)
         .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
+    profile_stage(&mut profile, "base_conversion");
 
     let adapter = AppleAdapterClient::new(executable.as_ref().to_path_buf());
     if !adapter.supports_photographic_styles()? {
@@ -143,11 +180,9 @@ pub(crate) fn convert_file(
         storage_orientation,
         SEMANTIC_MATTE_MAX_SIZE,
     )?;
-    let semantic_masks = adapter.vision_semantic_mattes(
-        &base_path,
-        &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
-        None,
-    )?;
+    let semantic_masks = adapter
+        .vision_semantic_mattes(&base_path, &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES, None)
+        .map_err(|error| note_system_carrier(carrier_report.as_deref(), error))?;
     let mut semantic_payloads = Vec::with_capacity(APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len());
     for role in APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES {
         let matte = semantic_masks.get(&role).ok_or_else(|| {
@@ -179,7 +214,13 @@ pub(crate) fn convert_file(
         semantic_payloads.push(payload);
     }
 
-    adapter.imageio_write_auxiliary(&base_path, &semantic_scaffold_path, &semantic_payloads)?;
+    let maker_apple = apple_style_maker_apple_dictionary();
+    adapter.imageio_write_auxiliary_with_properties(
+        &base_path,
+        &semantic_scaffold_path,
+        &semantic_payloads,
+        maker_apple.clone(),
+    )?;
     let semantic_scaffold = fs::read(&semantic_scaffold_path).map_err(|error| {
         RuntimeError::external("Photographic Styles semantic scaffold read", error)
     })?;
@@ -188,89 +229,125 @@ pub(crate) fn convert_file(
         &semantic_scaffold,
         APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
     )
-    .map_err(|error| RuntimeError::external("Photographic Styles semantic graph", error))?;
-    let primary = runtime
+    .map_err(|error| {
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles semantic graph", error),
+        )
+    })?;
+    profile_stage(&mut profile, "semantic_production");
+    runtime
         .heif
         .extract_primary_hevc_resource(&semantic_base)
         .map_err(|error| RuntimeError::external("Photographic Styles primary resource", error))?;
-    let structure = xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
-        RuntimeError::external("Photographic Styles source Gain Map structure", error)
+    let geometry = xdremux_heif::primary_coded_geometry(&semantic_base).map_err(|error| {
+        RuntimeError::external("Photographic Styles primary coded geometry", error)
     })?;
-    let raster = runtime
-        .heif
-        .decode_raster(&HeifRasterDecodeRequest {
-            data: semantic_base.clone(),
-            format: RasterPixelFormat::Rgb8,
-        })
-        .map_err(|error| RuntimeError::external("Photographic Styles source raster", error))?;
-    let gain_raster = runtime
-        .heif
-        .decode_item_raster(
-            &semantic_base,
-            structure.gain_map_item_id,
-            match prepared.analysis.gain_map.channels {
-                xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
-                xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
-            },
+    let structure = xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles source Gain Map structure", error),
         )
-        .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
-    let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
-    let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
-    let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
+    })?;
+    let scene_rasters = if let Some(encoded) = system_encoded.as_mut() {
+        let pair = encoded.submitted_scene.take().ok_or_else(|| {
+            RuntimeError::new(
+                "Photographic Styles system HDR",
+                "submitted scene was already consumed",
+            )
+        })?;
+        profile_stage(&mut profile, "resource_decode");
+        derive_style_scene_from_pair(
+            pair,
+            encoded.content_headroom.log2(),
+            LINEAR_THUMBNAIL_MAX_SIZE,
+        )?
+    } else {
+        let raster = runtime
+            .heif
+            .decode_raster(&HeifRasterDecodeRequest {
+                data: semantic_base.clone(),
+                format: RasterPixelFormat::Rgb8,
+            })
+            .map_err(|error| RuntimeError::external("Photographic Styles source raster", error))?;
+        let gain_raster = runtime
+            .heif
+            .decode_item_raster(
+                &semantic_base,
+                structure.gain_map_item_id,
+                match prepared.analysis.gain_map.channels {
+                    xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
+                    xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
+                },
+            )
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles source Gain Map", error)
+            })?;
+        profile_stage(&mut profile, "resource_decode");
+        derive_style_scene(
+            &raster,
+            &gain_raster,
+            &prepared.scale,
+            LINEAR_THUMBNAIL_MAX_SIZE,
+        )?
+    };
+    profile_stage(&mut profile, "scene_derivation");
+    let display_thumbnail = linear_thumbnail_raster(&scene_rasters)?;
+    let (width, height, data) = xdremux_codec::undo_heif_rgb16(
+        &display_thumbnail.data,
+        display_thumbnail.width,
+        display_thumbnail.height,
+        geometry.quarter_turns_ccw,
+        geometry.mirror_axis,
+        geometry.mirror_before_rotation,
+    )
+    .map_err(|error| {
+        RuntimeError::external(
+            "Photographic Styles Linear Thumbnail coded orientation",
+            error,
+        )
+    })?;
+    let linear_thumbnail_raster = LinearThumbnailCodes {
+        width,
+        height,
+        bytes_per_row: width.checked_mul(6).ok_or_else(|| {
+            RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
+        })?,
+        data,
+    };
     let linear_thumbnail = encode_linear_thumbnail(
         &adapter,
         staging.path(),
         &linear_thumbnail_raster,
         LINEAR_THUMBNAIL_QUALITY,
     )?;
+    profile_stage(&mut profile, "thumbnail_encode");
 
     let style_data = source_derived_style_data(&scene_rasters)?;
+    profile_stage(&mut profile, "key1_fit");
     let global_tone_curve = scene_rasters.global_tone_curve.data.clone();
     let statistics = style_scene_statistics(&scene_rasters, &semantic_masks)?;
+    let storage_orientation = u8::try_from(storage_orientation).map_err(|_| {
+        RuntimeError::new(
+            "Photographic Styles light map",
+            "ImageIO orientation exceeds the portable wire range",
+        )
+    })?;
+    // Key c is the primary-image guide mean. Key d is the linear-thumbnail
+    // guide mean. The consumer upsamples each with its guided filter and mixes
+    // them; these maps are not multiplied onto luminance.
     let tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.base_luminance,
-        width: usize::try_from(scene_raster.width).map_err(|_| {
-            RuntimeError::new("Photographic Styles light map", "width exceeds usize")
-        })?,
-        height: usize::try_from(scene_raster.height).map_err(|_| {
-            RuntimeError::new("Photographic Styles light map", "height exceeds usize")
-        })?,
-        value_scale: STYLE_TONE_LIGHT_MAP_SCALE,
-        value_offset: STYLE_TONE_LIGHT_MAP_OFFSET,
-        output_minimum: STYLE_TONE_LIGHT_MAP_MINIMUM,
-        output_maximum: STYLE_TONE_LIGHT_MAP_MAXIMUM,
-        storage_orientation: u8::try_from(storage_orientation).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles light map",
-                "ImageIO orientation exceeds the portable wire range",
-            )
-        })?,
+        width: scene_rasters.width,
+        height: scene_rasters.height,
+        storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles tone light map", error))?;
     let linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
-        luma: &scene_rasters.gtc_mapped_luminance,
-        width: usize::try_from(scene_raster.width).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "width exceeds usize",
-            )
-        })?,
-        height: usize::try_from(scene_raster.height).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "height exceeds usize",
-            )
-        })?,
-        value_scale: STYLE_LINEAR_LIGHT_MAP_SCALE,
-        value_offset: STYLE_LINEAR_LIGHT_MAP_OFFSET,
-        output_minimum: STYLE_LINEAR_LIGHT_MAP_MINIMUM,
-        output_maximum: STYLE_LINEAR_LIGHT_MAP_MAXIMUM,
-        storage_orientation: u8::try_from(storage_orientation).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "ImageIO orientation exceeds the portable wire range",
-            )
-        })?,
+        luma: &scene_rasters.thumbnail_luminance,
+        width: scene_rasters.width,
+        height: scene_rasters.height,
+        storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles linear light map", error))?;
     let scene_scores = adapter.vision_scene_scores(&base_path)?;
@@ -308,16 +385,18 @@ pub(crate) fn convert_file(
         face_exposure_boost,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles metadata", error))?;
+    profile_stage(&mut profile, "style_metadata");
 
     // Validate the exact Rust-owned key-1 resource at the private consumer
     // boundary before assembling the final file. The adapter cannot choose
     // style data or alter the property-list policy.
     adapter.semantic_style_properties_facts(&style_properties, &style_data)?;
+    profile_stage(&mut profile, "native_style_properties");
 
     let (style_delta_payload, style_delta_hvcc) = verified_neutral_style_delta()?;
 
     let (style_delta_grid_width, style_delta_grid_height, style_delta_rows, style_delta_columns) =
-        style_grid_size(primary.width, primary.height);
+        style_grid_size(geometry.width, geometry.height);
     let assembly = crate::PhotographicStylesAssembly {
         style_property_list: &style_properties,
         style_delta_hvcc,
@@ -334,32 +413,111 @@ pub(crate) fn convert_file(
         linear_thumbnail_height: linear_thumbnail.height,
     };
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
-        .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
+        .map_err(|error| {
+            note_system_carrier(
+                carrier_report.as_deref(),
+                RuntimeError::external("Rust Photographic Styles graph", error),
+            )
+        })?;
+    let styles_path = staging.path().join("styles-for-texture.heic");
+    fs::write(&styles_path, &assembled)
+        .map_err(|error| RuntimeError::external("Texture source staging", error))?;
+    profile_stage(&mut profile, "style_assembly");
+    let assembled =
+        crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?;
+    profile_stage(&mut profile, "texture_generation");
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
-        RuntimeError::external("Photographic Styles HDR structural validation", error)
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles HDR structural validation", error),
+        )
     })?;
 
+    // Inspect the exact final bytes, not the intermediate scaffold or the
+    // coefficient plist. An older adapter that ignores the additive metadata
+    // request must fail here before it can replace an existing output.
+    let final_path = staging.path().join("final-styles.heic");
+    fs::write(&final_path, &assembled).map_err(|error| {
+        RuntimeError::external("Photographic Styles final metadata staging", error)
+    })?;
+    let final_properties = adapter.imageio_image_properties(&final_path)?;
+    validate_maker_apple_properties(
+        &maker_apple,
+        &final_properties.maker_apple_integer_dictionaries,
+    )?;
+
+    if let Some(encoded) = &system_encoded {
+        if let Err(error) = crate::system_heif_hdr::record_after_styles(
+            &adapter,
+            &final_path,
+            &encoded.report_path,
+            &encoded.reference_f32_path,
+            &encoded.reference_f16_path,
+        ) {
+            return Err(note_system_carrier(carrier_report.as_deref(), error));
+        }
+    }
+
+    profile_stage(&mut profile, "final_validation");
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
     let published = publisher.publish_bytes(assembled)?;
+    profile_stage(&mut profile, "publication");
     Ok(PhotographicStylesFileReceipt { output: published })
+}
+
+fn note_system_carrier(report: Option<&Path>, error: RuntimeError) -> RuntimeError {
+    if let Some(report) = report {
+        crate::system_heif_hdr::record_carrier_error(report, &error.to_string());
+    }
+    error
+}
+
+pub(super) fn validate_maker_apple_properties(
+    expected: &BTreeMap<String, BTreeMap<String, i64>>,
+    actual: &BTreeMap<String, BTreeMap<String, i64>>,
+) -> Result<()> {
+    for (tag, fields) in expected {
+        for (key, value) in fields {
+            if actual.get(tag).and_then(|fields| fields.get(key)) != Some(value) {
+                return Err(RuntimeError::new(
+                    "Photographic Styles final metadata",
+                    format!("ImageIO did not retain MakerApple {tag} field {key}={value}"),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn encode_linear_thumbnail(
     adapter: &AppleAdapterClient,
     staging: &Path,
-    raster: &Raster8,
+    raster: &LinearThumbnailCodes,
     quality: f64,
 ) -> Result<EncodedHevcResource> {
-    raster
-        .validate()
-        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
-    if raster.format != RasterPixelFormat::Rgb8 {
+    if raster.width == 0
+        || raster.height == 0
+        || !raster.width.is_multiple_of(2)
+        || !raster.height.is_multiple_of(2)
+    {
         return Err(RuntimeError::new(
             "Photographic Styles Linear Thumbnail",
-            "VideoToolbox input raster is not RGB8",
+            "VideoToolbox input geometry must be non-zero and even",
         ));
     }
-    let raw_path = staging.join("linear-thumbnail-rgb8.bin");
+    let minimum_row = raster.width.checked_mul(6).ok_or_else(|| {
+        RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "RGB16 row stride overflows",
+        )
+    })?;
+    if raster.bytes_per_row < minimum_row {
+        return Err(RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "VideoToolbox input raster is shorter than 16-bit RGB",
+        ));
+    }
+    let raw_path = staging.join("linear-thumbnail-rgb16.bin");
     let annex_b_path = staging.join("linear-thumbnail.hevc");
     let hvcc_path = staging.join("linear-thumbnail.hvcc");
     fs::write(&raw_path, &raster.data).map_err(|error| {
@@ -371,12 +529,8 @@ fn encode_linear_thumbnail(
         output_hvcc: &hvcc_path,
         width: raster.width,
         height: raster.height,
-        bytes_per_row: u32::try_from(raster.bytes_per_row).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles Linear Thumbnail",
-                "RGB8 row stride exceeds the Apple adapter wire range",
-            )
-        })?,
+        bytes_per_row: raster.bytes_per_row,
+        component_bits: 16,
         quality,
     })?;
     let annex_b = fs::read(&annex_b_path).map_err(|error| {
@@ -471,6 +625,8 @@ struct StyleSceneRasters {
     hdr_luminance: Vec<f32>,
     coded_linear_luminance: Vec<f32>,
     renderer_linear_luminance: Vec<f32>,
+    thumbnail_codes: Vec<f32>,
+    thumbnail_luminance: Vec<f32>,
     gtc_mapped_luminance: Vec<f32>,
     global_tone_curve: AppleStyleGlobalToneCurve,
     linear_metadata: AppleStyleLinearMetadata,
@@ -482,6 +638,7 @@ fn derive_style_scene(
     raster: &Raster8,
     gain_map: &Raster8,
     scale: &ResolvedScale,
+    maximum_edge: u32,
 ) -> Result<StyleSceneRasters> {
     raster
         .validate()
@@ -529,29 +686,9 @@ fn derive_style_scene(
     let pixel_count = width.checked_mul(height).ok_or_else(|| {
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
-    let mut base_rgb = Vec::with_capacity(pixel_count * 3);
-    let mut hdr_rgb = Vec::with_capacity(pixel_count * 3);
-    let mut base_luminance = Vec::with_capacity(pixel_count);
-    let mut hdr_luminance = Vec::with_capacity(pixel_count);
-    let mut renderer_linear_minimum = f32::INFINITY;
-    let mut renderer_linear_maximum = f32::NEG_INFINITY;
-    let gain_width = usize::try_from(gain_map.width).map_err(|_| {
-        RuntimeError::new("Photographic Styles source Gain Map", "width exceeds usize")
-    })?;
-    let gain_height = usize::try_from(gain_map.height).map_err(|_| {
-        RuntimeError::new(
-            "Photographic Styles source Gain Map",
-            "height exceeds usize",
-        )
-    })?;
-    let gain_sampler = GainMapSampler {
-        raster: gain_map,
-        target_width: width,
-        target_height: height,
-        source_width: gain_width,
-        source_height: gain_height,
-    };
-
+    let srgb8_to_linear: [f32; 256] =
+        std::array::from_fn(|code| srgb_decode(f32::from(code as u8) / 255.0));
+    let mut full_sdr = Vec::with_capacity(pixel_count.saturating_mul(3));
     for y in 0..height {
         let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
             RuntimeError::new("Photographic Styles source raster", "row offset overflows")
@@ -570,79 +707,43 @@ fn derive_style_scene(
                         "pixel offset overflows",
                     )
                 })?;
-            let mut base = [0.0_f32; 3];
-            let mut hdr = [0.0_f32; 3];
-            for component in 0..3 {
-                base[component] =
-                    srgb_decode(f32::from(raster.data[source_offset + component]) / 255.0);
-                let code = gain_sampler.sample_code(x, y, component);
-                let parameter_index = if scale.channel_count == 1 {
-                    0
-                } else {
-                    component.min(scale.channel_count - 1)
-                };
-                let gamma = scale
-                    .per_channel_gamma
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gamma);
-                let minimum = scale
-                    .per_channel_gain_map_min
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_min);
-                let maximum = scale
-                    .per_channel_gain_map_max
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_max);
-                let base_offset = scale
-                    .per_channel_base_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_sdr);
-                let alternate_offset = scale
-                    .per_channel_alternate_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_hdr);
-                if gamma < 0.0 {
-                    return Err(RuntimeError::new(
-                        "Photographic Styles source Gain Map",
-                        "resolved Gain Map gamma is negative",
-                    ));
-                }
-                let log_gain = minimum + code.powf(gamma) * (maximum - minimum);
-                let reconstructed = (f64::from(base[component]) + base_offset).max(0.0)
-                    * 2.0_f64.powf(log_gain)
-                    - alternate_offset;
-                hdr[component] = reconstructed as f32;
-                if !hdr[component].is_finite() {
-                    return Err(RuntimeError::new(
-                        "Photographic Styles source Gain Map",
-                        "reconstructed HDR scene contains a non-finite sample",
-                    ));
-                }
-            }
-            let base_y = luminance(base);
-            let hdr_y = luminance(hdr);
-            if !base_y.is_finite() || !hdr_y.is_finite() {
-                return Err(RuntimeError::new(
-                    "Photographic Styles source raster",
-                    "source-derived luminance contains a non-finite sample",
-                ));
-            }
-            base_rgb.extend_from_slice(&base);
-            hdr_rgb.extend_from_slice(&hdr);
-            base_luminance.push(base_y);
-            hdr_luminance.push(hdr_y);
-            for value in hdr {
-                renderer_linear_minimum = renderer_linear_minimum.min(value);
-                renderer_linear_maximum = renderer_linear_maximum.max(value);
+            for component in &raster.data[source_offset..source_offset + 3] {
+                full_sdr.push(srgb8_to_linear[usize::from(*component)]);
             }
         }
     }
-
+    let full_sdr = SceneLinearRgb {
+        width,
+        height,
+        samples: full_sdr,
+    };
+    let application = iso_gain_application_for_alternate(scale)
+        .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+    let gain_channels = match gain_map.format {
+        RasterPixelFormat::Mono8 => 1,
+        RasterPixelFormat::Rgb8 => 3,
+    };
+    let mut reconstruction_profile = profile_start();
+    let full_hdr = reconstruct_scene_linear_hdr(
+        &full_sdr,
+        GainMapCodes {
+            width: usize::try_from(gain_map.width).map_err(|_| {
+                RuntimeError::new("Photographic Styles source Gain Map", "width exceeds usize")
+            })?,
+            height: usize::try_from(gain_map.height).map_err(|_| {
+                RuntimeError::new(
+                    "Photographic Styles source Gain Map",
+                    "height exceeds usize",
+                )
+            })?,
+            bytes_per_row: gain_map.bytes_per_row,
+            channels: gain_channels,
+            data: &gain_map.data,
+        },
+        &application,
+    )
+    .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+    profile_stage(&mut reconstruction_profile, "scene_hdr_reconstruction");
     let gain_map_maximum_stops = scale
         .per_channel_gain_map_max
         .iter()
@@ -656,25 +757,125 @@ fn derive_style_scene(
             "source Gain Map has no finite maximum headroom",
         ));
     }
-    let linear_metadata = apple_style_linear_metadata(
-        &base_luminance,
-        &hdr_luminance,
+    derive_style_scene_from_linear_images(
+        &full_sdr,
+        &full_hdr,
         gain_map_maximum_stops as f32,
+        maximum_edge,
     )
-    .map_err(|error| RuntimeError::external("Photographic Styles linear metadata", error))?;
+}
+
+fn derive_style_scene_from_pair(
+    pair: SceneLinearPair,
+    maximum_stops: f32,
+    maximum_edge: u32,
+) -> Result<StyleSceneRasters> {
+    let sdr = SceneLinearRgb {
+        width: pair.width,
+        height: pair.height,
+        samples: pair.sdr,
+    };
+    let hdr = SceneLinearRgb {
+        width: pair.width,
+        height: pair.height,
+        samples: pair.hdr,
+    };
+    derive_style_scene_from_linear_images(&sdr, &hdr, maximum_stops, maximum_edge)
+}
+
+fn derive_style_scene_from_linear_images(
+    full_sdr: &SceneLinearRgb,
+    full_hdr: &SceneLinearRgb,
+    gain_map_maximum_stops: f32,
+    maximum_edge: u32,
+) -> Result<StyleSceneRasters> {
+    // Thumbnail reduction happens only after the gain is applied at the base
+    // resolution. Both images use the same linear-light area footprint.
+    let mut reduction_profile = profile_start();
+    let base_image = area_resize_linear_rgb(full_sdr, maximum_edge)
+        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
+    let hdr_image = area_resize_linear_rgb(full_hdr, maximum_edge)
+        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
+    profile_stage(&mut reduction_profile, "scene_linear_area_reduction");
+    if base_image.width != hdr_image.width
+        || base_image.height != hdr_image.height
+        || base_image.samples.len() != hdr_image.samples.len()
+    {
+        return Err(RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "linear SDR and HDR reductions have different geometry",
+        ));
+    }
+    let width = base_image.width;
+    let height = base_image.height;
+    let mut base_luminance = Vec::with_capacity(width * height);
+    let mut hdr_luminance = Vec::with_capacity(width * height);
+    let mut renderer_linear_minimum = f32::INFINITY;
+    let mut renderer_linear_maximum = f32::NEG_INFINITY;
+    for (base_pixel, hdr_pixel) in base_image
+        .samples
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(hdr_image.samples.as_chunks::<3>().0)
+    {
+        let base = [base_pixel[0], base_pixel[1], base_pixel[2]];
+        let hdr = [hdr_pixel[0], hdr_pixel[1], hdr_pixel[2]];
+        let base_y = luminance(base);
+        let hdr_y = luminance(hdr);
+        if !base_y.is_finite() || !hdr_y.is_finite() {
+            return Err(RuntimeError::new(
+                "Photographic Styles source raster",
+                "source-derived luminance contains a non-finite sample",
+            ));
+        }
+        base_luminance.push(base_y);
+        hdr_luminance.push(hdr_y);
+        for value in hdr {
+            renderer_linear_minimum = renderer_linear_minimum.min(value);
+            renderer_linear_maximum = renderer_linear_maximum.max(value);
+        }
+    }
+    let base_rgb = base_image.samples;
+    let hdr_rgb = hdr_image.samples;
+
+    let linear_metadata =
+        apple_style_linear_metadata(&base_luminance, &hdr_luminance, gain_map_maximum_stops)
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles linear metadata", error)
+            })?;
     let coded_linear_luminance = hdr_luminance
         .iter()
         .map(|value| *value / linear_metadata.baseline_exposure)
         .collect::<Vec<_>>();
-    let global_tone_curve =
-        apple_style_monotonic_global_tone_curve(&coded_linear_luminance, &base_luminance).map_err(
-            |error| RuntimeError::external("Photographic Styles global tone curve", error),
-        )?;
-    let gtc_mapped_luminance = apple_style_apply_global_tone_curve(
-        &coded_linear_luminance,
-        &global_tone_curve.linear_samples,
-    )
-    .map_err(|error| RuntimeError::external("Photographic Styles global tone curve", error))?;
+    // S in the consumer is the decoded thumbnail after one base-gain multiply.
+    // The extra exposure E is a render parameter, so it stays out of this code.
+    let thumbnail_codes = hdr_rgb
+        .iter()
+        .map(|value| {
+            let code = f64::from(*value) / f64::from(linear_metadata.baseline_exposure)
+                * f64::from(linear_metadata.base_gain);
+            code.clamp(0.0, 1.0) as f32
+        })
+        .collect::<Vec<_>>();
+    let global_tone_curve = apple_style_monotonic_global_tone_curve(&thumbnail_codes, &base_rgb)
+        .map_err(|error| RuntimeError::external("Photographic Styles global tone curve", error))?;
+    let gtc_rgb =
+        apple_style_apply_global_tone_curve(&thumbnail_codes, &global_tone_curve.linear_samples)
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles global tone curve", error)
+            })?;
+    let mut thumbnail_luminance = Vec::with_capacity(width * height);
+    let mut gtc_mapped_luminance = Vec::with_capacity(width * height);
+    for (thumbnail, mapped) in thumbnail_codes
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(gtc_rgb.as_chunks::<3>().0)
+    {
+        thumbnail_luminance.push(luminance([thumbnail[0], thumbnail[1], thumbnail[2]]));
+        gtc_mapped_luminance.push(luminance([mapped[0], mapped[1], mapped[2]]));
+    }
     let renderer_linear_luminance = coded_linear_luminance
         .iter()
         .map(|value| *value / linear_metadata.encoding_gain)
@@ -697,6 +898,8 @@ fn derive_style_scene(
         hdr_luminance,
         coded_linear_luminance,
         renderer_linear_luminance,
+        thumbnail_codes,
+        thumbnail_luminance,
         gtc_mapped_luminance,
         global_tone_curve,
         linear_metadata,
@@ -705,105 +908,86 @@ fn derive_style_scene(
     })
 }
 
-fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<Raster8> {
-    let data =
+pub(crate) struct SceneLinearPair {
+    pub width: usize,
+    pub height: usize,
+    pub sdr: Vec<f32>,
+    pub hdr: Vec<f32>,
+}
+
+pub(crate) fn scene_linear_pair(
+    raster: &Raster8,
+    gain_map: &Raster8,
+    scale: &ResolvedScale,
+    maximum_edge: u32,
+) -> Result<SceneLinearPair> {
+    let scene = derive_style_scene(raster, gain_map, scale, maximum_edge)?;
+    Ok(SceneLinearPair {
+        width: scene.width,
+        height: scene.height,
+        sdr: scene.base_rgb,
+        hdr: scene.hdr_rgb,
+    })
+}
+
+struct LinearThumbnailCodes {
+    width: u32,
+    height: u32,
+    bytes_per_row: u32,
+    data: Vec<u8>,
+}
+
+fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<LinearThumbnailCodes> {
+    let codes =
         apple_style_linear_thumbnail_codes(&scene.hdr_rgb, scene.linear_metadata.baseline_exposure)
             .map_err(|error| {
                 RuntimeError::external("Photographic Styles Linear Thumbnail", error)
             })?;
-    // Keep the decoded scene geometry used by the auxiliary graph. Applying
-    // another display rotation here would misregister the reference.
-    Raster8::new(
-        u32::try_from(scene.width).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")
-        })?,
-        u32::try_from(scene.height).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds u32")
-        })?,
-        scene.width.checked_mul(3).ok_or_else(|| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
-        })?,
-        RasterPixelFormat::Rgb8,
+    // Keep display order here; the caller restores coded order before encode.
+    // The
+    // samples are Apple Log codes at 16-bit, not RGB8 and not a different
+    // transfer function.
+    let width = u32::try_from(scene.width).map_err(|_| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")
+    })?;
+    let height = u32::try_from(scene.height).map_err(|_| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds u32")
+    })?;
+    let bytes_per_row = width.checked_mul(6).ok_or_else(|| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
+    })?;
+    let mut data = Vec::with_capacity(codes.len().saturating_mul(2));
+    for code in codes {
+        data.extend_from_slice(&code.to_le_bytes());
+    }
+    Ok(LinearThumbnailCodes {
+        width,
+        height,
+        bytes_per_row,
         data,
-    )
-    .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))
+    })
 }
 
 fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
-    if scene.base_rgb.len() != scene.base_luminance.len().saturating_mul(3)
-        || scene.base_luminance.is_empty()
-        || scene.base_luminance.len() != scene.gtc_mapped_luminance.len()
-        || scene.base_luminance.iter().any(|value| !value.is_finite())
-        || scene
-            .gtc_mapped_luminance
-            .iter()
-            .any(|value| !value.is_finite())
+    if scene.base_rgb.len() != scene.thumbnail_codes.len()
+        || scene.base_rgb.is_empty()
+        || scene.base_rgb.len() != scene.width.saturating_mul(scene.height).saturating_mul(3)
     {
         return Err(RuntimeError::new(
             "Photographic Styles style data",
             "source-derived style raster geometry or values are invalid",
         ));
     }
-    let base_white = apple_style_distribution(&scene.base_luminance)
-        .high_key
-        .max(1.0 / 4096.0) as f32;
-    let mut source_rgb8 = Vec::with_capacity(scene.base_rgb.len());
-    let mut target_rgb8 = Vec::with_capacity(scene.base_rgb.len());
-    for (pixel, base_luma) in scene.base_luminance.iter().copied().enumerate() {
-        let target_luma = scene.gtc_mapped_luminance[pixel];
-        let base_normalized = (base_luma / base_white).clamp(0.0, 1.0);
-        let ratio = if base_normalized > 1.0 / 65_536.0 {
-            (target_luma / base_normalized).clamp(0.75, 1.25)
-        } else {
-            1.0
-        };
-        for component in 0..3 {
-            let base = scene.base_rgb[pixel * 3 + component].clamp(0.0, 1.0);
-            source_rgb8.push(base * 255.0);
-            target_rgb8.push((base * ratio).clamp(0.0, 1.0) * 255.0);
-        }
-    }
-    let deltas = apple_style_fit_global_polynomial(&source_rgb8, &target_rgb8)
-        .map_err(|error| RuntimeError::external("Photographic Styles style solver", error))?;
-    apple_style_data_from_coefficient_deltas(&deltas)
-        .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
-}
-
-struct GainMapSampler<'a> {
-    raster: &'a Raster8,
-    target_width: usize,
-    target_height: usize,
-    source_width: usize,
-    source_height: usize,
-}
-
-impl GainMapSampler<'_> {
-    fn sample_code(&self, target_x: usize, target_y: usize, component: usize) -> f64 {
-        let x = (((target_x as f64 + 0.5) * self.source_width as f64 / self.target_width as f64)
-            - 0.5)
-            .clamp(0.0, self.source_width.saturating_sub(1) as f64);
-        let y = (((target_y as f64 + 0.5) * self.source_height as f64 / self.target_height as f64)
-            - 0.5)
-            .clamp(0.0, self.source_height.saturating_sub(1) as f64);
-        let x0 = x.floor() as usize;
-        let y0 = y.floor() as usize;
-        let x1 = (x0 + 1).min(self.source_width - 1);
-        let y1 = (y0 + 1).min(self.source_height - 1);
-        let x_fraction = x - x0 as f64;
-        let y_fraction = y - y0 as f64;
-        let channel = match self.raster.format {
-            RasterPixelFormat::Mono8 => 0,
-            RasterPixelFormat::Rgb8 => component.min(2),
-        };
-        let at = |sample_x: usize, sample_y: usize| {
-            let offset = sample_y * self.raster.bytes_per_row
-                + sample_x * self.raster.format.bytes_per_pixel();
-            f64::from(self.raster.data[offset + channel]) / 255.0
-        };
-        let top = at(x0, y0) * (1.0 - x_fraction) + at(x1, y0) * x_fraction;
-        let bottom = at(x0, y1) * (1.0 - x_fraction) + at(x1, y1) * x_fraction;
-        top * (1.0 - y_fraction) + bottom * y_fraction
-    }
+    // Remove-style reads the displayed primary and applies key1. The recovered
+    // target is the same per-channel thumbnail code the semantic-tone stage
+    // uses. A forward primary-to-styled residual would point the other way.
+    apple_style_revert_local_data(&AppleStyleRevertRequest {
+        width: scene.width,
+        height: scene.height,
+        styled_rgb: &scene.base_rgb,
+        recovered_rgb: &scene.thumbnail_codes,
+    })
+    .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
 }
 
 fn srgb_decode(value: f32) -> f32 {
@@ -1024,6 +1208,7 @@ fn resize_semantic_matte(
         .map_err(|error| RuntimeError::external("Photographic Styles semantic matte", error))
 }
 
+#[cfg(test)]
 fn downsample_raster(raster: &Raster8, maximum_size: u32) -> Result<Raster8> {
     raster
         .validate()
@@ -1170,6 +1355,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn missing_or_changed_smartstyle_state_is_rejected_before_publication() {
+        let expected = apple_style_maker_apple_dictionary();
+        assert!(validate_maker_apple_properties(&expected, &BTreeMap::new()).is_err());
+        let mut actual = expected.clone();
+        actual.get_mut("84").unwrap().remove("5");
+        assert!(validate_maker_apple_properties(&expected, &actual).is_err());
+        actual.get_mut("84").unwrap().insert("5".to_owned(), 0);
+        assert!(validate_maker_apple_properties(&expected, &actual).is_err());
+        actual.get_mut("84").unwrap().insert("5".to_owned(), 1);
+        actual.get_mut("84").unwrap().insert("99".to_owned(), 7);
+        validate_maker_apple_properties(&expected, &actual).unwrap();
+        assert_eq!(expected.keys().collect::<Vec<_>>(), vec!["84"]);
+    }
+
+    #[test]
     fn real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox() {
         use xdremux_format::isobmff::{parse_meta_box, scan_top_level_boxes, META};
         use xdremux_format::FourCC;
@@ -1183,6 +1383,7 @@ mod tests {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| temporary.path().to_path_buf());
         fs::create_dir_all(&output_dir).unwrap();
+        let mut evidence = Vec::new();
         for fixture in [
             "oppo/find-x9-ultra/uhdr-portrait-01.heic",
             "oppo/find-x7-ultra/lhdr-v2-01.heic",
@@ -1228,7 +1429,7 @@ mod tests {
                     format: RasterPixelFormat::Rgb8,
                 })
                 .unwrap();
-            let base = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
+            let sdr_preview = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
             let prepared = runtime.analyze_proxdr(&source).unwrap();
             let gain = runtime
                 .heif
@@ -1241,20 +1442,38 @@ mod tests {
                     },
                 )
                 .unwrap();
-            let scene = derive_style_scene(&base, &gain, &prepared.scale).unwrap();
+            let scene =
+                derive_style_scene(&base, &gain, &prepared.scale, LINEAR_THUMBNAIL_MAX_SIZE)
+                    .unwrap();
             let expected = linear_thumbnail_raster(&scene).unwrap();
             assert_eq!(
                 (decoded.width, decoded.height),
                 (expected.width, expected.height)
             );
+            assert_eq!(
+                (sdr_preview.width, sdr_preview.height),
+                (decoded.width, decoded.height)
+            );
             let mut log_error = 0.0;
             let mut sdr_error = 0.0;
             for y in 0..scene.height {
-                for x in 0..scene.width * 3 {
-                    let actual = f64::from(decoded.data[y * decoded.bytes_per_row + x]);
-                    log_error +=
-                        (actual - f64::from(expected.data[y * expected.bytes_per_row + x])).abs();
-                    sdr_error += (actual - f64::from(base.data[y * base.bytes_per_row + x])).abs();
+                for x in 0..scene.width {
+                    for component in 0..3 {
+                        let actual =
+                            f64::from(decoded.data[y * decoded.bytes_per_row + x * 3 + component]);
+                        let code_offset = (y * scene.width + x) * 6 + component * 2;
+                        let code = u16::from_le_bytes([
+                            expected.data[code_offset],
+                            expected.data[code_offset + 1],
+                        ]);
+                        let expected_code = f64::from(code) / 65_535.0 * 255.0;
+                        log_error += (actual - expected_code).abs();
+                        sdr_error += (actual
+                            - f64::from(
+                                sdr_preview.data[y * sdr_preview.bytes_per_row + x * 3 + component],
+                            ))
+                        .abs();
+                    }
                 }
             }
             let count = (scene.width * scene.height * 3) as f64;
@@ -1286,8 +1505,67 @@ mod tests {
                 "Styles must preserve the primary HEVC"
             );
             assert_eq!(before.hvcc, after.hvcc);
-            eprintln!("hdr-log-thumbnail: fixture={fixture} dimensions={}x{} log_mae={log_mae:.4}/255 sdr_mae={sdr_mae:.4}/255 output={}", decoded.width, decoded.height, output_path.display());
+            eprintln!(
+                "hdr-log-thumbnail: fixture={fixture} dimensions={}x{} log_mae={log_mae:.4}/255 sdr_mae={sdr_mae:.4}/255 output={}",
+                decoded.width,
+                decoded.height,
+                output_path.display()
+            );
+            evidence.push(serde_json::json!({
+                "fixture": fixture,
+                "output": output_path.file_name().unwrap().to_string_lossy(),
+                "width": decoded.width,
+                "height": decoded.height,
+                "log_mae": log_mae,
+                "sdr_mae": sdr_mae,
+                "hdr_above_sdr_white_pixels": scene.hdr_luminance.iter().filter(|value| **value > 1.0).count(),
+                "pixel_count": scene.width * scene.height,
+                "source": "linear SDR RGB + ISO Gain Map; no PQ intermediate",
+                "verification": "decoded Main10 Linear Thumbnail versus expected Apple Log RGB16 codes"
+            }));
         }
+        if let Some(report_dir) =
+            std::env::var_os("XDREMUX_TEST_STYLES_REPORT").filter(|value| !value.is_empty())
+        {
+            let report_dir = std::path::PathBuf::from(report_dir);
+            fs::create_dir_all(&report_dir).unwrap();
+            fs::write(
+                report_dir.join("linear-thumbnail-roundtrip.json"),
+                serde_json::to_vec_pretty(&evidence).unwrap(),
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
+    fn submitted_system_pair_drives_styles_without_original_gain_parameters() {
+        let sdr = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.2, 0.4, 0.6];
+        let hdr = vec![0.2, 0.8, 0.6, 1.6, 1.0, 2.4, 1.4, 3.2, 1.8, 0.8, 0.8, 2.4];
+        let scene = derive_style_scene_from_pair(
+            SceneLinearPair {
+                width: 2,
+                height: 2,
+                sdr: sdr.clone(),
+                hdr: hdr.clone(),
+            },
+            2.0,
+            2,
+        )
+        .unwrap();
+        assert_eq!(scene.base_rgb, sdr);
+        assert_eq!(scene.hdr_rgb, hdr);
+        let thumbnail = linear_thumbnail_raster(&scene).unwrap();
+        let expected =
+            apple_style_linear_thumbnail_codes(&hdr, scene.linear_metadata.baseline_exposure)
+                .unwrap();
+        let actual = thumbnail
+            .data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|bytes| u16::from_le_bytes(*bytes))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -1316,18 +1594,16 @@ mod tests {
         parameters[17] = 8.0;
         parameters[18] = 8.0;
         let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
-        let scene = derive_style_scene(&base, &gain, &scale).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
         let thumbnail = linear_thumbnail_raster(&scene).unwrap();
         assert_eq!(
             (thumbnail.width, thumbnail.height, thumbnail.bytes_per_row),
-            (2, 2, 6)
+            (2, 2, 12)
         );
-        assert_ne!(
-            thumbnail.data, base.data,
-            "SDR codes are not a Linear Thumbnail"
-        );
+        assert_eq!(thumbnail.data.len(), 24);
         // Independent scalar reconstruction verifies channel order, exposure,
         // and position. There is no display rotation in this storage raster.
+        // Gamma is 1, so the ISO reciprocal exponent matches code ^ gamma.
         for index in 0..12 {
             let channel = index % 3;
             let sdr = f64::from(base.data[index]) / 255.0;
@@ -1339,14 +1615,87 @@ mod tests {
             let hdr =
                 linear * [2.0_f64, 4.0, 8.0][channel].powf(f64::from(gain.data[index]) / 255.0);
             let normalized = hdr / f64::from(scene.linear_metadata.baseline_exposure);
-            let code = if normalized >= 0.01 {
-                0.08550479 * (normalized + 0.00964052).log2() + 0.69336945
-            } else {
-                47.28711236 * (normalized + 0.05641088).powi(2)
-            };
-            let expected = (code.clamp(0.0, 1.0) * 255.0).round() as u8;
-            assert_eq!(thumbnail.data[index], expected, "RGB index {index}");
+            let code = xdremux_engine::apple_log_encode(normalized);
+            let expected = (code.clamp(0.0, 1.0) * 65_535.0).round() as u16;
+            let actual =
+                u16::from_le_bytes([thumbnail.data[index * 2], thumbnail.data[index * 2 + 1]]);
+            assert_eq!(actual, expected, "RGB index {index}");
         }
+    }
+
+    #[test]
+    fn style_scene_preserves_every_rgb8_code_and_row_stride() {
+        let width = 256;
+        let stride = width * 3 + 7;
+        let mut pixels = vec![0x7f; stride * 2];
+        let mut expected = Vec::with_capacity(width * 2 * 3);
+        for row in 0..2 {
+            for code in 0_u8..=255 {
+                let channels = if row == 0 {
+                    [code, 255 - code, code.wrapping_add(31)]
+                } else {
+                    [code.wrapping_add(73), code, 255 - code]
+                };
+                let offset = row * stride + usize::from(code) * 3;
+                pixels[offset..offset + 3].copy_from_slice(&channels);
+                for channel in channels {
+                    // Preserve the original scalar operation at runtime, even
+                    // in optimized builds; do not constant-fold the reference.
+                    let encoded = std::hint::black_box(f32::from(channel) / 255.0);
+                    expected.push(if encoded <= 0.040_45 {
+                        encoded / 12.92
+                    } else {
+                        ((encoded + 0.055) / 1.055).powf(2.4)
+                    });
+                }
+            }
+        }
+        let base = Raster8::new(width as u32, 2, stride, RasterPixelFormat::Rgb8, pixels).unwrap();
+        let gain = Raster8::new(1, 1, 1, RasterPixelFormat::Mono8, vec![128]).unwrap();
+        let mut parameters = vec![0.0; 20];
+        parameters[0..3].fill(1.0);
+        parameters[4..7].fill(2.0);
+        parameters[7..10].fill(1.0);
+        parameters[16] = 1.0;
+        parameters[17] = 2.0;
+        parameters[18] = 2.0;
+        let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, width as u32).unwrap();
+        assert_eq!((scene.width, scene.height), (width, 2));
+        assert_eq!(scene.base_rgb.len(), expected.len());
+        for (index, (actual, expected)) in scene.base_rgb.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "RGB component {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn style_scene_applies_gain_at_full_resolution_before_area_resize() {
+        let mut pixels = vec![255_u8; 4 * 2 * 3];
+        pixels[3] = 0;
+        pixels[4] = 0;
+        pixels[5] = 0;
+        let base = Raster8::new(4, 2, 12, RasterPixelFormat::Rgb8, pixels).unwrap();
+        let gain = Raster8::new(2, 2, 2, RasterPixelFormat::Mono8, vec![255; 4]).unwrap();
+        let mut parameters = vec![0.0; 20];
+        parameters[0..3].fill(1.0);
+        parameters[4..7].fill(2.0);
+        parameters[7..10].fill(1.0);
+        parameters[16] = 1.0;
+        parameters[17] = 2.0;
+        parameters[18] = 2.0;
+        let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, 2).unwrap();
+        assert_eq!((scene.width, scene.height), (2, 2));
+        // The black source pixel shares a 2x1 footprint with a white pixel.
+        // Full-resolution gain application then area averaging yields 1.
+        // Downsampling the SDR first with nearest sampling keeps only white
+        // and stays at 2.
+        assert!((scene.hdr_rgb[0] - 1.0).abs() < 1.0e-5);
+        assert!((scene.hdr_rgb[3] - 2.0).abs() < 1.0e-5);
     }
 
     #[test]

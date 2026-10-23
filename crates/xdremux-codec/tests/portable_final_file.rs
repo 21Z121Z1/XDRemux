@@ -143,7 +143,9 @@ fn assemble_and_validate(
 fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_intermediate() {
     let source = fs::read(source_fixture()).expect("read public HEIF fixture");
     let provider = LibHeifProvider::new();
-    let width = 641;
+    // 684x513 is an exact 4:3 of the fixture primary's coded 4000x3000 ispe
+    // and still spans a 2x2 grid of 512 tiles.
+    let width = 684;
     let height = 513;
 
     let cases = [

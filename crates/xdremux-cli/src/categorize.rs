@@ -1,3 +1,4 @@
+use crate::i18n::{message, Language};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
@@ -113,7 +114,13 @@ fn discover_directory(
                 )
             })?;
             let path = entry.path();
-            if file_type.is_symlink() || is_hidden(&path) {
+            if file_type.is_symlink()
+                || is_hidden(&path)
+                || (file_type.is_dir()
+                    && path
+                        .extension()
+                        .is_some_and(|value| value.eq_ignore_ascii_case("pvt")))
+            {
                 continue;
             }
             if file_type.is_file() {
@@ -149,6 +156,7 @@ fn discover_inputs(arguments: &CategorizeArgs) -> Result<Vec<PathBuf>, String> {
 
     let mut collected = Vec::new();
     for input in &arguments.inputs {
+        super::reject_package_input(input)?;
         let metadata = fs::symlink_metadata(input)
             .map_err(|error| format!("input not found {}: {error}", input.display()))?;
         if metadata.file_type().is_symlink() {
@@ -196,6 +204,7 @@ fn path_json(path: &Path) -> String {
 }
 
 pub(crate) fn run(
+    language: Language,
     arguments: CategorizeArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -203,7 +212,11 @@ pub(crate) fn run(
     let inputs = match discover_inputs(&arguments) {
         Ok(inputs) => inputs,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 2;
         }
     };
@@ -215,7 +228,11 @@ pub(crate) fn run(
     ) {
         Ok(receipt) => receipt,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 1;
         }
     };
@@ -250,22 +267,35 @@ pub(crate) fn run(
             .map_err(io::Error::other)
             .and_then(|()| writeln!(stdout))
         {
-            let _ = writeln!(stderr, "error: could not write categorize JSON: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(
+                    language,
+                    "error: could not write categorize JSON: {error}",
+                    "错误：无法写入 categorize JSON：{error}"
+                )
+            );
             return 1;
         }
     } else {
         for item in &receipt.items {
             let line = format!(
                 "{}: {} -> {}",
-                item.disposition.as_str(),
+                language.disposition(item.disposition.as_str()),
                 item.source.display(),
                 item.destination.display()
             );
             if item.error.is_some() {
                 let _ = writeln!(
                     stderr,
-                    "error: {line}: {}",
-                    item.error.as_deref().unwrap_or("")
+                    "{}",
+                    message!(
+                        language,
+                        "error: {line}: {}",
+                        "错误：{line}：{}",
+                        item.error.as_deref().unwrap_or("")
+                    )
                 );
             } else {
                 let _ = writeln!(stdout, "{line}");
@@ -273,12 +303,17 @@ pub(crate) fn run(
         }
         let _ = writeln!(
             stdout,
-            "categorize: {} resources, {} copied, {} duplicates, {} dry-run, {} failed",
-            receipt.processed(),
-            receipt.copied(),
-            receipt.duplicates(),
-            receipt.dry_run(),
-            receipt.failed()
+            "{}",
+            message!(
+                language,
+                "categorize: {} resources, {} copied, {} duplicates, {} dry-run, {} failed",
+                "分类：{} 个资源，已复制 {} 个，重复 {} 个，预演 {} 个，失败 {} 个",
+                receipt.processed(),
+                receipt.copied(),
+                receipt.duplicates(),
+                receipt.dry_run(),
+                receipt.failed()
+            )
         );
     }
 

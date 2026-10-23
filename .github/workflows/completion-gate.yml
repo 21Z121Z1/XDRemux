@@ -15,7 +15,7 @@ concurrency:
 jobs:
   exact-head:
     name: exact-head
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 75
     env:
       XDREMUX_GATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -98,6 +98,12 @@ jobs:
                 "kind": "integration",
                 "command": ["bash", "scripts/apple/check_rust_style_consumer.sh"],
                 "timeout_seconds": 2400
+              },
+              {
+                "name": "rust-native-texture-and-app-switch",
+                "kind": "integration",
+                "command": ["python3", "scripts/apple/check_texture_styles.py", "--skip-build"],
+                "timeout_seconds": 1800
               },
               {
                 "name": "rust-component-conformance",

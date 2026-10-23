@@ -85,13 +85,14 @@ class PerformanceBudgetTests(unittest.TestCase):
         self,
         benchmark_value: dict[str, object],
         launch_value: dict[str, object],
+        baseline_value: dict[str, object] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory(prefix="xdremux-perf-budget-") as raw:
             work = Path(raw)
             baseline_path = work / "baseline.json"
             benchmark_path = work / "benchmark.json"
             launches_path = work / "launches.json"
-            write_json(baseline_path, baseline())
+            write_json(baseline_path, baseline() if baseline_value is None else baseline_value)
             write_json(benchmark_path, benchmark_value)
             write_json(launches_path, launch_value)
             return subprocess.run(
@@ -122,6 +123,48 @@ class PerformanceBudgetTests(unittest.TestCase):
         completed = self.run_checker(benchmark(large_wall=14.0), launches())
         self.assertEqual(completed.returncode, 1)
         self.assertIn("large median_wall_seconds regressed", completed.stderr)
+
+    def test_case_wall_budget_accepts_the_expanded_workload(self) -> None:
+        reference = baseline()
+        reference["cases"]["large"]["wall_fraction"] = 1.0
+        completed = self.run_checker(benchmark(large_wall=18.0), launches(), reference)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_case_wall_budget_keeps_other_workloads_bounded(self) -> None:
+        reference = baseline()
+        reference["cases"]["large"]["wall_fraction"] = 1.0
+        completed = self.run_checker(benchmark(tiny_wall=0.40), launches(), reference)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("tiny median_wall_seconds regressed", completed.stderr)
+
+    def test_case_wall_budget_keeps_median_and_p95_bounded(self) -> None:
+        reference = baseline()
+        reference["cases"]["large"]["wall_fraction"] = 1.0
+        current = benchmark(large_wall=21.0)
+        current["cases"][1]["p95_wall_seconds"] = 25.0
+        completed = self.run_checker(current, launches(), reference)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("large median_wall_seconds regressed", completed.stderr)
+        self.assertIn("large p95_wall_seconds regressed", completed.stderr)
+
+    def test_case_wall_budget_keeps_rss_and_helper_launch_limits(self) -> None:
+        reference = baseline()
+        reference["cases"]["large"]["wall_fraction"] = 1.0
+        current = benchmark()
+        current["cases"][1]["max_peak_rss_bytes"] = 140 * MIB
+        completed = self.run_checker(current, launches(styles=2), reference)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("large max_peak_rss_mib regressed", completed.stderr)
+        self.assertIn("apple-styles helper launches regressed", completed.stderr)
+
+    def test_rejects_invalid_case_wall_budget(self) -> None:
+        for invalid in (True, -1, "1.0", float("inf")):
+            with self.subTest(invalid=invalid):
+                reference = baseline()
+                reference["cases"]["large"]["wall_fraction"] = invalid
+                completed = self.run_checker(benchmark(), launches(), reference)
+                self.assertEqual(completed.returncode, 2)
+                self.assertIn("large wall_fraction", completed.stderr)
 
     def test_rejects_structural_helper_launch_regression(self) -> None:
         completed = self.run_checker(benchmark(), launches(portrait=2))
