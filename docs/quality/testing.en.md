@@ -119,6 +119,11 @@ the filesystem/provider facts and the consumer type, native decode and hashes.
 Neither a Live Photo object type label nor assembly from extracted resources can
 substitute for whole-package decoding, system save and independent readback.
 
+All system share sheets use the invoking button as their popover source view
+and its bounds as the source rectangle. The image availability control and both
+whole-package routes use the same presentation path, including regular-width
+windows.
+
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence

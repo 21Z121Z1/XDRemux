@@ -37,7 +37,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             button.setTitle("Share PVT", for: .normal)
             button.accessibilityIdentifier = "share-pvt"
             button.frame = CGRect(x: 20, y: 100, width: 250, height: 60)
-            button.addTarget(self, action: #selector(sharePackage), for: .touchUpInside)
+            button.addTarget(self, action: #selector(sharePackage(_:)), for: .touchUpInside)
             controller.view.addSubview(button)
             statusLabel.accessibilityIdentifier = "share-result"
             statusLabel.text = "pending"
@@ -53,7 +53,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
-    @objc private func sharePackage() {
+    @objc private func sharePackage(_ sender: UIButton) {
         let package = ReadbackCore.documents.appendingPathComponent("capture.pvt", isDirectory: true)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: package.path, isDirectory: &isDirectory), isDirectory.boolValue else {
@@ -94,7 +94,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
                 return
             }
             // Availability control only: XCTest never selects an activity here.
-            present(UIActivityViewController(activityItems: [image], applicationActivities: nil))
+            present(UIActivityViewController(activityItems: [image], applicationActivities: nil), from: sender)
             return
         }
         if sharePhase == "share-url" {
@@ -106,7 +106,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
                 finishShare(activity: nil, completed: false, error: error)
                 return
             }
-            present(UIActivityViewController(activityItems: [package], applicationActivities: nil))
+            present(UIActivityViewController(activityItems: [package], applicationActivities: nil), from: sender)
             return
         }
         let readablePackageTypes = PHLivePhoto.readableTypeIdentifiersForItemProvider.filter {
@@ -163,7 +163,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
                 } catch { self.finishShare(activity: nil, completed: false, error: error); return }
                 // UIKit's save activity consumes the native Live Photo value.
                 // This value came only from the opaque whole-PVT reader above.
-                self.present(UIActivityViewController(activityItems: [photo], applicationActivities: nil))
+                self.present(UIActivityViewController(activityItems: [photo], applicationActivities: nil), from: sender)
             }
         }
     }
@@ -181,10 +181,12 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
         return provider
     }
 
-    private func present(_ activity: UIActivityViewController) {
+    private func present(_ activity: UIActivityViewController, from sourceView: UIView) {
         activity.completionWithItemsHandler = { [weak self] type, completed, _, error in
             self?.finishShare(activity: type, completed: completed, error: error)
         }
+        activity.popoverPresentationController?.sourceView = sourceView
+        activity.popoverPresentationController?.sourceRect = sourceView.bounds
         window?.rootViewController?.present(activity, animated: true)
     }
 
