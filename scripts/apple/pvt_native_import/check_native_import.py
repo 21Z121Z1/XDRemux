@@ -17,9 +17,18 @@ import tempfile
 import time
 import uuid
 
+if __package__:
+    from .observations import PVTStages, parse_share_observations, check_reader_observation
+    from .owned_cleanup import cleanup_owned_simulator
+else:
+    from observations import PVTStages, parse_share_observations, check_reader_observation
+    from owned_cleanup import cleanup_owned_simulator
+
 
 class Blocked(RuntimeError):
-    pass
+    def __init__(self, message, *, timed_out=False):
+        super().__init__(message)
+        self.timed_out = timed_out
 
 
 def sha(path):
@@ -89,13 +98,32 @@ def run_owned_process(command, cwd, stdout_path, stderr_path, *, timeout, stop_m
     return facts
 
 
-def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
+def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout, source_head=None, session_id=None):
     # Missing Save is a failed native precondition, never import success.
-    facts = run_owned_process(command, cwd, stdout_path, stderr_path, timeout=timeout,
-                              stop_marker=b'PVT_SHARE_UI_BLOCKED:')
-    facts['ui_observations'] = [{'phase': phase, 'save_candidates': int(count)} for phase, count in re.findall(
-        r'PVT_SHARE_UI_OBSERVATION: phase=(share(?:-control|-url)?) save_candidates=(\d+)',
-        stdout_path.read_text(errors='replace'))]
+    try:
+        facts = run_owned_process(command, cwd, stdout_path, stderr_path, timeout=timeout,
+                                  stop_marker=b'PVT_SHARE_UI_BLOCKED:')
+    except OSError as error:
+        facts = {'outcome': 'not-started', 'error': str(error), 'exit_code': None, 'duration_seconds': 0}
+    text = stdout_path.read_text(errors='replace')
+    observations = parse_share_observations(text, source_head=source_head, session_id=session_id,
+                                            outcome=facts.get('outcome'))
+    if facts.get('outcome') != 'not-started':
+        invocation = {'phase': 'test_runner', 'state': 'started', 'boundary': 'invocation_started',
+                      'elapsed_seconds': 0, 'clock': 'driver-monotonic'}
+        observations['events'].insert(0, invocation)
+        if observations['last_observed_boundary'] is None:
+            observations['last_observed_boundary'] = invocation
+    runner = observations['phases']['test_runner']
+    runner.update(state='not_started' if facts.get('outcome') == 'not-started'
+                  else 'unknown_after_timeout' if facts.get('outcome') == 'uncertain-after-timeout'
+                  else 'blocked' if facts.get('outcome') or facts['exit_code'] else 'completed',
+                  started_elapsed_seconds=0, completed_elapsed_seconds=facts['duration_seconds'], clock='driver-monotonic')
+    observations['missing_required_stages'] = [phase for phase, row in observations['phases'].items()
+                                               if row['state'] != 'completed']
+    observations['stdout_sha256'] = sha(stdout_path)
+    facts['stage_observations'] = observations
+    facts['ui_observations'] = observations['ui_observations']
     return facts
 
 
@@ -211,13 +239,13 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
              'readiness_attempt_limit': 3, 'reconcile_attempt_limit': 3, 'install_timeout_seconds': 120}
     report['reader_installation'] = facts
 
-    def fail(status, reason):
+    def fail(status, reason, *, timed_out=False):
         facts['status'] = status
         try:
             capture_host_simulator_diagnostics(run, owned_udid, report)
         except (Blocked, OSError, ValueError) as error:
             facts['host_diagnostic_error'] = str(error)
-        raise Blocked(reason)
+        raise Blocked(reason, timed_out=timed_out)
 
     def inventory(attempt):
         name = f'install-readiness-{attempt}'
@@ -289,7 +317,8 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             if attempt < 3:
                 pause(1)
     if ready is None:
-        fail('installation-service-not-ready', 'owned simulator app-inventory service did not become readable; no installation attempted')
+        fail('installation-service-not-ready', 'owned simulator app-inventory service did not become readable; no installation attempted',
+             timed_out=report['commands'][-1].get('outcome') == 'uncertain-after-timeout')
     if bundle not in ready:
         facts['install_attempts'] = 1
         try:
@@ -328,7 +357,9 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             pause(1)
     status = ('not-verified-after-client-timeout' if facts.get('install_client_outcome') == 'uncertain-after-timeout'
               else 'registered-reader-not-verified')
-    fail(status, 'owned reader installation could not be verified; no second install or Photos admission assumed')
+    fail(status, 'owned reader installation could not be verified; no second install or Photos admission assumed',
+         timed_out=(facts.get('install_client_outcome') == 'uncertain-after-timeout'
+                    or report['commands'][-1].get('outcome') == 'uncertain-after-timeout'))
 
 
 def print_console_receipt(work, report):
@@ -434,20 +465,23 @@ def check_readback(baseline, after, expected_id, expected_hashes, cover_seconds)
             'original_resource_hashes_match': matches, 'original_resource_bytes_match': all(matches.values())}
 
 
-def prepare_share_tests(source, work, bundle):
+def prepare_share_tests(source, work, bundle, *, source_head):
     if not re.fullmatch(r'org\.xdremux\.audit\.PVTReadback\.u[0-9a-f]{32}', bundle):
         raise Blocked('share test bundle does not belong to this probe')
     target = work / 'share-tests'
     target.mkdir()
     shutil.copytree(source / 'PVTShareTests.xcodeproj', target / 'PVTShareTests.xcodeproj')
     template = (source / 'PVTShareUITests.swift.in').read_text()
-    if template.count('@@BUNDLE_ID@@') != 1:
-        raise Blocked('share UI test bundle binding is not singular')
-    (target / 'PVTShareUITests.swift').write_text(template.replace('@@BUNDLE_ID@@', bundle))
+    if template.count('@@BUNDLE_ID@@') != 1 or template.count('@@SOURCE_HEAD@@') != 1 or not re.fullmatch(r'[0-9a-f]{40}', source_head):
+        raise Blocked('share UI test source/session binding is not singular and complete')
+    (target / 'PVTShareUITests.swift').write_text(template.replace('@@BUNDLE_ID@@', bundle).replace('@@SOURCE_HEAD@@', source_head))
     return target / 'PVTShareTests.xcodeproj'
 
 
-def check_share_receipt(shared, transfer, package, expected_members):
+def check_share_receipt(shared, transfer, package, expected_members, *, source_head=None, session_id=None):
+    if source_head is not None:
+        check_reader_observation(shared, source_head=source_head, session_id=session_id, phase='share')
+        check_reader_observation(transfer, source_head=source_head, session_id=session_id, phase='share-transfer')
     if (shared.get('status') != 'completed' or shared.get('activity_completed') is not True
             or shared.get('is_save_to_camera_roll') is not True):
         raise Blocked('native Photos save activity did not complete; no admission assumed')
@@ -487,23 +521,27 @@ def main():
     args.cli = args.cli.resolve()
     args.output_root = args.output_root.resolve()
     source = Path(__file__).resolve().parent
+    session_id = uuid.uuid4().hex
+    stages = PVTStages(args.expected_head, session_id, ('preparation', 'readiness', 'baseline', 'save_callback', 'readback'))
     args.output_root.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='pvt-native-', dir=args.output_root))
     report = {'status': 'pending-native-execution', 'work': str(work), 'host_system': platform.system(),
               'host_architecture': platform.machine(), 'host_version': platform.mac_ver()[0],
-              'commands': [], 'direct_package_import_only': True, 'media_uploaded': False,
+              'commands': [], 'session_id': session_id, 'stage_observations': stages.facts,
+              'direct_package_import_only': True, 'media_uploaded': False,
               'native_route': 'iOS Simulator system Photos save activity; whole package URL or live-photo file representation',
               'not_exercised': ['macOS Photos library import', 'physical-device Photos or wallpaper'],
               'known_unsupported_route_not_repeated': 'simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)',
               'probe_source_sha256': {str(path.relative_to(source)): sha(path) for path in source.rglob('*')
-                                      if path.is_file() and (path.name.endswith(('.swift', '.swift.in', '.xcscheme'))
+                                      if path.is_file() and (path.name.endswith(('.py', '.swift', '.swift.in', '.xcscheme'))
                                                              or path.name == 'project.pbxproj')}}
     owned_udid = None
     motion = None
     package = None
 
     def run(name, command, *, timeout=60, required=True):
-        record = {'name': name, 'argv': list(map(str, command))}
+        record = {'name': name, 'argv': list(map(str, command)),
+                  'started_elapsed_seconds': stages.clock() - stages.started, 'timeout_seconds': timeout}
         report['commands'].append(record)
         started = time.monotonic()
         try:
@@ -515,7 +553,8 @@ def main():
                 record.update(run_owned_process(record['argv'], args.repo, work / (name + '.stdout'),
                                                 work / (name + '.stderr'), timeout=timeout, diagnostic_path=progress))
                 if record.get('outcome'):
-                    raise Blocked(f'{name}: {record["outcome"]}; owned process stages and stdout/stderr retained')
+                    raise Blocked(f'{name}: {record["outcome"]}; owned process stages and stdout/stderr retained',
+                                  timed_out=record['outcome'] == 'uncertain-after-timeout')
                 result = subprocess.CompletedProcess(record['argv'], record['exit_code'],
                     (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
             else:
@@ -532,7 +571,7 @@ def main():
             if isinstance(error, subprocess.TimeoutExpired):
                 (work / (name + '.stdout')).write_bytes(error.stdout or b'')
                 (work / (name + '.stderr')).write_bytes(error.stderr or b'')
-            raise Blocked(f'{name}: {error}') from error
+            raise Blocked(f'{name}: {error}', timed_out=isinstance(error, subprocess.TimeoutExpired)) from error
         finally:
             record['duration_seconds'] = time.monotonic() - started
 
@@ -543,16 +582,21 @@ def main():
         return container
 
     def read_report(phase, bundle):
-        run('launch-' + phase, ['xcrun', 'simctl', 'launch', owned_udid, bundle, '--phase', phase])
+        stage = 'baseline' if phase == 'baseline' else 'readback'
+        stages.record(stage, 'started', 'photokit_launch_submitted')
+        run('launch-' + phase, ['xcrun', 'simctl', 'launch', owned_udid, bundle, '--phase', phase,
+                                '--source-head', args.expected_head, '--session-id', session_id])
         container = app_container(phase, bundle)
         deadline = time.monotonic() + 45
         path = container / 'Documents' / (phase + '.json')
         while not path.is_file() and time.monotonic() < deadline:
             time.sleep(0.2)
         if not path.is_file():
-            raise Blocked('PhotoKit report timeout; no authorization or readback success assumed')
+            raise Blocked('PhotoKit report timeout; no authorization or readback success assumed', timed_out=True)
         shutil.copy2(path, work / (phase + '.json'))
         value = json.loads(path.read_text())
+        check_reader_observation(value, source_head=args.expected_head, session_id=session_id, phase=phase)
+        stages.record(stage, 'observed', 'photokit_report_received', report_sha256=sha(path), native_status=value.get('status'))
         if phase == 'after' and (container / 'Documents/readback').exists():
             # These are exports after direct import, never import inputs.
             shutil.copytree(container / 'Documents/readback', work / 'readback')
@@ -560,6 +604,7 @@ def main():
         return value
 
     try:
+        stages.record('preparation', 'started', 'source_check_started')
         head = run('head', ['git', 'rev-parse', 'HEAD']).stdout.decode().strip()
         status = run('source-status', ['git', 'status', '--porcelain']).stdout
         report['head'] = head
@@ -621,7 +666,7 @@ def main():
         metadata = plistlib.loads((package / 'metadata.plist').read_bytes())
         if metadata != {'PFVideoComplementMetadataVersionKey': '1'}:
             raise Blocked('CLI package metadata differs from the string-version contract')
-        token = uuid.uuid4().hex
+        token = session_id
         bundle = 'org.xdremux.audit.PVTReadback.u' + token
         report['probe_bundle_id'] = bundle
         report['owned_device_name'] = 'pvt-audit-' + token
@@ -644,6 +689,8 @@ def main():
         run('sign-owned-reader', ['codesign', '--force', '--sign', '-', app])
         report['reader_binary_sha256'] = sha(app / 'PVTReadback')
         report['reader_info_sha256'] = sha(app / 'Info.plist')
+        stages.record('preparation', 'completed', 'reader_signed_and_package_validated')
+        stages.record('readiness', 'started', 'simulator_create_submitted')
         result = run('create-owned-simulator', ['xcrun', 'simctl', 'create', 'pvt-audit-' + token, device, runtime])
         owned_udid = str(uuid.UUID(result.stdout.decode().strip())).upper()
         report['owned_udid'] = owned_udid
@@ -653,9 +700,11 @@ def main():
         install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])
+        stages.record('readiness', 'completed', 'reader_installed_and_photos_granted', owned_udid=owned_udid)
         baseline = read_report('baseline', bundle)
         if baseline.get('status') != 'baseline' or not isinstance(baseline.get('asset_identifiers'), list):
             raise Blocked('owned simulator did not provide an authorized baseline identifier set')
+        stages.record('baseline', 'completed', 'authorized_asset_baseline_validated')
         container = app_container('share', bundle)
         transported = container / 'Documents/capture.pvt'
         # Transport the complete validated directory unchanged. No resource
@@ -668,7 +717,7 @@ def main():
         report['transported_package_sha256_before_share'] = before_share
         # Activity availability control only: never save this still to Photos.
         shutil.copy2(work / 'synthetic.jpg', container / 'Documents/control.jpg')
-        project = prepare_share_tests(source, work, bundle)
+        project = prepare_share_tests(source, work, bundle, source_head=head)
         report['ui_test_source_sha256'] = sha(project.parent / 'PVTShareUITests.swift')
         ui_command = ['xcodebuild', '-project', project, '-scheme', 'PVTShareUITests',
                       '-destination', 'id=' + owned_udid, '-derivedDataPath', work / 'ui-build',
@@ -683,7 +732,8 @@ def main():
             record = {'name': 'test-share-ui', 'argv': command}
             report['commands'].append(record)
             record.update(run_share_ui(command, args.repo, work / 'test-share-ui.stdout',
-                                       work / 'test-share-ui.stderr', timeout=180))
+                                       work / 'test-share-ui.stderr', timeout=180, source_head=head, session_id=session_id))
+            report['share_observations'] = record['stage_observations']
             if record.get('outcome') == 'native-save-activity-unavailable':
                 try:
                     after = read_report('after', bundle)
@@ -695,7 +745,12 @@ def main():
                     report['unavailable_save_readback_error'] = str(error)
                 raise Blocked('whole-package URL and live-photo provider expose no identifiable Photos save activity; native import remains unaccepted')
             if record.get('outcome') or record['exit_code']:
-                raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])))
+                raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])),
+                              timed_out=record.get('outcome') == 'uncertain-after-timeout')
+            if (record['stage_observations']['format'] != 'structured-events'
+                    or any(record['stage_observations']['phases'][phase]['state'] != 'completed'
+                           for phase in ('test_setup', 'test_body', 'save_callback'))):
+                raise Blocked('test-share-ui ended without complete source-bound setup/body/save observations')
         finally:
             # Retain native callbacks on UI failure as well as success.
             for phase in ('share', 'share-transfer', 'share-types'):
@@ -707,7 +762,12 @@ def main():
                 for path in transported.iterdir()} if transported.is_dir() and not transported.is_symlink() else None
         shared = json.loads((work / 'share.json').read_text())
         transfer = json.loads((work / 'share-transfer.json').read_text())
-        check_share_receipt(shared, transfer, transported, expected_members)
+        check_reader_observation(shared, source_head=head, session_id=session_id, phase='share')
+        stages.record('save_callback', 'observed', 'native_callback_receipt_received',
+                      report_sha256=sha(work / 'share.json'), native_status=shared.get('status'),
+                      native_observation=shared['observation'])
+        check_share_receipt(shared, transfer, transported, expected_members, source_head=head, session_id=session_id)
+        stages.record('save_callback', 'completed', 'whole_package_save_callback_validated')
         if report['transported_package_sha256_after_share'] != expected_members:
             raise Blocked('native sharing changed the transported package bytes')
         report['system_save_activity_completed'] = True
@@ -718,6 +778,7 @@ def main():
         report['single_live_asset_admission_verified'] = (len(added) == 1 and after.get('asset_local_identifier') in added and after.get('photo_live') is True)
         expected = {'photo': sha(Path(pair['image'])), 'paired_video': sha(Path(pair['video']))}
         report['native_facts'] = check_readback(baseline, after, pair['content_identifier'], expected, pair['still_time_seconds'])
+        stages.record('readback', 'observed', 'photokit_resource_relationships_validated')
         # Exported bytes are post-import readback, never an alternate import path.
         exported = after['resources']
         photo = next(item for item in exported if item['is_original_photo'])
@@ -729,14 +790,18 @@ def main():
         run('cli-validate-exported-pair', [args.cli, 'validate', checked / 'capture.heic', '--json'])
         if not report['native_facts']['original_resource_bytes_match']:
             raise Blocked('native admission and pairing verified, but original resource byte preservation failed')
+        stages.record('readback', 'completed', 'exported_resources_validated_and_bytes_preserved')
+        stages.facts['admission'] = 'verified'
         report['status'] = 'native-direct-pvt-import-and-readback-pass'
     except Blocked as error:
         report['status'] = 'blocked'
         report['reason'] = str(error)
+        stages.stop_active(timed_out=error.timed_out)
     except Exception as error:
         report['status'] = 'probe-error'
         report['reason'] = repr(error)
     finally:
+        stages.stop_active()
         observe_media_preservation(report, motion, package)
         if report['status'].endswith('-pass') and (report.get('synthetic_input_unchanged') is not True or report.get('package_bytes_unchanged') is not True):
             report['status'] = 'native-validation-passed-source-preservation-failed'
@@ -744,22 +809,23 @@ def main():
         report['native_validation_status_before_cleanup'] = report['status']
         cleanup_failed = False
         if owned_udid:
-            # Only the exact UUID returned by this invocation is ever removed.
-            for name, verb in [('shutdown-owned', 'shutdown'), ('delete-owned', 'delete')]:
-                try:
-                    result = run(name, ['xcrun', 'simctl', verb, owned_udid], required=False)
-                    report[name + '-exit'] = result.returncode
-                    cleanup_failed = cleanup_failed or result.returncode != 0
-                except Exception as error:
-                    report[name + '-error'] = str(error)
-                    cleanup_failed = True
+            cleanup = cleanup_owned_simulator(run, owned_udid,
+                {'owned_udid': owned_udid, 'source_head': args.expected_head, 'session_id': session_id},
+                Path.home() / 'Library/Developer/CoreSimulator/Devices', prefix='product', command_records=report['commands'])
+            report['cleanup_observations'] = cleanup
+            for verb, row in cleanup['commands'].items():
+                for field in ('exit_code', 'error'):
+                    if field in row:
+                        report[verb + '-owned-' + ('exit' if field == 'exit_code' else 'error')] = row[field]
+            report['cleanup_absence_verified'] = cleanup['absence']['verified_absent']
+            cleanup_failed = not cleanup['accepted']
             report['cleanup_status'] = 'failed' if cleanup_failed else 'completed'
         else:
             creation = next((record for record in report['commands'] if record['name'] == 'create-owned-simulator'), None)
             report['cleanup_status'] = 'creation-outcome-uncertain-no-udid' if creation else 'not-created'
         if cleanup_failed and report['status'].endswith('-pass'):
             report['status'] = 'native-validation-passed-cleanup-failed'
-            report['reason'] = 'owned simulator shutdown/delete failed; exact command receipts retained for cleanup'
+            report['reason'] = 'owned simulator cleanup commands or independent absence verification failed; exact observations retained'
         report['probe_driver_sha256'] = sha(Path(__file__))
         (work / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
         print_console_receipt(work, report)
