@@ -23,9 +23,16 @@ JPEG、原始 EXIF 和 BMFF 基础类型。产品 codec profile 检查仍在本�
 公共 pair 发布 helper 在成功和失败时都保留调用方所有的 staging 文件，允许使用
 同一文件系统的子目录。helper 不替换或删除最终路径。第二个成员发布失败时，
 `PairPublicationError::partial_output()` 返回 partial 路径；其他 writer 可能已修改
-该路径，因此它不构成删除权限。runtime 在此错误下保留自己的独占 staging 目录。
-reconcile 保留未知 partial、无效 pair 及全部 sidecar。文件系统要求与两文件事务
-边界见 [发布与恢复契约](architecture.md#发布)。
+该路径，因此它不构成删除权限。这个机械 helper 没有源媒体或期望 identity 输入，
+不执行 runtime 的完整产品校验。reconcile 保留未知 partial、无效 pair 及全部 sidecar。
+
+runtime 的私有 pair publisher 只接收已完成严格 pair 校验、期望 identity 与精确时间
+检查、源视频与输出视频压缩媒体比较的自有字节。publisher 负责 staging 和同步，
+通过有界读取将 staging 及最终字节与不可变 buffer 比较。第二成员发布失败或最终
+字节读回失败时，保留完整 staging，并记录观察到的最终目录项供显式恢复。
+这些观察不构成删除权限。调用方必须保持路径解析稳定；检查不能阻止同一用户的
+其他 writer 在读回后继续改写文件。文件系统要求与两文件事务边界见
+[发布与恢复契约](architecture.md#发布)。
 
 runtime 保留已知的整数和 timescale 时间，不再把已知 XMP 时间舍入到视频帧。
 源时间未知时，现有产品 fallback 选择一个位置，并在回执中标记为推断。
