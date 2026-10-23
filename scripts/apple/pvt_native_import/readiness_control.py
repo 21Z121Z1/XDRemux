@@ -28,9 +28,9 @@ class ReadinessBlocked(RuntimeError):
     pass
 
 
-def run_control(run, choose_device, report, name, device_root):
+def run_control(run, choose_device, report, name, device_root, *, capture_diagnostics=None):
     stages = PVTStages(report.get('expected_head'), name, ('readiness',))
-    facts = {'name': name, 'status': 'pending', 'listapps_attempts': 0,
+    facts = {'name': name, 'source_head': report.get('expected_head'), 'status': 'pending', 'listapps_attempts': 0,
              'cleanup_status': 'not-created', 'stage_observations': stages.facts}
     report['control'] = facts
     owned = None
@@ -84,6 +84,12 @@ def run_control(run, choose_device, report, name, device_root):
     finally:
         stages.stop_active(timed_out=any(row.get('outcome') == 'uncertain-after-timeout' for row in report.get('commands', [])))
         if owned:
+            if not ready and capture_diagnostics is not None:
+                try:
+                    capture_diagnostics(run, owned, facts, include_host_processes=False)
+                except Exception as error:
+                    # Optional observations must not replace the failure or skip cleanup.
+                    facts['host_diagnostic_error'] = str(error)
             cleanup = cleanup_owned_simulator(run, owned,
                 {'owned_udid': owned, 'source_head': report.get('expected_head'), 'session_id': name},
                 device_root, prefix='control', command_records=report.get('commands', []))
@@ -97,10 +103,11 @@ def run_control(run, choose_device, report, name, device_root):
     return facts
 
 
-def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head):
+def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head, capture_diagnostics=None):
     report.update(control_prewarms_core_simulator=True, product_probe_invocations=0,
                   experimental_condition='control may warm CoreSimulator/runtime; not a cold-start fix or fresh-VM claim')
-    control = run_control(run, choose_device, report, control_name, device_root)
+    control = run_control(run, choose_device, report, control_name, device_root,
+                          capture_diagnostics=capture_diagnostics)
     if control['status'] != 'passed-cleaned':
         report.update(status='control-environment-blocked', reason=control.get('reason', 'control cleanup is not confirmed'))
         return
@@ -225,7 +232,7 @@ def main():
         run_control_and_probe(run, probe.select_device, invoke_probe, report,
                               'pvt-readiness-control-' + uuid.uuid4().hex,
                               Path.home() / 'Library/Developer/CoreSimulator/Devices',
-                              expected_head=args.expected_head)
+                              expected_head=args.expected_head, capture_diagnostics=probe.capture_host_simulator_diagnostics)
     except (ReadinessBlocked, OSError, ValueError, RuntimeError) as error:
         report.update(status='experiment-blocked', reason=str(error))
     except Exception as error:

@@ -127,7 +127,7 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout, source_head
     return facts
 
 
-def capture_host_simulator_diagnostics(run, owned_udid, report):
+def capture_host_simulator_diagnostics(run, owned_udid, report, *, include_host_processes=True):
     """Observe an unresponsive owned device without its simctl spawn service.
 
     These host facts never establish installation or Photos readiness.
@@ -137,6 +137,9 @@ def capture_host_simulator_diagnostics(run, owned_udid, report):
     facts = {'owned_udid': owned_udid, 'processes': [],
              'process_scope': 'selected host service names; per-process device ownership is not inferred',
              'scope': 'read-only host observations; device/service readiness remains unproven'}
+    if not include_host_processes:
+        facts.update(source_head=report.get('source_head'), session_id=report.get('name'),
+                     process_scope='host process query disabled')
     report['host_simulator_diagnostics'] = facts
     home = Path.home().resolve(strict=True)
     try:
@@ -180,24 +183,25 @@ def capture_host_simulator_diagnostics(run, owned_udid, report):
         facts['system_log'] = {**metadata, 'text': data.decode(errors='replace')}
     except (OSError, ValueError, AttributeError) as error:
         facts['system_log'] = {'error': str(error)}
-    try:
-        observed = subprocess.run(['/bin/ps', '-ww', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,rss=,comm='],
-                                  capture_output=True, timeout=5)
-        facts['process_query_exit_code'] = observed.returncode
-        relevant = {'CoreSimulatorService', 'com.apple.CoreSimulator.CoreSimulatorService',
-                    'SimulatorTrampoline', 'launchd_sim', 'simdiskimaged',
-                    'SpringBoard', 'backboardd', 'installd', 'installcoordinationd'}
-        for line in observed.stdout.decode(errors='replace').splitlines():
-            fields = line.split(None, 8)
-            if len(fields) == 9 and Path(fields[-1]).name in relevant:
-                facts['processes'].append(dict(zip(
-                    ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'rss_kib', 'command'),
-                    [*map(int, fields[:3]), *fields[3:7], int(fields[7]), Path(fields[-1]).name])))
-                if len(facts['processes']) == 64:
-                    facts['process_list_truncated'] = True
-                    break
-    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-        facts['process_error'] = str(error)
+    if include_host_processes:
+        try:
+            observed = subprocess.run(['/bin/ps', '-ww', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,rss=,comm='],
+                                      capture_output=True, timeout=5)
+            facts['process_query_exit_code'] = observed.returncode
+            relevant = {'CoreSimulatorService', 'com.apple.CoreSimulator.CoreSimulatorService',
+                        'SimulatorTrampoline', 'launchd_sim', 'simdiskimaged',
+                        'SpringBoard', 'backboardd', 'installd', 'installcoordinationd'}
+            for line in observed.stdout.decode(errors='replace').splitlines():
+                fields = line.split(None, 8)
+                if len(fields) == 9 and Path(fields[-1]).name in relevant:
+                    facts['processes'].append(dict(zip(
+                        ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'rss_kib', 'command'),
+                        [*map(int, fields[:3]), *fields[3:7], int(fields[7]), Path(fields[-1]).name])))
+                    if len(facts['processes']) == 64:
+                        facts['process_list_truncated'] = True
+                        break
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            facts['process_error'] = str(error)
     try:
         memory = subprocess.run(['/usr/bin/vm_stat'], capture_output=True, timeout=5)
         text = memory.stdout.decode(errors='replace')
