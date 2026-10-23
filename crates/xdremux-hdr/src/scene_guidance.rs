@@ -12,6 +12,10 @@ pub struct SceneGuidancePolicy {
     pub minimum_region_pixels: usize,
     pub feather_radius: usize,
     pub merge_radius: usize,
+    pub detail_radius: usize,
+    pub detail_threshold_ev: f32,
+    pub detail_limit_ev: f32,
+    pub minimum_gain_support: f32,
 }
 
 #[derive(Debug)]
@@ -20,6 +24,7 @@ pub struct SceneGuidanceMetrics {
     pub height: usize,
     pub regions: usize,
     pub region_fraction: f32,
+    pub detail_fraction: f32,
     pub adjustment_rms_ev: f32,
     pub maximum_adjustment_ev: f32,
 }
@@ -27,6 +32,7 @@ pub struct SceneGuidanceMetrics {
 pub(super) struct GuidanceAdjustment {
     pub values: Vec<Option<f32>>,
     pub strength: Vec<f32>,
+    pub detail: Vec<f32>,
     pub guide: Vec<f32>,
     pub metrics: SceneGuidanceMetrics,
 }
@@ -48,6 +54,14 @@ pub(super) fn validate(policy: SceneGuidancePolicy) -> Result<()> {
         || !(4..=4096).contains(&policy.minimum_region_pixels)
         || !(1..=8).contains(&policy.feather_radius)
         || !(2..=24).contains(&policy.merge_radius)
+        || !(1..=4).contains(&policy.detail_radius)
+        || !policy.detail_threshold_ev.is_finite()
+        || !(0.05..=0.5).contains(&policy.detail_threshold_ev)
+        || !policy.detail_limit_ev.is_finite()
+        || !(0.25..=2.).contains(&policy.detail_limit_ev)
+        || !policy.minimum_gain_support.is_finite()
+        || !(0.75..=1.).contains(&policy.minimum_gain_support)
+        || policy.detail_limit_ev < policy.limit_ev
     {
         return Err(invalid("unsupported stabilization policy"));
     }
@@ -217,6 +231,7 @@ pub(super) fn adjustment(
         .max(4.) as usize;
     let feather = (policy.feather_radius as f32 * relative).round().max(1.) as usize;
     let merge = (policy.merge_radius as f32 * relative).round().max(2.) as usize;
+    let detail_radius = (policy.detail_radius as f32 * relative).round().max(1.) as usize;
     let mut flat = vec![false; data.len()];
     for y in 0..ah {
         for x in 0..aw {
@@ -283,21 +298,37 @@ pub(super) fn adjustment(
         let mut gains = queue.iter().map(|i| data[*i].unwrap()).collect::<Vec<_>>();
         gains.sort_unstable_by(f32::total_cmp);
         let center = gains[gains.len() / 2];
-        // Large, possibly genuine scene differences must not be flattened.
-        if gains.iter().any(|v| (v - center).abs() > policy.limit_ev) {
+        // Small aliasing outliers must not invalidate an otherwise reliable
+        // surface. Broad scene differences still fail the support requirement.
+        let supported = queue
+            .iter()
+            .copied()
+            .filter(|i| (data[*i].unwrap() - center).abs() <= policy.limit_ev)
+            .collect::<Vec<_>>();
+        if supported.len() < minimum
+            || (supported.len() as f32 / queue.len() as f32) < policy.minimum_gain_support
+        {
             continue;
         }
+        let gain_lo = supported
+            .iter()
+            .map(|i| data[*i].unwrap())
+            .fold(f32::INFINITY, f32::min);
+        let gain_hi = supported
+            .iter()
+            .map(|i| data[*i].unwrap())
+            .fold(f32::NEG_INFINITY, f32::max);
         let id = regions.len();
         regions.push(Region {
             gain: center,
             lo,
             hi,
-            gain_lo: gains[0],
-            gain_hi: gains[gains.len() - 1],
-            sum: queue.iter().map(|i| log[*i] as f64).sum(),
-            count: queue.len(),
+            gain_lo,
+            gain_hi,
+            sum: supported.iter().map(|i| log[*i] as f64).sum(),
+            count: supported.len(),
         });
-        for &i in &queue {
+        for &i in &supported {
             owner[i] = Some(id);
         }
     }
@@ -342,15 +373,90 @@ pub(super) fn adjustment(
             }
         }
     }
+    // A median surface guide removes thin strokes but keeps broad step edges.
+    // It detects undersampled structure; it never replaces the primary pixels.
+    let mut surface = log.clone();
+    let mut small = vec![false; data.len()];
+    let mut samples = Vec::new();
+    for y in 0..ah {
+        for x in 0..aw {
+            let i = y * aw + x;
+            if !valid[i] {
+                continue;
+            }
+            samples.clear();
+            for j in y.saturating_sub(detail_radius)..=(y + detail_radius).min(ah - 1) {
+                for k in x.saturating_sub(detail_radius)..=(x + detail_radius).min(aw - 1) {
+                    if valid[j * aw + k] {
+                        samples.push(log[j * aw + k]);
+                    }
+                }
+            }
+            samples.sort_unstable_by(f32::total_cmp);
+            surface[i] = samples[samples.len() / 2];
+            small[i] = (log[i] - surface[i]).abs() > policy.detail_threshold_ev;
+        }
+    }
+    let mut detail = vec![0.; data.len()];
+    for y in 0..ah {
+        for x in 0..aw {
+            let i = y * aw + x;
+            if !valid[i] {
+                continue;
+            }
+            let outer = detail_radius * 2;
+            let mut distance = usize::MAX;
+            for j in y.saturating_sub(outer)..=(y + outer).min(ah - 1) {
+                for k in x.saturating_sub(outer)..=(x + outer).min(aw - 1) {
+                    if small[j * aw + k] {
+                        distance = distance.min(x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2));
+                    }
+                }
+            }
+            if distance >= outer * outer {
+                continue;
+            }
+            let mut nearest = None;
+            let mut nearest_distance = usize::MAX;
+            for j in y.saturating_sub(merge)..=(y + merge).min(ah - 1) {
+                for k in x.saturating_sub(merge)..=(x + merge).min(aw - 1) {
+                    let Some(id) = owner[j * aw + k] else {
+                        continue;
+                    };
+                    let region = &regions[id];
+                    if surface[i] < region.lo - policy.edge_ev
+                        || surface[i] > region.hi + policy.edge_ev
+                    {
+                        continue;
+                    }
+                    let d = x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2);
+                    if d < nearest_distance && d <= merge * merge {
+                        nearest = Some(id);
+                        nearest_distance = d;
+                    }
+                }
+            }
+            if let Some(id) = nearest {
+                let a = (2. - (distance as f32).sqrt() / detail_radius as f32).clamp(0., 1.);
+                let a = a * a * (3. - 2. * a);
+                values[i] = Some(regions[id].gain);
+                strength[i] = strength[i].max(a);
+                detail[i] = a;
+            }
+        }
+    }
+    let detail_fraction = detail.iter().filter(|v| **v > 0.).count() as f32 / data.len() as f32;
     Ok(GuidanceAdjustment {
         values,
         strength,
+        detail,
         guide,
         metrics: SceneGuidanceMetrics {
             width: aw,
             height: ah,
             regions: region_count,
             region_fraction,
+            detail_fraction,
             adjustment_rms_ev: 0.,
             maximum_adjustment_ev: 0.,
         },

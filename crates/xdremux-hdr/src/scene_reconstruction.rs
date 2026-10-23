@@ -257,6 +257,7 @@ pub fn reconstruct_relative_scene(
                 display_p3_luminance(&base_sdr[n]).max(1e-8),
                 original_gain,
                 guidance_policy.limit_ev,
+                guidance_policy.detail_limit_ev,
             );
             adjustment_square += (delta as f64).powi(2);
             maximum_adjustment = maximum_adjustment.max(delta.abs());
@@ -296,12 +297,14 @@ fn interpolate_adjustment(
     primary_y: f32,
     original_gain: f32,
     limit_ev: f32,
+    detail_limit_ev: f32,
 ) -> f32 {
     let (w, h) = (field.metrics.width, field.metrics.height);
     let fx = (point.0 as f32 + 0.5) * w as f32 / geometry.0 as f32 - 0.5;
     let fy = (point.1 as f32 + 0.5) * h as f32 / geometry.1 as f32 - 0.5;
     let mut sum = 0.;
     let mut weight = 0.;
+    let mut detail = 0.;
     for dy in -1..=2 {
         for dx in -1..=2 {
             let x = (fx.floor() as isize + dx).clamp(0, w as isize - 1) as usize;
@@ -313,11 +316,13 @@ fn interpolate_adjustment(
                 let q = (-0.5 * distance - 2. * range * range).exp();
                 sum += q * field.strength[i] * (delta - original_gain);
                 weight += q;
+                detail += q * field.detail[i];
             }
         }
     }
     if weight > 1e-10 {
-        (sum / weight).clamp(-limit_ev, limit_ev)
+        let limit = limit_ev + (detail_limit_ev - limit_ev) * (detail / weight).clamp(0., 1.);
+        (sum / weight).clamp(-limit, limit)
     } else {
         0.
     }
@@ -333,6 +338,10 @@ mod tests {
             minimum_region_pixels: 64,
             feather_radius: 4,
             merge_radius: 16,
+            detail_radius: 3,
+            detail_threshold_ev: 0.1,
+            detail_limit_ev: 1.5,
+            minimum_gain_support: 0.9,
             edge_ev: 0.1,
             flat_ev: 0.075,
             limit_ev: 0.25,
@@ -577,6 +586,63 @@ mod tests {
             display_p3_luminance(&result.pixels[128 * w + 128])
                 > display_p3_luminance(&result.pixels[120 * w + 128]) * 1.5
         );
+    }
+    #[test]
+    fn a_blurred_thumbnail_does_not_add_rings_to_high_resolution_strokes() {
+        let (w, h, tw, th) = (512, 256, 256, 128);
+        let mut primary = vec![[0.2, 0.2, 0.2, 1.]; w * h];
+        // Several narrow strokes with original full-resolution contrast.
+        for x0 in [160, 184, 208, 232] {
+            for y in 110..138 {
+                for x in x0..x0 + 4 {
+                    primary[y * w + x] = [0.8, 0.8, 0.8, 1.];
+                }
+            }
+        }
+        let area = area_luminance(&primary, w, h, tw, th);
+        let mut thumbnail = vec![[0.; 4]; tw * th];
+        for y in 0..th {
+            for x in 0..tw {
+                let mut sum = 0.;
+                let mut count = 0.;
+                for j in y.saturating_sub(1)..=(y + 1).min(th - 1) {
+                    for k in x.saturating_sub(1)..=(x + 1).min(tw - 1) {
+                        sum += area[j * tw + k];
+                        count += 1.;
+                    }
+                }
+                let c = encode(0.5 * sum / count);
+                thumbnail[y * tw + x] = [c, c, c, 1.];
+            }
+        }
+        let result = reconstruct_relative_scene(
+            &primary,
+            &primary,
+            &primary,
+            (w, h),
+            &thumbnail,
+            (tw, th),
+            policy(),
+        )
+        .unwrap();
+        let mut errors = Vec::new();
+        for y in 106..142 {
+            for x in 154..242 {
+                let i = y * w + x;
+                errors.push(
+                    (display_p3_luminance(&result.pixels[i]) / display_p3_luminance(&primary[i]))
+                        .log2()
+                        .abs(),
+                );
+            }
+        }
+        errors.sort_unstable_by(f32::total_cmp);
+        let p95 = errors[errors.len() * 95 / 100];
+        assert!(p95 < 0.06, "added stroke/ring gain p95 {p95} EV");
+        assert!(result.guidance.detail_fraction > 0.);
+        let stroke = display_p3_luminance(&result.pixels[124 * w + 184]);
+        let background = display_p3_luminance(&result.pixels[124 * w + 180]);
+        assert!(((stroke / background).log2() - 2.).abs() < 0.08);
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {
