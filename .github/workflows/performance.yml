@@ -13,6 +13,7 @@ on:
       - "benchmarks/macos27-arm64-product-baseline.json"
       - "tests/test_performance_design.py"
       - "tests/test_performance_budget.py"
+      - "tests/test_product_benchmark.py"
       - "scripts/performance/benchmark_rust_product.py"
       - "scripts/performance/compare_apple_styles_revisions.py"
       - "tests/test_styles_revision_comparison.py"
@@ -34,6 +35,7 @@ on:
       - "benchmarks/macos27-arm64-product-baseline.json"
       - "tests/test_performance_design.py"
       - "tests/test_performance_budget.py"
+      - "tests/test_product_benchmark.py"
       - "scripts/performance/benchmark_rust_product.py"
       - "scripts/performance/compare_apple_styles_revisions.py"
       - "tests/test_styles_revision_comparison.py"
@@ -105,6 +107,7 @@ jobs:
           python3 -m unittest \
             tests.test_performance_design \
             tests.test_performance_budget \
+            tests.test_product_benchmark \
             tests.test_styles_revision_comparison \
             2>&1 | tee artifacts/performance/design-policy.log
 
@@ -211,19 +214,26 @@ jobs:
           report = json.loads(Path("artifacts/performance/product-benchmark.json").read_text())
           print("### End-to-end product workloads")
           print()
-          print("| workload | source | Gain Map | codec path | median | p95 | max RSS |")
-          print("| --- | --- | --- | --- | ---: | ---: | ---: |")
+          print(f"Collection status: {report.get('status', 'unknown')}")
+          for error in report.get("errors", []):
+              print(f"- Collection error: {error.get('error', error)}")
+          print()
+          print("| workload | status | validated samples | source | Gain Map | codec path | median | p95 | max RSS |")
+          print("| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: |")
           for case in report["cases"]:
               source = case.get("source_family") or "—"
               channels = case.get("gain_map_channels")
               chroma = case.get("gain_map_chroma")
               gain_map = f"{channels}/{chroma}" if channels and chroma else "—"
               codec_path = case.get("codec_path") or "—"
+              samples = case.get("samples", [])
+              completed = sum(sample.get("status") == "validated" for sample in samples)
+              median = f"{case['median_wall_seconds']:.3f}s" if "median_wall_seconds" in case else "—"
+              p95 = f"{case['p95_wall_seconds']:.3f}s" if "p95_wall_seconds" in case else "—"
+              rss = f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB" if "max_peak_rss_bytes" in case else "—"
               print(
-                  f"| {case['name']} | {source} | {gain_map} | {codec_path} | "
-                  f"{case['median_wall_seconds']:.3f}s | "
-                  f"{case['p95_wall_seconds']:.3f}s | "
-                  f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB |"
+                  f"| {case['name']} | {case.get('status', 'unknown')} | {completed}/{len(samples)} | "
+                  f"{source} | {gain_map} | {codec_path} | {median} | {p95} | {rss} |"
               )
           PY
           fi

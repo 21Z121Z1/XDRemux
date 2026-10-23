@@ -13,21 +13,40 @@ import argparse
 import json
 import math
 from pathlib import Path
+import re
+import statistics
 import sys
+import uuid
 from typing import Any
 
 
 MIB = 1024 * 1024
 
+# Workload identity is owned by the benchmark, never by the measured report.
+# Keep these contracts aligned with benchmark_rust_product.cases.
+CASE_CONTRACTS = {
+    "hdr-lhdr-mono400": (1, "iso-hdr-heif", ("output.heic",)),
+    "hdr-uhdr-rgb444": (1, "iso-hdr-heif", ("output.heic",)),
+    "oppo-compatible-lhdr-rgb420": (1, "iso-hdr-heif", ("output.heic",)),
+    "oppo-compatible-uhdr-rgb420": (1, "iso-hdr-heif", ("output.heic",)),
+    "motion-jpeg": (1, "live-photo", ("live.heic", "live.mov")),
+    "motion-heif": (1, "live-photo", ("live.heic", "live.mov")),
+    "batch-3": (3, "iso-hdr-heif", None),
+    "apple-portrait": (1, "iso-hdr-heif", ("portrait.heic",)),
+    "apple-styles": (1, "iso-hdr-heif", ("styles.heic",)),
+}
 
-def load_object(path: Path, label: str) -> dict[str, Any]:
+
+def load_object(path: Path, label: str, version: int = 1) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise RuntimeError(f"cannot read {label} {path}: {error}") from error
     if not isinstance(value, dict):
         raise RuntimeError(f"{label} must be a JSON object")
-    if value.get("schema_version") != 1:
+    if value.get("schema_version") != version:
+        if label == "current benchmark report":
+            raise RuntimeError("current benchmark report requires schema_version 2")
         raise RuntimeError(f"unsupported {label} schema_version {value.get('schema_version')!r}")
     return value
 
@@ -66,16 +85,238 @@ def benchmark_cases(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return indexed
 
 
+def identity(value: Any, context: str) -> None:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{context} identity is missing")
+    if integer_count(value.get("bytes"), f"{context} bytes") == 0:
+        raise RuntimeError(f"{context} bytes must be positive")
+    if not isinstance(value.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", value["sha256"]):
+        raise RuntimeError(f"{context} sha256 must identify the actual bytes")
+
+
+def canonical_output(output: dict[str, Any], kind: str, name: str) -> str:
+    report = output.get("report")
+    if (not isinstance(report, dict) or report.get("command") != "validate"
+            or type(report.get("schema_version")) is not int or report["schema_version"] != 1
+            or report.get("valid") is not True or report.get("kind") != kind):
+        raise RuntimeError(f"{name}: canonical validation receipt is missing or contradicts output")
+    details = report.get("details")
+    if not isinstance(details, dict) or details.get("kind") != kind:
+        raise RuntimeError(f"{name}: canonical validation details disagree")
+    value = details.get("value")
+    path = value.get("input") if isinstance(value, dict) else None
+    relative = Path(output["relative_path"])
+    if (not isinstance(path, str) or not Path(path).is_absolute()
+            or ".." in Path(path).parts or relative.is_absolute() or ".." in relative.parts
+            or Path(path).parts[-len(relative.parts):] != relative.parts):
+        raise RuntimeError(f"{name}: canonical validation input does not bind the output")
+    if kind == "live-photo":
+        still = Path(path).with_suffix(".heic")
+        if (value.get("image") != str(still) or value.get("video") != str(still.with_suffix(".mov"))
+                or not isinstance(value.get("content_identifier"), str)
+                or not value["content_identifier"].strip()):
+            raise RuntimeError(f"{name}: canonical Live Photo member roles disagree")
+    return path
+
+
+def batch_receipt(validation: dict[str, Any], inputs: list[dict[str, Any]],
+                  paths: dict[str, dict[str, Any]], expected: int, name: str) -> None:
+    receipt = validation.get("batch_receipt")
+    if not isinstance(receipt, dict) or receipt.get("command") != "batch":
+        raise RuntimeError(f"{name}: batch receipt is missing")
+    for key, count in (("processed", expected), ("succeeded", expected),
+                       ("failed", 0), ("skipped_existing", 0)):
+        if integer_count(receipt.get(key), f"{name} batch {key}") != count:
+            raise RuntimeError(f"{name}: batch receipt workload disagrees")
+    successes = receipt.get("successes")
+    if (not isinstance(successes, list) or len(successes) != expected
+            or receipt.get("failures") != []):
+        raise RuntimeError(f"{name}: batch receipt is incomplete")
+    bindings = validation.get("batch_bindings")
+    if not isinstance(bindings, list) or len(bindings) != expected:
+        raise RuntimeError(f"{name}: batch filesystem bindings are missing or incomplete")
+    input_identities = {item["path"]: item for item in inputs}
+    sources, outputs = set(), set()
+    raw_sources, raw_outputs = set(), set()
+    for item, binding in zip(successes, bindings):
+        if not isinstance(item, dict) or item.get("status") != "converted":
+            raise RuntimeError(f"{name}: batch receipt contains unconverted work")
+        source, members = item.get("input"), item.get("outputs")
+        if (not isinstance(source, str) or source in raw_sources
+                or not isinstance(members, list) or len(members) != 1
+                or not isinstance(members[0], str) or members[0] in raw_outputs):
+            raise RuntimeError(f"{name}: batch receipt contains missing or duplicate work")
+        raw_sources.add(source)
+        raw_outputs.add(members[0])
+        if (not isinstance(binding, dict) or binding.get("receipt_input") != source
+                or binding.get("receipt_output") != members[0]):
+            raise RuntimeError(f"{name}: batch filesystem binding contradicts the raw receipt")
+        source_identity, output_identity = binding.get("input"), binding.get("output")
+        identity(source_identity, f"{name} batch input binding")
+        identity(output_identity, f"{name} batch output binding")
+        source_path, output_path = source_identity.get("path"), output_identity.get("path")
+        if (not isinstance(source_path, str) or not isinstance(output_path, str)
+                or source_path in sources or output_path in outputs
+                or source_identity != input_identities.get(source_path)):
+            raise RuntimeError(f"{name}: batch input binding is missing, duplicated or changed")
+        validated = paths.get(output_path)
+        if (validated is None or output_identity["bytes"] != validated["bytes"]
+                or output_identity["sha256"] != validated["sha256"]):
+            raise RuntimeError(f"{name}: batch output binding differs from canonical validation")
+        sources.add(source_path)
+        outputs.add(output_path)
+    if sources != set(input_identities) or outputs != set(paths):
+        raise RuntimeError(f"{name}: batch receipt does not bind all inputs and validated outputs")
+
+
+def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) -> None:
+    if report.get("status") != "complete" or report.get("errors") != []:
+        raise RuntimeError("current benchmark report is incomplete or contains failures")
+    iterations = integer_count(report.get("iterations"), "iterations")
+    warmup = integer_count(report.get("warmup"), "warmup")
+    if iterations < 5:
+        raise RuntimeError("current benchmark report requires at least five completed measurements")
+    identity(report.get("cli_identity"), "CLI")
+    identity(report.get("cargo_lock_identity"), "Cargo.lock")
+    if "adapter_identity" not in report:
+        raise RuntimeError("current benchmark adapter identity is missing")
+    if report.get("apple_adapter") is not None or any(case.get("apple") for case in cases.values()):
+        identity(report["adapter_identity"], "Apple adapter")
+    elif report["adapter_identity"] is not None:
+        raise RuntimeError("Apple adapter identity has no measured adapter")
+    execution = report.get("execution")
+    if not isinstance(execution, dict):
+        raise RuntimeError("current benchmark execution identity is missing")
+    try:
+        uuid.UUID(execution.get("id", ""))
+    except (ValueError, TypeError, AttributeError) as error:
+        raise RuntimeError("current benchmark execution id must be a UUID") from error
+    if not isinstance(execution.get("host"), str) or not execution["host"].strip():
+        raise RuntimeError("current benchmark execution host is missing")
+    if not integer_count(execution.get("logical_cpus"), "execution logical_cpus"):
+        raise RuntimeError("execution logical_cpus must be positive")
+    for key in ("run_id", "run_attempt", "job", "runner"):
+        if key not in execution or (execution[key] is not None
+                and (not isinstance(execution[key], str) or not execution[key].strip())):
+            raise RuntimeError(f"execution {key} must record its value or explicit null")
+    source = report.get("source")
+    if (not isinstance(source, dict) or source.get("head") != report.get("head")
+            or source.get("tracked_tree_clean") is not True
+            or not isinstance(source.get("tree"), str) or not re.fullmatch(r"[0-9a-f]{40}", source["tree"])):
+        raise RuntimeError("current benchmark source must identify a clean exact-head tree")
+    for name, case in cases.items():
+        if case.get("status") != "complete" or case.get("errors") != []:
+            raise RuntimeError(f"{name}: measurement is incomplete or contains failures")
+        if (integer_count(case.get("iterations"), f"{name} iterations") != iterations
+                or integer_count(case.get("warmup"), f"{name} warmup") != warmup
+                or integer_count(case.get("warmup_completed"), f"{name} warmup_completed") != warmup):
+            raise RuntimeError(f"{name}: declared run counts disagree")
+        contract = CASE_CONTRACTS.get(name)
+        if contract is None:
+            raise RuntimeError(f"{name}: unknown workload contract")
+        expected, kind, members = contract
+        if integer_count(case.get("expected_work"), f"{name} expected_work") != expected:
+            raise RuntimeError(f"{name}: expected work differs from fixed workload contract")
+        inputs = case.get("inputs")
+        if not expected or not isinstance(inputs, list) or len(inputs) != expected:
+            raise RuntimeError(f"{name}: input count differs from expected work")
+        input_paths = set()
+        for item in inputs:
+            identity(item, f"{name} input")
+            path = item.get("path")
+            if not isinstance(path, str) or not path or path in input_paths:
+                raise RuntimeError(f"{name}: input identity is missing or duplicated")
+            input_paths.add(path)
+        samples = case.get("samples")
+        if not isinstance(samples, list) or len(samples) != iterations:
+            raise RuntimeError(f"{name}: actual sample count differs from declared measurements")
+        wall, rss = [], []
+        for index, sample in enumerate(samples):
+            if not isinstance(sample, dict):
+                raise RuntimeError(f"{name}: sample must be an object")
+            if (type(sample.get("index")) is not int or sample["index"] != index
+                    or sample.get("status") != "validated"
+                    or type(sample.get("process_return_code")) is not int
+                    or sample["process_return_code"] != 0):
+                raise RuntimeError(f"{name}: sample {index} did not complete successfully")
+            elapsed = finite_number(sample.get("wall_seconds"), f"{name} sample wall_seconds")
+            if elapsed == 0:
+                raise RuntimeError(f"{name}: sample wall_seconds must be positive")
+            wall.append(elapsed)
+            rss.append(integer_count(sample.get("peak_rss_bytes"), f"{name} sample peak_rss_bytes"))
+            validation = sample.get("validation")
+            if not isinstance(validation, dict):
+                raise RuntimeError(f"{name}: sample validation is missing")
+            for key, required in (("expected_work", expected), ("completed_work", expected),
+                                  ("failed_work", 0), ("skipped_work", 0)):
+                observed = integer_count(validation.get(key), f"{name} {key}")
+                if observed != required:
+                    raise RuntimeError(f"{name}: {key} differs from completed workload")
+            outputs = validation.get("outputs")
+            if not isinstance(outputs, list) or not outputs or any(not isinstance(item, dict) for item in outputs):
+                raise RuntimeError(f"{name}: output validation is incomplete")
+            if any(item.get("kind") != kind for item in outputs):
+                raise RuntimeError(f"{name}: output contract requires {kind}")
+            if len(outputs) != expected * (2 if kind == "live-photo" else 1):
+                raise RuntimeError(f"{name}: output validation is incomplete")
+            seen, canonical_paths, work_roots = set(), set(), set()
+            pair_identifiers = set()
+            for output in outputs:
+                identity(output, f"{name} output")
+                path = output.get("relative_path")
+                if not isinstance(path, str) or not path or path in seen:
+                    raise RuntimeError(f"{name}: output identity is missing or duplicated")
+                seen.add(path)
+                if output.get("valid") is not True or output.get("kind") not in ("iso-hdr-heif", "live-photo"):
+                    raise RuntimeError(f"{name}: canonical output validation did not pass")
+                canonical = canonical_output(output, kind, name)
+                canonical_paths.add(canonical)
+                work_roots.add(str(Path(canonical).parents[len(Path(path).parts) - 1]))
+                if kind == "live-photo":
+                    pair_identifiers.add(output["report"]["details"]["value"]["content_identifier"])
+            if len(work_roots) != 1 or len(canonical_paths) != len(outputs):
+                raise RuntimeError(f"{name}: canonical outputs do not share one owned work directory")
+            if members is not None and seen != set(members):
+                raise RuntimeError(f"{name}: output contract member roles disagree")
+            if name == "batch-3":
+                if any(Path(path).parent != Path("batch") or Path(path).suffix != ".heic" for path in seen):
+                    raise RuntimeError(f"{name}: batch output contract member roles disagree")
+                batch_receipt(validation, inputs,
+                              {output["report"]["details"]["value"]["input"]: output for output in outputs},
+                              expected, name)
+            if kind == "live-photo":
+                if len(pair_identifiers) != 1:
+                    raise RuntimeError(f"{name}: canonical Live Photo pair identifiers disagree")
+                stills = {Path(path) for path in seen if Path(path).suffix.lower() in (".heic", ".heif")}
+                movies = {Path(path) for path in seen if Path(path).suffix == ".mov"}
+                if len(stills) != expected or movies != {path.with_suffix(".mov") for path in stills}:
+                    raise RuntimeError(f"{name}: Live Photo member identities do not form complete pairs")
+        expected_summary = {
+            "median_wall_seconds": statistics.median(wall),
+            "p95_wall_seconds": statistics.quantiles(wall, n=100, method="inclusive")[94],
+            "median_peak_rss_bytes": int(statistics.median(rss)),
+            "max_peak_rss_bytes": max(rss),
+        }
+        for metric, expected_value in expected_summary.items():
+            observed = finite_number(case.get(metric), f"{name} {metric}")
+            if not math.isclose(observed, expected_value, rel_tol=1e-12, abs_tol=1e-9):
+                raise RuntimeError(f"{name}: {metric} disagrees with samples")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--benchmark", type=Path, required=True)
     parser.add_argument("--launches", type=Path, required=True)
     parser.add_argument("--expected-head", required=True)
+    parser.add_argument("--historical-replay", action="store_true",
+                        help="Read an archived v1 run under its original summary contract; not current CI evidence")
     args = parser.parse_args()
 
     baseline = load_object(args.baseline, "performance baseline")
-    benchmark_report = load_object(args.benchmark, "benchmark report")
+    benchmark_report = load_object(args.benchmark,
+                                   "historical benchmark report" if args.historical_replay else "current benchmark report",
+                                   1 if args.historical_replay else 2)
     launch_report = load_object(args.launches, "Apple launch report")
 
     benchmark_head = benchmark_report.get("head")
@@ -106,6 +347,10 @@ def main() -> int:
     if not isinstance(reference_cases, dict) or not reference_cases:
         raise RuntimeError("performance baseline cases must be a non-empty object")
     current_cases = benchmark_cases(benchmark_report)
+    if args.historical_replay:
+        print("historical replay: schema-v1 summaries retain their original budget contract")
+    else:
+        validated_samples(benchmark_report, current_cases)
 
     failures: list[str] = []
     print("product performance regression budget:")

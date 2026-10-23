@@ -18,6 +18,7 @@ variance, then add or update the separate comparison gate.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -29,6 +30,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -249,49 +252,170 @@ def assert_outputs(work: Path, expected: tuple[str, ...]) -> None:
             raise RuntimeError(f"benchmark command created empty output directory {path}")
 
 
+def file_identity(path: Path) -> dict[str, object]:
+    with path.open("rb") as stream:
+        checksum = hashlib.file_digest(stream, "sha256").hexdigest()
+    return {"path": str(path), "bytes": path.stat().st_size, "sha256": checksum}
+
+
+def validate_outputs(case: Case, cli: Path, work: Path, stdout: str,
+                     env: dict[str, str]) -> dict[str, object]:
+    assert_outputs(work, case.expected)
+    expected = len(case.inputs)
+    receipt = None
+    bindings = []
+    if case.args[0] == "batch":
+        try:
+            receipt = json.loads(stdout)
+        except json.JSONDecodeError as error:
+            raise RuntimeError("batch benchmark did not return its JSON receipt") from error
+        if not isinstance(receipt, dict) or receipt.get("command") != "batch":
+            raise RuntimeError("batch benchmark returned an invalid receipt")
+        for field, value in (("processed", expected), ("succeeded", expected),
+                             ("failed", 0), ("skipped_existing", 0)):
+            if type(receipt.get(field)) is not int or receipt[field] != value:
+                raise RuntimeError(f"batch benchmark {field} does not match expected work")
+        successes = receipt.get("successes")
+        if not isinstance(successes, list) or len(successes) != expected or receipt.get("failures") != []:
+            raise RuntimeError("batch benchmark did not complete every requested input")
+        inputs = {str(path.resolve(strict=True)): path for path in case.inputs}
+        if len(inputs) != expected:
+            raise RuntimeError("batch benchmark input identities are duplicated")
+        observed = set()
+        outputs = []
+        for success in successes:
+            if not isinstance(success, dict) or success.get("status") != "converted":
+                raise RuntimeError("batch benchmark reused or omitted work")
+            source = success.get("input")
+            if not isinstance(source, str):
+                raise RuntimeError("batch benchmark input receipt is missing")
+            canonical = str(Path(source).resolve(strict=True))
+            if canonical not in inputs or canonical in observed:
+                raise RuntimeError("batch benchmark input receipt is missing or duplicated")
+            observed.add(canonical)
+            names = success.get("outputs")
+            if not isinstance(names, list) or len(names) != 1 or not isinstance(names[0], str):
+                raise RuntimeError("batch benchmark must publish one HDR output for each input")
+            output = Path(names[0]).resolve(strict=True)
+            if not output.is_relative_to(work.resolve(strict=True)) or output in outputs:
+                raise RuntimeError("benchmark output is duplicated or outside its owned directory")
+            outputs.append(output)
+            # Preserve the raw receipt, and bind its aliases while the source and
+            # output still exist on this runner. Offline checks cannot resolve them.
+            bindings.append({"receipt_input": source, "receipt_output": names[0],
+                             "input": file_identity(inputs[canonical]),
+                             "output": file_identity(output)})
+    else:
+        outputs = [work / name for name in case.expected]
+    validations = []
+    seen = set()
+    for output in outputs:
+        output = output.resolve()
+        if not output.is_relative_to(work.resolve()) or output in seen:
+            raise RuntimeError("benchmark output is duplicated or outside its owned directory")
+        seen.add(output)
+        before = file_identity(output)
+        command = [str(cli), "validate", str(output), "--json"]
+        if case.name == "apple-styles":
+            command.append("--apple-styles")
+        result = subprocess.run(command, cwd=ROOT, env=env, text=True,
+                                capture_output=True, check=False)
+        try:
+            report = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise RuntimeError(f"canonical validation returned no JSON for {output.name}") from error
+        kind = "live-photo" if len(case.expected) == 2 else "iso-hdr-heif"
+        if (result.returncode or not isinstance(report, dict) or report.get("command") != "validate"
+                or report.get("schema_version") != 1 or report.get("valid") is not True
+                or report.get("kind") != kind):
+            raise RuntimeError(f"canonical validation failed for {output.name}: {result.stdout} {result.stderr}")
+        if file_identity(output) != before:
+            raise RuntimeError(f"canonical validation changed {output.name}")
+        if receipt is not None:
+            binding = bindings[len(validations)]
+            details = report.get("details")
+            value = details.get("value") if isinstance(details, dict) else None
+            if (binding["output"] != before or not isinstance(value, dict)
+                    or value.get("input") != str(output)):
+                raise RuntimeError("batch canonical validation does not bind the measured output")
+        validations.append({"relative_path": str(output.relative_to(work.resolve())),
+                            "bytes": before["bytes"], "sha256": before["sha256"],
+                            "valid": True, "kind": report["kind"], "report": report})
+    return {"expected_work": expected, "completed_work": expected, "failed_work": 0,
+            "skipped_work": 0, "outputs": validations,
+            **({"batch_receipt": receipt, "batch_bindings": bindings} if receipt is not None else {})}
+
+
 def measure_case(
     case: Case,
     cli: Path,
     env: dict[str, str],
     warmup: int,
     iterations: int,
+    update: Callable[[dict[str, object]], None] | None = None,
 ) -> dict[str, object]:
-    samples: list[dict[str, float | int]] = []
+    samples: list[dict[str, object]] = []
+    inputs = [file_identity(path) for path in case.inputs]
+    result = {
+        "name": case.name, "measurement_layer": "product-e2e", "status": "running",
+        "apple": case.apple, "source_family": case.source_family,
+        "gain_map_channels": case.gain_map_channels, "gain_map_chroma": case.gain_map_chroma,
+        "codec_path": case.codec_path, "input_bytes": case.input_bytes, "inputs": inputs,
+        "expected_work": len(case.inputs), "iterations": iterations, "warmup": warmup,
+        "warmup_completed": 0, "samples": samples, "errors": [],
+    }
+    def emit() -> None:
+        if update is not None:
+            update(result)
+    emit()
     total_runs = warmup + iterations
     for index in range(total_runs):
-        with tempfile.TemporaryDirectory(prefix=f"xdremux-bench-{case.name}-") as raw_work:
-            work = Path(raw_work)
-            args = [argument.format(work=work) for argument in case.args]
-            elapsed, rss_bytes, _, _ = run_timed([str(cli), *args], env)
-            assert_outputs(work, case.expected)
+        row = {"index": index - warmup, "status": "running"}
         if index >= warmup:
-            samples.append(
-                {
-                    "wall_seconds": elapsed,
-                    "peak_rss_bytes": rss_bytes,
-                }
-            )
+            samples.append(row)
+        emit()
+        try:
+            with tempfile.TemporaryDirectory(prefix=f"xdremux-bench-{case.name}-") as raw_work:
+                work = Path(raw_work)
+                args = [argument.format(work=work) for argument in case.args]
+                elapsed, rss_bytes, stdout, _ = run_timed([str(cli), *args], env)
+                row.update(wall_seconds=elapsed, peak_rss_bytes=rss_bytes,
+                           process_return_code=0, status="converted")
+                emit()
+                row["validation"] = validate_outputs(case, cli, work, stdout, env)
+                if [file_identity(path) for path in case.inputs] != inputs:
+                    raise RuntimeError("benchmark conversion changed its source bytes")
+            row["status"] = "validated"
+            if index < warmup:
+                result["warmup_completed"] += 1
+            emit()
+        except Exception as error:
+            row.update(status="failed", error=str(error))
+            result["status"] = "failed"
+            result["errors"].append({"run": index, "warmup": index < warmup, "error": str(error)})
+            emit()
+            raise
 
     wall = [float(sample["wall_seconds"]) for sample in samples]
     rss = [int(sample["peak_rss_bytes"]) for sample in samples]
     median_wall = statistics.median(wall)
-    return {
-        "name": case.name,
-        "measurement_layer": "product-e2e",
-        "apple": case.apple,
-        "source_family": case.source_family,
-        "gain_map_channels": case.gain_map_channels,
-        "gain_map_chroma": case.gain_map_chroma,
-        "codec_path": case.codec_path,
-        "input_bytes": case.input_bytes,
-        "iterations": iterations,
-        "samples": samples,
+    result.update({
+        "status": "complete",
         "median_wall_seconds": median_wall,
         "p95_wall_seconds": percentile(wall, 0.95),
         "median_peak_rss_bytes": int(statistics.median(rss)),
         "max_peak_rss_bytes": max(rss),
         "median_input_mib_per_second": (case.input_bytes / MIB) / median_wall,
-    }
+    })
+    emit()
+    return result
+
+
+def write_report(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pending = path.with_name(path.name + ".pending")
+    pending.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    pending.replace(path)
 
 
 def git_head() -> str:
@@ -303,6 +427,12 @@ def git_head() -> str:
         check=True,
     )
     return completed.stdout.strip()
+
+
+def source_identity() -> dict[str, object]:
+    tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT, text=True).strip()
+    status = subprocess.check_output(["git", "status", "--porcelain=v1", "--untracked-files=no"], cwd=ROOT)
+    return {"head": git_head(), "tree": tree, "tracked_tree_clean": not status}
 
 
 def main() -> int:
@@ -320,21 +450,30 @@ def main() -> int:
     apple_adapter = args.apple_adapter.resolve() if args.apple_adapter else None
     if apple_adapter is not None and not apple_adapter.is_file():
         parser.error(f"--apple-adapter is not a file: {apple_adapter}")
-    if args.warmup < 0 or args.iterations < 3:
-        parser.error("--warmup must be non-negative and --iterations must be at least 3")
+    if args.warmup < 0 or args.iterations < 5:
+        parser.error("--warmup must be non-negative and --iterations must be at least 5")
 
     env = os.environ.copy()
     if apple_adapter is not None:
         env["XDREMUX_APPLE_ADAPTER"] = str(apple_adapter)
 
     report: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "status": "running", "errors": [],
         "measurement_layer": "product-e2e",
         "head": git_head(),
+        "source": source_identity(),
         "platform": platform.platform(),
         "machine": platform.machine(),
         "python": platform.python_version(),
         "cli": str(cli),
+        "cli_identity": file_identity(cli),
+        "adapter_identity": file_identity(apple_adapter) if apple_adapter else None,
+        "cargo_lock_identity": file_identity(ROOT / "Cargo.lock"),
+        "execution": {"id": str(uuid.uuid4()), "run_id": os.environ.get("GITHUB_RUN_ID"),
+                      "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                      "job": os.environ.get("GITHUB_JOB"), "runner": os.environ.get("RUNNER_NAME"),
+                      "host": platform.node(), "logical_cpus": os.cpu_count()},
         "apple_adapter": str(apple_adapter) if apple_adapter else None,
         "warmup": args.warmup,
         "iterations": args.iterations,
@@ -342,19 +481,31 @@ def main() -> int:
     }
     measured = report["cases"]
     assert isinstance(measured, list)
-    for case in cases(cli, apple_adapter):
-        print(f"measuring {case.name}...", flush=True)
-        result = measure_case(case, cli, env, args.warmup, args.iterations)
-        measured.append(result)
-        print(
-            f"{case.name}: median={result['median_wall_seconds']:.3f}s "
-            f"p95={result['p95_wall_seconds']:.3f}s "
-            f"max_rss={result['max_peak_rss_bytes'] / MIB:.1f}MiB",
-            flush=True,
-        )
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_report(args.output, report)
+    try:
+        for case in cases(cli, apple_adapter):
+            print(f"measuring {case.name}...", flush=True)
+            def update(row: dict[str, object]) -> None:
+                if not measured or measured[-1] is not row:
+                    measured.append(row)
+                write_report(args.output, report)
+            result = measure_case(case, cli, env, args.warmup, args.iterations, update)
+            print(
+                f"{case.name}: median={result['median_wall_seconds']:.3f}s "
+                f"p95={result['p95_wall_seconds']:.3f}s "
+                f"max_rss={result['max_peak_rss_bytes'] / MIB:.1f}MiB",
+                flush=True,
+            )
+        if (source_identity() != report["source"] or file_identity(cli) != report["cli_identity"]
+                or (apple_adapter is not None and file_identity(apple_adapter) != report["adapter_identity"])):
+            raise RuntimeError("source or measured executable changed during collection")
+        report["status"] = "complete"
+    except Exception as error:
+        report["status"] = "failed"
+        report["errors"].append({"error": str(error)})
+        write_report(args.output, report)
+        raise
+    write_report(args.output, report)
     return 0
 
 
