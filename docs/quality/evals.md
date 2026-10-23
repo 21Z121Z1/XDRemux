@@ -46,6 +46,27 @@ fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体
 - App 状态：使用 macOS App model test。
 - Apple Photos 行为：除结构检查外，还需要原生框架或真机证据。
 
+## 当前产品测量报告
+
+`scripts/performance/benchmark_rust_product.py` 增量写入 schema-v2 报告。
+每次被测转换保留耗时、峰值 RSS、源文件身份、完成工作量和标准 CLI 输出验证。
+验证与哈希计算位于转换计时之外。转换或验证失败时，报告保留失败状态和已观察的样本，
+不会生成成功汇总。batch workload 要求三个输入均完成转换，没有失败或复用项，
+并通过 `xdremux validate` 验证每个发布输出。
+
+`scripts/performance/check_performance_budget.py` 要求当前 schema-v2 报告中，
+每个 workload 至少有五次完成的测量。它先从样本重算 median、p95 和峰值 RSS，
+再应用现有限制。检查要求可执行文件与 Cargo.lock 的身份，以及记录 host、CPU 数量和
+显式 hosted run 字段的执行身份（本地未记录的字段为 null）。Live Photo 样本保留
+同名 HEIC/MOV 两个成员的身份与验证。缺失观察、汇总不一致、工作量不足、验证失败，
+以及把当前报告降级为只有汇总的 v1，都会使检查失败。
+失败 workload 尚无完整汇总统计时，workflow summary 仍展示部分采集状态、样本数和错误。
+
+历史 baseline 文件保留 schema v1 及其原始参考值。`--historical-replay` 仅用于
+按原有汇总合同检查归档的 v1 run 报告，该模式不提供当前 CI 证据。
+预算通过不构成有因果依据的性能比较。速度或内存结论需要匹配的工作、
+适当的同机测量，以及对限制因素的实际观察。
+
 ## 已知边界
 
 没有单个 harness 可以证明全部用户可见行为。
