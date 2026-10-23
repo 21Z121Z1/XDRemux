@@ -75,7 +75,7 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 默认 pair 输出只有在两个最终成员都发布后才算转换成功。转换先在自己独占的 staging 目录写入并同步已验证的完整 pair，再通过原子的 no-clobber 硬链接先占用 MOV 名称、后发布静态照片。已有最终路径及无关文件、目录不会被替换或删除。协作 writer 共享 MOV 占用，同 stem 的 `.heic` 与 `.heif` 也不例外。
 
-两个文件名不是系统原子事务。第二个链接失败时，转换返回带 partial MOV 路径的错误，并保留完整 staging pair 供显式恢复。可对 staging 内的 `capture.heic` 执行 `xdremux validate`；移动资源前先检查两个最终路径。reconcile 只检查目标，未知 partial 或无效 pair 均保留并拒绝；名称像旧临时文件并不能证明删除所有权。
+两个文件名不是系统原子事务。第二个链接失败时，转换返回带 partial MOV 路径的错误，并保留 staging 供显式恢复。publisher 从已校验的 buffer 写入独立的 `recovery.heic` 和 `recovery.mov`，验证成功后才声明完整恢复副本已保留。恢复写入或读回失败时报告 `recovery-unverified`；原 `capture.*` 文件可能与受损的最终文件共享 inode。可对报告的独立 `recovery.heic` 执行 `xdremux validate`，移动资源前先检查两个最终路径。reconcile 只检查目标，未知 partial 或无效 pair 均保留并拒绝；名称像旧临时文件并不能证明删除所有权。
 
 发布要求同一文件系统支持硬链接。不支持时保留原始 I/O 错误并拒绝，不宣称 FAT/exFAT 支持。此协议无法阻止外部 writer 主动替换最终路径。staging 文件已同步不等于断电后目录项具有持久性保证。
 

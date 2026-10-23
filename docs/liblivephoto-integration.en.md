@@ -38,9 +38,12 @@ The private runtime pair publisher accepts owned bytes only after strict pair
 validation, checks of expected identity and exact presentation time, and equality
 of compressed source and output movie payloads. It owns staging and synchronization.
 It checks staged and final bytes against the immutable buffers with bounded reads. A second-member publication
-failure or final-byte readback failure retains complete staging and records the
-observed final entries for explicit recovery. These observations do not authorize
-deletion. Callers must keep path resolution stable; the checks do not prevent an
+failure or final-byte readback failure retains staging and records the observed
+final entries. It attempts to write and verify independent `recovery.heic` and
+`recovery.mov` from the checked buffers; only successful readback permits a
+complete-recovery claim. Otherwise the error reports `recovery-unverified`.
+The original `capture.*` files may share damaged final inodes. These observations
+do not authorize deletion. Callers must keep path resolution stable; the checks do not prevent an
 active same-user writer from changing files after readback. See the
 [publication and recovery contract](architecture.en.md#publication) for filesystem
 requirements and the two-file transaction boundary.
