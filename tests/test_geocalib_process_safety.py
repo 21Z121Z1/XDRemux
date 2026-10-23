@@ -23,7 +23,8 @@ SPEC.loader.exec_module(ESTIMATOR)
 class LauncherIsolationTests(unittest.TestCase):
     def test_isolation_keeps_venv_packages_without_cwd_or_pythonpath(self):
         with tempfile.TemporaryDirectory(prefix="camera's environment ") as directory:
-            root = Path(directory)
+            # macOS exposes the same temp directory through /var and /private/var.
+            root = Path(directory).resolve()
             environment = root / "venv"
             venv.EnvBuilder(with_pip=False).create(environment)
             python = environment / "bin/python"
