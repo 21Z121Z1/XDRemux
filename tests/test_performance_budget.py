@@ -28,12 +28,12 @@ def baseline() -> dict[str, object]:
             "rss_absolute_mib": 32.0,
         },
         "cases": {
-            "tiny": {
+            "hdr-lhdr-mono400": {
                 "median_wall_seconds": 0.10,
                 "p95_wall_seconds": 0.12,
                 "max_peak_rss_mib": 16.0,
             },
-            "large": {
+            "hdr-uhdr-rgb444": {
                 "median_wall_seconds": 10.0,
                 "p95_wall_seconds": 12.0,
                 "max_peak_rss_mib": 100.0,
@@ -44,6 +44,15 @@ def baseline() -> dict[str, object]:
             "apple-styles": 1,
         },
     }
+
+
+def canonical_report(path: str, kind: str) -> dict[str, object]:
+    value = {"input": path}
+    if kind == "live-photo":
+        value.update(image="/work/live.heic", video="/work/live.mov",
+                     content_identifier="pair-id", still_time_seconds=0.5)
+    return {"schema_version": 1, "command": "validate", "valid": True,
+            "kind": kind, "details": {"kind": kind, "value": value}}
 
 
 def measured_case(name: str, median: float, p95: float, rss_mib: int) -> dict[str, object]:
@@ -58,7 +67,8 @@ def measured_case(name: str, median: float, p95: float, rss_mib: int) -> dict[st
             "validation": {
                 "expected_work": 1, "completed_work": 1, "failed_work": 0, "skipped_work": 0,
                 "outputs": [{"relative_path": "output.heic", "bytes": 100,
-                             "sha256": "b" * 64, "kind": "iso-hdr-heif", "valid": True}],
+                             "sha256": "b" * 64, "kind": "iso-hdr-heif", "valid": True,
+                             "report": canonical_report("/work/output.heic", "iso-hdr-heif")}],
             },
         })
     return {
@@ -85,8 +95,8 @@ def benchmark(*, tiny_wall: float = 0.30, large_wall: float = 13.0,
                       "job": None, "runner": None},
         "source": {"head": HEAD, "tree": "d" * 40, "tracked_tree_clean": True},
         "cases": [
-            measured_case("tiny", tiny_wall, max(0.31, tiny_wall + 0.01), 40),
-            measured_case("large", large_wall, large_p95 or max(15.0, large_wall + 2), 124),
+            measured_case("hdr-lhdr-mono400", tiny_wall, max(0.31, tiny_wall + 0.01), 40),
+            measured_case("hdr-uhdr-rgb444", large_wall, large_p95 or max(15.0, large_wall + 2), 124),
         ],
     }
 
@@ -147,33 +157,33 @@ class PerformanceBudgetTests(unittest.TestCase):
     def test_rejects_wall_time_regression_beyond_budget(self) -> None:
         completed = self.run_checker(benchmark(large_wall=14.0), launches())
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("large median_wall_seconds regressed", completed.stderr)
+        self.assertIn("hdr-uhdr-rgb444 median_wall_seconds regressed", completed.stderr)
 
     def test_case_wall_budget_accepts_the_expanded_workload(self) -> None:
         reference = baseline()
-        reference["cases"]["large"]["wall_fraction"] = 1.0
+        reference["cases"]["hdr-uhdr-rgb444"]["wall_fraction"] = 1.0
         completed = self.run_checker(benchmark(large_wall=18.0), launches(), reference)
         self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_case_wall_budget_keeps_other_workloads_bounded(self) -> None:
         reference = baseline()
-        reference["cases"]["large"]["wall_fraction"] = 1.0
+        reference["cases"]["hdr-uhdr-rgb444"]["wall_fraction"] = 1.0
         completed = self.run_checker(benchmark(tiny_wall=0.40), launches(), reference)
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("tiny median_wall_seconds regressed", completed.stderr)
+        self.assertIn("hdr-lhdr-mono400 median_wall_seconds regressed", completed.stderr)
 
     def test_case_wall_budget_keeps_median_and_p95_bounded(self) -> None:
         reference = baseline()
-        reference["cases"]["large"]["wall_fraction"] = 1.0
+        reference["cases"]["hdr-uhdr-rgb444"]["wall_fraction"] = 1.0
         current = benchmark(large_wall=21.0, large_p95=25.0)
         completed = self.run_checker(current, launches(), reference)
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("large median_wall_seconds regressed", completed.stderr)
-        self.assertIn("large p95_wall_seconds regressed", completed.stderr)
+        self.assertIn("hdr-uhdr-rgb444 median_wall_seconds regressed", completed.stderr)
+        self.assertIn("hdr-uhdr-rgb444 p95_wall_seconds regressed", completed.stderr)
 
     def test_case_wall_budget_keeps_rss_and_helper_launch_limits(self) -> None:
         reference = baseline()
-        reference["cases"]["large"]["wall_fraction"] = 1.0
+        reference["cases"]["hdr-uhdr-rgb444"]["wall_fraction"] = 1.0
         current = benchmark()
         current["cases"][1]["max_peak_rss_bytes"] = 140 * MIB
         for sample in current["cases"][1]["samples"]:
@@ -181,17 +191,17 @@ class PerformanceBudgetTests(unittest.TestCase):
         current["cases"][1]["median_peak_rss_bytes"] = 140 * MIB
         completed = self.run_checker(current, launches(styles=2), reference)
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("large max_peak_rss_mib regressed", completed.stderr)
+        self.assertIn("hdr-uhdr-rgb444 max_peak_rss_mib regressed", completed.stderr)
         self.assertIn("apple-styles helper launches regressed", completed.stderr)
 
     def test_rejects_invalid_case_wall_budget(self) -> None:
         for invalid in (True, -1, "1.0", float("inf")):
             with self.subTest(invalid=invalid):
                 reference = baseline()
-                reference["cases"]["large"]["wall_fraction"] = invalid
+                reference["cases"]["hdr-uhdr-rgb444"]["wall_fraction"] = invalid
                 completed = self.run_checker(benchmark(), launches(), reference)
                 self.assertEqual(completed.returncode, 2)
-                self.assertIn("large wall_fraction", completed.stderr)
+                self.assertIn("hdr-uhdr-rgb444 wall_fraction", completed.stderr)
 
     def test_rejects_structural_helper_launch_regression(self) -> None:
         completed = self.run_checker(benchmark(), launches(portrait=2))
@@ -273,7 +283,7 @@ class PerformanceBudgetTests(unittest.TestCase):
     def test_rejects_partial_run_with_retained_failure(self) -> None:
         current = benchmark()
         current["status"] = "failed"
-        current["errors"] = [{"case": "large", "error": "validation failed"}]
+        current["errors"] = [{"case": "hdr-uhdr-rgb444", "error": "validation failed"}]
         result = self.run_checker(current, launches())
         self.assertEqual(result.returncode, 2)
 
@@ -295,14 +305,116 @@ class PerformanceBudgetTests(unittest.TestCase):
 
     def test_live_photo_requires_both_member_identities(self) -> None:
         current = benchmark()
+        current["cases"][0]["name"] = "motion-jpeg"
+        reference = baseline()
+        reference["cases"]["motion-jpeg"] = reference["cases"].pop("hdr-lhdr-mono400")
         for sample in current["cases"][0]["samples"]:
             output = sample["validation"]["outputs"][0]
-            output.update(relative_path="live.heic", kind="live-photo")
-            sample["validation"]["outputs"].append({**output, "relative_path": "live.mov"})
-        self.assertEqual(self.run_checker(current, launches()).returncode, 0)
+            output.update(relative_path="live.heic", kind="live-photo",
+                          report=canonical_report("/work/live.heic", "live-photo"))
+            sample["validation"]["outputs"].append({**output, "relative_path": "live.mov",
+                "report": canonical_report("/work/live.mov", "live-photo")})
+        self.assertEqual(self.run_checker(current, launches(), reference).returncode, 0)
         for sample in current["cases"][0]["samples"]:
             sample["validation"]["outputs"].pop()
         self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+
+    def test_rejects_shrunken_batch_contract(self) -> None:
+        current = benchmark()
+        current["cases"][0]["name"] = "batch-3"
+        reference = baseline()
+        reference["cases"]["batch-3"] = reference["cases"].pop("hdr-lhdr-mono400")
+        result = self.run_checker(current, launches(), reference)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("workload contract", result.stderr)
+
+    def test_rejects_motion_downgraded_to_heif(self) -> None:
+        current = benchmark()
+        current["cases"][0]["name"] = "motion-jpeg"
+        reference = baseline()
+        reference["cases"]["motion-jpeg"] = reference["cases"].pop("hdr-lhdr-mono400")
+        result = self.run_checker(current, launches(), reference)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("output contract", result.stderr)
+
+    def test_rejects_missing_or_contradictory_canonical_receipt(self) -> None:
+        for bad in (None, {"valid": False}, canonical_report("/work/wrong.heic", "iso-hdr-heif")):
+            current = benchmark()
+            current["cases"][0]["samples"][0]["validation"]["outputs"][0]["report"] = bad
+            result = self.run_checker(current, launches())
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("canonical", result.stderr)
+
+    def test_fixed_contracts_match_collector_workloads(self) -> None:
+        import importlib.util
+        from unittest import mock
+        modules = []
+        for name, filename in (("contracts", CHECKER),
+                               ("collector", ROOT / "scripts/performance/benchmark_rust_product.py")):
+            spec = importlib.util.spec_from_file_location(name, filename)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+            modules.append(module)
+        checker, collector = modules
+        with mock.patch.object(Path, "is_file", return_value=True):
+            cases = collector.cases(Path("cli"), Path("adapter"))
+        self.assertEqual({case.name for case in cases}, set(checker.CASE_CONTRACTS))
+        for case in cases:
+            count, kind, members = checker.CASE_CONTRACTS[case.name]
+            self.assertEqual(count, len(case.inputs))
+            self.assertEqual(kind, "live-photo" if len(case.expected) == 2 else "iso-hdr-heif")
+            if members is not None:
+                self.assertEqual(members, case.expected)
+
+    def test_rejects_unknown_case_and_member_substitution(self) -> None:
+        current = benchmark()
+        current["cases"][0]["name"] = "unknown-case"
+        self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+        current = benchmark()
+        output = current["cases"][0]["samples"][0]["validation"]["outputs"][0]
+        output["relative_path"] = "other.heic"
+        output["report"] = canonical_report("/work/other.heic", "iso-hdr-heif")
+        self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+
+    def test_batch_receipt_binds_all_inputs_and_outputs(self) -> None:
+        import copy
+        current = benchmark()
+        case = current["cases"][0]
+        case["name"] = "batch-3"
+        case["expected_work"] = 3
+        case["inputs"] = [{"path": f"/source/{i}.heic", "bytes": 1000,
+                           "sha256": "a" * 64} for i in range(3)]
+        for sample in case["samples"]:
+            validation = sample["validation"]
+            validation.update(expected_work=3, completed_work=3)
+            validation["outputs"] = [{"relative_path": f"batch/{i}.heic", "bytes": 100,
+                "sha256": "b" * 64, "valid": True, "kind": "iso-hdr-heif",
+                "report": canonical_report(f"/work/batch/{i}.heic", "iso-hdr-heif")}
+                for i in range(3)]
+            validation["batch_receipt"] = {"command": "batch", "processed": 3,
+                "succeeded": 3, "failed": 0, "skipped_existing": 0, "failures": [],
+                "successes": [{"input": f"/source/{i}.heic", "status": "converted",
+                               "outputs": [f"/work/batch/{i}.heic"]} for i in range(3)]}
+        reference = baseline()
+        reference["cases"]["batch-3"] = reference["cases"].pop("hdr-lhdr-mono400")
+        result = self.run_checker(current, launches(), reference)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for mutation in ("missing", "skipped", "duplicate", "wrong-output"):
+            bad = copy.deepcopy(current)
+            validation = bad["cases"][0]["samples"][0]["validation"]
+            receipt = validation["batch_receipt"]
+            if mutation == "missing":
+                validation.pop("batch_receipt")
+            elif mutation == "skipped":
+                receipt["successes"][0]["status"] = "skipped"
+            elif mutation == "duplicate":
+                receipt["successes"][1]["input"] = receipt["successes"][0]["input"]
+            else:
+                receipt["successes"][0]["outputs"] = ["/other/output.heic"]
+            result = self.run_checker(bad, launches(), reference)
+            self.assertEqual(result.returncode, 2, mutation + result.stdout + result.stderr)
+            self.assertIn("batch", result.stderr)
 
 
 if __name__ == "__main__":

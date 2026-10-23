@@ -22,6 +22,20 @@ from typing import Any
 
 MIB = 1024 * 1024
 
+# Workload identity is owned by the benchmark, never by the measured report.
+# Keep these contracts aligned with benchmark_rust_product.cases.
+CASE_CONTRACTS = {
+    "hdr-lhdr-mono400": (1, "iso-hdr-heif", ("output.heic",)),
+    "hdr-uhdr-rgb444": (1, "iso-hdr-heif", ("output.heic",)),
+    "oppo-compatible-lhdr-rgb420": (1, "iso-hdr-heif", ("output.heic",)),
+    "oppo-compatible-uhdr-rgb420": (1, "iso-hdr-heif", ("output.heic",)),
+    "motion-jpeg": (1, "live-photo", ("live.heic", "live.mov")),
+    "motion-heif": (1, "live-photo", ("live.heic", "live.mov")),
+    "batch-3": (3, "iso-hdr-heif", None),
+    "apple-portrait": (1, "iso-hdr-heif", ("portrait.heic",)),
+    "apple-styles": (1, "iso-hdr-heif", ("styles.heic",)),
+}
+
 
 def load_object(path: Path, label: str, version: int = 1) -> dict[str, Any]:
     try:
@@ -80,6 +94,59 @@ def identity(value: Any, context: str) -> None:
         raise RuntimeError(f"{context} sha256 must identify the actual bytes")
 
 
+def canonical_output(output: dict[str, Any], kind: str, name: str) -> str:
+    report = output.get("report")
+    if (not isinstance(report, dict) or report.get("command") != "validate"
+            or type(report.get("schema_version")) is not int or report["schema_version"] != 1
+            or report.get("valid") is not True or report.get("kind") != kind):
+        raise RuntimeError(f"{name}: canonical validation receipt is missing or contradicts output")
+    details = report.get("details")
+    if not isinstance(details, dict) or details.get("kind") != kind:
+        raise RuntimeError(f"{name}: canonical validation details disagree")
+    value = details.get("value")
+    path = value.get("input") if isinstance(value, dict) else None
+    relative = Path(output["relative_path"])
+    if (not isinstance(path, str) or not Path(path).is_absolute()
+            or ".." in Path(path).parts or relative.is_absolute() or ".." in relative.parts
+            or Path(path).parts[-len(relative.parts):] != relative.parts):
+        raise RuntimeError(f"{name}: canonical validation input does not bind the output")
+    if kind == "live-photo":
+        still = Path(path).with_suffix(".heic")
+        if (value.get("image") != str(still) or value.get("video") != str(still.with_suffix(".mov"))
+                or not isinstance(value.get("content_identifier"), str)
+                or not value["content_identifier"].strip()):
+            raise RuntimeError(f"{name}: canonical Live Photo member roles disagree")
+    return path
+
+
+def batch_receipt(validation: dict[str, Any], inputs: list[dict[str, Any]],
+                  paths: set[str], expected: int, name: str) -> None:
+    receipt = validation.get("batch_receipt")
+    if not isinstance(receipt, dict) or receipt.get("command") != "batch":
+        raise RuntimeError(f"{name}: batch receipt is missing")
+    for key, count in (("processed", expected), ("succeeded", expected),
+                       ("failed", 0), ("skipped_existing", 0)):
+        if integer_count(receipt.get(key), f"{name} batch {key}") != count:
+            raise RuntimeError(f"{name}: batch receipt workload disagrees")
+    successes = receipt.get("successes")
+    if (not isinstance(successes, list) or len(successes) != expected
+            or receipt.get("failures") != []):
+        raise RuntimeError(f"{name}: batch receipt is incomplete")
+    sources, outputs = set(), set()
+    for item in successes:
+        if not isinstance(item, dict) or item.get("status") != "converted":
+            raise RuntimeError(f"{name}: batch receipt contains unconverted work")
+        source, members = item.get("input"), item.get("outputs")
+        if (not isinstance(source, str) or source in sources
+                or not isinstance(members, list) or len(members) != 1
+                or not isinstance(members[0], str) or members[0] in outputs):
+            raise RuntimeError(f"{name}: batch receipt contains missing or duplicate work")
+        sources.add(source)
+        outputs.add(members[0])
+    if sources != {item["path"] for item in inputs} or outputs != paths:
+        raise RuntimeError(f"{name}: batch receipt does not bind all inputs and validated outputs")
+
+
 def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) -> None:
     if report.get("status") != "complete" or report.get("errors") != []:
         raise RuntimeError("current benchmark report is incomplete or contains failures")
@@ -122,12 +189,22 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
                 or integer_count(case.get("warmup"), f"{name} warmup") != warmup
                 or integer_count(case.get("warmup_completed"), f"{name} warmup_completed") != warmup):
             raise RuntimeError(f"{name}: declared run counts disagree")
-        expected = integer_count(case.get("expected_work"), f"{name} expected_work")
+        contract = CASE_CONTRACTS.get(name)
+        if contract is None:
+            raise RuntimeError(f"{name}: unknown workload contract")
+        expected, kind, members = contract
+        if integer_count(case.get("expected_work"), f"{name} expected_work") != expected:
+            raise RuntimeError(f"{name}: expected work differs from fixed workload contract")
         inputs = case.get("inputs")
         if not expected or not isinstance(inputs, list) or len(inputs) != expected:
             raise RuntimeError(f"{name}: input count differs from expected work")
+        input_paths = set()
         for item in inputs:
             identity(item, f"{name} input")
+            path = item.get("path")
+            if not isinstance(path, str) or not path or path in input_paths:
+                raise RuntimeError(f"{name}: input identity is missing or duplicated")
+            input_paths.add(path)
         samples = case.get("samples")
         if not isinstance(samples, list) or len(samples) != iterations:
             raise RuntimeError(f"{name}: actual sample count differs from declared measurements")
@@ -156,15 +233,12 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
             outputs = validation.get("outputs")
             if not isinstance(outputs, list) or not outputs or any(not isinstance(item, dict) for item in outputs):
                 raise RuntimeError(f"{name}: output validation is incomplete")
-            if any(item.get("kind") not in ("iso-hdr-heif", "live-photo") for item in outputs):
-                raise RuntimeError(f"{name}: canonical output validation did not pass")
-            kinds = {item["kind"] for item in outputs}
-            if len(kinds) != 1:
-                raise RuntimeError(f"{name}: output validation kinds disagree")
-            kind = next(iter(kinds))
+            if any(item.get("kind") != kind for item in outputs):
+                raise RuntimeError(f"{name}: output contract requires {kind}")
             if len(outputs) != expected * (2 if kind == "live-photo" else 1):
                 raise RuntimeError(f"{name}: output validation is incomplete")
-            seen = set()
+            seen, canonical_paths, work_roots = set(), set(), set()
+            pair_identifiers = set()
             for output in outputs:
                 identity(output, f"{name} output")
                 path = output.get("relative_path")
@@ -173,7 +247,22 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
                 seen.add(path)
                 if output.get("valid") is not True or output.get("kind") not in ("iso-hdr-heif", "live-photo"):
                     raise RuntimeError(f"{name}: canonical output validation did not pass")
+                canonical = canonical_output(output, kind, name)
+                canonical_paths.add(canonical)
+                work_roots.add(str(Path(canonical).parents[len(Path(path).parts) - 1]))
+                if kind == "live-photo":
+                    pair_identifiers.add(output["report"]["details"]["value"]["content_identifier"])
+            if len(work_roots) != 1 or len(canonical_paths) != len(outputs):
+                raise RuntimeError(f"{name}: canonical outputs do not share one owned work directory")
+            if members is not None and seen != set(members):
+                raise RuntimeError(f"{name}: output contract member roles disagree")
+            if name == "batch-3":
+                if any(Path(path).parent != Path("batch") or Path(path).suffix != ".heic" for path in seen):
+                    raise RuntimeError(f"{name}: batch output contract member roles disagree")
+                batch_receipt(validation, inputs, canonical_paths, expected, name)
             if kind == "live-photo":
+                if len(pair_identifiers) != 1:
+                    raise RuntimeError(f"{name}: canonical Live Photo pair identifiers disagree")
                 stills = {Path(path) for path in seen if Path(path).suffix.lower() in (".heic", ".heif")}
                 movies = {Path(path) for path in seen if Path(path).suffix == ".mov"}
                 if len(stills) != expected or movies != {path.with_suffix(".mov") for path in stills}:
