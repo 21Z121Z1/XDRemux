@@ -13,6 +13,8 @@ import argparse
 import json
 import math
 from pathlib import Path
+import re
+import statistics
 import sys
 from typing import Any
 
@@ -20,14 +22,16 @@ from typing import Any
 MIB = 1024 * 1024
 
 
-def load_object(path: Path, label: str) -> dict[str, Any]:
+def load_object(path: Path, label: str, version: int = 1) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise RuntimeError(f"cannot read {label} {path}: {error}") from error
     if not isinstance(value, dict):
         raise RuntimeError(f"{label} must be a JSON object")
-    if value.get("schema_version") != 1:
+    if value.get("schema_version") != version:
+        if label == "current benchmark report":
+            raise RuntimeError("current benchmark report requires schema_version 2")
         raise RuntimeError(f"unsupported {label} schema_version {value.get('schema_version')!r}")
     return value
 
@@ -66,16 +70,104 @@ def benchmark_cases(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return indexed
 
 
+def identity(value: Any, context: str) -> None:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{context} identity is missing")
+    if integer_count(value.get("bytes"), f"{context} bytes") == 0:
+        raise RuntimeError(f"{context} bytes must be positive")
+    if not isinstance(value.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", value["sha256"]):
+        raise RuntimeError(f"{context} sha256 must identify the actual bytes")
+
+
+def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) -> None:
+    if report.get("status") != "complete" or report.get("errors") != []:
+        raise RuntimeError("current benchmark report is incomplete or contains failures")
+    iterations = integer_count(report.get("iterations"), "iterations")
+    warmup = integer_count(report.get("warmup"), "warmup")
+    if iterations < 5:
+        raise RuntimeError("current benchmark report requires at least five completed measurements")
+    identity(report.get("cli_identity"), "CLI")
+    source = report.get("source")
+    if (not isinstance(source, dict) or source.get("head") != report.get("head")
+            or source.get("tracked_tree_clean") is not True
+            or not isinstance(source.get("tree"), str) or not re.fullmatch(r"[0-9a-f]{40}", source["tree"])):
+        raise RuntimeError("current benchmark source must identify a clean exact-head tree")
+    for name, case in cases.items():
+        if case.get("status") != "complete" or case.get("errors") != []:
+            raise RuntimeError(f"{name}: measurement is incomplete or contains failures")
+        if (integer_count(case.get("iterations"), f"{name} iterations") != iterations
+                or integer_count(case.get("warmup"), f"{name} warmup") != warmup
+                or integer_count(case.get("warmup_completed"), f"{name} warmup_completed") != warmup):
+            raise RuntimeError(f"{name}: declared run counts disagree")
+        expected = integer_count(case.get("expected_work"), f"{name} expected_work")
+        inputs = case.get("inputs")
+        if not expected or not isinstance(inputs, list) or len(inputs) != expected:
+            raise RuntimeError(f"{name}: input count differs from expected work")
+        for item in inputs:
+            identity(item, f"{name} input")
+        samples = case.get("samples")
+        if not isinstance(samples, list) or len(samples) != iterations:
+            raise RuntimeError(f"{name}: actual sample count differs from declared measurements")
+        wall, rss = [], []
+        for index, sample in enumerate(samples):
+            if not isinstance(sample, dict):
+                raise RuntimeError(f"{name}: sample must be an object")
+            if (type(sample.get("index")) is not int or sample["index"] != index
+                    or sample.get("status") != "validated"
+                    or type(sample.get("process_return_code")) is not int
+                    or sample["process_return_code"] != 0):
+                raise RuntimeError(f"{name}: sample {index} did not complete successfully")
+            elapsed = finite_number(sample.get("wall_seconds"), f"{name} sample wall_seconds")
+            if elapsed == 0:
+                raise RuntimeError(f"{name}: sample wall_seconds must be positive")
+            wall.append(elapsed)
+            rss.append(integer_count(sample.get("peak_rss_bytes"), f"{name} sample peak_rss_bytes"))
+            validation = sample.get("validation")
+            if not isinstance(validation, dict):
+                raise RuntimeError(f"{name}: sample validation is missing")
+            for key, required in (("expected_work", expected), ("completed_work", expected),
+                                  ("failed_work", 0), ("skipped_work", 0)):
+                observed = integer_count(validation.get(key), f"{name} {key}")
+                if observed != required:
+                    raise RuntimeError(f"{name}: {key} differs from completed workload")
+            outputs = validation.get("outputs")
+            if not isinstance(outputs, list) or len(outputs) < expected:
+                raise RuntimeError(f"{name}: output validation is incomplete")
+            seen = set()
+            for output in outputs:
+                identity(output, f"{name} output")
+                path = output.get("relative_path")
+                if not isinstance(path, str) or not path or path in seen:
+                    raise RuntimeError(f"{name}: output identity is missing or duplicated")
+                seen.add(path)
+                if output.get("valid") is not True or output.get("kind") not in ("iso-hdr-heif", "live-photo"):
+                    raise RuntimeError(f"{name}: canonical output validation did not pass")
+        expected_summary = {
+            "median_wall_seconds": statistics.median(wall),
+            "p95_wall_seconds": statistics.quantiles(wall, n=100, method="inclusive")[94],
+            "median_peak_rss_bytes": int(statistics.median(rss)),
+            "max_peak_rss_bytes": max(rss),
+        }
+        for metric, expected_value in expected_summary.items():
+            observed = finite_number(case.get(metric), f"{name} {metric}")
+            if not math.isclose(observed, expected_value, rel_tol=1e-12, abs_tol=1e-9):
+                raise RuntimeError(f"{name}: {metric} disagrees with samples")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--benchmark", type=Path, required=True)
     parser.add_argument("--launches", type=Path, required=True)
     parser.add_argument("--expected-head", required=True)
+    parser.add_argument("--historical-replay", action="store_true",
+                        help="Read an archived v1 run under its original summary contract; not current CI evidence")
     args = parser.parse_args()
 
     baseline = load_object(args.baseline, "performance baseline")
-    benchmark_report = load_object(args.benchmark, "benchmark report")
+    benchmark_report = load_object(args.benchmark,
+                                   "historical benchmark report" if args.historical_replay else "current benchmark report",
+                                   1 if args.historical_replay else 2)
     launch_report = load_object(args.launches, "Apple launch report")
 
     benchmark_head = benchmark_report.get("head")
@@ -106,6 +198,10 @@ def main() -> int:
     if not isinstance(reference_cases, dict) or not reference_cases:
         raise RuntimeError("performance baseline cases must be a non-empty object")
     current_cases = benchmark_cases(benchmark_report)
+    if args.historical_replay:
+        print("historical replay: schema-v1 summaries retain their original budget contract")
+    else:
+        validated_samples(benchmark_report, current_cases)
 
     failures: list[str] = []
     print("product performance regression budget:")

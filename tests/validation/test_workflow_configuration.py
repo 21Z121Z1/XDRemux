@@ -276,6 +276,9 @@ class WorkflowConfigurationTests(unittest.TestCase):
         workflow = self.workflow("performance.yml")
         self.assertIn("scripts/performance/benchmark_rust_product.py", workflow)
         self.assertIn("scripts/performance/check_performance_budget.py", workflow)
+        self.assertIn("tests.test_product_benchmark", workflow)
+        self.assertNotIn("--historical-replay", workflow,
+                         "current CI cannot use archived summary-only reports")
         self.assertNotIn("scripts/ci/agent_completion_gate.py", workflow)
         self.assertNotIn("scripts/validation/check_rust_cli_smoke.sh", workflow)
         self.assertNotIn("XDRemuxAppModelTests", workflow)
