@@ -191,7 +191,7 @@ class ReadinessControlTests(unittest.TestCase):
                 self.assertEqual(m.report['status'], 'native-direct-pvt-import-and-readback-pass')
                 self.assertEqual(m.probes, 1)
                 queries = [c for c in m.commands if c[0] == 'control-listapps']
-                self.assertEqual(len(queries), 1); self.assertEqual(queries[0][2], 20)
+                self.assertEqual(len(queries), 1); self.assertLessEqual(queries[0][2], 120)
                 self.assertEqual(next(c[2] for c in m.commands if c[0] == 'control-bootstatus'), 180)
                 self.assertTrue(m.report['control_prewarms_core_simulator'])
                 self.assertEqual(m.report['control']['cleanup_status'], 'verified-absent')
@@ -206,6 +206,55 @@ class ReadinessControlTests(unittest.TestCase):
                 self.assertEqual(sum(c[0] == 'control-listapps' for c in m.commands), 1)
                 self.assertEqual(m.report['status'], 'control-environment-blocked')
                 m.assert_control_cleaned()
+
+    def test_slow_inventory_can_complete_within_a_bounded_startup_budget(self):
+        for reply_after, accepted in ((30, True), (121, False)):
+            with self.subTest(reply_after=reply_after), tempfile.TemporaryDirectory() as raw:
+                m = ControlModel(Path(raw))
+                original = m.run
+                def run(name, argv, **kwargs):
+                    if name == 'control-listapps' and reply_after > kwargs['timeout']:
+                        raise control.ReadinessBlocked('inventory did not reply within its deadline')
+                    return original(name, argv, **kwargs)
+                m.run = run
+                m.execute()
+                self.assertEqual(m.probes, int(accepted))
+                self.assertEqual(m.report['control']['status'], 'passed-cleaned' if accepted else 'blocked')
+                m.assert_control_cleaned()
+
+    def test_inventory_timeout_preserves_owned_host_diagnostics_before_cleanup(self):
+        with tempfile.TemporaryDirectory() as raw:
+            m = ControlModel(Path(raw), 'inventory-timeout')
+            m.report['commands'].append({'name': 'control-listapps', 'outcome': 'uncertain-after-timeout'})
+            def diagnose(run, owned, report):
+                self.assertEqual(owned, m.uuid)
+                self.assertTrue((m.devices / owned).is_dir())
+                self.assertEqual(report['owned_udid'], owned)
+                report['host_simulator_diagnostics'] = {'owned_udid': owned, 'processes': []}
+            with patch.object(control, 'capture_host_simulator_diagnostics', side_effect=diagnose, create=True) as collector:
+                m.execute()
+            collector.assert_called_once()
+            facts = m.report['control']
+            self.assertEqual(facts['host_simulator_diagnostics']['owned_udid'], m.uuid)
+            self.assertEqual(facts['host_simulator_diagnostics']['source_head'], m.source_sha)
+            self.assertEqual(facts['host_simulator_diagnostics']['session_id'], facts['name'])
+            self.assertEqual(facts['reason'], 'inventory timeout')
+            self.assertEqual(m.probes, 0)
+            self.assertEqual(facts['cleanup_status'], 'verified-absent')
+            m.assert_control_cleaned()
+
+    def test_diagnostic_failure_cannot_replace_inventory_failure_or_skip_cleanup(self):
+        with tempfile.TemporaryDirectory() as raw:
+            m = ControlModel(Path(raw), 'inventory-timeout')
+            m.report['commands'].append({'name': 'control-listapps', 'outcome': 'uncertain-after-timeout'})
+            with patch.object(control, 'capture_host_simulator_diagnostics', side_effect=OSError('diagnostic unavailable'), create=True):
+                m.execute()
+            facts = m.report['control']
+            self.assertEqual(facts['reason'], 'inventory timeout')
+            self.assertIn('diagnostic unavailable', facts['host_simulator_diagnostics_error'])
+            self.assertEqual(m.probes, 0)
+            self.assertEqual(facts['cleanup_status'], 'verified-absent')
+            m.assert_control_cleaned()
 
     def test_boot_or_uncertain_cleanup_stops_the_experiment(self):
         for failure in ('control-bootstatus', 'control-shutdown', 'control-delete', 'cleanup-query', 'cleanup-present'):

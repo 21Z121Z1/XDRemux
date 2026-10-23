@@ -1,0 +1,9 @@
+# Isolated model dependencies; not the XDRemux research Python package.
+geocalib @ https://github.com/cvg/GeoCalib/archive/1dedb29f94fc11b896c5f572005978aeebccd67f.tar.gz
+torch==2.14.1
+torchvision==0.29.1
+numpy==2.5.4
+Pillow==13.0.0
+opencv-python==5.0.0.93
+kornia==0.8.3
+matplotlib==3.11.2

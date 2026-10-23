@@ -54,6 +54,10 @@ The Motion Photo and normal HDR paths have different output-safety rules. See th
 
 It does not participate in the Rust runtime, define a formal conversion path, or serve as the canonical CI correctness source.
 
+### Model primitives
+
+`model_adapters/geocalib/` is a separate local inference component. The Rust runtime reads recorded equivalent-focal metadata through ExifTool and invokes the model only when that metadata is absent. The Python helper returns source-bound pixel intrinsics and uncertainty. Rust owns source precedence, fixed-camera admission, equivalent-focal conversion, native generation and publication. The helper is not a second converter or a user CLI. Its pinned environment and weights require separate installation; no media is uploaded.
+
 ## Stable media contracts
 
 ### Standard HDR

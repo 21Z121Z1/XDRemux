@@ -215,7 +215,10 @@ This command is experimental. Successful pending-state recognition does not guar
 
 For this intent, batch directory discovery selects MOV, MP4, M4V, AVI, and MKV candidates. AVFoundation decides whether their media can be decoded. Generated `.xdremux` files are not rediscovered. Output planning reserves unique `.mov` names; receipts use kind `cinematic`. Live Photo checkpoint/resume and photo categorization options do not apply to this video intent.
 
-`--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. Supplying either parameter requires `--apple-cinematic`. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
+Both entry points choose focal input automatically: explicit `--focal-length-35mm MM`, then a fixed recorded 35mm-equivalent tag read by ExifTool, then the installed GeoCalib helper when the tag is absent or unknown. Physical focal length alone is insufficient. There is no default 24 mm substitution. Missing dependencies, conflicting metadata or rejected model observations fail before output publication. `--aperture F` remains a separate assumption with default 2.8. Either explicit parameter requires `--apple-cinematic`. See the [Cinematic envelope contract](cinematic.en.md) for admitted tags, limits and native verification.
+
+
+`convert --cinematic-camera-estimate camera.json` remains an explicit observation override above automatic selection. An explicit `--focal-length-35mm` takes priority. Normal use needs no JSON argument, and `batch` resolves each source independently. The [GeoCalib model adapter](../model_adapters/geocalib/README.en.md) requires one-time local setup and currently supports fixed-view SDR video. Rust owns admission and focal selection. It does not recover capture aperture, focus distance or unknown EIS crop, and low model uncertainty does not establish physical accuracy.
 
 ## Product intent versus implementation detail
 

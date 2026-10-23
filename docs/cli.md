@@ -202,7 +202,10 @@ xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jo
 
 此意图的批处理目录扫描选择 MOV、MP4、M4V、AVI、MKV 候选，媒体是否能解码由 AVFoundation 判断。不会重新发现已生成的 `.xdremux` 文件。规划器保留不冲突的 `.mov` 文件名，回执类型为 `cinematic`。Live Photo 检查点/恢复及照片分类选项不适用于此视频意图。
 
-`--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8，显式传入任一参数都需要 `--apple-cinematic`。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
+两个入口都自动选择焦距：显式 `--focal-length-35mm MM` 优先，然后是 ExifTool 读取的固定 35mm 等效焦距，字段缺失或未知时调用已安装的 GeoCalib helper。只有物理焦距还不够，不再默认代入 24 mm。依赖缺失、元数据冲突或模型观测被拒绝时，在发布输出前失败。`--aperture F` 仍是独立假设，默认为 2.8。显式传入任一参数都需要 `--apple-cinematic`。支持的标签、限制和原生验证见 [Cinematic 元数据封装约定](cinematic.md)。
+
+
+`convert --cinematic-camera-estimate camera.json` 保留为高于自动选择的显式观测输入，显式 `--focal-length-35mm` 优先。正常使用不需要 JSON 参数，`batch` 会逐个解析输入。[GeoCalib 模型适配器](../model_adapters/geocalib/README.md) 需要一次性本地安装，目前支持固定视角 SDR 视频。准入和焦距选择由 Rust 持有。它不能恢复拍摄光圈、对焦距离或未知 EIS 裁切；模型不确定度较低也不等于物理精度已验证。
 
 ## 产品意图与实现细节
 

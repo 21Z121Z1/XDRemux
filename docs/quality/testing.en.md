@@ -97,6 +97,33 @@ the same source SHA, runtime and device type. A passing control does not prove
 PVT admission. Admission requires whole-package identity and independent PhotoKit
 readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 
+The control submits one application-inventory query with a 120-second deadline.
+A timeout keeps readiness blocked and collects bounded host diagnostics for the
+owned simulator before cleanup. These diagnostics do not establish readiness or
+Photos admission.
+
+The product probe permits at most three startup inventory queries, each with a
+120-second deadline. A real inventory reply is required before its single reader
+installation. The registration query after that command has a 20-second deadline;
+matching installed bytes and both owned containers must still be verified.
+
+The file promise uses the package interchange type declared readable by
+`PHLivePhoto`, rather than assuming the filesystem's content-type alias is a
+Photos reader type. Before sharing, a separate provider must load the exact
+whole directory through that native reader, with positive dimensions and
+unchanged member hashes. UIKit receives that native decoder result, with its
+object class and the opaque whole-package origin bound to the input receipt.
+Receipts distinguish native decoding from the later system save callback and
+independent library readback; decoding alone is not admission. They retain both
+the filesystem/provider facts and the consumer type, native decode and hashes.
+Neither a Live Photo object type label nor assembly from extracted resources can
+substitute for whole-package decoding, system save and independent readback.
+
+All system share sheets use the invoking button as their popover source view
+and its bounds as the source rectangle. The image availability control and both
+whole-package routes use the same presentation path, including regular-width
+windows.
+
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence

@@ -53,6 +53,10 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 它不参与 Rust runtime，不定义正式 conversion path，也不作为 CI canonical correctness source。
 
+### 模型原语
+
+`model_adapters/geocalib/` 是独立的本地推理组件。Rust runtime 通过 ExifTool 读取已记录的等效焦距，只有缺失时才调用模型。Python helper 返回绑定源视频的像素内参和不确定度。来源优先级、固定相机准入、等效焦距换算、原生生成和发布均由 Rust 持有。helper 不构成第二套转换器或用户 CLI。固定版本环境与权重需要单独安装，不上传媒体。
+
 ## 稳定媒体契约
 
 ### 标准 HDR

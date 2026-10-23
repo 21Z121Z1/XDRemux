@@ -15,9 +15,11 @@ import time
 import uuid
 
 if __package__:
+    from .check_native_import import capture_host_simulator_diagnostics
     from .observations import PVTStages
     from .owned_cleanup import cleanup_owned_simulator
 else:
+    from check_native_import import capture_host_simulator_diagnostics
     from observations import PVTStages
     from owned_cleanup import cleanup_owned_simulator
 
@@ -61,7 +63,9 @@ def run_control(run, choose_device, report, name, device_root):
         stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1
         stages.record('readiness', 'observed', 'inventory_submitted')
-        result = run('control-listapps', ['xcrun', 'simctl', 'listapps', owned], timeout=20)
+        # Keep one query, with a finite startup observation window. Bootstatus
+        # completion alone does not establish the application service's readiness.
+        result = run('control-listapps', ['xcrun', 'simctl', 'listapps', owned], timeout=120)
         if result.returncode:
             raise ReadinessBlocked('control inventory returned nonzero')
         try:
@@ -81,6 +85,16 @@ def run_control(run, choose_device, report, name, device_root):
         ready = True
     except (ReadinessBlocked, RuntimeError, OSError, ValueError, KeyError, StopIteration) as error:
         facts['reason'] = str(error)
+        if owned and any(row.get('name') == 'control-listapps' and row.get('outcome') == 'uncertain-after-timeout'
+                         for row in report.get('commands', [])):
+            diagnostic_report = {'owned_udid': owned}
+            try:
+                capture_host_simulator_diagnostics(run, owned, diagnostic_report)
+            except (RuntimeError, OSError, ValueError) as diagnostic_error:
+                facts['host_simulator_diagnostics_error'] = str(diagnostic_error)
+            if 'host_simulator_diagnostics' in diagnostic_report:
+                facts['host_simulator_diagnostics'] = diagnostic_report['host_simulator_diagnostics']
+                facts['host_simulator_diagnostics'].update(source_head=report.get('expected_head'), session_id=name)
     finally:
         stages.stop_active(timed_out=any(row.get('outcome') == 'uncertain-after-timeout' for row in report.get('commands', [])))
         if owned:

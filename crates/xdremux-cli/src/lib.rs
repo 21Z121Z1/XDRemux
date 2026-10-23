@@ -55,10 +55,7 @@ struct CinematicEnvelopeArgs {
     input: PathBuf,
     /// New MOV output path; existing files are never replaced.
     output: PathBuf,
-    /// Assumed 35mm-equivalent view angle when the source has no camera geometry.
-    focal_length_35mm: f32,
-    /// Assumed capture aperture used by Cinematic rendering metadata.
-    aperture: f32,
+    options: xdremux_runtime::CinematicEnvelopeOptions,
 }
 
 #[derive(Debug, Args)]
@@ -91,7 +88,7 @@ struct ProductConversionArgs {
     /// Infer pending Cinematic editing metadata for ordinary video (macOS 27).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles"])]
     apple_cinematic: bool,
-    /// Assumed 35mm-equivalent focal length for Cinematic input without camera geometry.
+    /// Override recorded/automatically estimated Cinematic 35mm-equivalent focal length.
     #[arg(long, value_name = "MM", requires = "apple_cinematic")]
     focal_length_35mm: Option<f32>,
     /// Assumed capture aperture for Cinematic rendering metadata.
@@ -136,7 +133,10 @@ impl ProductConversionArgs {
 
     fn cinematic_options(&self) -> xdremux_runtime::CinematicEnvelopeOptions {
         xdremux_runtime::CinematicEnvelopeOptions {
-            focal_length_35mm: self.focal_length_35mm.unwrap_or(24.0),
+            focal_length: self.focal_length_35mm.map_or(
+                xdremux_runtime::CinematicFocalLength::Automatic,
+                xdremux_runtime::CinematicFocalLength::Assumed,
+            ),
             aperture: self.aperture.unwrap_or(2.8),
         }
     }
@@ -158,8 +158,24 @@ struct ConvertArgs {
     /// Output HEIC or MOV; Cinematic chooses a new .xdremux.mov file.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+    /// Use a source-bound fixed-view camera estimate; explicit --focal-length-35mm takes priority.
+    #[arg(long, value_name = "JSON", requires = "apple_cinematic")]
+    cinematic_camera_estimate: Option<PathBuf>,
     #[command(flatten)]
     product: ProductConversionArgs,
+}
+
+impl ConvertArgs {
+    fn cinematic_options(&self) -> xdremux_runtime::CinematicEnvelopeOptions {
+        let mut options = self.product.cinematic_options();
+        if self.product.focal_length_35mm.is_none() {
+            if let Some(path) = &self.cinematic_camera_estimate {
+                options.focal_length =
+                    xdremux_runtime::CinematicFocalLength::CameraEstimate(path.clone());
+            }
+        }
+        options
+    }
 }
 
 fn default_batch_jobs() -> usize {
@@ -547,7 +563,7 @@ fn run_convert(
         return 1;
     }
     if arguments.product.apple_cinematic {
-        let options = arguments.product.cinematic_options();
+        let options = arguments.cinematic_options();
         let output = arguments.output.unwrap_or_else(|| {
             let mut name = arguments
                 .input
@@ -562,8 +578,7 @@ fn run_convert(
             CinematicEnvelopeArgs {
                 input: arguments.input,
                 output,
-                focal_length_35mm: options.focal_length_35mm,
-                aperture: options.aperture,
+                options,
             },
             stdout,
             stderr,
@@ -868,8 +883,7 @@ fn run_cinematic_envelope(
             adapter,
             &arguments.input,
             &arguments.output,
-            arguments.focal_length_35mm,
-            arguments.aperture,
+            &arguments.options,
         ) {
             Ok(receipt) => {
                 let _ = writeln!(
@@ -901,6 +915,18 @@ fn run_cinematic_envelope(
                         "35mm 等效焦距：{}",
                         receipt.focal_length_35mm
                     )
+                );
+                if let Some(estimate) = &receipt.camera_estimate {
+                    let _ = writeln!(
+                        stdout,
+                        "camera-estimator: {} ({} samples)",
+                        estimate.estimator, estimate.sample_count
+                    );
+                }
+                let _ = writeln!(
+                    stdout,
+                    "focal-length-source: {}",
+                    receipt.focal_length_source.as_str()
                 );
                 let _ = writeln!(
                     stdout,
@@ -934,8 +960,7 @@ fn run_cinematic_envelope(
         let _ = (
             arguments.input,
             arguments.output,
-            arguments.focal_length_35mm,
-            arguments.aperture,
+            &arguments.options,
             stdout,
         );
         let _ = writeln!(
@@ -1762,6 +1787,69 @@ mod tests {
     }
 
     #[test]
+    fn cinematic_defaults_to_automatic_camera_on_both_entry_points() {
+        for command in ["convert", "batch"] {
+            let cli = parse(&[command, "--input", "clip.mov", "--apple-cinematic"]);
+            let options = match cli.command {
+                RootCommand::Convert(args) => args.cinematic_options(),
+                RootCommand::Batch(args) => args.product.cinematic_options(),
+                _ => panic!("conversion expected"),
+            };
+            assert_eq!(
+                options.focal_length,
+                xdremux_runtime::CinematicFocalLength::Automatic
+            );
+        }
+    }
+
+    #[test]
+    fn camera_estimate_is_convert_only_and_manual_focal_has_priority() {
+        let arguments = [
+            "convert",
+            "--input",
+            "clip.mp4",
+            "--apple-cinematic",
+            "--cinematic-camera-estimate",
+            "camera.json",
+        ];
+        let cli = parse(&arguments);
+        let RootCommand::Convert(convert) = cli.command else {
+            panic!("convert expected")
+        };
+        assert_eq!(
+            convert.cinematic_options().focal_length,
+            xdremux_runtime::CinematicFocalLength::CameraEstimate(PathBuf::from("camera.json"))
+        );
+        let cli = parse(&[arguments.as_slice(), &["--focal-length-35mm", "50"]].concat());
+        let RootCommand::Convert(convert) = cli.command else {
+            panic!("convert expected")
+        };
+        assert_eq!(
+            convert.cinematic_options().focal_length,
+            xdremux_runtime::CinematicFocalLength::Assumed(50.0)
+        );
+        for args in [
+            vec![
+                "convert",
+                "--input",
+                "clip.mp4",
+                "--cinematic-camera-estimate",
+                "camera.json",
+            ],
+            vec![
+                "batch",
+                "--input",
+                "clip.mp4",
+                "--apple-cinematic",
+                "--cinematic-camera-estimate",
+                "camera.json",
+            ],
+        ] {
+            assert!(parse_cli(args.into_iter().map(OsString::from)).is_err());
+        }
+    }
+
+    #[test]
     fn cinematic_requests_and_video_discovery_follow_the_selected_intent() {
         for command in ["convert", "batch"] {
             let cli = parse(&[
@@ -1780,7 +1868,10 @@ mod tests {
                 _ => panic!("conversion expected"),
             };
             assert!(product.request().apple_features.cinematic);
-            assert_eq!(product.cinematic_options().focal_length_35mm, 35.0);
+            assert_eq!(
+                product.cinematic_options().focal_length,
+                xdremux_runtime::CinematicFocalLength::Assumed(35.0)
+            );
             assert_eq!(product.cinematic_options().aperture, 4.0);
         }
         let root = unique_dir("cinematic-discovery");
