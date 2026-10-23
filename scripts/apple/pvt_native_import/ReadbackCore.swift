@@ -7,12 +7,26 @@ import Photos
 // Native observations only. Publication policy and import admission stay in
 // the Python probe; this helper never creates or alters a Photos asset.
 enum ReadbackCore {
+    private static let started = ProcessInfo.processInfo.systemUptime
+
+    private static func argument(_ name: String) -> String? {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: name), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
     static var documents: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
     static func write(_ report: [String: Any], phase: String) throws {
-        let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+        var observed = report
+        let origin = started
+        observed["observation"] = ["source_head": argument("--source-head") ?? "<missing>",
+                                    "session_id": argument("--session-id") ?? "<missing>",
+                                    "phase": phase, "clock": "reader-process-monotonic",
+                                    "elapsed_seconds": ProcessInfo.processInfo.systemUptime - origin] as [String: Any]
+        let data = try JSONSerialization.data(withJSONObject: observed, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: documents.appendingPathComponent(phase + ".json"), options: .atomic)
     }
 
