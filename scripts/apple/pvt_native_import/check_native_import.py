@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -493,9 +494,21 @@ def check_share_receipt(shared, transfer, package, expected_members, *, source_h
     native = native if isinstance(native, dict) else {}
     native_type = native.get('url_content_type')
     registered = native.get('contents_provider_registered_types')
+    readable = native.get('live_photo_readable_types')
+    decoded = native.get('whole_package_decode')
+    decoded = decoded if isinstance(decoded, dict) else {}
+    representation_type = transfer.get('type_identifier')
     native_file_type = (isinstance(native_type, str) and bool(native_type)
                         and isinstance(registered, list) and all(isinstance(value, str) for value in registered)
-                        and native_type in registered and transfer.get('type_identifier') == native_type
+                        and native_type in registered
+                        and isinstance(readable, list) and all(isinstance(value, str) for value in readable)
+                        and representation_type in readable
+                        and native.get('file_representation_conforms_to_package') is True
+                        and decoded.get('status') == 'loaded' and decoded.get('type_identifier') == representation_type
+                        and decoded.get('member_sha256') == expected_members
+                        and all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                                and math.isfinite(value) and value > 0
+                                for value in (decoded.get('width'), decoded.get('height')))
                         and native.get('package_is_directory') is True and native.get('package_is_package') is True)
     valid_representation = (representation == 'file' and phase == 'share' and native_file_type
                             or representation == 'whole-package-url' and phase == 'share-url')

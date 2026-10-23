@@ -127,7 +127,11 @@ class PVTNativeImportTests(unittest.TestCase):
         bundle_facts = {"url_content_type": "com.apple.private.live-photo-bundle",
                         "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
                         "package_is_directory": True, "package_is_package": True}
-        transfer = {"type_identifier": "com.apple.private.live-photo-bundle", "representation": "file", "share_phase": "share",
+        bundle_facts.update({"live_photo_readable_types": ["com.apple.live-photo-bundle"],
+                             "file_representation_conforms_to_package": True,
+                             "whole_package_decode": {"status": "loaded", "type_identifier": "com.apple.live-photo-bundle",
+                                                      "member_sha256": hashes, "width": 256, "height": 256}})
+        transfer = {"type_identifier": "com.apple.live-photo-bundle", "representation": "file", "share_phase": "share",
                     "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes,
                     "native_bundle_facts": bundle_facts}
         probe.check_share_receipt(shared, transfer, package, hashes)
@@ -135,6 +139,11 @@ class PVTNativeImportTests(unittest.TestCase):
                          {"native_bundle_facts": {}}, {"native_bundle_facts": []},
                          {"native_bundle_facts": {**bundle_facts, "package_is_package": False}},
                          {"native_bundle_facts": {**bundle_facts, "contents_provider_registered_types": ["public.file-url"]}},
+                         {"native_bundle_facts": {**bundle_facts, "live_photo_readable_types": []}},
+                         {"native_bundle_facts": {**bundle_facts, "file_representation_conforms_to_package": False}},
+                         {"native_bundle_facts": {**bundle_facts, "whole_package_decode": {"status": "failed"}}},
+                         {"native_bundle_facts": {**bundle_facts, "whole_package_decode": {
+                             **bundle_facts["whole_package_decode"], "member_sha256": {"capture.heic": "other"}}}},
                          {"is_in_place": True}, {"whole_package_url": str(package / "capture.heic")},
                          {"member_sha256": {"capture.heic": "still"}}):
             with self.subTest(mutation=mutation):
@@ -161,6 +170,26 @@ class PVTNativeImportTests(unittest.TestCase):
         after["photo_live"] = False
         with self.assertRaises(probe.Blocked):
             self.check(baseline, after)
+
+    def test_filesystem_bundle_alias_is_not_native_live_photo_reader_support(self):
+        shared = {"status": "completed", "activity_completed": True,
+                  "is_save_to_camera_roll": True, "share_phase": "share"}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        # Measured on iOS: Foundation registers the private filesystem alias,
+        # while PHLivePhoto reads the distinct whole-bundle interchange type.
+        transfer = {"type_identifier": "com.apple.private.live-photo-bundle", "representation": "file",
+                    "share_phase": "share", "is_in_place": False, "whole_package_url": str(package),
+                    "member_sha256": hashes, "native_bundle_facts": {
+                        "url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True,
+                        "live_photo_readable_types": ["com.apple.live-photo-bundle"],
+                        "file_representation_conforms_to_package": True,
+                        "whole_package_decode": {"status": "loaded", "type_identifier": "com.apple.live-photo-bundle",
+                                                 "member_sha256": hashes, "width": 256, "height": 256}}}
+        with self.assertRaises(probe.Blocked):
+            probe.check_share_receipt(shared, transfer, package, hashes)
 
     def test_file_promise_cannot_relabel_a_native_bundle_as_public_live_photo(self):
         shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}

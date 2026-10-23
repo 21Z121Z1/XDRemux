@@ -107,10 +107,15 @@ The product probe permits at most three startup inventory queries, each with a
 installation. The registration query after that command has a 20-second deadline;
 matching installed bytes and both owned containers must still be verified.
 
-The file promise uses the whole PVT directory's framework-reported content type.
-Its receipt must bind that type to the native provider's registered types, package
-facts and member hashes. A public Live Photo object type does not substitute for
-the directory's actual file type.
+The file promise uses the package interchange type declared readable by
+`PHLivePhoto`, rather than assuming the filesystem's content-type alias is a
+Photos reader type. Before sharing, a separate provider must load the exact
+whole directory through that native reader, with positive dimensions and
+unchanged member hashes. The system activity receives a fresh provider so the
+preflight load cannot supply its input receipt. Receipts retain both the
+filesystem/provider facts and the consumer type, native decode and member hashes.
+Neither a Live Photo object type nor assembly from extracted resources can
+substitute for whole-package decoding, system save and independent readback.
 
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission

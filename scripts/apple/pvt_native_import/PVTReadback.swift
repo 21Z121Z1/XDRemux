@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import Photos
 import UniformTypeIdentifiers
 
 // Shares one complete file representation with Apple's system activity. There
@@ -73,6 +74,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
         do {
             let values = try package.resourceValues(forKeys: [.contentTypeKey, .isPackageKey, .isDirectoryKey])
             var facts: [String: Any] = ["live_photo_type": identifier,
+                                       "live_photo_readable_types": PHLivePhoto.readableTypeIdentifiersForItemProvider,
                                        "live_photo_conforms_to_image": UTType.livePhoto.conforms(to: .image),
                                        "live_photo_conforms_to_package": UTType.livePhoto.conforms(to: .package),
                                        "package_is_directory": values.isDirectory == true,
@@ -107,30 +109,77 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             present(UIActivityViewController(activityItems: [package], applicationActivities: nil))
             return
         }
-        guard let fileTypeIdentifier = nativeBundleFacts["url_content_type"] as? String,
+        let readablePackageTypes = PHLivePhoto.readableTypeIdentifiersForItemProvider.filter {
+            UTType($0)?.conforms(to: .package) == true
+        }
+        guard let nativeFileType = nativeBundleFacts["url_content_type"] as? String,
               let registeredTypes = nativeBundleFacts["contents_provider_registered_types"] as? [String],
-              registeredTypes.contains(fileTypeIdentifier),
+              registeredTypes.contains(nativeFileType), readablePackageTypes.count == 1,
               nativeBundleFacts["package_is_directory"] as? Bool == true,
               nativeBundleFacts["package_is_package"] as? Bool == true else {
             finishShare(activity: nil, completed: false,
-                        error: ReadbackCore.failure("native PVT bundle file type is not established"))
+                        error: ReadbackCore.failure("native whole-PVT reader/file types are not established"))
             return
         }
+        let fileTypeIdentifier = readablePackageTypes[0]
+        let members: [String: String]
+        do { members = try ReadbackCore.packageHashes(package) }
+        catch { finishShare(activity: nil, completed: false, error: error); return }
+        // Foundation's filesystem alias is not necessarily a type that Photos
+        // reads. Ask Photos to decode the exact whole-directory file promise;
+        // never extract members or assemble a PHLivePhoto from resource URLs.
+        let decoder = wholePackageProvider(package, typeIdentifier: fileTypeIdentifier)
+        _ = decoder.loadObject(ofClass: PHLivePhoto.self) { [weak self] (object: NSItemProviderReading?, error: Error?) in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                var facts = nativeBundleFacts
+                guard let photo = object as? PHLivePhoto,
+                      photo.size.width.isFinite, photo.size.height.isFinite,
+                      photo.size.width > 0, photo.size.height > 0 else {
+                    facts["whole_package_decode"] = ["status": "failed", "type_identifier": fileTypeIdentifier,
+                        "error": error.map(ReadbackCore.errorFacts) ?? ["description": "native whole-PVT decoder returned no Live Photo"]]
+                    try? ReadbackCore.write(facts, phase: "share-types")
+                    self.finishShare(activity: nil, completed: false,
+                                     error: error ?? ReadbackCore.failure("native whole-PVT decode failed"))
+                    return
+                }
+                facts["file_representation_conforms_to_package"] = UTType(fileTypeIdentifier)?.conforms(to: .package) == true
+                facts["whole_package_decode"] = ["status": "loaded", "type_identifier": fileTypeIdentifier,
+                                                  "member_sha256": members,
+                                                  "width": photo.size.width, "height": photo.size.height]
+                do {
+                    guard try ReadbackCore.packageHashes(package) == members else {
+                        throw ReadbackCore.failure("native whole-PVT decode changed the input package")
+                    }
+                    try ReadbackCore.write(facts, phase: "share-types")
+                } catch { self.finishShare(activity: nil, completed: false, error: error); return }
+                // A fresh provider keeps the decoder's cache and load callback
+                // out of the subsequent system-share input receipt.
+                let provider = self.wholePackageProvider(package, typeIdentifier: fileTypeIdentifier) { hashes in
+                    let transfer: [String: Any] = ["type_identifier": fileTypeIdentifier, "share_phase": "share",
+                        "whole_package_url": package.path, "representation": "file", "is_in_place": false,
+                        "member_sha256": hashes, "native_bundle_facts": facts]
+                    try ReadbackCore.write(transfer, phase: "share-transfer")
+                }
+                self.present(UIActivityViewController(activityItemsConfiguration:
+                    UIActivityItemsConfiguration(itemProviders: [provider])))
+            }
+        }
+    }
+
+    private func wholePackageProvider(_ package: URL, typeIdentifier: String,
+                                      onLoad: (([String: String]) throws -> Void)? = nil) -> NSItemProvider {
         let provider = NSItemProvider()
         provider.suggestedName = "capture.pvt"
-        provider.registerFileRepresentation(forTypeIdentifier: fileTypeIdentifier, fileOptions: [], visibility: .all) { completion in
+        provider.registerFileRepresentation(forTypeIdentifier: typeIdentifier, fileOptions: [], visibility: .all) { completion in
             do {
                 let hashes = try ReadbackCore.packageHashes(package)
-                let facts: [String: Any] = ["type_identifier": fileTypeIdentifier, "share_phase": "share", "whole_package_url": package.path,
-                                           "representation": "file", "is_in_place": false,
-                                           "member_sha256": hashes, "native_bundle_facts": nativeBundleFacts]
-                try ReadbackCore.write(facts, phase: "share-transfer")
+                try onLoad?(hashes)
                 completion(package, false, nil)
             } catch { completion(nil, false, error) }
             return nil
         }
-        let configuration = UIActivityItemsConfiguration(itemProviders: [provider])
-        present(UIActivityViewController(activityItemsConfiguration: configuration))
+        return provider
     }
 
     private func present(_ activity: UIActivityViewController) {
