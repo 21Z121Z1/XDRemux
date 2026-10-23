@@ -1,6 +1,7 @@
 //! Relative scene luminance from embedded Log-like thumbnail guidance.
 //! This is an approximation, not inversion of Apple's entire capture ISP.
 use crate::error::{HdrError, Result};
+use crate::{SceneGuidanceMetrics, SceneGuidancePolicy};
 
 pub type LinearPixel = [f32; 4];
 
@@ -10,6 +11,7 @@ pub struct SceneReconstruction {
     pub exposure_ev: f32,
     pub guidance_valid_fraction: f32,
     pub limited_fraction: f32,
+    pub guidance: SceneGuidanceMetrics,
 }
 
 #[derive(Debug)]
@@ -131,12 +133,14 @@ pub(super) fn area_luminance(
 pub fn reconstruct_relative_scene(
     unstyled: &[LinearPixel],
     original_hdr: &[LinearPixel],
-    width: usize,
-    height: usize,
+    geometry: (usize, usize),
     thumbnail_codes: &[LinearPixel],
-    thumb_width: usize,
-    thumb_height: usize,
+    thumbnail_geometry: (usize, usize),
+    guidance_policy: SceneGuidancePolicy,
 ) -> Result<SceneReconstruction> {
+    let (width, height) = geometry;
+    let (thumb_width, thumb_height) = thumbnail_geometry;
+    crate::scene_guidance::validate(guidance_policy)?;
     checked_raster(unstyled, width, height)?;
     checked_raster(original_hdr, width, height)?;
     checked_raster(thumbnail_codes, thumb_width, thumb_height)?;
@@ -206,6 +210,13 @@ pub fn reconstruct_relative_scene(
             "scene guidance requires excessive gain; unsupported or misaligned resources",
         ));
     }
+    let adjustment = crate::scene_guidance::adjustment(
+        &base,
+        &scene,
+        (thumb_width, thumb_height),
+        exposure_ev,
+        guidance_policy,
+    )?;
     let mut output = Vec::with_capacity(unstyled.len());
     for y in 0..height {
         let fy = (y as f32 + 0.5) * thumb_height as f32 / height as f32 - 0.5;
@@ -233,11 +244,8 @@ pub fn reconstruct_relative_scene(
                     }
                 }
             }
-            let gain = if weight > 1e-10 {
-                (sum / weight).exp2()
-            } else {
-                1.
-            };
+            let delta = interpolate_adjustment(&adjustment, (x, y), (width, height), hdr_y);
+            let gain = (if weight > 1e-10 { sum / weight } else { 0. } + delta).exp2();
             let uy = display_p3_luminance(&unstyled[n]);
             let color = if uy > 1e-7 {
                 unstyled[n]
@@ -257,12 +265,56 @@ pub fn reconstruct_relative_scene(
         exposure_ev,
         guidance_valid_fraction: valid_fraction,
         limited_fraction: limited as f32 / base.len() as f32,
+        guidance: adjustment.metrics,
     })
+}
+
+// The bounded adjustment uses the same primary edge guide as the original
+// thumbnail gain. Positive interpolation weights retain its pointwise bound.
+fn interpolate_adjustment(
+    field: &crate::scene_guidance::GuidanceAdjustment,
+    point: (usize, usize),
+    geometry: (usize, usize),
+    primary_y: f32,
+) -> f32 {
+    let (w, h) = (field.metrics.width, field.metrics.height);
+    let fx = (point.0 as f32 + 0.5) * w as f32 / geometry.0 as f32 - 0.5;
+    let fy = (point.1 as f32 + 0.5) * h as f32 / geometry.1 as f32 - 0.5;
+    let mut sum = 0.;
+    let mut weight = 0.;
+    for dy in -1..=2 {
+        for dx in -1..=2 {
+            let x = (fx.floor() as isize + dx).clamp(0, w as isize - 1) as usize;
+            let y = (fy.floor() as isize + dy).clamp(0, h as isize - 1) as usize;
+            let i = y * w + x;
+            if let Some(delta) = field.values[i] {
+                let range = (field.guide[i].max(1e-8) / primary_y).log2();
+                let distance = (x as f32 - fx).powi(2) + (y as f32 - fy).powi(2);
+                let q = (-0.5 * distance - 2. * range * range).exp();
+                sum += q * delta;
+                weight += q;
+            }
+        }
+    }
+    if weight > 1e-10 {
+        sum / weight
+    } else {
+        0.
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn policy() -> SceneGuidancePolicy {
+        SceneGuidancePolicy {
+            analysis_edge: 512,
+            radius: 32.,
+            edge_ev: 0.1,
+            flat_ev: 0.15,
+            limit_ev: 0.25,
+        }
+    }
     fn encode(x: f32) -> f32 {
         0.08550479 * (x + 0.00964052).log2() + 0.69336945
     }
@@ -280,8 +332,15 @@ mod tests {
                 [v * 1.1, v, v * 0.8, 1.]
             })
             .collect();
-        let result =
-            reconstruct_relative_scene(&processed, &processed, 16, 16, &codes, 16, 16).unwrap();
+        let result = reconstruct_relative_scene(
+            &processed,
+            &processed,
+            (16, 16),
+            &codes,
+            (16, 16),
+            policy(),
+        )
+        .unwrap();
         let before =
             (display_p3_luminance(&processed[240]) / display_p3_luminance(&processed[16])).log2();
         let after = (display_p3_luminance(&result.pixels[240])
@@ -294,11 +353,78 @@ mod tests {
     #[test]
     fn rejects_mismatched_orientation_and_nonfinite_or_empty_guidance() {
         let p = vec![[0.2, 0.2, 0.2, 1.]; 128];
-        assert!(reconstruct_relative_scene(&p, &p, 16, 8, &p, 8, 16).is_err());
+        assert!(reconstruct_relative_scene(&p, &p, (16, 8), &p, (8, 16), policy()).is_err());
         let bad = vec![[f32::NAN, 0., 0., 1.]; 128];
-        assert!(reconstruct_relative_scene(&p, &p, 16, 8, &bad, 16, 8).is_err());
+        assert!(reconstruct_relative_scene(&p, &p, (16, 8), &bad, (16, 8), policy()).is_err());
         let black = vec![[0., 0., 0., 1.]; 128];
-        assert!(reconstruct_relative_scene(&p, &p, 16, 8, &black, 16, 8).is_err());
+        assert!(reconstruct_relative_scene(&p, &p, (16, 8), &black, (16, 8), policy()).is_err());
+    }
+    #[test]
+    fn weak_primary_structure_does_not_inherit_all_thumbnail_blotches_or_lose_detail() {
+        let (w, h, tw, th) = (512, 256, 256, 128);
+        let primary = (0..w * h)
+            .map(|i| {
+                let v = 0.2 * 2f32.powf(if (i / w) % 2 == 0 { 0.03 } else { -0.03 });
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let thumbnail = (0..tw * th)
+            .map(|i| {
+                let blotch = 0.12 * (std::f32::consts::TAU * (i % tw) as f32 / 64.).sin();
+                let v = encode(0.1 * blotch.exp2());
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let result =
+            reconstruct_relative_scene(&primary, &primary, (w, h), &thumbnail, (tw, th), policy())
+                .unwrap();
+        let gains = (64..448)
+            .map(|x| {
+                let i = 120 * w + x;
+                (display_p3_luminance(&result.pixels[i]) / display_p3_luminance(&primary[i])).log2()
+            })
+            .collect::<Vec<_>>();
+        let spread = gains.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+            - gains.iter().copied().fold(f32::INFINITY, f32::min);
+        // The old pointwise guidance transfers almost the full 0.24 EV wave.
+        assert!(spread < 0.16, "transferred low-frequency spread {spread}");
+        for x in 64..448 {
+            let a = 120 * w + x;
+            let b = a + w;
+            let detail = (display_p3_luminance(&result.pixels[a])
+                / display_p3_luminance(&result.pixels[b]))
+            .log2();
+            assert!((detail - 0.06).abs() < 1e-5, "detail {detail}");
+        }
+        assert!(result.guidance.maximum_adjustment_ev <= policy().limit_ev);
+        assert!(result.guidance.relative_residual <= 1e-5);
+    }
+    #[test]
+    fn stabilization_keeps_true_range_and_does_not_bleed_across_a_strong_edge() {
+        let (w, h) = (128, 32);
+        let primary = (0..w * h)
+            .map(|i| {
+                let v = if i % w < w / 2 { 0.1 } else { 0.5 };
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let thumbnail = (0..w * h)
+            .map(|i| {
+                let v = encode(if i % w < w / 2 { 0.03 } else { 2. });
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let result =
+            reconstruct_relative_scene(&primary, &primary, (w, h), &thumbnail, (w, h), policy())
+                .unwrap();
+        let row = &result.pixels[16 * w..17 * w];
+        let lo = display_p3_luminance(&row[16]);
+        let hi = display_p3_luminance(&row[112]);
+        assert!(((hi / lo).log2() - (2f32 / 0.03).log2()).abs() < 0.005);
+        for (x, p) in row.iter().enumerate() {
+            let expected = if x < w / 2 { lo } else { hi };
+            assert!((display_p3_luminance(p) / expected).log2().abs() < 0.005);
+        }
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {

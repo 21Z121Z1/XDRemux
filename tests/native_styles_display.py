@@ -52,6 +52,16 @@ def compare_luminance(a, b):
                 max_abs_ev=errors[-1], pixels=len(errors), global_exposure_removed=False)
 
 
+def check_guidance(report):
+    assert report["algorithm"] == "embedded-styles-relative-scene-v2"
+    facts = report["scene"]["guidance_stabilization"]
+    assert facts["algorithm"] == "bounded-weak-structure-log-gain-v1"
+    assert max(facts["width"], facts["height"]) <= 512
+    assert 0 <= facts["solver_relative_residual"] <= 1e-5
+    assert 0 <= facts["maximum_adjustment_ev"] <= facts["limit_ev"] == .25
+    assert 0 <= facts["adjustment_rms_ev"] <= facts["maximum_adjustment_ev"]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
@@ -62,6 +72,8 @@ def main():
     parser.add_argument("--headrooms", type=int, nargs="+", choices=[2, 4, 8], default=[2, 4, 8])
     parser.add_argument("--check-coupling", action="store_true",
                         help="Compare separately encoded 2x/4x endpoints to the same 8x file")
+    parser.add_argument("--check-scene", action="store_true",
+                        help="Also validate the default scene outcome on the same inputs")
     args = parser.parse_args()
     if args.check_coupling:
         assert sorted(args.headrooms) == [2, 4, 8]
@@ -85,6 +97,7 @@ def main():
         assert batch["failures"] == 0 and len(batch["results"]) == len(inputs)
         for item in batch["results"]:
             report = item["report"]
+            check_guidance(report)
             display = report["display"]
             carrier = report["outputs"]["hdr.heic"]
             assert display["headroom"] == headroom
@@ -138,7 +151,33 @@ def main():
                     assert metrics["mean_abs_ev"] <= .03, metrics
                     coupling.append(dict(source=str(source), headroom=h, metrics=metrics,
                                          same_file_sha256=variants[8]["sha256"]))
-    published = {row["output"]: sha(row["output"]) for row in rows}
+    scene_rows = []
+    if args.check_scene:
+        command = [str(binary), "reconstruct-styles", "--output-dir", str(args.output),
+                   "--max-edge", str(args.max_edge)]
+        for path in inputs:
+            command.extend(["--input", str(path)])
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=1200)
+        (args.output / "scene.stdout.json").write_text(result.stdout)
+        (args.output / "scene.stderr.log").write_text(result.stderr)
+        assert result.returncode == 0, result.stderr
+        batch = json.loads(result.stdout)
+        assert batch["failures"] == 0 and len(batch["results"]) == len(inputs)
+        for item in batch["results"]:
+            report = item["report"]
+            check_guidance(report)
+            assert report["display"] is None
+            carrier = report["outputs"]["hdr.heic"]
+            assert carrier["compressed_sdr_preserved"]
+            assert carrier["sdr_readback_max_rgb_error"] == 0
+            assert carrier["hdr_target_mae_ev"] <= .15
+            assert report["outputs"]["scene_linear.exr"]["readback_mae_ev"] <= .005
+            assert report["source_sha256"] == before[report["source"]]
+            path = Path(item["output"]) / "hdr.heic"
+            assert sha(path) == carrier["sha256"]
+            scene_rows.append(dict(input=report["source"], output=str(path),
+                                   scene=report["scene"], carrier=carrier))
+    published = {row["output"]: sha(row["output"]) for row in rows + scene_rows}
     repeated = subprocess.run(first_command, env=env, capture_output=True, text=True, timeout=120)
     assert repeated.returncode != 0
     assert json.loads(repeated.stdout)["failures"] == len(inputs)
@@ -147,7 +186,7 @@ def main():
     result = dict(passed=True, head=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                   binary_sha256=sha(binary), adapter_sha256=sha(adapter),
                   max_edge=args.max_edge, original_hashes=before, rows=rows,
-                  coupling=coupling,
+                  coupling=coupling, scene_rows=scene_rows,
                   existing_bundle_refusal=True, physical_HDR_visual_acceptance=False)
     (args.output / "validation.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(dict(passed=True, photos=len(inputs), profiles=len(rows),

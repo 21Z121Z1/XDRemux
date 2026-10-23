@@ -71,13 +71,23 @@ Existing bundles are never replaced. Duplicate source stems in one output direct
 1. Rust extracts the linked metadata and complete auxiliary image subgraphs. This prevents ImageIO from selecting another primary through an alternative-image group.
 2. The adapter asks Apple for reverse configuration and tuning. It checks coefficient storage against the native texture dimensions. It maps the Delta Map to the primary canvas independently of the Delta Map's stored size.
 3. Apple's reverse processor supplies the unstyled colours. The original HDR supplies fine luminance detail.
-4. Rust decodes the Linear Thumbnail with the measured native exponential inverse, `2^((code - 0.69336945) / 0.08550479) - 0.00964052`. It derives a bounded luminance gain field. Joint bilateral interpolation follows primary luminance edges. Native YCbCr-to-RGB decoding can produce small values outside the nominal code range; those values do not select a different transfer function.
+4. Rust decodes the Linear Thumbnail with the measured native exponential inverse, `2^((code - 0.69336945) / 0.08550479) - 0.00964052`. It derives a bounded luminance gain field and stabilizes weak primary structure as described below. Joint bilateral interpolation follows primary luminance edges. Native YCbCr-to-RGB decoding can produce small values outside the nominal code range; those values do not select a different transfer function.
 5. A robust scalar preserves the original HDR midtone exposure. No RAW file, per-camera fit, filename-specific parameter, or trained model is used at runtime.
 6. Rust derives RGB gain values relative to the original SDR. Negative gain values can darken HDR shadows. A shared `1/64` offset keeps black finite. HEVC 4:4:4 encodes the gain image. The original compressed SDR tree is copied.
 7. The writer uses the displayed primary dimensions and identity rotation for the derived `tmap`. Copying a portrait primary's rotation to the derived image makes ImageIO ignore the ISO Gain Map.
 8. Before success, the command checks compressed SDR identity, native SDR readback, native HDR expansion, EXR readback, and source integrity. SDR RGB error must not exceed `1e-6`. Mean HDR target luminance error must not exceed `0.15 EV`. Mean EXR luminance roundtrip error must not exceed `0.005 EV`.
 
 The generated HEIC retains source metadata and auxiliary resources. Existing Styles resources describe the original capture. This command does not establish that later interactive Styles editing in Photos remains equivalent after the Gain Map changes.
+
+## Weak-structure guidance stabilization
+
+The thumbnail can contain low-frequency luminance structure that the existing HDR rendering suppressed. Transferring every difference directly can make a smooth surface uneven. The reconstruction therefore constrains this transfer before defining R and the display family. This is an appearance safeguard, not a classifier of true illumination or capture artifacts.
+
+Analysis uses area-averaged linear luminance at up to 512 pixels on the long edge. Let b be the original HDR log luminance and g the thumbnail-to-HDR log gain after the exposure anchor. A screened diffusion solve minimizes `sum((u-g)^2) + radius^2 * sum(w_ij * (u_i-u_j)^2)` over adjacent valid pixels, where `w_ij = exp(-0.5*((b_i-b_j)/0.1)^2)`. The radius is 32 pixels at analysis edge 512, scaled for smaller resources. Invalid nodes do not exchange values. A preconditioned conjugate-gradient solve must reach relative residual `1e-5` within 1024 iterations; failure prevents publication.
+
+The solver supplies a candidate adjustment, not a replacement gain field. Local primary log-luminance variance v is measured in a radius-4 neighborhood at edge 512. With `f = 0.15^2`, the confidence is `(f/(f+v))^2`. The applied adjustment is `confidence * 0.25 * tanh((u-g)/0.25)` EV. It is jointly interpolated with original HDR luminance and added to the original thumbnail gain. Strong primary structure receives less adjustment. Each correction stays within 0.25 EV, and primary RGB is never spatially averaged. This bound does not guarantee unchanged texture or exclude every halo in real photographs.
+
+The report records the analysis geometry, policy, solver residual/iterations, adjustment RMS, and maximum. Both the default scene outcome and the separate display outcome use this stabilized R. The original SDR remains unchanged. This deliberately trades some agreement with the thumbnail or RAW for smoother weak structure; RAW agreement alone cannot decide the intended display appearance. It does not remove every inherited local-processing artifact or recover a calibrated physical scene.
 
 ## Limits
 

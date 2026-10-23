@@ -12,7 +12,7 @@ use xdremux_engine::{
 use xdremux_format::ChromaSampling;
 use xdremux_hdr::{
     display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, DisplayFamily,
-    DisplayFamilyPolicy, DisplayMethods, LinearPixel,
+    DisplayFamilyPolicy, DisplayMethods, LinearPixel, SceneGuidancePolicy,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, extract_style_display_mattes,
@@ -475,8 +475,21 @@ pub fn reconstruct_styles_hdr_with_display(
         let hdr = read_pixels(&dir.join("original_hdr.f32"), w * h)?;
         let codes = read_pixels(&dir.join("thumbnail_codes.f32"), tw * th)?;
         let sdr = read_pixels(&dir.join("original_sdr.f32"), w * h)?;
-        let reconstructed = reconstruct_relative_scene(&unstyled, &hdr, w, h, &codes, tw, th)
-            .map_err(|e| RuntimeError::external("relative scene reconstruction", e))?;
+        let reconstructed = reconstruct_relative_scene(
+            &unstyled,
+            &hdr,
+            (w, h),
+            &codes,
+            (tw, th),
+            SceneGuidancePolicy {
+                analysis_edge: plan.guidance_analysis_edge,
+                radius: plan.guidance_radius,
+                edge_ev: plan.guidance_edge_ev,
+                flat_ev: plan.guidance_flat_ev,
+                limit_ev: plan.guidance_limit_ev,
+            },
+        )
+        .map_err(|e| RuntimeError::external("relative scene reconstruction", e))?;
         drop(hdr);
         drop(codes);
         let scene_path = dir.join("scene.f32");
@@ -608,11 +621,17 @@ pub fn reconstruct_styles_hdr_with_display(
         if hash_file(&input)? != source_hash {
             return Err(error("source changed during processing"));
         }
-        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v1",
+        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v2",
             "source":input,"source_sha256":source_hash,"source_preserved":true,
             "resources":{"metadata_item_id":resources.metadata_item_id,"linear_thumbnail_item_id":resources.linear_thumbnail_item_id,"delta_map_item_id":resources.delta_map_item_id},
             "native":native,"scene":{"width":w,"height":h,"color_space":"extended-linear Display P3","exposure_ev":reconstructed.exposure_ev,
                 "guidance_valid_fraction":reconstructed.guidance_valid_fraction,"limited_fraction":reconstructed.limited_fraction,
+                "guidance_stabilization":{"algorithm":"bounded-weak-structure-log-gain-v1",
+                    "width":reconstructed.guidance.width,"height":reconstructed.guidance.height,
+                    "radius_at_analysis_edge":plan.guidance_radius,"analysis_edge":plan.guidance_analysis_edge,
+                    "edge_ev":plan.guidance_edge_ev,"flat_ev":plan.guidance_flat_ev,"limit_ev":plan.guidance_limit_ev,
+                    "solver_iterations":reconstructed.guidance.iterations,"solver_relative_residual":reconstructed.guidance.relative_residual,
+                    "adjustment_rms_ev":reconstructed.guidance.adjustment_rms_ev,"maximum_adjustment_ev":reconstructed.guidance.maximum_adjustment_ev},
                 "runtime_raw_inputs":0,"transfer":"measured native Apple Log exponential inverse","absolute_nit_calibration":false},
             "sdr_policy":"original compressed primary and its colour/geometry properties preserved; only HDR Gain Map changes appearance",
             "outputs":{"scene_linear.exr":scene,"hdr.heic":heic,"unstyled.exr":reverse},"display":display_facts,

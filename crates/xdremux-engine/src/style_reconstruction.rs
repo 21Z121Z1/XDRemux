@@ -1,10 +1,15 @@
 //! Policy for the separate, source-preserving Styles reconstruction outcome.
 pub const STYLE_RECONSTRUCTION_METADATA_VERSIONS: &[u32] = &[8, 9, 15, 16];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StyleReconstructionPlan {
     pub max_edge: u32,
     pub preserve_sdr: bool,
+    pub guidance_analysis_edge: usize,
+    pub guidance_radius: f32,
+    pub guidance_edge_ev: f32,
+    pub guidance_flat_ev: f32,
+    pub guidance_limit_ev: f32,
 }
 
 pub fn plan_style_reconstruction(max_edge: u32) -> Result<StyleReconstructionPlan, &'static str> {
@@ -14,6 +19,11 @@ pub fn plan_style_reconstruction(max_edge: u32) -> Result<StyleReconstructionPla
     Ok(StyleReconstructionPlan {
         max_edge,
         preserve_sdr: true,
+        guidance_analysis_edge: 512,
+        guidance_radius: 32.,
+        guidance_edge_ev: 0.1,
+        guidance_flat_ev: 0.15,
+        guidance_limit_ev: 0.25,
     })
 }
 
