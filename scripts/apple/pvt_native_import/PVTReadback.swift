@@ -3,8 +3,8 @@ import UIKit
 import Photos
 import UniformTypeIdentifiers
 
-// Shares one complete file representation with Apple's system activity. There
-// is no PhotoKit creation request, resource-list import or PHLivePhoto assembly.
+// Loads one complete PVT through Photos' native file reader and hands its result
+// to the system activity. No PhotoKit creation or resource-list assembly occurs.
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
@@ -146,35 +146,34 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
                 facts["file_representation_conforms_to_package"] = UTType(fileTypeIdentifier)?.conforms(to: .package) == true
                 facts["whole_package_decode"] = ["status": "loaded", "type_identifier": fileTypeIdentifier,
                                                   "member_sha256": members,
-                                                  "width": photo.size.width, "height": photo.size.height]
+                                                  "width": photo.size.width, "height": photo.size.height,
+                                                  "object_class": NSStringFromClass(type(of: photo))]
                 do {
                     guard try ReadbackCore.packageHashes(package) == members else {
                         throw ReadbackCore.failure("native whole-PVT decode changed the input package")
                     }
                     try ReadbackCore.write(facts, phase: "share-types")
-                } catch { self.finishShare(activity: nil, completed: false, error: error); return }
-                // A fresh provider keeps the decoder's cache and load callback
-                // out of the subsequent system-share input receipt.
-                let provider = self.wholePackageProvider(package, typeIdentifier: fileTypeIdentifier) { hashes in
-                    let transfer: [String: Any] = ["type_identifier": fileTypeIdentifier, "share_phase": "share",
-                        "whole_package_url": package.path, "representation": "file", "is_in_place": false,
-                        "member_sha256": hashes, "native_bundle_facts": facts]
+                    let transfer: [String: Any] = ["type_identifier": UTType.livePhoto.identifier,
+                        "share_phase": "share", "whole_package_url": package.path,
+                        "representation": "whole-package-native-live-photo", "is_in_place": false,
+                        "native_object_class": NSStringFromClass(type(of: photo)),
+                        "native_object_is_live_photo": photo.isKind(of: PHLivePhoto.self),
+                        "member_sha256": members, "native_bundle_facts": facts]
                     try ReadbackCore.write(transfer, phase: "share-transfer")
-                }
-                self.present(UIActivityViewController(activityItemsConfiguration:
-                    UIActivityItemsConfiguration(itemProviders: [provider])))
+                } catch { self.finishShare(activity: nil, completed: false, error: error); return }
+                // UIKit's save activity consumes the native Live Photo value.
+                // This value came only from the opaque whole-PVT reader above.
+                self.present(UIActivityViewController(activityItems: [photo], applicationActivities: nil))
             }
         }
     }
 
-    private func wholePackageProvider(_ package: URL, typeIdentifier: String,
-                                      onLoad: (([String: String]) throws -> Void)? = nil) -> NSItemProvider {
+    private func wholePackageProvider(_ package: URL, typeIdentifier: String) -> NSItemProvider {
         let provider = NSItemProvider()
         provider.suggestedName = "capture.pvt"
         provider.registerFileRepresentation(forTypeIdentifier: typeIdentifier, fileOptions: [], visibility: .all) { completion in
             do {
-                let hashes = try ReadbackCore.packageHashes(package)
-                try onLoad?(hashes)
+                _ = try ReadbackCore.packageHashes(package)
                 completion(package, false, nil)
             } catch { completion(nil, false, error) }
             return nil

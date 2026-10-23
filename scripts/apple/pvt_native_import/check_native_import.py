@@ -498,19 +498,26 @@ def check_share_receipt(shared, transfer, package, expected_members, *, source_h
     decoded = native.get('whole_package_decode')
     decoded = decoded if isinstance(decoded, dict) else {}
     representation_type = transfer.get('type_identifier')
-    native_file_type = (isinstance(native_type, str) and bool(native_type)
+    native_decoded_package = (isinstance(native_type, str) and bool(native_type)
                         and isinstance(registered, list) and all(isinstance(value, str) for value in registered)
                         and native_type in registered
                         and isinstance(readable, list) and all(isinstance(value, str) for value in readable)
-                        and representation_type in readable
+                        and decoded.get('type_identifier') in readable
                         and native.get('file_representation_conforms_to_package') is True
-                        and decoded.get('status') == 'loaded' and decoded.get('type_identifier') == representation_type
+                        and decoded.get('status') == 'loaded'
                         and decoded.get('member_sha256') == expected_members
                         and all(isinstance(value, (int, float)) and not isinstance(value, bool)
                                 and math.isfinite(value) and value > 0
                                 for value in (decoded.get('width'), decoded.get('height')))
                         and native.get('package_is_directory') is True and native.get('package_is_package') is True)
-    valid_representation = (representation == 'file' and phase == 'share' and native_file_type
+    native_object = (representation == 'whole-package-native-live-photo'
+                     and representation_type == native.get('live_photo_type')
+                     and isinstance(representation_type, str) and bool(representation_type)
+                     and transfer.get('native_object_is_live_photo') is True
+                     and isinstance(transfer.get('native_object_class'), str) and bool(transfer['native_object_class'])
+                     and transfer['native_object_class'] == decoded.get('object_class'))
+    file_promise = representation == 'file' and representation_type == decoded.get('type_identifier')
+    valid_representation = ((file_promise or native_object) and phase == 'share' and native_decoded_package
                             or representation == 'whole-package-url' and phase == 'share-url')
     if (not valid_representation or transfer.get('is_in_place') is not False
             or shared.get('share_phase') != phase
@@ -551,7 +558,7 @@ def main():
               'host_architecture': platform.machine(), 'host_version': platform.mac_ver()[0],
               'commands': [], 'session_id': session_id, 'stage_observations': stages.facts,
               'direct_package_import_only': True, 'media_uploaded': False,
-              'native_route': 'iOS Simulator system Photos save activity; whole package URL or live-photo file representation',
+              'native_route': 'iOS Simulator system Photos save activity; whole package URL or native Live Photo decoded from its whole-package file representation',
               'not_exercised': ['macOS Photos library import', 'physical-device Photos or wallpaper'],
               'known_unsupported_route_not_repeated': 'simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)',
               'probe_source_sha256': {str(path.relative_to(source)): sha(path) for path in source.rglob('*')
@@ -765,7 +772,7 @@ def main():
                         'readback_status': after.get('status')}
                 except Blocked as error:
                     report['unavailable_save_readback_error'] = str(error)
-                raise Blocked('whole-package URL and live-photo provider expose no identifiable Photos save activity; native import remains unaccepted')
+                raise Blocked('whole-package URL and whole-package native decoder result expose no identifiable Photos save activity; native import remains unaccepted')
             if record.get('outcome') or record['exit_code']:
                 raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])),
                               timed_out=record.get('outcome') == 'uncertain-after-timeout')
@@ -795,6 +802,7 @@ def main():
         report['system_save_activity_completed'] = True
         report['whole_pvt_input_representation'] = transfer['representation']
         report['whole_pvt_representation_requested'] = transfer['representation'] == 'file'
+        report['whole_pvt_file_loaded_by_native_decoder'] = transfer.get('native_bundle_facts', {}).get('whole_package_decode', {}).get('status') == 'loaded'
         after = read_report('after', bundle)
         added = set(after.get('asset_identifiers', [])) - set(baseline['asset_identifiers'])
         report['single_live_asset_admission_verified'] = (len(added) == 1 and after.get('asset_local_identifier') in added and after.get('photo_live') is True)

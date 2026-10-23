@@ -111,10 +111,12 @@ The file promise uses the package interchange type declared readable by
 `PHLivePhoto`, rather than assuming the filesystem's content-type alias is a
 Photos reader type. Before sharing, a separate provider must load the exact
 whole directory through that native reader, with positive dimensions and
-unchanged member hashes. The system activity receives a fresh provider so the
-preflight load cannot supply its input receipt. Receipts retain both the
-filesystem/provider facts and the consumer type, native decode and member hashes.
-Neither a Live Photo object type nor assembly from extracted resources can
+unchanged member hashes. UIKit receives that native decoder result, with its
+object class and the opaque whole-package origin bound to the input receipt.
+Receipts distinguish native decoding from the later system save callback and
+independent library readback; decoding alone is not admission. They retain both
+the filesystem/provider facts and the consumer type, native decode and hashes.
+Neither a Live Photo object type label nor assembly from extracted resources can
 substitute for whole-package decoding, system save and independent readback.
 
 PVT stage observations bind the source and session and retain monotonic times
