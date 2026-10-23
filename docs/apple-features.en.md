@@ -77,6 +77,12 @@ SkinSmoothStandalone statistics operations for each matched person. Each effect
 uses the same inferred geometry and masks. The native order is setup, prewarm,
 prepare, calculateStats, process, GPU fence, and terminal finishProcessing.
 
+The runtime adapter uses separate typed requests and results for analysis,
+inference, statistics, and final readback. It owns native report decoding and
+workfile names. A helper acknowledgement alone cannot supply measured statistics
+or admit the final file; the GPU, lifecycle, input bindings, and final-byte
+readback checks still apply.
+
 Rust combines only the native statistics that each effect actually returned.
 A successful empty optional group is omitted. A scene with no matched faces gets
 an empty people array. It does not get a template person. Nose, lips, eyebrows,
