@@ -57,6 +57,7 @@ fn conversion_preserves_a_source_directory_with_a_temporary_looking_name() {
 #[cfg(unix)]
 fn second_member_failure_retains_partial_movie_and_complete_staged_pair() {
     use std::error::Error;
+    use std::os::unix::fs::MetadataExt;
     use xdremux_motion_photo::PairPublicationError;
     let directory = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
@@ -87,7 +88,33 @@ fn second_member_failure_retains_partial_movie_and_complete_staged_pair() {
     let staging = &directories[0];
     let still = fs::read(staging.join("capture.heic")).unwrap();
     let staged_movie = fs::read(staging.join("capture.mov")).unwrap();
-    assert_eq!(fs::read_dir(staging).unwrap().count(), 2);
+    let mut retained_names = fs::read_dir(staging)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<Vec<_>>();
+    retained_names.sort();
+    assert_eq!(
+        retained_names,
+        ["capture.heic", "capture.mov", "recovery.heic", "recovery.mov"]
+            .map(str::to_owned)
+    );
+    let recovery_image = staging.join("recovery.heic");
+    let recovery_video = staging.join("recovery.mov");
+    let recovered_still = fs::read(&recovery_image).unwrap();
+    let recovered_movie = fs::read(&recovery_video).unwrap();
+    assert_eq!(recovered_still, still);
+    assert_eq!(recovered_movie, staged_movie);
+    for (staged, recovery) in [
+        (staging.join("capture.heic"), &recovery_image),
+        (staging.join("capture.mov"), &recovery_video),
+    ] {
+        let original = fs::metadata(staged).unwrap();
+        let independent = fs::metadata(recovery).unwrap();
+        assert_ne!(
+            (original.dev(), original.ino()),
+            (independent.dev(), independent.ino())
+        );
+    }
     MotionPhoto::parse(
         Input::ApplePair {
             still: &still,
@@ -97,6 +124,22 @@ fn second_member_failure_retains_partial_movie_and_complete_staged_pair() {
     )
     .unwrap();
     assert_eq!(fs::read(&movie).unwrap(), staged_movie);
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: &recovered_still,
+            movie: &recovered_movie,
+        },
+        ParseOptions::strict(),
+    )
+    .unwrap()
+    .validate()
+    .unwrap();
+    fs::write(&movie, b"subsequent partial publication damage").unwrap();
+    assert_eq!(fs::read(&recovery_image).unwrap(), recovered_still);
+    assert_eq!(fs::read(&recovery_video).unwrap(), recovered_movie);
+    assert!(error
+        .to_string()
+        .contains("independent checked recovery pair retained"));
     assert!(
         error.to_string().contains(&staging.display().to_string()),
         "{error}"
