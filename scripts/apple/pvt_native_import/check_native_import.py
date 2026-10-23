@@ -236,7 +236,8 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
         raise Blocked('staged reader identity does not match this invocation')
     expected_binary = sha(app / 'PVTReadback')
     facts = {'status': 'preparing', 'install_attempts': 0, 'observations': [],
-             'readiness_attempt_limit': 3, 'reconcile_attempt_limit': 3, 'install_timeout_seconds': 120}
+             'readiness_attempt_limit': 3, 'readiness_query_timeout_seconds': 120,
+             'reconcile_attempt_limit': 3, 'install_timeout_seconds': 120}
     report['reader_installation'] = facts
 
     def fail(status, reason, *, timed_out=False):
@@ -247,9 +248,9 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             facts['host_diagnostic_error'] = str(error)
         raise Blocked(reason, timed_out=timed_out)
 
-    def inventory(attempt):
+    def inventory(attempt, *, timeout=20):
         name = f'install-readiness-{attempt}'
-        result = run(name, ['xcrun', 'simctl', 'listapps', owned_udid], timeout=20, required=False)
+        result = run(name, ['xcrun', 'simctl', 'listapps', owned_udid], timeout=timeout, required=False)
         if result.returncode:
             raise Blocked('installed-app inventory service returned nonzero; readiness not established')
         try:
@@ -307,7 +308,7 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
     ready = None
     for attempt in range(1, 4):
         try:
-            ready = inventory(attempt)
+            ready = inventory(attempt, timeout=facts['readiness_query_timeout_seconds'])
             facts['observations'].append({'phase': 'inventory', 'attempt': attempt, 'state': 'service-answered',
                 'registered_app_count': len(ready), 'reader_registered': bundle in ready,
                 'inventory_contains_com_apple_mobileslideshow': 'com.apple.mobileslideshow' in ready})

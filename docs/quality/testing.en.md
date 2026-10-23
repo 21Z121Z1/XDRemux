@@ -102,6 +102,11 @@ A timeout keeps readiness blocked and collects bounded host diagnostics for the
 owned simulator before cleanup. These diagnostics do not establish readiness or
 Photos admission.
 
+The product probe permits at most three startup inventory queries, each with a
+120-second deadline. A real inventory reply is required before its single reader
+installation. The registration query after that command has a 20-second deadline;
+matching installed bytes and both owned containers must still be verified.
+
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence
