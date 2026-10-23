@@ -296,9 +296,7 @@ fn automatic_cinematic_fails_without_guessing_and_cleans_model_staging() {
             "second-video-only" => {
                 r#"[{"Track1:Main:HandlerType":"vide","Track2:Main:HandlerType":"vide","VideoKeys:Main:FocalLengthIn35mmFormat":"70.00mm"}]"#
             }
-            "missing-track-facts" => {
-                r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#
-            }
+            "missing-track-facts" => r#"[{"VideoKeys:Main:FocalLengthIn35mmFormat":70}]"#,
             _ => "[{}]",
         };
         camera_tools(temp.path(), &input, metadata);

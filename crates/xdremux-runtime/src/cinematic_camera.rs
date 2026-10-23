@@ -334,7 +334,9 @@ mod tests {
         ] {
             let error = recorded_focal(metadata.as_bytes()).unwrap_err();
             assert!(
-                error.to_string().contains("exactly one verified video track"),
+                error
+                    .to_string()
+                    .contains("exactly one verified video track"),
                 "{error}"
             );
         }
