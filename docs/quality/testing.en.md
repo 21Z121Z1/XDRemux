@@ -107,6 +107,11 @@ The product probe permits at most three startup inventory queries, each with a
 installation. The registration query after that command has a 20-second deadline;
 matching installed bytes and both owned containers must still be verified.
 
+The file promise uses the whole PVT directory's framework-reported content type.
+Its receipt must bind that type to the native provider's registered types, package
+facts and member hashes. A public Live Photo object type does not substitute for
+the directory's actual file type.
+
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence

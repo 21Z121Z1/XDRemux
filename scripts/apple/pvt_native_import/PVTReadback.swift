@@ -69,6 +69,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             finishShare(activity: nil, completed: false, error: error)
             return
         }
+        let nativeBundleFacts: [String: Any]
         do {
             let values = try package.resourceValues(forKeys: [.contentTypeKey, .isPackageKey, .isDirectoryKey])
             var facts: [String: Any] = ["live_photo_type": identifier,
@@ -79,6 +80,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
                                        "contents_provider_registered_types": NSItemProvider(contentsOf: package)?.registeredTypeIdentifiers ?? []]
             facts["extension_type"] = UTType(filenameExtension: "pvt")?.identifier ?? "<not-declared>"
             facts["url_content_type"] = values.contentType?.identifier ?? "<not-declared>"
+            nativeBundleFacts = facts
             try ReadbackCore.write(facts, phase: "share-types")
         } catch {
             finishShare(activity: nil, completed: false, error: error)
@@ -105,14 +107,23 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             present(UIActivityViewController(activityItems: [package], applicationActivities: nil))
             return
         }
+        guard let fileTypeIdentifier = nativeBundleFacts["url_content_type"] as? String,
+              let registeredTypes = nativeBundleFacts["contents_provider_registered_types"] as? [String],
+              registeredTypes.contains(fileTypeIdentifier),
+              nativeBundleFacts["package_is_directory"] as? Bool == true,
+              nativeBundleFacts["package_is_package"] as? Bool == true else {
+            finishShare(activity: nil, completed: false,
+                        error: ReadbackCore.failure("native PVT bundle file type is not established"))
+            return
+        }
         let provider = NSItemProvider()
         provider.suggestedName = "capture.pvt"
-        provider.registerFileRepresentation(forTypeIdentifier: identifier, fileOptions: [], visibility: .all) { completion in
+        provider.registerFileRepresentation(forTypeIdentifier: fileTypeIdentifier, fileOptions: [], visibility: .all) { completion in
             do {
                 let hashes = try ReadbackCore.packageHashes(package)
-                let facts: [String: Any] = ["type_identifier": identifier, "share_phase": "share", "whole_package_url": package.path,
+                let facts: [String: Any] = ["type_identifier": fileTypeIdentifier, "share_phase": "share", "whole_package_url": package.path,
                                            "representation": "file", "is_in_place": false,
-                                           "member_sha256": hashes]
+                                           "member_sha256": hashes, "native_bundle_facts": nativeBundleFacts]
                 try ReadbackCore.write(facts, phase: "share-transfer")
                 completion(package, false, nil)
             } catch { completion(nil, false, error) }

@@ -124,10 +124,17 @@ class PVTNativeImportTests(unittest.TestCase):
         shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}
         package = Path("/owned/container/Documents/capture.pvt")
         hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
-        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file", "share_phase": "share",
-                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes}
+        bundle_facts = {"url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True}
+        transfer = {"type_identifier": "com.apple.private.live-photo-bundle", "representation": "file", "share_phase": "share",
+                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes,
+                    "native_bundle_facts": bundle_facts}
         probe.check_share_receipt(shared, transfer, package, hashes)
         for mutation in ({}, {"type_identifier": "public.jpeg"}, {"representation": "data"},
+                         {"native_bundle_facts": {}}, {"native_bundle_facts": []},
+                         {"native_bundle_facts": {**bundle_facts, "package_is_package": False}},
+                         {"native_bundle_facts": {**bundle_facts, "contents_provider_registered_types": ["public.file-url"]}},
                          {"is_in_place": True}, {"whole_package_url": str(package / "capture.heic")},
                          {"member_sha256": {"capture.heic": "still"}}):
             with self.subTest(mutation=mutation):
@@ -154,6 +161,18 @@ class PVTNativeImportTests(unittest.TestCase):
         after["photo_live"] = False
         with self.assertRaises(probe.Blocked):
             self.check(baseline, after)
+
+    def test_file_promise_cannot_relabel_a_native_bundle_as_public_live_photo(self):
+        shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file", "share_phase": "share",
+                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes,
+                    "native_bundle_facts": {"url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True}}
+        with self.assertRaises(probe.Blocked):
+            probe.check_share_receipt(shared, transfer, package, hashes)
 
     def test_ui_project_is_bound_only_to_the_created_probe_bundle(self):
         source = Path(probe.__file__).parent

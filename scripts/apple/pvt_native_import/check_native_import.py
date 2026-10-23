@@ -489,7 +489,15 @@ def check_share_receipt(shared, transfer, package, expected_members, *, source_h
     native_url = Path(transfer.get('whole_package_url', ''))
     representation = transfer.get('representation')
     phase = transfer.get('share_phase')
-    valid_representation = (representation == 'file' and phase == 'share' and transfer.get('type_identifier') == 'com.apple.live-photo'
+    native = transfer.get('native_bundle_facts')
+    native = native if isinstance(native, dict) else {}
+    native_type = native.get('url_content_type')
+    registered = native.get('contents_provider_registered_types')
+    native_file_type = (isinstance(native_type, str) and bool(native_type)
+                        and isinstance(registered, list) and all(isinstance(value, str) for value in registered)
+                        and native_type in registered and transfer.get('type_identifier') == native_type
+                        and native.get('package_is_directory') is True and native.get('package_is_package') is True)
+    valid_representation = (representation == 'file' and phase == 'share' and native_file_type
                             or representation == 'whole-package-url' and phase == 'share-url')
     if (not valid_representation or transfer.get('is_in_place') is not False
             or shared.get('share_phase') != phase

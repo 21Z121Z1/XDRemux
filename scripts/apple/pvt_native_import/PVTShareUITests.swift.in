@@ -45,21 +45,6 @@ final class PVTShareUITests: XCTestCase {
             while buttons.count == 0 && cells.count == 0 && Date() < deadline {
                 Thread.sleep(forTimeInterval: 0.2)
             }
-            // New share sheets can group Save Image under one More cell.
-            // Expand only that observed system group, then require the same
-            // singular Photos action and independent native readback as before.
-            if buttons.count == 0 && cells.count == 0 && phase != "share-control" {
-                let more = app.cells.matching(NSPredicate(format: "identifier == %@ AND label IN %@",
-                                                         "shareCell", ["More", "更多"]))
-                print("PVT_SHARE_UI_MORE: phase=\(phase) candidates=\(more.count)")
-                if more.count == 1 {
-                    more.firstMatch.tap()
-                    let expandedDeadline = Date().addingTimeInterval(15)
-                    while buttons.count == 0 && cells.count == 0 && Date() < expandedDeadline {
-                        Thread.sleep(forTimeInterval: 0.2)
-                    }
-                }
-            }
             let candidates = buttons.count > 0 ? buttons : cells
             observe(phase, "sheet_observed", saveCandidates: candidates.count)
             print("PVT_SHARE_UI_OBSERVATION: phase=\(phase) save_candidates=\(candidates.count)")
