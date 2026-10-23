@@ -160,15 +160,16 @@ class PVTNativeImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             work = Path(raw)
             bundle = "org.xdremux.audit.PVTReadback.u" + "a" * 32
-            project = probe.prepare_share_tests(source, work, bundle)
+            project = probe.prepare_share_tests(source, work, bundle, source_head='a' * 40)
             code = (project.parent / "PVTShareUITests.swift").read_text()
-            self.assertIn('XCUIApplication(bundleIdentifier: "' + bundle + '")', code)
+            self.assertIn('private let bundleIdentifier = "' + bundle + '"', code)
+            self.assertIn('private let sourceHead = "' + 'a' * 40 + '"', code)
             self.assertNotIn("@@BUNDLE_ID@@", code)
             self.assertTrue((project / "project.pbxproj").is_file())
             self.assertTrue((project / "xcshareddata/xcschemes/PVTShareUITests.xcscheme").is_file())
         with tempfile.TemporaryDirectory() as raw:
             with self.assertRaises(probe.Blocked):
-                probe.prepare_share_tests(source, Path(raw), "com.apple.mobileslideshow")
+                probe.prepare_share_tests(source, Path(raw), "com.apple.mobileslideshow", source_head='a' * 40)
 
     def baseline_and_after(self):
         return ({"status": "baseline", "asset_identifiers": ["stock"]},
