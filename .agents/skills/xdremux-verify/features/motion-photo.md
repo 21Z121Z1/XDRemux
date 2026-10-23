@@ -182,6 +182,16 @@ decomposed-member import or PhotoKit pair creation cannot substitute for these
 checks. Runtime, build, inventory, install, permission, save-action, readback and
 cleanup failures remain non-PASS under the probe's existing process budgets.
 
+The receipts keep preparation, readiness, XCTest setup/body, each share
+representation, the save callback and independent PhotoKit readback as separate
+observations bound to the source SHA and run session. New native events record
+monotonic elapsed time in their named process clock. An outer timeout preserves
+the last observed boundary and missing stages; it does not establish a hang,
+unsupported representation or Photos rejection. Archived text logs retain their
+missing clock boundaries. Cleanup records command outcomes and independent
+registry/directory absence separately. Both must pass for accepted cleanup;
+later absence observations link the original receipt hash and preserve its status.
+
 Retain the control and product `result.json` receipts and their diagnostics.
 Only the workflow's listed text diagnostics leave the runner; generated media
 and UI result bundles stay local. This checks the iOS simulator sharing path.

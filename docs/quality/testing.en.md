@@ -97,6 +97,14 @@ the same source SHA, runtime and device type. A passing control does not prove
 PVT admission. Admission requires whole-package identity and independent PhotoKit
 readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 
+PVT stage observations bind the source and session and retain monotonic times
+within each named process clock. Unstarted or timed-out stages leave admission
+unobserved. Cleanup command outcomes and independently observed resource absence
+are separate facts; later absence does not rewrite a failed or uncertain original
+receipt. Portable event and history replays establish harness reporting only.
+An owned run of the changed native runner is required for a runner-working claim;
+Photos admission still requires the complete save and independent readback path.
+
 Keep experiment commands and promotion criteria beside their code rather than
 creating a workflow per hypothesis. Product orientation readback runs inside
 `ci.yml` against the same exact SHA as the Rust product tests. It reads the
