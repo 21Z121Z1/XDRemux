@@ -254,10 +254,9 @@ pub fn reconstruct_relative_scene(
                 &adjustment,
                 (x, y),
                 (width, height),
-                display_p3_luminance(&base_sdr[n]).max(1e-8),
+                (display_p3_luminance(&base_sdr[n]).max(1e-8), hdr_y),
                 original_gain,
-                guidance_policy.limit_ev,
-                guidance_policy.detail_limit_ev,
+                (guidance_policy.limit_ev, guidance_policy.detail_limit_ev),
             );
             adjustment_square += (delta as f64).powi(2);
             maximum_adjustment = maximum_adjustment.max(delta.abs());
@@ -294,11 +293,12 @@ fn interpolate_adjustment(
     field: &crate::scene_guidance::GuidanceAdjustment,
     point: (usize, usize),
     geometry: (usize, usize),
-    primary_y: f32,
+    luminance: (f32, f32),
     original_gain: f32,
-    limit_ev: f32,
-    detail_limit_ev: f32,
+    limits: (f32, f32),
 ) -> f32 {
+    let (primary_y, hdr_y) = luminance;
+    let (limit_ev, detail_limit_ev) = limits;
     let (w, h) = (field.metrics.width, field.metrics.height);
     let fx = (point.0 as f32 + 0.5) * w as f32 / geometry.0 as f32 - 0.5;
     let fy = (point.1 as f32 + 0.5) * h as f32 / geometry.1 as f32 - 0.5;
@@ -315,6 +315,19 @@ fn interpolate_adjustment(
                 let distance = (x as f32 - fx).powi(2) + (y as f32 - fy).powi(2);
                 let q = (-0.5 * distance - 2. * range * range).exp();
                 sum += q * field.strength[i] * (delta - original_gain);
+                let relative = hdr_y / field.surface_hdr[i].max(1e-8);
+                // Preserve the background's original fine texture; reconstruct
+                // genuine stroke contrast with a monotone, spatially aligned
+                // curve instead of the thumbnail's blurred edge profile.
+                let a = ((relative.log2().abs() - 0.15) / 0.5).clamp(0., 1.);
+                let a = a * a * (3. - 2. * a);
+                let slope = if field.contrast[i] < 1. {
+                    field.contrast[i]
+                } else {
+                    1. + (field.contrast[i] - 1.) * a
+                };
+                let target = (1. + slope * (relative - 1.)).max(1e-6);
+                sum += q * field.detail[i] * (target / relative).log2();
                 weight += q;
                 detail += q * field.detail[i];
             }
@@ -342,6 +355,9 @@ mod tests {
             detail_threshold_ev: 0.1,
             detail_limit_ev: 1.5,
             minimum_gain_support: 0.9,
+            contrast_limit: 4.,
+            minimum_detail_correlation: 0.5,
+            maximum_detail_fit_error_ev: 0.1,
             edge_ev: 0.1,
             flat_ev: 0.075,
             limit_ev: 0.25,
@@ -643,6 +659,133 @@ mod tests {
         let stroke = display_p3_luminance(&result.pixels[124 * w + 184]);
         let background = display_p3_luminance(&result.pixels[124 * w + 180]);
         assert!(((stroke / background).log2() - 2.).abs() < 0.08);
+    }
+    #[test]
+    fn removing_stroke_rings_preserves_measured_hdr_contrast_in_both_directions() {
+        for foreground in [0.4f32, 2.] {
+            let (w, h, tw, th) = (512, 256, 256, 128);
+            let mut primary = vec![[0.2, 0.2, 0.2, 1.]; w * h];
+            let mut truth = primary.clone();
+            for x0 in [160, 184, 208, 232] {
+                for y in 110..138 {
+                    for x in x0..x0 + 4 {
+                        primary[y * w + x] = [0.8, 0.8, 0.8, 1.];
+                        truth[y * w + x] = [foreground, foreground, foreground, 1.];
+                    }
+                }
+            }
+            let thumbnail = area_luminance(&truth, w, h, tw, th)
+                .iter()
+                .map(|v| {
+                    let c = encode(v * 0.5);
+                    [c, c, c, 1.]
+                })
+                .collect::<Vec<_>>();
+            let result = reconstruct_relative_scene(
+                &primary,
+                &primary,
+                &primary,
+                (w, h),
+                &thumbnail,
+                (tw, th),
+                policy(),
+            )
+            .unwrap();
+            let core = display_p3_luminance(&result.pixels[124 * w + 185]);
+            let background = display_p3_luminance(&result.pixels[124 * w + 180]);
+            assert!(
+                (core / foreground).log2().abs() < 0.08,
+                "foreground {foreground} -> {core}"
+            );
+            assert!(
+                (background / 0.2).log2().abs() < 0.02,
+                "background ring {background}"
+            );
+            assert!(((core / background).log2() - (foreground / 0.2).log2()).abs() < 0.1);
+        }
+    }
+    #[test]
+    fn detail_repair_rejects_displaced_or_reversed_structures() {
+        let (w, h) = (256, 128);
+        let mut primary = vec![[0.2, 0.2, 0.2, 1.]; w * h];
+        for y in 50..78 {
+            for x in 110..114 {
+                primary[y * w + x] = [0.8, 0.8, 0.8, 1.];
+            }
+        }
+        for reversed in [false, true] {
+            let mut scene = vec![0.2; w * h];
+            for y in 50..78 {
+                for x in if reversed { 110..114 } else { 126..130 } {
+                    scene[y * w + x] = if reversed { 0.05 } else { 0.8 };
+                }
+            }
+            let field = crate::scene_guidance::adjustment(
+                &primary.iter().map(|p| p[0]).collect::<Vec<_>>(),
+                &scene,
+                &primary.iter().map(|p| p[0]).collect::<Vec<_>>(),
+                (w, h),
+                0.,
+                policy(),
+            )
+            .unwrap();
+            assert_eq!(field.metrics.detail_fraction, 0., "reversed {reversed}");
+        }
+    }
+    #[test]
+    fn consistent_gradient_texture_and_small_highlights_are_not_rewritten() {
+        let (w, h, tw, th) = (256usize, 128usize, 128, 64);
+        let primary = (0..w * h)
+            .map(|i| {
+                let (x, y) = (i % w, i / w);
+                let gradient = 0.02 * 2f32.powf(x as f32 / 48.);
+                let v = if x.abs_diff(190) < 2 && y.abs_diff(60) < 2 {
+                    3.
+                } else if x > 128 && y > 80 {
+                    gradient * if (x + y) % 2 == 0 { 1.3 } else { 0.7 }
+                } else {
+                    gradient
+                };
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let thumbnail = area_luminance(&primary, w, h, tw, th)
+            .iter()
+            .map(|v| {
+                let c = encode(v * 0.5);
+                [c, c, c, 1.]
+            })
+            .collect::<Vec<_>>();
+        let result = reconstruct_relative_scene(
+            &primary,
+            &primary,
+            &primary,
+            (w, h),
+            &thumbnail,
+            (tw, th),
+            policy(),
+        )
+        .unwrap();
+        for (actual, expected) in result.pixels.iter().zip(&primary) {
+            assert!((actual[0] / expected[0]).log2().abs() < 0.002);
+        }
+    }
+    #[test]
+    fn dense_texture_without_a_flat_donor_gets_no_guidance_repair() {
+        let (w, h) = (128, 64);
+        let base = (0..w * h)
+            .map(|i| if (i % w + i / w) % 2 == 0 { 0.1 } else { 0.4 })
+            .collect::<Vec<_>>();
+        let scene = base
+            .iter()
+            .enumerate()
+            .map(|(i, v)| v * 2f32.powf(0.12 * (i % w) as f32 / 128.))
+            .collect::<Vec<_>>();
+        let field =
+            crate::scene_guidance::adjustment(&base, &scene, &base, (w, h), 0., policy()).unwrap();
+        assert_eq!(field.metrics.regions, 0);
+        assert_eq!(field.metrics.detail_fraction, 0.);
+        assert!(field.strength.iter().all(|s| *s == 0.));
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {

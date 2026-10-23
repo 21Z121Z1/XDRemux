@@ -16,6 +16,9 @@ pub struct SceneGuidancePolicy {
     pub detail_threshold_ev: f32,
     pub detail_limit_ev: f32,
     pub minimum_gain_support: f32,
+    pub contrast_limit: f32,
+    pub minimum_detail_correlation: f32,
+    pub maximum_detail_fit_error_ev: f32,
 }
 
 #[derive(Debug)]
@@ -25,6 +28,8 @@ pub struct SceneGuidanceMetrics {
     pub regions: usize,
     pub region_fraction: f32,
     pub detail_fraction: f32,
+    pub detail_seed_candidates: usize,
+    pub detail_seed_accepted: usize,
     pub adjustment_rms_ev: f32,
     pub maximum_adjustment_ev: f32,
 }
@@ -33,6 +38,8 @@ pub(super) struct GuidanceAdjustment {
     pub values: Vec<Option<f32>>,
     pub strength: Vec<f32>,
     pub detail: Vec<f32>,
+    pub surface_hdr: Vec<f32>,
+    pub contrast: Vec<f32>,
     pub guide: Vec<f32>,
     pub metrics: SceneGuidanceMetrics,
 }
@@ -61,6 +68,12 @@ pub(super) fn validate(policy: SceneGuidancePolicy) -> Result<()> {
         || !(0.25..=2.).contains(&policy.detail_limit_ev)
         || !policy.minimum_gain_support.is_finite()
         || !(0.75..=1.).contains(&policy.minimum_gain_support)
+        || !policy.contrast_limit.is_finite()
+        || !(1.0..=8.0).contains(&policy.contrast_limit)
+        || !policy.minimum_detail_correlation.is_finite()
+        || !(0.25..=0.95).contains(&policy.minimum_detail_correlation)
+        || !policy.maximum_detail_fit_error_ev.is_finite()
+        || !(0.01..=0.2).contains(&policy.maximum_detail_fit_error_ev)
         || policy.detail_limit_ev < policy.limit_ev
     {
         return Err(invalid("unsupported stabilization policy"));
@@ -89,6 +102,117 @@ fn area(input: &[f32], w: usize, h: usize, aw: usize, ah: usize) -> Vec<f32> {
         }
     }
     output
+}
+
+struct DetailModel {
+    slope: f32,
+    intercept: f32,
+    error_ev: f32,
+}
+
+// Account for a small unknown thumbnail blur before estimating contrast.
+// Fitting alternate pixels and checking the rest rejects unrelated structure;
+// no shifted model is searched, so registration errors do not become a fit.
+fn detail_model(
+    primary: &[Vec<f32>],
+    scene: &[f32],
+    valid: &[bool],
+    geometry: (usize, usize),
+    point: (usize, usize),
+    radius: usize,
+    policy: SceneGuidancePolicy,
+) -> Option<DetailModel> {
+    let (w, h) = geometry;
+    let (x, y) = point;
+    let mut best: Option<DetailModel> = None;
+    for plane in primary {
+        let (mut n, mut sx, mut sy, mut sxx, mut syy, mut sxy) = (0f64, 0., 0., 0., 0., 0.);
+        let mut total = 0;
+        let mut supported = 0;
+        for j in y.saturating_sub(radius)..=(y + radius).min(h - 1) {
+            for k in x.saturating_sub(radius)..=(x + radius).min(w - 1) {
+                total += 1;
+                let i = j * w + k;
+                if !valid[i] {
+                    continue;
+                }
+                supported += 1;
+                if (j + k) % 2 != 0 {
+                    continue;
+                }
+                let a = plane[i] as f64;
+                let b = scene[i] as f64;
+                n += 1.;
+                sx += a;
+                sy += b;
+                sxx += a * a;
+                syy += b * b;
+                sxy += a * b;
+            }
+        }
+        if n < 8. || supported as f32 / (total as f32) < policy.minimum_gain_support {
+            continue;
+        }
+        let vx = (sxx / n - (sx / n).powi(2)).max(0.);
+        let vy = (syy / n - (sy / n).powi(2)).max(0.);
+        let covariance = sxy / n - sx * sy / (n * n);
+        if vx <= (sx / n * 0.02).powi(2)
+            || vy <= 0.
+            || covariance <= 0.
+            || covariance * covariance
+                < vx * vy * (policy.minimum_detail_correlation as f64).powi(2)
+        {
+            continue;
+        }
+        let slope = covariance / vx;
+        let intercept = (sy - slope * sx) / n;
+        let (mut count, mut error) = (0, 0.);
+        for j in y.saturating_sub(radius)..=(y + radius).min(h - 1) {
+            for k in x.saturating_sub(radius)..=(x + radius).min(w - 1) {
+                let i = j * w + k;
+                if !valid[i] || (j + k) % 2 == 0 {
+                    continue;
+                }
+                let predicted = slope * plane[i] as f64 + intercept;
+                if predicted <= 0. {
+                    error = f64::INFINITY;
+                } else {
+                    error += (predicted / scene[i] as f64).log2().powi(2);
+                }
+                count += 1;
+            }
+        }
+        let error_ev = (error / count.max(1) as f64).sqrt() as f32;
+        if count >= 8
+            && error_ev <= policy.maximum_detail_fit_error_ev
+            && best.as_ref().is_none_or(|m| error_ev < m.error_ev)
+        {
+            best = Some(DetailModel {
+                slope: slope as f32,
+                intercept: intercept as f32,
+                error_ev,
+            });
+        }
+    }
+    best
+}
+
+fn blur_primary(input: &[f32], valid: &[bool], w: usize, h: usize, radius: usize) -> Vec<f32> {
+    (0..input.len())
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            let (mut sum, mut n) = (0f64, 0);
+            for j in y.saturating_sub(radius)..=(y + radius).min(h - 1) {
+                for k in x.saturating_sub(radius)..=(x + radius).min(w - 1) {
+                    if valid[j * w + k] {
+                        sum += input[j * w + k] as f64;
+                        n += 1;
+                    }
+                }
+            }
+            (sum / n.max(1) as f64) as f32
+        })
+        .collect()
 }
 
 struct Region {
@@ -224,6 +348,7 @@ pub(super) fn adjustment(
             }
         })
         .collect::<Vec<_>>();
+    let exposure_gain = exposure_ev.exp2() as f64;
     let relative = aw.max(ah) as f32 / policy.analysis_edge as f32;
     let neighborhood = (4. * relative).round().max(1.) as usize;
     let minimum = (policy.minimum_region_pixels as f32 * relative * relative)
@@ -376,6 +501,7 @@ pub(super) fn adjustment(
     // A median surface guide removes thin strokes but keeps broad step edges.
     // It detects undersampled structure; it never replaces the primary pixels.
     let mut surface = log.clone();
+    let mut surface_hdr = primary.clone();
     let mut small = vec![false; data.len()];
     let mut samples = Vec::new();
     for y in 0..ah {
@@ -395,9 +521,79 @@ pub(super) fn adjustment(
             samples.sort_unstable_by(f32::total_cmp);
             surface[i] = samples[samples.len() / 2];
             small[i] = (log[i] - surface[i]).abs() > policy.detail_threshold_ev;
+            samples.clear();
+            for j in y.saturating_sub(detail_radius)..=(y + detail_radius).min(ah - 1) {
+                for k in x.saturating_sub(detail_radius)..=(x + detail_radius).min(aw - 1) {
+                    if valid[j * aw + k] {
+                        samples.push(primary[j * aw + k]);
+                    }
+                }
+            }
+            samples.sort_unstable_by(f32::total_cmp);
+            surface_hdr[i] = samples[samples.len() / 2];
         }
     }
+    let primary_models = vec![
+        primary.clone(),
+        blur_primary(&primary, &valid, aw, ah, 1),
+        blur_primary(&primary, &valid, aw, ah, 2),
+    ];
+    let scene_scaled = scene
+        .iter()
+        .map(|v| (*v as f64 * exposure_gain) as f32)
+        .collect::<Vec<_>>();
+    let detail_seed_candidates = small.iter().filter(|v| **v).count();
+    let mut seeds = vec![None; data.len()];
+    for y in 0..ah {
+        for x in 0..aw {
+            let i = y * aw + x;
+            if !small[i] {
+                continue;
+            }
+            let Some(model) = detail_model(
+                &primary_models,
+                &scene_scaled,
+                &valid,
+                (aw, ah),
+                (x, y),
+                detail_radius,
+                policy,
+            ) else {
+                continue;
+            };
+            let mut nearest = None;
+            let mut distance = usize::MAX;
+            for j in y.saturating_sub(merge)..=(y + merge).min(ah - 1) {
+                for k in x.saturating_sub(merge)..=(x + merge).min(aw - 1) {
+                    let Some(id) = owner[j * aw + k] else {
+                        continue;
+                    };
+                    let region = &regions[id];
+                    let gain = region.gain.exp2();
+                    let contrast = model.slope / gain;
+                    let anchor = model.slope * surface_hdr[i] + model.intercept;
+                    if surface[i] < region.lo - policy.edge_ev
+                        || surface[i] > region.hi + policy.edge_ev
+                        || !(1. / policy.contrast_limit..=policy.contrast_limit).contains(&contrast)
+                        || anchor <= 0.
+                        || (anchor / (surface_hdr[i] * gain)).log2().abs()
+                            > policy.maximum_detail_fit_error_ev
+                    {
+                        continue;
+                    }
+                    let d = x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2);
+                    if d < distance && d <= merge * merge {
+                        nearest = Some((id, contrast));
+                        distance = d;
+                    }
+                }
+            }
+            seeds[i] = nearest;
+        }
+    }
+    let detail_seed_accepted = seeds.iter().filter(|v| v.is_some()).count();
     let mut detail = vec![0.; data.len()];
+    let mut contrast = vec![1.; data.len()];
     for y in 0..ah {
         for x in 0..aw {
             let i = y * aw + x;
@@ -405,22 +601,11 @@ pub(super) fn adjustment(
                 continue;
             }
             let outer = detail_radius * 2;
+            let mut nearest = None;
             let mut distance = usize::MAX;
             for j in y.saturating_sub(outer)..=(y + outer).min(ah - 1) {
                 for k in x.saturating_sub(outer)..=(x + outer).min(aw - 1) {
-                    if small[j * aw + k] {
-                        distance = distance.min(x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2));
-                    }
-                }
-            }
-            if distance >= outer * outer {
-                continue;
-            }
-            let mut nearest = None;
-            let mut nearest_distance = usize::MAX;
-            for j in y.saturating_sub(merge)..=(y + merge).min(ah - 1) {
-                for k in x.saturating_sub(merge)..=(x + merge).min(aw - 1) {
-                    let Some(id) = owner[j * aw + k] else {
+                    let Some((id, c)) = seeds[j * aw + k] else {
                         continue;
                     };
                     let region = &regions[id];
@@ -430,18 +615,19 @@ pub(super) fn adjustment(
                         continue;
                     }
                     let d = x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2);
-                    if d < nearest_distance && d <= merge * merge {
-                        nearest = Some(id);
-                        nearest_distance = d;
+                    if d < distance && d < outer * outer {
+                        nearest = Some((id, c));
+                        distance = d;
                     }
                 }
             }
-            if let Some(id) = nearest {
+            if let Some((id, c)) = nearest {
                 let a = (2. - (distance as f32).sqrt() / detail_radius as f32).clamp(0., 1.);
                 let a = a * a * (3. - 2. * a);
                 values[i] = Some(regions[id].gain);
                 strength[i] = strength[i].max(a);
                 detail[i] = a;
+                contrast[i] = c;
             }
         }
     }
@@ -450,6 +636,8 @@ pub(super) fn adjustment(
         values,
         strength,
         detail,
+        surface_hdr,
+        contrast,
         guide,
         metrics: SceneGuidanceMetrics {
             width: aw,
@@ -457,6 +645,8 @@ pub(super) fn adjustment(
             regions: region_count,
             region_fraction,
             detail_fraction,
+            detail_seed_candidates,
+            detail_seed_accepted,
             adjustment_rms_ev: 0.,
             maximum_adjustment_ev: 0.,
         },

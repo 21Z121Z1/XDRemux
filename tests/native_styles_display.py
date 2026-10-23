@@ -53,14 +53,17 @@ def compare_luminance(a, b):
 
 
 def check_guidance(report):
-    assert report["algorithm"] == "embedded-styles-relative-scene-v4"
+    assert report["algorithm"] == "embedded-styles-relative-scene-v5"
     facts = report["scene"]["guidance_stabilization"]
-    assert facts["algorithm"] == "bounded-base-guided-region-gain-v3"
+    assert facts["algorithm"] == "bounded-base-guided-region-gain-v4"
     assert max(facts["width"], facts["height"]) <= 512
     assert facts["guide"] == "full-resolution linear SDR base"
     assert facts["regions"] >= 0 and 0 <= facts["region_fraction"] <= 1
     assert facts["limit_ev"] == .25 and facts["detail_limit_ev"] == 1.5
     assert 0 <= facts["detail_fraction"] <= 1
+    assert 0 <= facts["detail_seed_accepted"] <= facts["detail_seed_candidates"]
+    assert facts["minimum_detail_correlation"] == .5
+    assert abs(facts["maximum_detail_fit_error_ev"] - .1) < 1e-6
     assert 0 <= facts["maximum_adjustment_ev"] <= facts["detail_limit_ev"]
     assert 0 <= facts["adjustment_rms_ev"] <= facts["maximum_adjustment_ev"]
 
