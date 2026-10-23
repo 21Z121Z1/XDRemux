@@ -59,8 +59,13 @@ and validation of every published output through `xdremux validate`.
 `scripts/performance/check_performance_budget.py` requires current schema-v2
 reports with at least five completed measurements per workload. It recomputes
 median, p95 and peak RSS from the samples before applying the existing limits.
+It requires executable and Cargo.lock identities and an execution identity with
+host, CPU count and explicit hosted-run fields (null for an unrecorded local field).
+Live Photo samples retain both same-stem member identities and validations.
 Missing observations, inconsistent summaries, incomplete work, failed validation
 and a downgrade to a summary-only v1 current report fail the check.
+The workflow summary displays partial collection status, sample counts and errors
+when a failed workload has no completed summary statistics.
 
 Historical baseline files keep schema v1 and their original reference values.
 Use `--historical-replay` only to inspect archived v1 run reports under their

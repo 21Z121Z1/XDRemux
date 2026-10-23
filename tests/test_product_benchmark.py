@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest import mock
 
@@ -20,6 +21,26 @@ SPEC.loader.exec_module(BENCHMARK)
 
 
 class ProductBenchmarkTests(unittest.TestCase):
+    def test_workflow_summary_keeps_partial_failure_observable(self):
+        workflow = (ROOT / ".github/workflows/performance.yml").read_text()
+        block = workflow.split("if [[ -s artifacts/performance/product-benchmark.json ]]; then", 1)[1]
+        code = textwrap.dedent(block.split("\n", 2)[2].split("\n          PY", 1)[0])
+        report = {"status": "failed", "errors": [{"error": "command exited 7"}], "cases": [
+            {"name": "motion-heif", "status": "failed", "samples": [{"status": "failed"}],
+             "errors": [{"error": "command exited 7"}]},
+        ]}
+        with tempfile.TemporaryDirectory() as raw:
+            work = Path(raw)
+            path = work / "artifacts/performance/product-benchmark.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps(report))
+            result = subprocess.run([sys.executable, "-c", code], cwd=work,
+                                    text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("failed", result.stdout)
+        self.assertIn("command exited 7", result.stdout)
+        self.assertIn("0/1", result.stdout)
+
     def test_nonempty_invalid_output_fails_canonical_validation(self):
         with tempfile.TemporaryDirectory() as raw:
             work = Path(raw)

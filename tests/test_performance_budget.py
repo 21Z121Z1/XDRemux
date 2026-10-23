@@ -78,6 +78,11 @@ def benchmark(*, tiny_wall: float = 0.30, large_wall: float = 13.0,
         "machine": "arm64",
         "status": "complete", "errors": [], "iterations": 5, "warmup": 1,
         "cli_identity": {"bytes": 100, "sha256": "c" * 64},
+        "cargo_lock_identity": {"bytes": 100, "sha256": "e" * 64},
+        "apple_adapter": None, "adapter_identity": None,
+        "execution": {"id": "769b7995-2658-4b77-8783-fbb230145fd5", "host": "test-host",
+                      "logical_cpus": 4, "run_id": None, "run_attempt": None,
+                      "job": None, "runner": None},
         "source": {"head": HEAD, "tree": "d" * 40, "tracked_tree_clean": True},
         "cases": [
             measured_case("tiny", tiny_wall, max(0.31, tiny_wall + 0.01), 40),
@@ -271,6 +276,33 @@ class PerformanceBudgetTests(unittest.TestCase):
         current["errors"] = [{"case": "large", "error": "validation failed"}]
         result = self.run_checker(current, launches())
         self.assertEqual(result.returncode, 2)
+
+    def test_rejects_missing_dependency_and_execution_identity(self) -> None:
+        for field in ("cargo_lock_identity", "adapter_identity", "execution"):
+            with self.subTest(field=field):
+                current = benchmark()
+                current.pop(field)
+                self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+        for field, invalid in (("id", ""), ("host", ""), ("logical_cpus", 0),
+                               ("run_attempt", 1)):
+            with self.subTest(field=field):
+                current = benchmark()
+                current["execution"][field] = invalid
+                self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+        current = benchmark()
+        current["cases"][0]["apple"] = True
+        self.assertEqual(self.run_checker(current, launches()).returncode, 2)
+
+    def test_live_photo_requires_both_member_identities(self) -> None:
+        current = benchmark()
+        for sample in current["cases"][0]["samples"]:
+            output = sample["validation"]["outputs"][0]
+            output.update(relative_path="live.heic", kind="live-photo")
+            sample["validation"]["outputs"].append({**output, "relative_path": "live.mov"})
+        self.assertEqual(self.run_checker(current, launches()).returncode, 0)
+        for sample in current["cases"][0]["samples"]:
+            sample["validation"]["outputs"].pop()
+        self.assertEqual(self.run_checker(current, launches()).returncode, 2)
 
 
 if __name__ == "__main__":

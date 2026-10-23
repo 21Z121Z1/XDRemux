@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import statistics
 import sys
+import uuid
 from typing import Any
 
 
@@ -87,6 +88,28 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
     if iterations < 5:
         raise RuntimeError("current benchmark report requires at least five completed measurements")
     identity(report.get("cli_identity"), "CLI")
+    identity(report.get("cargo_lock_identity"), "Cargo.lock")
+    if "adapter_identity" not in report:
+        raise RuntimeError("current benchmark adapter identity is missing")
+    if report.get("apple_adapter") is not None or any(case.get("apple") for case in cases.values()):
+        identity(report["adapter_identity"], "Apple adapter")
+    elif report["adapter_identity"] is not None:
+        raise RuntimeError("Apple adapter identity has no measured adapter")
+    execution = report.get("execution")
+    if not isinstance(execution, dict):
+        raise RuntimeError("current benchmark execution identity is missing")
+    try:
+        uuid.UUID(execution.get("id", ""))
+    except (ValueError, TypeError, AttributeError) as error:
+        raise RuntimeError("current benchmark execution id must be a UUID") from error
+    if not isinstance(execution.get("host"), str) or not execution["host"].strip():
+        raise RuntimeError("current benchmark execution host is missing")
+    if not integer_count(execution.get("logical_cpus"), "execution logical_cpus"):
+        raise RuntimeError("execution logical_cpus must be positive")
+    for key in ("run_id", "run_attempt", "job", "runner"):
+        if key not in execution or (execution[key] is not None
+                and (not isinstance(execution[key], str) or not execution[key].strip())):
+            raise RuntimeError(f"execution {key} must record its value or explicit null")
     source = report.get("source")
     if (not isinstance(source, dict) or source.get("head") != report.get("head")
             or source.get("tracked_tree_clean") is not True
@@ -131,7 +154,15 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
                 if observed != required:
                     raise RuntimeError(f"{name}: {key} differs from completed workload")
             outputs = validation.get("outputs")
-            if not isinstance(outputs, list) or len(outputs) < expected:
+            if not isinstance(outputs, list) or not outputs or any(not isinstance(item, dict) for item in outputs):
+                raise RuntimeError(f"{name}: output validation is incomplete")
+            if any(item.get("kind") not in ("iso-hdr-heif", "live-photo") for item in outputs):
+                raise RuntimeError(f"{name}: canonical output validation did not pass")
+            kinds = {item["kind"] for item in outputs}
+            if len(kinds) != 1:
+                raise RuntimeError(f"{name}: output validation kinds disagree")
+            kind = next(iter(kinds))
+            if len(outputs) != expected * (2 if kind == "live-photo" else 1):
                 raise RuntimeError(f"{name}: output validation is incomplete")
             seen = set()
             for output in outputs:
@@ -142,6 +173,11 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
                 seen.add(path)
                 if output.get("valid") is not True or output.get("kind") not in ("iso-hdr-heif", "live-photo"):
                     raise RuntimeError(f"{name}: canonical output validation did not pass")
+            if kind == "live-photo":
+                stills = {Path(path) for path in seen if Path(path).suffix.lower() in (".heic", ".heif")}
+                movies = {Path(path) for path in seen if Path(path).suffix == ".mov"}
+                if len(stills) != expected or movies != {path.with_suffix(".mov") for path in stills}:
+                    raise RuntimeError(f"{name}: Live Photo member identities do not form complete pairs")
         expected_summary = {
             "median_wall_seconds": statistics.median(wall),
             "p95_wall_seconds": statistics.quantiles(wall, n=100, method="inclusive")[94],
