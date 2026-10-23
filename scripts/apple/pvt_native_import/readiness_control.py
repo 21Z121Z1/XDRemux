@@ -99,7 +99,6 @@ def run_control(run, choose_device, report, name, device_root):
 
 def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head):
     report.update(control_prewarms_core_simulator=True, product_probe_invocations=0,
-                  product_admission='unobserved',
                   experimental_condition='control may warm CoreSimulator/runtime; not a cold-start fix or fresh-VM claim')
     control = run_control(run, choose_device, report, control_name, device_root)
     if control['status'] != 'passed-cleaned':
@@ -121,7 +120,6 @@ def run_control_and_probe(run, choose_device, invoke_probe, report, control_name
                       product_native_status=native.get('status'), product_native_reason=native.get('reason'))
         report['product_observations'] = {key: native[key] for key in ('session_id', 'stage_observations', 'share_observations')
                                           if key in native}
-        report['product_admission'] = 'verified' if valid else 'unobserved'
     except (ReadinessBlocked, OSError, ValueError) as error:
         report.update(status='product-probe-not-accepted', reason=str(error))
 

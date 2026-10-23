@@ -238,6 +238,23 @@ class ReadinessControlTests(unittest.TestCase):
                 self.assertEqual(m.probes, 1)
                 self.assertEqual(m.report['status'], 'product-probe-not-accepted')
 
+    def test_product_cleanup_failure_preserves_verified_admission_observation(self):
+        with tempfile.TemporaryDirectory() as raw:
+            m = ControlModel(Path(raw))
+            observed = {'source_head': m.source_sha, 'session_id': 'owned-product-session',
+                        'admission': 'verified'}
+            def probe():
+                _, result = m.probe()
+                return 1, {**result, 'status': 'native-validation-passed-cleanup-failed',
+                           'cleanup_status': 'failed', 'stage_observations': observed}
+            m.execute(probe)
+            self.assertEqual(m.probes, 1)
+            self.assertEqual(m.report['product_probe_exit_code'], 1)
+            self.assertEqual(m.report['status'], 'product-probe-not-accepted')
+            self.assertEqual(m.report['product_result']['cleanup_status'], 'failed')
+            self.assertEqual(m.report['product_observations']['stage_observations'], observed)
+            self.assertNotIn('product_admission', m.report)
+
 
 if __name__ == '__main__':
     unittest.main()

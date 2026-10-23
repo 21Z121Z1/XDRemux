@@ -101,7 +101,9 @@ PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission
 unobserved. Cleanup command outcomes and independently observed resource absence
 are separate facts; later absence does not rewrite a failed or uncertain original
-receipt. Portable event and history replays establish harness reporting only.
+receipt. The control wrapper keeps overall acceptance in `status` and native
+facts in `product_observations`; a cleanup failure does not erase verified
+admission observations. Portable event and history replays establish harness reporting only.
 An owned run of the changed native runner is required for a runner-working claim;
 Photos admission still requires the complete save and independent readback path.
 
