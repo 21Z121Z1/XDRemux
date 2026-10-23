@@ -26,7 +26,9 @@ else:
 
 
 class Blocked(RuntimeError):
-    pass
+    def __init__(self, message, *, timed_out=False):
+        super().__init__(message)
+        self.timed_out = timed_out
 
 
 def sha(path):
@@ -237,13 +239,13 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
              'readiness_attempt_limit': 3, 'reconcile_attempt_limit': 3, 'install_timeout_seconds': 120}
     report['reader_installation'] = facts
 
-    def fail(status, reason):
+    def fail(status, reason, *, timed_out=False):
         facts['status'] = status
         try:
             capture_host_simulator_diagnostics(run, owned_udid, report)
         except (Blocked, OSError, ValueError) as error:
             facts['host_diagnostic_error'] = str(error)
-        raise Blocked(reason)
+        raise Blocked(reason, timed_out=timed_out)
 
     def inventory(attempt):
         name = f'install-readiness-{attempt}'
@@ -315,7 +317,8 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             if attempt < 3:
                 pause(1)
     if ready is None:
-        fail('installation-service-not-ready', 'owned simulator app-inventory service did not become readable; no installation attempted')
+        fail('installation-service-not-ready', 'owned simulator app-inventory service did not become readable; no installation attempted',
+             timed_out=report['commands'][-1].get('outcome') == 'uncertain-after-timeout')
     if bundle not in ready:
         facts['install_attempts'] = 1
         try:
@@ -354,7 +357,9 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             pause(1)
     status = ('not-verified-after-client-timeout' if facts.get('install_client_outcome') == 'uncertain-after-timeout'
               else 'registered-reader-not-verified')
-    fail(status, 'owned reader installation could not be verified; no second install or Photos admission assumed')
+    fail(status, 'owned reader installation could not be verified; no second install or Photos admission assumed',
+         timed_out=(facts.get('install_client_outcome') == 'uncertain-after-timeout'
+                    or report['commands'][-1].get('outcome') == 'uncertain-after-timeout'))
 
 
 def print_console_receipt(work, report):
@@ -548,7 +553,8 @@ def main():
                 record.update(run_owned_process(record['argv'], args.repo, work / (name + '.stdout'),
                                                 work / (name + '.stderr'), timeout=timeout, diagnostic_path=progress))
                 if record.get('outcome'):
-                    raise Blocked(f'{name}: {record["outcome"]}; owned process stages and stdout/stderr retained')
+                    raise Blocked(f'{name}: {record["outcome"]}; owned process stages and stdout/stderr retained',
+                                  timed_out=record['outcome'] == 'uncertain-after-timeout')
                 result = subprocess.CompletedProcess(record['argv'], record['exit_code'],
                     (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
             else:
@@ -565,7 +571,7 @@ def main():
             if isinstance(error, subprocess.TimeoutExpired):
                 (work / (name + '.stdout')).write_bytes(error.stdout or b'')
                 (work / (name + '.stderr')).write_bytes(error.stderr or b'')
-            raise Blocked(f'{name}: {error}') from error
+            raise Blocked(f'{name}: {error}', timed_out=isinstance(error, subprocess.TimeoutExpired)) from error
         finally:
             record['duration_seconds'] = time.monotonic() - started
 
@@ -586,7 +592,7 @@ def main():
         while not path.is_file() and time.monotonic() < deadline:
             time.sleep(0.2)
         if not path.is_file():
-            raise Blocked('PhotoKit report timeout; no authorization or readback success assumed')
+            raise Blocked('PhotoKit report timeout; no authorization or readback success assumed', timed_out=True)
         shutil.copy2(path, work / (phase + '.json'))
         value = json.loads(path.read_text())
         check_reader_observation(value, source_head=args.expected_head, session_id=session_id, phase=phase)
@@ -739,7 +745,8 @@ def main():
                     report['unavailable_save_readback_error'] = str(error)
                 raise Blocked('whole-package URL and live-photo provider expose no identifiable Photos save activity; native import remains unaccepted')
             if record.get('outcome') or record['exit_code']:
-                raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])))
+                raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])),
+                              timed_out=record.get('outcome') == 'uncertain-after-timeout')
             if (record['stage_observations']['format'] != 'structured-events'
                     or any(record['stage_observations']['phases'][phase]['state'] != 'completed'
                            for phase in ('test_setup', 'test_body', 'save_callback'))):
@@ -789,11 +796,12 @@ def main():
     except Blocked as error:
         report['status'] = 'blocked'
         report['reason'] = str(error)
+        stages.stop_active(timed_out=error.timed_out)
     except Exception as error:
         report['status'] = 'probe-error'
         report['reason'] = repr(error)
     finally:
-        stages.stop_active(timed_out=any(row.get('outcome') == 'uncertain-after-timeout' for row in report['commands']))
+        stages.stop_active()
         observe_media_preservation(report, motion, package)
         if report['status'].endswith('-pass') and (report.get('synthetic_input_unchanged') is not True or report.get('package_bytes_unchanged') is not True):
             report['status'] = 'native-validation-passed-source-preservation-failed'

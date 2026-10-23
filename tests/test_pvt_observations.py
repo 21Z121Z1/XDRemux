@@ -1,11 +1,14 @@
 """PVT harness facts; synthetic traces here do not establish Photos support."""
 import json
 import hashlib
+import ast
+import copy
 from pathlib import Path
 import sys
 import tempfile
 import unittest
 from unittest.mock import Mock
+from types import SimpleNamespace
 
 from scripts.apple.pvt_native_import import check_native_import as probe
 from scripts.apple.pvt_native_import.observations import check_reader_observation
@@ -24,6 +27,61 @@ def event(phase, boundary, elapsed, **facts):
 
 
 class PVTObservationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tree = ast.parse(Path(probe.__file__).read_text())
+        main = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'main')
+        outer = next(node for node in main.body if isinstance(node, ast.Try))
+        handler = next(node for node in outer.handlers if isinstance(node.type, ast.Name) and node.type.id == 'Blocked')
+        stop = next(node for node in outer.finalbody if isinstance(node, ast.Expr)
+                    and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute)
+                    and node.value.func.attr == 'stop_active')
+        cls.finish_code = compile(ast.fix_missing_locations(ast.Module(
+            body=copy.deepcopy([*handler.body, stop]), type_ignores=[])), probe.__file__, 'exec')
+        reader = next(node for node in main.body if isinstance(node, ast.FunctionDef) and node.name == 'read_report')
+        cls.reader_code = compile(ast.fix_missing_locations(ast.Module(
+            body=[copy.deepcopy(reader)], type_ignores=[])), probe.__file__, 'exec')
+
+    def finish_failure(self, stages, report, error):
+        exec(self.finish_code, {**vars(probe), 'stages': stages, 'report': report, 'error': error})
+
+    def test_photokit_poll_timeout_is_unknown_for_its_current_stage(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            stages = probe.PVTStages(HEAD, SESSION, ('baseline',))
+            report = {'commands': []}
+            clock = iter((0, 46))
+            def run(name, command):
+                report['commands'].append({'name': name, 'exit_code': 0})
+                return subprocess.CompletedProcess(command, 0, b'', b'')
+            namespace = {**vars(probe), 'stages': stages, 'report': report, 'run': run,
+                         'args': SimpleNamespace(expected_head=HEAD), 'session_id': SESSION,
+                         'owned_udid': 'owned', 'app_container': lambda *args: root, 'work': root,
+                         'time': SimpleNamespace(monotonic=lambda: next(clock), sleep=lambda _: None)}
+            exec(self.reader_code, namespace)
+            try:
+                namespace['read_report']('baseline', 'owned.bundle')
+            except probe.Blocked as error:
+                self.finish_failure(stages, report, error)
+            else:
+                self.fail('missing PhotoKit report must time out')
+            self.assertEqual(stages.facts['phases']['baseline']['state'], 'unknown_after_timeout')
+            self.assertEqual(stages.facts['admission'], 'unobserved')
+
+    def test_recovered_install_timeout_cannot_relabel_later_explicit_failure(self):
+        from tests.test_pvt_simulator_install import SimulatorInstallModel
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw), 'timeout-installed')
+            self.assertEqual(model.install()['status'], 'installed-verified-after-client-timeout')
+            stages = probe.PVTStages(HEAD, SESSION, ('readiness', 'baseline'))
+            stages.record('readiness', 'completed', 'reader_installed_and_photos_granted')
+            stages.record('baseline', 'started', 'photokit_launch_submitted')
+            stages.record('baseline', 'observed', 'photokit_report_received', native_status='denied')
+            self.finish_failure(stages, model.report, probe.Blocked('baseline is not authorized'))
+            self.assertEqual(stages.facts['phases']['readiness']['state'], 'completed')
+            self.assertEqual(stages.facts['phases']['baseline']['state'], 'blocked')
+            self.assertEqual(model.report['reader_installation']['install_client_outcome'], 'uncertain-after-timeout')
+
     def test_test_process_not_started_does_not_claim_setup_or_product_failure(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
