@@ -332,6 +332,7 @@ mod tests {
             primary_span_ev: 0.4,
             minimum_region_pixels: 64,
             feather_radius: 4,
+            merge_radius: 16,
             edge_ev: 0.1,
             flat_ev: 0.075,
             limit_ev: 0.25,
@@ -534,6 +535,48 @@ mod tests {
         let hi = display_p3_luminance(&result.pixels[32 * w + 16]);
         let lo = display_p3_luminance(&result.pixels[32 * w + 48]);
         assert!(((hi / lo).log2() - 1.5).abs() < 0.02);
+    }
+    #[test]
+    fn a_thin_rule_does_not_split_one_flat_surface_into_different_gain_plateaus() {
+        let (w, h) = (512usize, 256usize);
+        let primary = (0..w * h)
+            .map(|i| {
+                let v = if (i / w).abs_diff(128) <= 1 { 0.4 } else { 0.2 };
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let thumbnail = primary
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let wave = 0.1 * (std::f32::consts::TAU * (i % w) as f32 / 128.).sin()
+                    + if i / w < 128 { 0.04 } else { -0.04 };
+                let v = encode(p[0] * 0.5 * wave.exp2());
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let result = reconstruct_relative_scene(
+            &primary,
+            &primary,
+            &primary,
+            (w, h),
+            &thumbnail,
+            (w, h),
+            policy(),
+        )
+        .unwrap();
+        for x in 64..448 {
+            let upper = display_p3_luminance(&result.pixels[80 * w + x]);
+            let lower = display_p3_luminance(&result.pixels[176 * w + x]);
+            assert!(
+                (upper / lower).log2().abs() < 0.01,
+                "split plateau at {x}: {upper}/{lower}"
+            );
+        }
+        assert!(
+            display_p3_luminance(&result.pixels[128 * w + 128])
+                > display_p3_luminance(&result.pixels[120 * w + 128]) * 1.5
+        );
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {

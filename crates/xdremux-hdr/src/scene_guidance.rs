@@ -11,6 +11,7 @@ pub struct SceneGuidancePolicy {
     pub limit_ev: f32,
     pub minimum_region_pixels: usize,
     pub feather_radius: usize,
+    pub merge_radius: usize,
 }
 
 #[derive(Debug)]
@@ -46,6 +47,7 @@ pub(super) fn validate(policy: SceneGuidancePolicy) -> Result<()> {
         || !(0.01..=0.5).contains(&policy.limit_ev)
         || !(4..=4096).contains(&policy.minimum_region_pixels)
         || !(1..=8).contains(&policy.feather_radius)
+        || !(2..=24).contains(&policy.merge_radius)
     {
         return Err(invalid("unsupported stabilization policy"));
     }
@@ -79,6 +81,98 @@ struct Region {
     gain: f32,
     lo: f32,
     hi: f32,
+    gain_lo: f32,
+    gain_hi: f32,
+    sum: f64,
+    count: usize,
+}
+
+fn root(parent: &[usize], mut id: usize) -> usize {
+    while parent[id] != id {
+        id = parent[id];
+    }
+    id
+}
+
+// Thin text/rules can split one flat surface into several connected cores.
+// Share their plateau only when proximity, base tone and gain bounds agree.
+fn merge_regions(
+    owner: &mut [Option<usize>],
+    regions: &mut [Region],
+    data: &[Option<f32>],
+    geometry: (usize, usize),
+    radius: usize,
+    policy: SceneGuidancePolicy,
+) -> usize {
+    let (w, h) = geometry;
+    let mut parent = (0..regions.len()).collect::<Vec<_>>();
+    for y in 0..h {
+        for x in 0..w {
+            let Some(id) = owner[y * w + x] else {
+                continue;
+            };
+            for j in y.saturating_sub(radius)..=(y + radius).min(h - 1) {
+                for k in x.saturating_sub(radius)..=(x + radius).min(w - 1) {
+                    let Some(other) = owner[j * w + k] else {
+                        continue;
+                    };
+                    if other == id || x.abs_diff(k).pow(2) + y.abs_diff(j).pow(2) > radius * radius
+                    {
+                        continue;
+                    }
+                    let a = root(&parent, id);
+                    let b = root(&parent, other);
+                    if a == b {
+                        continue;
+                    }
+                    let ra = &regions[a];
+                    let rb = &regions[b];
+                    let lo = ra.lo.min(rb.lo);
+                    let hi = ra.hi.max(rb.hi);
+                    let gain_lo = ra.gain_lo.min(rb.gain_lo);
+                    let gain_hi = ra.gain_hi.max(rb.gain_hi);
+                    if hi - lo > policy.primary_span_ev
+                        || gain_hi - gain_lo > 2. * policy.limit_ev
+                        || (ra.sum / ra.count as f64 - rb.sum / rb.count as f64).abs()
+                            > policy.edge_ev as f64
+                    {
+                        continue;
+                    }
+                    let sum = ra.sum + rb.sum;
+                    let count = ra.count + rb.count;
+                    parent[b] = a;
+                    regions[a].lo = lo;
+                    regions[a].hi = hi;
+                    regions[a].gain_lo = gain_lo;
+                    regions[a].gain_hi = gain_hi;
+                    regions[a].sum = sum;
+                    regions[a].count = count;
+                }
+            }
+        }
+    }
+    let mut gains = vec![Vec::<f32>::new(); regions.len()];
+    for (i, id) in owner.iter_mut().enumerate() {
+        if let Some(old) = *id {
+            let new = root(&parent, old);
+            *id = Some(new);
+            gains[new].push(data[i].unwrap());
+        }
+    }
+    let mut count = 0;
+    for (id, values) in gains.iter_mut().enumerate() {
+        if values.is_empty() {
+            continue;
+        }
+        count += 1;
+        values.sort_unstable_by(f32::total_cmp);
+        let region = &mut regions[id];
+        region.gain = values[values.len() / 2].clamp(
+            region.gain_hi - policy.limit_ev,
+            (region.gain_lo + policy.limit_ev).max(region.gain_hi - policy.limit_ev),
+        );
+    }
+    count
 }
 
 pub(super) fn adjustment(
@@ -122,6 +216,7 @@ pub(super) fn adjustment(
         .ceil()
         .max(4.) as usize;
     let feather = (policy.feather_radius as f32 * relative).round().max(1.) as usize;
+    let merge = (policy.merge_radius as f32 * relative).round().max(2.) as usize;
     let mut flat = vec![false; data.len()];
     for y in 0..ah {
         for x in 0..aw {
@@ -197,11 +292,16 @@ pub(super) fn adjustment(
             gain: center,
             lo,
             hi,
+            gain_lo: gains[0],
+            gain_hi: gains[gains.len() - 1],
+            sum: queue.iter().map(|i| log[*i] as f64).sum(),
+            count: queue.len(),
         });
         for &i in &queue {
             owner[i] = Some(id);
         }
     }
+    let region_count = merge_regions(&mut owner, &mut regions, &data, (aw, ah), merge, policy);
     let region_fraction = owner.iter().filter(|v| v.is_some()).count() as f32 / data.len() as f32;
     let mut values = data.clone();
     let mut strength = vec![0.; data.len()];
@@ -249,7 +349,7 @@ pub(super) fn adjustment(
         metrics: SceneGuidanceMetrics {
             width: aw,
             height: ah,
-            regions: regions.len(),
+            regions: region_count,
             region_fraction,
             adjustment_rms_ev: 0.,
             maximum_adjustment_ev: 0.,
