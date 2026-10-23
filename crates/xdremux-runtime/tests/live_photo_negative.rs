@@ -95,8 +95,13 @@ fn second_member_failure_retains_partial_movie_and_complete_staged_pair() {
     retained_names.sort();
     assert_eq!(
         retained_names,
-        ["capture.heic", "capture.mov", "recovery.heic", "recovery.mov"]
-            .map(str::to_owned)
+        [
+            "capture.heic",
+            "capture.mov",
+            "recovery.heic",
+            "recovery.mov"
+        ]
+        .map(str::to_owned)
     );
     let recovery_image = staging.join("recovery.heic");
     let recovery_video = staging.join("recovery.mov");

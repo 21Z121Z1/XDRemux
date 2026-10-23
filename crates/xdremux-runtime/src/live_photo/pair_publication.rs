@@ -516,7 +516,8 @@ mod tests {
         let video = companion_video_path(&image);
         fs::write(&image, b"changed").unwrap();
         fs::write(&video, &pair.movie).unwrap();
-        let failure = readback_published(pair, staging, PublishedPair { image, video }).unwrap_err();
+        let failure =
+            readback_published(pair, staging, PublishedPair { image, video }).unwrap_err();
         assert!(failure.retained.as_ref().unwrap().recovery.is_err());
         let error = failure.into_runtime_error().to_string();
         assert!(error.contains("recovery-unverified"));
