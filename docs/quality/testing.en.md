@@ -93,7 +93,11 @@ It selects an iPhone that the chosen runtime explicitly supports and that meets
 the device type's runtime version bounds. An independent membership check runs
 before simulator creation. The product probe runs at most once, after the owned
 control simulator has passed and its deletion is verified. Its receipt must bind
-the same source SHA, runtime and device type. A passing control does not prove
+the same source SHA, runtime and device type. The control passes its exact pair
+as `--required-runtime` and `--required-device-type`; the product validates it
+against fresh catalogs without selecting a replacement. It checks the same pair
+again immediately before creation, after build and preparation work. A changed
+or incompatible pair blocks creation. A passing control does not prove
 PVT admission. Admission requires whole-package identity and independent PhotoKit
 readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 

@@ -70,7 +70,8 @@ class ControlModel:
     def assert_owned(self, argv):
         assert self.uuid in argv and self.foreign not in argv
 
-    def probe(self):
+    def probe(self, runtime=None, device=None):
+        assert (runtime, device) == (self.runtime, self.device)
         self.probes += 1
         self.assert_control_cleaned()
         assert self.report['status'] == 'product-probe-running'
@@ -120,7 +121,7 @@ class ReadinessControlTests(unittest.TestCase):
                     model.assert_control_cleaned()
                     receipt = root / 'product' / 'pvt-native-test' / 'result.json'
                     receipt.parent.mkdir()
-                    _, result = model.probe()
+                    _, result = model.probe(model.runtime, model.device)
                     receipt.write_text(json.dumps(result))
                     return subprocess.CompletedProcess(argv, 0)
                 def environment(run, choose, invoke, report, name, device_root, *, expected_head):
@@ -144,6 +145,8 @@ class ReadinessControlTests(unittest.TestCase):
                 self.assertEqual(command[command.index('--repo') + 1], str(repo))
                 self.assertEqual(command[command.index('--expected-head') + 1], expected)
                 self.assertEqual(command[command.index('--cli') + 1], str(repo / 'target/debug/xdremux'))
+                self.assertEqual(command[command.index('--required-runtime') + 1], model.runtime)
+                self.assertEqual(command[command.index('--required-device-type') + 1], model.device)
                 report = json.loads(next((root / 'control').glob('control-*/result.json')).read_text())
                 self.assertEqual(report['source'], facts)
                 self.assertEqual(report['expected_head'], expected)
@@ -232,8 +235,8 @@ class ReadinessControlTests(unittest.TestCase):
                                    ({'package_bytes_unchanged': False}, 0)]:
             with self.subTest(changes=changes), tempfile.TemporaryDirectory() as raw:
                 m = ControlModel(Path(raw))
-                def probe():
-                    code, result = m.probe(); return exit_code, {**result, **changes}
+                def probe(runtime, device):
+                    code, result = m.probe(runtime, device); return exit_code, {**result, **changes}
                 m.execute(probe)
                 self.assertEqual(m.probes, 1)
                 self.assertEqual(m.report['status'], 'product-probe-not-accepted')
@@ -243,8 +246,8 @@ class ReadinessControlTests(unittest.TestCase):
             m = ControlModel(Path(raw))
             observed = {'source_head': m.source_sha, 'session_id': 'owned-product-session',
                         'admission': 'verified'}
-            def probe():
-                _, result = m.probe()
+            def probe(runtime, device):
+                _, result = m.probe(runtime, device)
                 return 1, {**result, 'status': 'native-validation-passed-cleanup-failed',
                            'cleanup_status': 'failed', 'stage_observations': observed}
             m.execute(probe)

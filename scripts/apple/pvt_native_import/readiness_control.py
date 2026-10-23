@@ -106,7 +106,7 @@ def run_control_and_probe(run, choose_device, invoke_probe, report, control_name
         return
     report.update(product_probe_invocations=1, status='product-probe-running')
     try:
-        code, native = invoke_probe()
+        code, native = invoke_probe(control['selected_runtime'], control['selected_device_type'])
         report['product_probe_exit_code'] = code
         report['product_result'] = native
         if not isinstance(native, dict):
@@ -203,12 +203,13 @@ def main():
             return subprocess.CompletedProcess(argv, record['exit_code'],
                 (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
 
-        def invoke_probe():
+        def invoke_probe(runtime, device):
             save_report()
             args.product_output_root.mkdir(parents=True, exist_ok=False)
             command = [sys.executable, str(probe_path), '--repo', str(args.repo), '--cli',
                        str(args.repo / 'target/debug/xdremux'), '--expected-head', args.expected_head,
-                       '--output-root', str(args.product_output_root), '--execute-owned-simulator']
+                       '--output-root', str(args.product_output_root), '--execute-owned-simulator',
+                       '--required-runtime', runtime, '--required-device-type', device]
             report['product_command'] = command
             started = time.monotonic()
             with (work / 'product-probe.stdout').open('wb') as stdout, (work / 'product-probe.stderr').open('wb') as stderr:

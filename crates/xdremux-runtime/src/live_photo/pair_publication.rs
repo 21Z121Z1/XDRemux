@@ -91,6 +91,7 @@ enum ObservedFinalEntries {
 struct RetainedPair {
     staging: PathBuf,
     observed: ObservedFinalEntries,
+    recovery: Result<()>,
 }
 
 #[derive(Debug)]
@@ -115,13 +116,44 @@ impl PublicationFailure {
                     format!("{} and {}", pair.image.display(), pair.video.display())
                 }
             };
+            let recovery = match retained.recovery {
+                Ok(()) => {
+                    "independent checked recovery pair retained as recovery.heic and recovery.mov"
+                        .to_owned()
+                }
+                Err(error) => format!(
+                    "recovery-unverified: {error}; retained staging may share damaged final inodes"
+                ),
+            };
             self.cause.detail.push_str(&format!(
-                "; complete staged pair retained at {}; publication observed at {observed}; inspect both final entries before explicit recovery",
+                "; {recovery} at {}; publication observed at {observed}; inspect both final entries before explicit recovery",
                 retained.staging.display()
             ));
         }
         self.cause
     }
+}
+
+fn retain_for_recovery(
+    pair: &CheckedPair,
+    staging: tempfile::TempDir,
+    observed: ObservedFinalEntries,
+) -> Box<RetainedPair> {
+    // Publication hard-links capture.* to final entries. Never repair those
+    // names in place: doing so would also overwrite an observed final inode.
+    // New files retain the immutable checked buffers independently, and only a
+    // successful readback permits a complete-recovery claim.
+    let image = staging.path().join("recovery.heic");
+    let video = staging.path().join("recovery.mov");
+    let recovery = super::write_synced_new(&image, &pair.still)
+        .and_then(|()| super::write_synced_new(&video, &pair.movie))
+        .and_then(|()| verify_bytes(&image, &pair.still))
+        .and_then(|()| verify_bytes(&video, &pair.movie));
+    Box::new(RetainedPair {
+        staging: staging.keep(),
+        observed,
+        recovery,
+    })
 }
 
 fn verify_bytes(path: &Path, expected: &[u8]) -> Result<()> {
@@ -194,10 +226,11 @@ pub(super) fn publish(
         &published.video,
     ) {
         let retained = error.partial_output().map(|movie| {
-            Box::new(RetainedPair {
-                staging: staging.keep(),
-                observed: ObservedFinalEntries::Movie(movie.to_path_buf()),
-            })
+            retain_for_recovery(
+                &pair,
+                staging,
+                ObservedFinalEntries::Movie(movie.to_path_buf()),
+            )
         });
         return Err(PublicationFailure {
             cause: RuntimeError::external("Live Photo pair publication", error),
@@ -217,10 +250,11 @@ fn readback_published(
     {
         return Err(PublicationFailure {
             cause,
-            retained: Some(Box::new(RetainedPair {
-                staging: staging.keep(),
-                observed: ObservedFinalEntries::Pair(published),
-            })),
+            retained: Some(retain_for_recovery(
+                &pair,
+                staging,
+                ObservedFinalEntries::Pair(published),
+            )),
         });
     }
     Ok(published)
@@ -387,8 +421,9 @@ mod tests {
         let failure = publish(checked_fixture(), &image).unwrap_err();
         let retained = failure.retained.as_ref().unwrap();
         assert!(matches!(&retained.observed, ObservedFinalEntries::Movie(path) if path == &video));
-        let still = fs::read(retained.staging.join("capture.heic")).unwrap();
-        let movie = fs::read(retained.staging.join("capture.mov")).unwrap();
+        assert!(retained.recovery.is_ok());
+        let still = fs::read(retained.staging.join("recovery.heic")).unwrap();
+        let movie = fs::read(retained.staging.join("recovery.mov")).unwrap();
         assert_eq!(fs::read(&video).unwrap(), movie);
         let (_, _, source_movie, time) = fixture_pair();
         let recovered = publish(
@@ -403,7 +438,89 @@ mod tests {
         let error = failure.into_runtime_error();
         assert!(error
             .to_string()
-            .contains("complete staged pair retained at"));
+            .contains("independent checked recovery pair retained"));
         assert_eq!(fs::read(video).unwrap(), b"replacement final entry");
+    }
+
+    #[test]
+    fn in_place_hardlink_damage_retains_independent_checked_recovery_bytes() {
+        let directory = tempfile::tempdir().unwrap();
+        let staging = tempfile::tempdir_in(directory.path()).unwrap();
+        let pair = CheckedPair {
+            still: b"synthetic checked still".to_vec(),
+            movie: b"synthetic checked movie".to_vec(),
+        };
+        let expected_still = pair.still.clone();
+        let expected_movie = pair.movie.clone();
+        let staged_image = staging.path().join("capture.heic");
+        let staged_video = staging.path().join("capture.mov");
+        super::super::write_synced_new(&staged_image, &pair.still).unwrap();
+        super::super::write_synced_new(&staged_video, &pair.movie).unwrap();
+        let image = directory.path().join("capture.heic");
+        let video = companion_video_path(&image);
+        fs::hard_link(&staged_image, &image).unwrap();
+        fs::hard_link(&staged_video, &video).unwrap();
+        fs::write(&image, b"damaged still").unwrap();
+        fs::write(&video, b"damaged movie").unwrap();
+        assert_eq!(fs::read(&staged_image).unwrap(), b"damaged still");
+        assert_eq!(fs::read(&staged_video).unwrap(), b"damaged movie");
+        let failure = readback_published(
+            pair,
+            staging,
+            PublishedPair {
+                image: image.clone(),
+                video: video.clone(),
+            },
+        )
+        .unwrap_err();
+        let retained = failure.retained.as_ref().unwrap();
+        assert!(retained.recovery.is_ok());
+        assert_eq!(
+            fs::read(retained.staging.join("recovery.heic")).unwrap(),
+            expected_still
+        );
+        assert_eq!(
+            fs::read(retained.staging.join("recovery.mov")).unwrap(),
+            expected_movie
+        );
+        // Further changes to either published inode cannot damage recovery.
+        fs::write(&image, b"later still").unwrap();
+        fs::write(&video, b"later movie").unwrap();
+        assert_eq!(
+            fs::read(retained.staging.join("recovery.heic")).unwrap(),
+            expected_still
+        );
+        assert_eq!(
+            fs::read(retained.staging.join("recovery.mov")).unwrap(),
+            expected_movie
+        );
+        assert!(failure
+            .into_runtime_error()
+            .to_string()
+            .contains("independent checked recovery pair"));
+        assert_eq!(fs::read(image).unwrap(), b"later still");
+        assert_eq!(fs::read(video).unwrap(), b"later movie");
+    }
+
+    #[test]
+    fn failed_recovery_write_is_reported_unverified_without_overwriting_entries() {
+        let directory = tempfile::tempdir().unwrap();
+        let staging = tempfile::tempdir_in(directory.path()).unwrap();
+        let pair = CheckedPair {
+            still: b"still".to_vec(),
+            movie: b"movie".to_vec(),
+        };
+        let occupied = staging.path().join("recovery.heic");
+        fs::write(&occupied, b"existing recovery entry").unwrap();
+        let image = directory.path().join("capture.heic");
+        let video = companion_video_path(&image);
+        fs::write(&image, b"changed").unwrap();
+        fs::write(&video, &pair.movie).unwrap();
+        let failure = readback_published(pair, staging, PublishedPair { image, video }).unwrap_err();
+        assert!(failure.retained.as_ref().unwrap().recovery.is_err());
+        let error = failure.into_runtime_error().to_string();
+        assert!(error.contains("recovery-unverified"));
+        assert!(!error.contains("independent checked recovery pair"));
+        assert_eq!(fs::read(occupied).unwrap(), b"existing recovery entry");
     }
 }
