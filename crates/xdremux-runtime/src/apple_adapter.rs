@@ -18,6 +18,8 @@ use xdremux_format::FourCC;
 
 use crate::{Result, RuntimeError};
 
+pub(super) mod texture;
+
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -304,28 +306,6 @@ impl AppleAdapterClient {
 
     pub(super) fn supports_photographic_styles(&self) -> Result<bool> {
         Ok(self.capabilities()?.photographic_styles)
-    }
-
-    pub(super) fn texture_primitive(
-        &self,
-        operation: &str,
-        input: &Path,
-        output: &Path,
-        options: serde_json::Value,
-    ) -> Result<()> {
-        let request = serde_json::json!({
-            "schema_version": APPLE_ADAPTER_SCHEMA_VERSION,
-            "operation": operation,
-            "input_path": input_path(input)?,
-            "output_path": input_path(output)?,
-            "texture": options,
-        });
-        let bytes = serde_json::to_vec(&request)
-            .map_err(|error| RuntimeError::external("Texture adapter request", error))?;
-        let bytes = self.invoke(&bytes, APPLE_COMPUTE_TIMEOUT)?;
-        let response: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|error| RuntimeError::external("Texture adapter response", error))?;
-        validate_schema(response["schema_version"].as_u64().unwrap_or(0) as u32)
     }
 
     pub(super) fn generate_cinematic_envelope(
