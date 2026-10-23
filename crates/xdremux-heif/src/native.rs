@@ -2,10 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
-    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_irot_quarter_turns,
-    parse_ispe_dimensions, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE,
-    IPCO, IPMA, IPRP, IREF, MDAT, META,
+    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_meta_box, scan_top_level_boxes,
+    BoxHeader, IlocEntry, IlocExtent, IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta,
+    PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPMA, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
@@ -1323,6 +1322,7 @@ pub fn assemble_iso_gain_map_heif(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use xdremux_format::isobmff::{parse_irot_quarter_turns, parse_ispe_dimensions};
 
     #[test]
     fn portrait_tmap_uses_display_dimensions_without_repeating_primary_rotation() {
@@ -1368,14 +1368,14 @@ mod tests {
             });
         let tile = crate::GainMapTile {
             payload: &[1],
-            width: 4,
-            height: 4,
+            width: dimensions.0,
+            height: dimensions.1,
         };
         let gain = DirectHevcGainMap {
-            gain_map_width: 4,
-            gain_map_height: 4,
-            tile_width: 4,
-            tile_height: 4,
+            gain_map_width: dimensions.0,
+            gain_map_height: dimensions.1,
+            tile_width: dimensions.0,
+            tile_height: dimensions.1,
             tiles: std::slice::from_ref(&tile),
             hvcc: &[1],
             profile: crate::GainMapEncodeProfile {

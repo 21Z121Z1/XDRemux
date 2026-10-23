@@ -60,6 +60,7 @@ targets:
       - path: Sources
         excludes:
           - ContentView.swift
+          - HDRLookView.swift
           - PhotoCategorizationView.swift
           - VisualEffectView.swift
           - XDRemuxApp.swift
@@ -75,6 +76,7 @@ targets:
       - path: Sources
         excludes:
           - ContentView.swift
+          - HDRLookView.swift
           - PhotoCategorizationView.swift
           - PhotoCategorizationViewModel.swift
           - VisualEffectView.swift

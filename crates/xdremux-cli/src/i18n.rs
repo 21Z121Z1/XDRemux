@@ -95,6 +95,8 @@ fn about(name: &str) -> &'static str {
         "batch" => "以确定的顺序批量转换支持的资源。",
         "categorize" => "分类照片资源并发布到确定的目录中。",
         "validate" => "验证一个标准输出，不进行转换。",
+        "hdr-look" => "重新设计原始摄影风格照片的 HDR look，支持单张和文件夹（macOS）。",
+        "reconstruct-styles" => "使用内嵌摄影风格资源重建相对场景 HDR（macOS）。",
         _ => "",
     }
 }
@@ -102,6 +104,16 @@ fn about(name: &str) -> &'static str {
 fn description(command: &str, id: &str) -> Option<&'static str> {
     Some(match (command, id) {
         (_, "help") => "显示帮助信息",
+        ("hdr-look", "inputs") => "原始摄影风格 HEIC/HEIF 照片或目录，可指定多个路径。",
+        ("hdr-look", "output_dir") => "新的输出目录；省略时在首个输入旁新建 HDR-Look 目录。",
+        ("hdr-look", "headroom") => "HDR 显示余量：2、4 或 8，默认 8。",
+        ("hdr-look", "max_edge") => "处理与 Gain Map 长边；0 使用原始像素。",
+        ("hdr-look", "dry_run") => "只列出计划，不写入文件，也不调用原生适配器。",
+        ("hdr-look", "json") => "将结果写到标准输出，不保存报告或清单文件。",
+        ("reconstruct-styles", "inputs") => "原始摄影风格 HEIC/HEIF 照片，可重复指定。",
+        ("reconstruct-styles", "output_dir") => "研究输出目录，保留 HDR HEIC、EXR 和验证报告。",
+        ("reconstruct-styles", "max_edge") => "处理与 Gain Map 长边；0 使用原始像素。",
+        ("reconstruct-styles", "display_headroom") => "生成指定亮度余量的显示目标：2、4 或 8。",
         (_, "version") => "显示版本信息",
         (_, "lang") => "终端显示语言（en 或 zh-CN）；JSON 始终保持不变。",
         ("convert", "input") => "输入 ProXDR、Motion Photo，或搭配 --apple-cinematic 的普通视频。",

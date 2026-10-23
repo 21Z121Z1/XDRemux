@@ -12,13 +12,17 @@
 		17105CA4AA094A96D25AC071 /* RustCLIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7991F954B97C8C6059E2396D /* RustCLIClient.swift */; };
 		20FFE9400D3A7728B116293A /* RustCLIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7991F954B97C8C6059E2396D /* RustCLIClient.swift */; };
 		21E8B10752D98447E81C4EDE /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533B4F99005F2161735DB764 /* AppModels.swift */; };
+		2EF5B2271CDC113BB9D84B65 /* HDRLookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6BFFB7F1F9F8E5566A1DB3B /* HDRLookViewModel.swift */; };
 		352247840A9DE001C2383196 /* RustAppConversionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */; };
 		380978E0BA3FD18D9D246F58 /* RustAppConversionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */; };
+		389F7B056E1B78B62A4BF48F /* HDRLookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6BFFB7F1F9F8E5566A1DB3B /* HDRLookViewModel.swift */; };
 		4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B033306E4AE0A568C34EBB /* VisualEffectView.swift */; };
 		64707094865385A92093E856 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B735B3E26375EEF954008A /* ContentView.swift */; };
 		6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
 		730715CA1E3ED4981267A175 /* XDRemuxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */; };
 		7D5AF2A3C8D8CD5B3E4C16ED /* PhotoCategorizationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */; };
+		9378FC0CA549D0C787AEEDEE /* HDRLookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11654FCA48406D1FC8A40A5F /* HDRLookView.swift */; };
+		9D627151FB3A53A7A9CC83D0 /* HDRLookViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6BFFB7F1F9F8E5566A1DB3B /* HDRLookViewModel.swift */; };
 		A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */; };
 		AA8B69637B6501859D143F53 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C71CCE0438700ED958A717D9 /* Assets.xcassets */; };
 		BAF5DCC3B6AB918C96092168 /* PhotoCategorizationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */; };
@@ -34,6 +38,7 @@
 
 /* Begin PBXFileReference section */
 		02861545396D149E80797322 /* XDRemuxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxViewModel.swift; sourceTree = "<group>"; };
+		11654FCA48406D1FC8A40A5F /* HDRLookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDRLookView.swift; sourceTree = "<group>"; };
 		24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppModelTests.swift; sourceTree = "<group>"; };
 		33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XDRemuxApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppConversionSmoke.swift; sourceTree = "<group>"; };
@@ -47,6 +52,7 @@
 		8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppModelTests; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxApp.swift; sourceTree = "<group>"; };
 		C71CCE0438700ED958A717D9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D6BFFB7F1F9F8E5566A1DB3B /* HDRLookViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDRLookViewModel.swift; sourceTree = "<group>"; };
 		D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppConversionSmoke; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCategorizationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -87,6 +93,8 @@
 				533B4F99005F2161735DB764 /* AppModels.swift */,
 				4C894071433802A3CCD2584E /* AppStrings.swift */,
 				67B735B3E26375EEF954008A /* ContentView.swift */,
+				11654FCA48406D1FC8A40A5F /* HDRLookView.swift */,
+				D6BFFB7F1F9F8E5566A1DB3B /* HDRLookViewModel.swift */,
 				FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */,
 				84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */,
 				8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */,
@@ -230,6 +238,8 @@
 				D4F2AA7C7F6176104270BF09 /* AppModels.swift in Sources */,
 				E1116493F99381D29CD7E8D7 /* AppStrings.swift in Sources */,
 				64707094865385A92093E856 /* ContentView.swift in Sources */,
+				9378FC0CA549D0C787AEEDEE /* HDRLookView.swift in Sources */,
+				389F7B056E1B78B62A4BF48F /* HDRLookViewModel.swift in Sources */,
 				7D5AF2A3C8D8CD5B3E4C16ED /* PhotoCategorizationView.swift in Sources */,
 				BAF5DCC3B6AB918C96092168 /* PhotoCategorizationViewModel.swift in Sources */,
 				352247840A9DE001C2383196 /* RustAppConversionBridge.swift in Sources */,
@@ -246,6 +256,7 @@
 			files = (
 				F0B1FDD6D6EB6EAC9DE6CDDD /* AppModels.swift in Sources */,
 				FBAE381A260B401C292D7ABC /* AppStrings.swift in Sources */,
+				9D627151FB3A53A7A9CC83D0 /* HDRLookViewModel.swift in Sources */,
 				C135C4E6E7337935172B1AAC /* PhotoCategorizationViewModel.swift in Sources */,
 				130A8F3095B008F0E6EBBB5B /* RustAppConversionBridge.swift in Sources */,
 				20FFE9400D3A7728B116293A /* RustCLIClient.swift in Sources */,
@@ -260,6 +271,7 @@
 			files = (
 				21E8B10752D98447E81C4EDE /* AppModels.swift in Sources */,
 				FA8D86BD040C149938C2778B /* AppStrings.swift in Sources */,
+				2EF5B2271CDC113BB9D84B65 /* HDRLookViewModel.swift in Sources */,
 				380978E0BA3FD18D9D246F58 /* RustAppConversionBridge.swift in Sources */,
 				17105CA4AA094A96D25AC071 /* RustCLIClient.swift in Sources */,
 				A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */,
@@ -272,6 +284,7 @@
 		0842F78FE9009FC6A0F20304 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -284,7 +297,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxApp;
 				SDKROOT = macosx;
@@ -294,13 +306,13 @@
 		25519BD28AB27D8EDD9F3B68 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
 				SDKROOT = macosx;
@@ -310,6 +322,7 @@
 		271039D9B0886A4A6336D4DB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -322,7 +335,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxApp;
 				SDKROOT = macosx;
@@ -394,13 +406,13 @@
 		31FAB81F83E9413C6AF6C056 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
 				SDKROOT = macosx;
@@ -465,13 +477,13 @@
 		70CAD3FF2F9EA351ABCAECB0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
 				SDKROOT = macosx;
@@ -481,13 +493,13 @@
 		BDE0A282D57E3D8FDCB623CA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				ARCHS = arm64;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
 				SDKROOT = macosx;

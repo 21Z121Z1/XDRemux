@@ -18,6 +18,7 @@ The Swift package is only the Apple platform capability adapter, and the remaini
 | `inspect` | Inspect input type and important structure. |
 | `validate` | Validate ISO HDR HEIF or Live Photo output. |
 | `reconstruct-styles` | Reconstruct relative scene HDR from embedded Apple Styles data while preserving SDR (macOS). |
+| `hdr-look` | Generate HDR HEIC photos from original Styles photos or folders (macOS). |
 
 Show help with:
 
@@ -25,6 +26,32 @@ Show help with:
 xdremux --help
 xdremux convert --help
 ```
+
+## `hdr-look`
+
+```bash
+xdremux hdr-look '/path/to/photo.HEIC'
+xdremux hdr-look '/path/to/folder' --recursive --output-dir '/path/to/results'
+```
+
+Accepts multiple photo or folder paths. The default uses original pixels and
+8× headroom; `--headroom` accepts 2, 4 or 8. A new `HDR-Look-<id>` directory
+beside the first input is used unless `--output-dir` is supplied. The output
+contains only `.hdr-look.heic` photos, with path-derived suffixes to avoid
+same-name collisions. No report, manifest or EXR sidecar is retained. Results
+and failures are displayed in the terminal; `--json` emits them to stdout.
+`--dry-run` lists inputs and destinations without native calls or file writes.
+
+Originals and existing destinations are preserved. Folder discovery skips
+symlinks and generated HDR-look files. A failed photo does not stop the batch;
+any failure produces a nonzero exit status. Requires supported embedded Styles
+data, Apple Silicon and macOS 27 or newer. Missing data fails explicitly. The
+macOS app's **摄影风格 HDR** workspace uses this same command for photo/folder
+selection, headroom and output-directory choices.
+
+See [Styles HDR reconstruction](styles-reconstruction.en.md) for algorithm and
+native-readback limits. The separate research command below retains its full
+intermediate outputs.
 
 ## `reconstruct-styles`
 

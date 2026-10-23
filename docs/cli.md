@@ -18,6 +18,7 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 | `inspect` | 检查输入类型和关键结构。 |
 | `validate` | 验证 ISO HDR HEIF 或 Live Photo 输出。 |
 | `reconstruct-styles` | 保留 SDR，使用内嵌 Apple Styles 数据重建相对场景 HDR（macOS）。 |
+| `hdr-look` | 从原始摄影风格照片或文件夹生成 HDR HEIC 照片（macOS）。 |
 
 运行帮助：
 
@@ -25,6 +26,29 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 xdremux --help
 xdremux convert --help
 ```
+
+## `hdr-look`
+
+```bash
+xdremux hdr-look '/path/to/photo.HEIC'
+xdremux hdr-look '/path/to/folder' --recursive --output-dir '/path/to/results'
+```
+
+接受多个照片或文件夹路径。默认保留原图尺寸，使用 8× HDR 亮度余量；
+`--headroom` 支持 2、4、8。不指定 `--output-dir` 时，在首个输入旁创建新的
+`HDR-Look-<id>` 文件夹。输出仅有 `.hdr-look.heic` 照片，文件名包含根据源路径
+生成的后缀，避免不同文件夹内的同名照片冲突。不保留报告、清单或 EXR。
+完成和失败信息显示在终端；`--json` 仅向标准输出返回结果。
+`--dry-run` 只列出输入与目标，不调用原生处理，也不写文件。
+
+保留原图和已有目标文件。扫描文件夹时跳过符号链接和已生成的 HDR-look 文件。
+某张失败后继续处理其余照片；任何失败都会返回非零退出码。输入需包含受支持的
+摄影风格内嵌数据，并要求 Apple Silicon、macOS 27 或更新版本；缺少数据会明确
+报错。macOS 应用的 **摄影风格 HDR** 工作区使用同一命令，提供照片／文件夹选择、
+HDR 亮度余量与输出目录设置。
+
+算法与原生回读边界见[摄影风格 HDR 重建](styles-reconstruction.md)。
+下方独立研究命令仍保留完整中间结果。
 
 ## `reconstruct-styles`
 

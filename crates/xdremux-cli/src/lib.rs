@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod categorize;
+mod hdr_look;
 mod i18n;
 mod reconstruct_styles;
 mod validate;
@@ -38,6 +39,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum RootCommand {
+    /// Redesign the HDR look of original Photographic Styles photos or a directory (macOS).
+    HdrLook(hdr_look::HdrLookArgs),
     /// Reconstruct relative scene HDR using a photo's embedded Photographic Styles resources (macOS).
     ReconstructStyles(reconstruct_styles::ReconstructStylesArgs),
     /// Inspect one input without converting it.
@@ -1361,6 +1364,7 @@ where
     };
     let language = cli.lang.unwrap_or(language);
     match cli.command {
+        RootCommand::HdrLook(arguments) => hdr_look::run(language, arguments, stdout, stderr),
         RootCommand::ReconstructStyles(arguments) => {
             reconstruct_styles::run(arguments, stdout, stderr)
         }
