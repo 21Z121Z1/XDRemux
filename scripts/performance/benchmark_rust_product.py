@@ -263,6 +263,7 @@ def validate_outputs(case: Case, cli: Path, work: Path, stdout: str,
     assert_outputs(work, case.expected)
     expected = len(case.inputs)
     receipt = None
+    bindings = []
     if case.args[0] == "batch":
         try:
             receipt = json.loads(stdout)
@@ -277,7 +278,9 @@ def validate_outputs(case: Case, cli: Path, work: Path, stdout: str,
         successes = receipt.get("successes")
         if not isinstance(successes, list) or len(successes) != expected or receipt.get("failures") != []:
             raise RuntimeError("batch benchmark did not complete every requested input")
-        inputs = {str(path.resolve()) for path in case.inputs}
+        inputs = {str(path.resolve(strict=True)): path for path in case.inputs}
+        if len(inputs) != expected:
+            raise RuntimeError("batch benchmark input identities are duplicated")
         observed = set()
         outputs = []
         for success in successes:
@@ -286,14 +289,22 @@ def validate_outputs(case: Case, cli: Path, work: Path, stdout: str,
             source = success.get("input")
             if not isinstance(source, str):
                 raise RuntimeError("batch benchmark input receipt is missing")
-            canonical = str(Path(source).resolve())
+            canonical = str(Path(source).resolve(strict=True))
             if canonical not in inputs or canonical in observed:
                 raise RuntimeError("batch benchmark input receipt is missing or duplicated")
             observed.add(canonical)
             names = success.get("outputs")
             if not isinstance(names, list) or len(names) != 1 or not isinstance(names[0], str):
                 raise RuntimeError("batch benchmark must publish one HDR output for each input")
-            outputs.append(Path(names[0]))
+            output = Path(names[0]).resolve(strict=True)
+            if not output.is_relative_to(work.resolve(strict=True)) or output in outputs:
+                raise RuntimeError("benchmark output is duplicated or outside its owned directory")
+            outputs.append(output)
+            # Preserve the raw receipt, and bind its aliases while the source and
+            # output still exist on this runner. Offline checks cannot resolve them.
+            bindings.append({"receipt_input": source, "receipt_output": names[0],
+                             "input": file_identity(inputs[canonical]),
+                             "output": file_identity(output)})
     else:
         outputs = [work / name for name in case.expected]
     validations = []
@@ -320,12 +331,19 @@ def validate_outputs(case: Case, cli: Path, work: Path, stdout: str,
             raise RuntimeError(f"canonical validation failed for {output.name}: {result.stdout} {result.stderr}")
         if file_identity(output) != before:
             raise RuntimeError(f"canonical validation changed {output.name}")
+        if receipt is not None:
+            binding = bindings[len(validations)]
+            details = report.get("details")
+            value = details.get("value") if isinstance(details, dict) else None
+            if (binding["output"] != before or not isinstance(value, dict)
+                    or value.get("input") != str(output)):
+                raise RuntimeError("batch canonical validation does not bind the measured output")
         validations.append({"relative_path": str(output.relative_to(work.resolve())),
                             "bytes": before["bytes"], "sha256": before["sha256"],
                             "valid": True, "kind": report["kind"], "report": report})
     return {"expected_work": expected, "completed_work": expected, "failed_work": 0,
             "skipped_work": 0, "outputs": validations,
-            **({"batch_receipt": receipt} if receipt is not None else {})}
+            **({"batch_receipt": receipt, "batch_bindings": bindings} if receipt is not None else {})}
 
 
 def measure_case(

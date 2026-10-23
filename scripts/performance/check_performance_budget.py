@@ -120,7 +120,7 @@ def canonical_output(output: dict[str, Any], kind: str, name: str) -> str:
 
 
 def batch_receipt(validation: dict[str, Any], inputs: list[dict[str, Any]],
-                  paths: set[str], expected: int, name: str) -> None:
+                  paths: dict[str, dict[str, Any]], expected: int, name: str) -> None:
     receipt = validation.get("batch_receipt")
     if not isinstance(receipt, dict) or receipt.get("command") != "batch":
         raise RuntimeError(f"{name}: batch receipt is missing")
@@ -132,18 +132,40 @@ def batch_receipt(validation: dict[str, Any], inputs: list[dict[str, Any]],
     if (not isinstance(successes, list) or len(successes) != expected
             or receipt.get("failures") != []):
         raise RuntimeError(f"{name}: batch receipt is incomplete")
+    bindings = validation.get("batch_bindings")
+    if not isinstance(bindings, list) or len(bindings) != expected:
+        raise RuntimeError(f"{name}: batch filesystem bindings are missing or incomplete")
+    input_identities = {item["path"]: item for item in inputs}
     sources, outputs = set(), set()
-    for item in successes:
+    raw_sources, raw_outputs = set(), set()
+    for item, binding in zip(successes, bindings):
         if not isinstance(item, dict) or item.get("status") != "converted":
             raise RuntimeError(f"{name}: batch receipt contains unconverted work")
         source, members = item.get("input"), item.get("outputs")
-        if (not isinstance(source, str) or source in sources
+        if (not isinstance(source, str) or source in raw_sources
                 or not isinstance(members, list) or len(members) != 1
-                or not isinstance(members[0], str) or members[0] in outputs):
+                or not isinstance(members[0], str) or members[0] in raw_outputs):
             raise RuntimeError(f"{name}: batch receipt contains missing or duplicate work")
-        sources.add(source)
-        outputs.add(members[0])
-    if sources != {item["path"] for item in inputs} or outputs != paths:
+        raw_sources.add(source)
+        raw_outputs.add(members[0])
+        if (not isinstance(binding, dict) or binding.get("receipt_input") != source
+                or binding.get("receipt_output") != members[0]):
+            raise RuntimeError(f"{name}: batch filesystem binding contradicts the raw receipt")
+        source_identity, output_identity = binding.get("input"), binding.get("output")
+        identity(source_identity, f"{name} batch input binding")
+        identity(output_identity, f"{name} batch output binding")
+        source_path, output_path = source_identity.get("path"), output_identity.get("path")
+        if (not isinstance(source_path, str) or not isinstance(output_path, str)
+                or source_path in sources or output_path in outputs
+                or source_identity != input_identities.get(source_path)):
+            raise RuntimeError(f"{name}: batch input binding is missing, duplicated or changed")
+        validated = paths.get(output_path)
+        if (validated is None or output_identity["bytes"] != validated["bytes"]
+                or output_identity["sha256"] != validated["sha256"]):
+            raise RuntimeError(f"{name}: batch output binding differs from canonical validation")
+        sources.add(source_path)
+        outputs.add(output_path)
+    if sources != set(input_identities) or outputs != set(paths):
         raise RuntimeError(f"{name}: batch receipt does not bind all inputs and validated outputs")
 
 
@@ -259,7 +281,9 @@ def validated_samples(report: dict[str, Any], cases: dict[str, dict[str, Any]]) 
             if name == "batch-3":
                 if any(Path(path).parent != Path("batch") or Path(path).suffix != ".heic" for path in seen):
                     raise RuntimeError(f"{name}: batch output contract member roles disagree")
-                batch_receipt(validation, inputs, canonical_paths, expected, name)
+                batch_receipt(validation, inputs,
+                              {output["report"]["details"]["value"]["input"]: output for output in outputs},
+                              expected, name)
             if kind == "live-photo":
                 if len(pair_identifiers) != 1:
                     raise RuntimeError(f"{name}: canonical Live Photo pair identifiers disagree")

@@ -106,6 +106,86 @@ class ProductBenchmarkTests(unittest.TestCase):
             self.assertEqual(len(result["samples"]), 5)
             self.assertEqual(result["warmup_completed"], 1)
 
+    def test_batch_aliases_are_bound_while_files_exist(self):
+        import copy
+        spec = importlib.util.spec_from_file_location(
+            "budget_alias_test", ROOT / "scripts/performance/check_performance_budget.py")
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            real = root / "private-var"
+            real.mkdir()
+            alias = root / "var"
+            alias.symlink_to(real, target_is_directory=True)
+            work = alias / "work"
+            (work / "batch").mkdir(parents=True)
+            sources = tuple(real / f"input-{i}.heic" for i in range(3))
+            successes = []
+            for i, source in enumerate(sources):
+                source.write_bytes(f"input-{i}".encode())
+                (work / f"batch/{i}.heic").write_bytes(f"output-{i}".encode())
+                successes.append({"input": str(alias / source.name), "status": "converted",
+                                  "outputs": [str(work / f"batch/{i}.heic")]})
+            receipt = {"command": "batch", "processed": 3, "succeeded": 3,
+                       "failed": 0, "skipped_existing": 0, "successes": successes, "failures": []}
+            original = copy.deepcopy(receipt)
+            case = BENCHMARK.Case("batch-3", sources, ("batch",), ("batch",))
+            def validate(command, **kwargs):
+                return subprocess.CompletedProcess(command, 0, json.dumps({
+                    "schema_version": 1, "command": "validate", "valid": True,
+                    "kind": "iso-hdr-heif", "details": {"kind": "iso-hdr-heif",
+                    "value": {"input": command[2]}}}), "")
+            with mock.patch.object(BENCHMARK.subprocess, "run", side_effect=validate):
+                validation = BENCHMARK.validate_outputs(case, Path("cli"), work, json.dumps(receipt), {})
+            self.assertEqual(validation["batch_receipt"], original)
+            self.assertEqual(len(validation["batch_bindings"]), 3)
+            def unrelated_report(command, **kwargs):
+                result = validate(command, **kwargs)
+                report = json.loads(result.stdout)
+                report["details"]["value"]["input"] = str(root / "other" / Path(command[2]).name)
+                result.stdout = json.dumps(report)
+                return result
+            with mock.patch.object(BENCHMARK.subprocess, "run", side_effect=unrelated_report):
+                with self.assertRaisesRegex(RuntimeError, "does not bind"):
+                    BENCHMARK.validate_outputs(case, Path("cli"), work, json.dumps(receipt), {})
+            identities = [BENCHMARK.file_identity(path) for path in sources]
+            outputs = {output["report"]["details"]["value"]["input"]: output
+                       for output in validation["outputs"]}
+            # Offline verification must not inspect the collector's filesystem.
+            with mock.patch.object(Path, "resolve", side_effect=AssertionError("offline resolve")):
+                checker.batch_receipt(validation, identities, outputs, 3, "batch-3")
+            for mutation in ("other-directory", "hash", "missing", "receipt"):
+                bad = copy.deepcopy(validation)
+                if mutation == "other-directory":
+                    bad["batch_bindings"][0]["output"]["path"] = str(root / "other/0.heic")
+                elif mutation == "hash":
+                    bad["batch_bindings"][0]["output"]["sha256"] = "0" * 64
+                elif mutation == "missing":
+                    bad.pop("batch_bindings")
+                else:
+                    bad["batch_receipt"]["successes"][0]["outputs"] = [str(root / "other/0.heic")]
+                with self.subTest(mutation=mutation), self.assertRaises(RuntimeError):
+                    checker.batch_receipt(bad, identities, outputs, 3, "batch-3")
+            # A different directory with the same basename is not an alias.
+            other = root / "other"
+            other.mkdir()
+            (other / sources[0].name).write_bytes(sources[0].read_bytes())
+            wrong = copy.deepcopy(receipt)
+            wrong["successes"][0]["input"] = str(other / sources[0].name)
+            with self.assertRaisesRegex(RuntimeError, "input receipt"):
+                BENCHMARK.validate_outputs(case, Path("cli"), work, json.dumps(wrong), {})
+            wrong = copy.deepcopy(receipt)
+            (other / "0.heic").write_bytes(b"output-0")
+            wrong["successes"][0]["outputs"] = [str(other / "0.heic")]
+            real_identity = BENCHMARK.file_identity
+            def owned_identity(path):
+                self.assertNotEqual(path, other / "0.heic", "foreign output must not be read")
+                return real_identity(path)
+            with mock.patch.object(BENCHMARK, "file_identity", side_effect=owned_identity):
+                with self.assertRaisesRegex(RuntimeError, "outside"):
+                    BENCHMARK.validate_outputs(case, Path("cli"), work, json.dumps(wrong), {})
+
 
 if __name__ == "__main__":
     unittest.main()

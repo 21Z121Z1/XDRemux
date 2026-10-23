@@ -396,9 +396,24 @@ class PerformanceBudgetTests(unittest.TestCase):
                 "succeeded": 3, "failed": 0, "skipped_existing": 0, "failures": [],
                 "successes": [{"input": f"/source/{i}.heic", "status": "converted",
                                "outputs": [f"/work/batch/{i}.heic"]} for i in range(3)]}
+            validation["batch_bindings"] = [{"receipt_input": f"/source/{i}.heic",
+                "receipt_output": f"/work/batch/{i}.heic", "input": case["inputs"][i],
+                "output": {"path": f"/work/batch/{i}.heic", "bytes": 100, "sha256": "b" * 64}}
+                for i in range(3)]
         reference = baseline()
         reference["cases"]["batch-3"] = reference["cases"].pop("hdr-lhdr-mono400")
         result = self.run_checker(current, launches(), reference)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        aliased = copy.deepcopy(current)
+        for sample in aliased["cases"][0]["samples"]:
+            validation = sample["validation"]
+            for i, item in enumerate(validation["batch_receipt"]["successes"]):
+                item["outputs"] = [f"/var/folders/run/batch/{i}.heic"]
+                validation["batch_bindings"][i]["receipt_output"] = item["outputs"][0]
+                canonical = f"/private/var/folders/run/batch/{i}.heic"
+                validation["batch_bindings"][i]["output"]["path"] = canonical
+                validation["outputs"][i]["report"]["details"]["value"]["input"] = canonical
+        result = self.run_checker(aliased, launches(), reference)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for mutation in ("missing", "skipped", "duplicate", "wrong-output"):
             bad = copy.deepcopy(current)
