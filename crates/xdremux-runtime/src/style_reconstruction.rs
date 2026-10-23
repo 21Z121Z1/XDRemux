@@ -633,7 +633,7 @@ pub fn reconstruct_styles_hdr_with_display(
         if hash_file(&input)? != source_hash {
             return Err(error("source changed during processing"));
         }
-        let guidance_report = json!({"algorithm":"bounded-base-guided-region-gain-v5",
+        let guidance_report = json!({"algorithm":"bounded-base-guided-region-gain-v6",
                     "width":reconstructed.guidance.width,"height":reconstructed.guidance.height,
                     "analysis_edge":plan.guidance_analysis_edge,
                     "guide":"full-resolution linear SDR base",
@@ -652,7 +652,7 @@ pub fn reconstruct_styles_hdr_with_display(
                     "detail_seed_background_only":reconstructed.guidance.detail_seed_accepted-reconstructed.guidance.detail_seed_photometric,
                     "detail_model":"positive local affine fit with primary blur candidates 0/1/2; alternate-pixel validation for foreground tone; strong structural-only evidence protects matching background without rewriting foreground; no registration search",
                     "adjustment_rms_ev":reconstructed.guidance.adjustment_rms_ev,"maximum_adjustment_ev":reconstructed.guidance.maximum_adjustment_ev});
-        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v6",
+        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v7",
             "source":input,"source_sha256":source_hash,"source_preserved":true,
             "resources":{"metadata_item_id":resources.metadata_item_id,"linear_thumbnail_item_id":resources.linear_thumbnail_item_id,"delta_map_item_id":resources.delta_map_item_id},
             "native":native,"scene":{"width":w,"height":h,"color_space":"extended-linear Display P3","exposure_ev":reconstructed.exposure_ev,

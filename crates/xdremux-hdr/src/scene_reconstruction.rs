@@ -318,10 +318,10 @@ fn interpolate_adjustment(
                 if field.detail[i] > 0. && !field.photometric[i] {
                     // Reliable shape alone may protect a matching background,
                     // but is not permission to rewrite the foreground tone.
-                    let a = ((primary_y.log2() - field.surface_sdr[i]).abs()
-                        / field.background_tolerance_ev
-                        - 1.)
-                        .clamp(0., 1.);
+                    let v = primary_y.log2();
+                    let (lo, hi) = field.background_sdr_range[i];
+                    let distance = (lo - v).max(v - hi).max(0.);
+                    let a = (distance / field.background_tolerance_ev - 1.).clamp(0., 1.);
                     strength *= 1. - a * a * (3. - 2. * a);
                 }
                 sum += q * strength * (delta - original_gain);
@@ -800,12 +800,12 @@ mod tests {
     }
     #[test]
     fn background_only_evidence_cannot_author_a_foreground_tone() {
-        let field = crate::scene_guidance::GuidanceAdjustment {
+        let mut field = crate::scene_guidance::GuidanceAdjustment {
             values: vec![Some(0.); 16],
             strength: vec![1.; 16],
             detail: vec![1.; 16],
             surface_hdr: vec![0.2; 16],
-            surface_sdr: vec![0.2f32.log2(); 16],
+            background_sdr_range: vec![(0.2f32.log2(), 0.2f32.log2()); 16],
             photometric: vec![false; 16],
             background_tolerance_ev: 0.1,
             contrast: vec![1.; 16],
@@ -832,6 +832,23 @@ mod tests {
         }
         let transition = evaluate(0.2 * 2f32.powf(0.15));
         assert!(transition > -0.7 && transition < 0.);
+        field
+            .background_sdr_range
+            .fill((0.2f32.log2() - 0.15, 0.2f32.log2() + 0.15));
+        let background_undershoot = 0.2 * 2f32.powf(-0.2);
+        let delta = interpolate_adjustment(
+            &field,
+            (4, 4),
+            (8, 8),
+            (background_undershoot, background_undershoot),
+            0.7,
+            (0.25, 1.5),
+        );
+        assert!((delta + 0.7).abs() < 1e-5);
+        assert!(
+            interpolate_adjustment(&field, (4, 4), (8, 8), (0.05, 0.05), 0.7, (0.25, 1.5)).abs()
+                < 1e-6
+        );
     }
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {

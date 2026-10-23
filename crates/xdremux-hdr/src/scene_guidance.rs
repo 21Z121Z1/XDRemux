@@ -41,7 +41,7 @@ pub(super) struct GuidanceAdjustment {
     pub strength: Vec<f32>,
     pub detail: Vec<f32>,
     pub surface_hdr: Vec<f32>,
-    pub surface_sdr: Vec<f32>,
+    pub background_sdr_range: Vec<(f32, f32)>,
     pub photometric: Vec<bool>,
     pub background_tolerance_ev: f32,
     pub contrast: Vec<f32>,
@@ -626,6 +626,7 @@ pub(super) fn adjustment(
     let mut detail = vec![0.; data.len()];
     let mut contrast = vec![1.; data.len()];
     let mut photometric = vec![false; data.len()];
+    let mut background_sdr_range = surface.iter().map(|v| (*v, *v)).collect::<Vec<_>>();
     for y in 0..ah {
         for x in 0..aw {
             let i = y * aw + x;
@@ -661,6 +662,7 @@ pub(super) fn adjustment(
                 detail[i] = a;
                 contrast[i] = c;
                 photometric[i] = trusted;
+                background_sdr_range[i] = (regions[id].lo, regions[id].hi);
             }
         }
     }
@@ -670,7 +672,7 @@ pub(super) fn adjustment(
         strength,
         detail,
         surface_hdr,
-        surface_sdr: surface,
+        background_sdr_range,
         photometric,
         background_tolerance_ev: policy.edge_ev,
         contrast,
