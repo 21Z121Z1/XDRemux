@@ -66,6 +66,8 @@ Rust 请求 ImageIO 生成已校正方向、长边最多 1024 像素的 sRGB 推
 
 Vision 提供人脸关键点、有符号姿态角、人物实例与语义蒙版。通过最大总重叠匹配，每个人脸只关联一个独立实例。Rust 为每人调用原生 Mattify、UnderEyeBrighten 和 SkinSmoothStandalone 统计生产端，共享同一套实际几何与蒙版。调用顺序为 setup、prewarm、prepare、calculateStats、process、GPU 等待及最后一次 finishProcessing。
 
+运行时适配器为分析、推理、统计和最终读回使用各自的类型化请求与结果，并负责原生报告解码及工作文件命名。仅有 helper acknowledgement 不能提供已测统计，也不能接纳最终文件；GPU、生命周期、输入绑定与最终字节读回检查仍然适用。
+
 Rust 只合并原生实际返回的统计。成功但为空的可选统计组会省略。没有匹配人脸时写入空人物数组，不创建模板人物。鼻、唇、眉和手部保护使用原生关键点或手势检测推导的区域；本次派生编辑禁用耳部和纹身保护。这不等同于完整的相机 FSINC 生产端。
 
 Rust HEIF 写入器向已有摄影风格输出添加 v3 Texture plist、独立编码的蒙版和精确的实例 XMP 引用键。调参配置仅选择派生编辑，不替换 EXIF 相机身份、曝光、镜头、时间或拍摄 UUID。搬移后逐项核对原有载荷。原子发布前，由原始 Apple 解析器读回并校验人物数量、引用键、几何和统计。
