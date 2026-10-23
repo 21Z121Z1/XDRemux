@@ -18,9 +18,11 @@ import time
 import uuid
 
 if __package__:
+    from .boot_status import observe_boot_status
     from .observations import PVTStages, parse_share_observations, check_reader_observation
     from .owned_cleanup import cleanup_owned_simulator
 else:
+    from boot_status import observe_boot_status
     from observations import PVTStages, parse_share_observations, check_reader_observation
     from owned_cleanup import cleanup_owned_simulator
 
@@ -737,7 +739,10 @@ def main():
         report['owned_udid'] = owned_udid
         (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
         # Start and monitor with one bounded command, as in the control.
-        run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
+        boot = run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
+        report['boot_observation'] = observe_boot_status(boot.stdout, owned_udid)
+        if report['boot_observation']['state'] != 'completed':
+            raise Blocked(report['boot_observation']['reason'])
         install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])

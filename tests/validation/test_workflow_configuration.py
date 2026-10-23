@@ -88,6 +88,8 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertIn('python3 "$GITHUB_WORKSPACE/scripts/apple/pvt_native_import/readiness_control.py"', execution)
         self.assertIn('--repo "$GITHUB_WORKSPACE"', execution)
         self.assertIn('--expected-head "$EXPECTED_HEAD"', execution)
+        self.assertIn('--required-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-0', execution)
+        self.assertIn('--required-device-type com.apple.CoreSimulator.SimDeviceType.iPhone-11', execution)
         self.assertIn('CARGO_TARGET_DIR: ${{ github.workspace }}/target', job)
         self.assertNotIn("--expected-product-head", execution)
         self.assertNotIn("--expected-harness-head", execution)

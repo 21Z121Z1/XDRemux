@@ -15,9 +15,11 @@ import time
 import uuid
 
 if __package__:
+    from .boot_status import observe_boot_status
     from .observations import PVTStages
     from .owned_cleanup import cleanup_owned_simulator
 else:
+    from boot_status import observe_boot_status
     from observations import PVTStages
     from owned_cleanup import cleanup_owned_simulator
 
@@ -58,7 +60,10 @@ def run_control(run, choose_device, report, name, device_root, *, capture_diagno
         stages.record('readiness', 'observed', 'owned_uuid_received', owned_udid=owned)
         # Let the monitor initiate startup; a preceding boot can leave it
         # observing an already-Booted device instead of the startup sequence.
-        run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
+        boot = run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
+        facts['boot_observation'] = observe_boot_status(boot.stdout, owned)
+        if facts['boot_observation']['state'] != 'completed':
+            raise ReadinessBlocked(facts['boot_observation']['reason'])
         stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1
         stages.record('readiness', 'observed', 'inventory_submitted')
@@ -161,7 +166,11 @@ def main():
     parser.add_argument('--output-root', type=Path, required=True)
     parser.add_argument('--product-output-root', type=Path, required=True)
     parser.add_argument('--execute-owned-simulator', action='store_true')
+    parser.add_argument('--required-runtime')
+    parser.add_argument('--required-device-type')
     args = parser.parse_args()
+    if (args.required_runtime is None) != (args.required_device_type is None):
+        parser.error('required runtime and device type must be provided together')
     args.repo = args.repo.resolve()
     args.output_root = args.output_root.resolve()
     args.product_output_root = args.product_output_root.resolve()
@@ -230,7 +239,11 @@ def main():
             report['product_receipt'] = str(receipts[0])
             return result.returncode, json.loads(receipts[0].read_text())
 
-        run_control_and_probe(run, probe.select_device, invoke_probe, report,
+        choose_device = probe.select_device
+        if args.required_runtime is not None:
+            def choose_device(runtimes, types):
+                return probe.validate_required_device(runtimes, types, args.required_runtime, args.required_device_type)
+        run_control_and_probe(run, choose_device, invoke_probe, report,
                               'pvt-readiness-control-' + uuid.uuid4().hex,
                               Path.home() / 'Library/Developer/CoreSimulator/Devices',
                               expected_head=args.expected_head, capture_diagnostics=probe.capture_host_simulator_diagnostics)

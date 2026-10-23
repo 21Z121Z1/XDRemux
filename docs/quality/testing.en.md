@@ -89,6 +89,10 @@ measurement artifacts for one day. Their results do not supply `exact-head` or
 establish Photos editing, slider response, save/reopen, or Gallery acceptance.
 
 The PVT job uses one clean checkout for its readiness control and product probe.
+CI explicitly requires the installed iOS 27.0 / iPhone 11 pair, so a newer
+runtime or specialized device cannot silently change this baseline. If either
+is missing or incompatible, the control blocks without creating a simulator.
+Direct runs without both pin options retain catalog-based selection.
 It selects an iPhone that the chosen runtime explicitly supports and that meets
 the device type's runtime version bounds. An independent membership check runs
 before simulator creation. The product probe runs at most once, after the owned
@@ -100,6 +104,11 @@ again immediately before creation, after build and preparation work. A changed
 or incompatible pair blocks creation. A passing control does not prove
 PVT admission. Admission requires whole-package identity and independent PhotoKit
 readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
+
+The control and product boot monitors require an owned-device `Finished` terminal
+record as well as a zero process exit. Migration failure, an already-booted
+shortcut, and unknown output block inventory or installation. This check does
+not replace inventory, Photos Save, or independent PhotoKit readback.
 
 PVT stage observations bind the source and session and retain monotonic times
 within each named process clock. Unstarted or timed-out stages leave admission

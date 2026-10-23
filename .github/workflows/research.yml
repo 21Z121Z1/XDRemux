@@ -354,6 +354,8 @@ jobs:
             --expected-head "$EXPECTED_HEAD" \
             --output-root "$RUNNER_TEMP/pvt-readiness-control" \
             --product-output-root "$RUNNER_TEMP/pvt-native-import" \
+            --required-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-0 \
+            --required-device-type com.apple.CoreSimulator.SimDeviceType.iPhone-11 \
             --execute-owned-simulator
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}

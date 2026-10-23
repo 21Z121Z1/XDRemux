@@ -46,6 +46,10 @@ class ControlModel:
             self.assert_owned(argv)
             if self.failure == name:
                 raise control.ReadinessBlocked(name + ' result unknown')
+            if name == 'control-bootstatus':
+                result.stdout = (f'Monitoring boot status for owned ({self.uuid}).\n'
+                                 '[2026-10-23 08:00:00 +0000] Status=4294967295, isTerminal=YES, Elapsed=00:54.\n'
+                                 '\tFinished\n').encode()
             if name == 'control-delete': (self.devices / self.uuid).rmdir()
             return result
         elif name == 'control-listapps':
@@ -90,6 +94,78 @@ class ControlModel:
 
 
 class ReadinessControlTests(unittest.TestCase):
+    def test_zero_exit_migration_failure_never_queries_inventory_or_product(self):
+        stdout = (Path(__file__).parent / 'fixtures/pvt_boot_status/data-migration-failed.stdout').read_bytes()
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw))
+            model.uuid = '481E73B6-B8CB-49EC-9C8F-42C86B91A2E2'
+            original = model.run
+            def run(name, argv, **kwargs):
+                result = original(name, argv, **kwargs)
+                if name == 'control-bootstatus': result.stdout = stdout
+                return result
+            model.run = run
+            model.execute()
+            self.assertEqual(model.probes, 0)
+            self.assertEqual(model.report['control']['listapps_attempts'], 0)
+            self.assertEqual(model.report['status'], 'control-environment-blocked')
+            self.assertIn('Data Migration Failed', model.report['control']['reason'])
+            model.assert_control_cleaned()
+
+    def test_main_pinned_pair_cannot_follow_new_runtime_or_fall_back_when_absent(self):
+        repo = Path(control.__file__).resolve().parents[3]
+        original_control = control.run_control_and_probe
+        for absent in (False, True):
+            with self.subTest(absent=absent), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                model = ControlModel(root)
+                original_run = model.run
+                def run(name, argv, **kwargs):
+                    result = original_run(name, argv, **kwargs)
+                    if name == 'control-runtimes':
+                        data = json.loads(result.stdout)
+                        newer = {**data['runtimes'][0], 'identifier': model.runtime + '-new', 'version': '27.1'}
+                        data['runtimes'] = ([] if absent else data['runtimes']) + [newer]
+                        result.stdout = json.dumps(data).encode()
+                    return result
+                def environment(run_ignored, choose, invoke, report, name, device_root, **kwargs):
+                    model.report = report
+                    original_control(run, choose, model.probe, report, name, model.devices,
+                                     expected_head=model.source_sha)
+                argv = ['control', '--repo', str(repo), '--expected-head', model.source_sha,
+                        '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
+                        '--required-runtime', model.runtime, '--required-device-type', model.device,
+                        '--execute-owned-simulator']
+                with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts', return_value={}), \
+                        patch.object(control, 'source_bindings', return_value={}), \
+                        patch.object(control.platform, 'system', return_value='Darwin'), \
+                        patch.object(control.platform, 'machine', return_value='arm64'), \
+                        patch.object(control, 'run_control_and_probe', side_effect=environment), \
+                        redirect_stdout(io.StringIO()):
+                    self.assertEqual(control.main(), 2 if absent else 0)
+                self.assertEqual(model.probes, 0 if absent else 1)
+                if absent:
+                    self.assertEqual([name for name, _, _ in model.commands],
+                                     ['control-runtimes', 'control-device-types'])
+                    self.assertEqual(model.report['control']['cleanup_status'], 'not-created')
+                else:
+                    self.assertEqual(model.report['control']['selected_runtime'], model.runtime)
+                    self.assertEqual(model.report['control']['selected_device_type'], model.device)
+
+    def test_partial_control_pin_is_rejected_before_output_or_source_reads(self):
+        for flag in ('--required-runtime', '--required-device-type'):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                argv = ['control', '--repo', str(root), '--expected-head', 'a' * 40,
+                        '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
+                        flag, 'value']
+                with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts') as checkout, \
+                        redirect_stdout(io.StringIO()), patch.object(sys, 'stderr', io.StringIO()):
+                    with self.assertRaises(SystemExit) as error: control.main()
+                self.assertEqual(error.exception.code, 2)
+                checkout.assert_not_called()
+                self.assertFalse((root / 'control').exists())
+
     def test_boot_monitor_starts_the_owned_device_before_inventory(self):
         with tempfile.TemporaryDirectory() as raw:
             model = ControlModel(Path(raw))
@@ -266,6 +342,8 @@ class ReadinessControlTests(unittest.TestCase):
                 argv = ['readiness_control.py', '--repo', str(repo), '--expected-head', expected,
                         '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
                         '--execute-owned-simulator']
+                if expected == 'b' * 40:
+                    argv += ['--required-runtime', model.runtime, '--required-device-type', model.device]
                 facts = {'head': expected, 'tree': 'c' * 40, 'status': ''}
                 with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts', return_value=facts) as checkout, \
                         patch.object(control.platform, 'system', return_value='Darwin'), \
