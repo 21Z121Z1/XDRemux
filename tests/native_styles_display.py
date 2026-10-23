@@ -53,7 +53,10 @@ def compare_luminance(a, b):
 
 
 def check_guidance(report):
-    assert report["algorithm"] == "embedded-styles-relative-scene-v7"
+    assert report["algorithm"] == "embedded-styles-relative-scene-v8"
+    encoding = report["scene"]["thumbnail_encoding"]
+    assert encoding["gain"] > 0 and all(math.isfinite(v) for v in encoding.values())
+    assert encoding["minimum"] <= encoding["maximum"]
     facts = report["scene"]["guidance_stabilization"]
     assert facts["algorithm"] == "bounded-base-guided-region-gain-v6"
     assert max(facts["width"], facts["height"]) <= 512

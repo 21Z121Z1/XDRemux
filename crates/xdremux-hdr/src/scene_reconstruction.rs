@@ -5,6 +5,15 @@ use crate::{SceneGuidanceMetrics, SceneGuidancePolicy};
 
 pub type LinearPixel = [f32; 4];
 
+/// Source-defined scaling and range of the embedded Styles Linear Thumbnail.
+/// These values must come from the thumbnail's native style properties.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LinearThumbnailEncoding {
+    pub gain: f32,
+    pub minimum: f32,
+    pub maximum: f32,
+}
+
 #[derive(Debug)]
 pub struct SceneReconstruction {
     pub pixels: Vec<LinearPixel>,
@@ -83,6 +92,44 @@ pub fn styles_thumbnail_to_linear(code: f32) -> f32 {
     ((code - 0.69336945) / 0.08550479).exp2() - 0.00964052
 }
 
+/// Decode RGB thumbnail codes while preserving alpha. Native thumbnail decode
+/// divides exponential Apple Log values by the source gain and clamps each RGB
+/// channel to the source range before any luminance reduction.
+pub fn decode_styles_thumbnail(
+    codes: &[LinearPixel],
+    encoding: LinearThumbnailEncoding,
+) -> Result<Vec<LinearPixel>> {
+    if !encoding.gain.is_finite() || encoding.gain <= 0. {
+        return Err(invalid("thumbnail linear gain must be finite and positive"));
+    }
+    if !encoding.minimum.is_finite()
+        || !encoding.maximum.is_finite()
+        || encoding.minimum > encoding.maximum
+    {
+        return Err(invalid("thumbnail linear range must be finite and ordered"));
+    }
+    if codes.is_empty() || codes.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(invalid("invalid thumbnail pixels"));
+    }
+    if codes
+        .iter()
+        .any(|p| p[..3].iter().any(|x| *x < -0.25 || *x > 1.25))
+    {
+        return Err(invalid("thumbnail is outside the supported encoded domain"));
+    }
+    Ok(codes
+        .iter()
+        .map(|p| {
+            let mut decoded = *p;
+            for value in &mut decoded[..3] {
+                *value = (styles_thumbnail_to_linear(*value) / encoding.gain)
+                    .clamp(encoding.minimum, encoding.maximum);
+            }
+            decoded
+        })
+        .collect())
+}
+
 fn invalid(message: &str) -> HdrError {
     HdrError::invalid("scene reconstruction", message)
 }
@@ -130,6 +177,7 @@ pub(super) fn area_luminance(
     values
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn reconstruct_relative_scene(
     unstyled: &[LinearPixel],
     original_hdr: &[LinearPixel],
@@ -137,6 +185,7 @@ pub fn reconstruct_relative_scene(
     geometry: (usize, usize),
     thumbnail_codes: &[LinearPixel],
     thumbnail_geometry: (usize, usize),
+    thumbnail_encoding: LinearThumbnailEncoding,
     guidance_policy: SceneGuidancePolicy,
 ) -> Result<SceneReconstruction> {
     let (width, height) = geometry;
@@ -153,23 +202,10 @@ pub fn reconstruct_relative_scene(
             "thumbnail aspect ratio does not match the oriented primary",
         ));
     }
-    if thumbnail_codes
-        .iter()
-        .any(|p| p[..3].iter().any(|x| *x < -0.25 || *x > 1.25))
-    {
-        return Err(invalid("thumbnail is outside the supported encoded domain"));
-    }
     let base = area_luminance(original_hdr, width, height, thumb_width, thumb_height);
-    let scene: Vec<f32> = thumbnail_codes
+    let scene: Vec<f32> = decode_styles_thumbnail(thumbnail_codes, thumbnail_encoding)?
         .iter()
-        .map(|p| {
-            display_p3_luminance(&[
-                styles_thumbnail_to_linear(p[0]),
-                styles_thumbnail_to_linear(p[1]),
-                styles_thumbnail_to_linear(p[2]),
-                1.,
-            ])
-        })
+        .map(display_p3_luminance)
         .collect();
     let mut anchors: Vec<(f32, f32)> = base
         .iter()
@@ -354,6 +390,13 @@ fn interpolate_adjustment(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn synthetic_encoding() -> LinearThumbnailEncoding {
+        LinearThumbnailEncoding {
+            gain: 1.,
+            minimum: -1.,
+            maximum: 100.,
+        }
+    }
     fn policy() -> SceneGuidancePolicy {
         SceneGuidancePolicy {
             analysis_edge: 512,
@@ -378,6 +421,164 @@ mod tests {
         0.08550479 * (x + 0.00964052).log2() + 0.69336945
     }
     #[test]
+    fn thumbnail_range_clamps_each_channel_after_gain_before_luminance() {
+        let codes = [[encode(-0.008), encode(0.4), encode(2.), 0.25]];
+        let encoding = LinearThumbnailEncoding {
+            gain: 2.,
+            minimum: -0.005,
+            maximum: 0.4,
+        };
+        let decoded = decode_styles_thumbnail(&codes, encoding).unwrap();
+        let expected = [-0.004, 0.2, 0.4, 0.25];
+        for (actual, expected) in decoded[0].iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-6, "{decoded:?}");
+        }
+        let clipped_luminance = display_p3_luminance(&decoded[0]);
+        let incorrectly_clipped_luminance =
+            display_p3_luminance(&[-0.004, 0.2, 1., 1.]).clamp(encoding.minimum, encoding.maximum);
+        assert!((clipped_luminance - incorrectly_clipped_luminance).abs() > 0.04);
+    }
+
+    #[test]
+    fn thumbnail_positive_gain_scales_linear_rgb() {
+        let codes = [[encode(0.125), encode(0.5), encode(2.), 0.75]];
+        let decoded = decode_styles_thumbnail(
+            &codes,
+            LinearThumbnailEncoding {
+                gain: 4.,
+                minimum: -1.,
+                maximum: 4.,
+            },
+        )
+        .unwrap();
+        for (actual, expected) in decoded[0].iter().zip([0.03125, 0.125, 0.5, 0.75]) {
+            assert!((actual - expected).abs() < 1e-6, "{decoded:?}");
+        }
+    }
+
+    #[test]
+    fn thumbnail_identity_encoding_preserves_in_range_exponential_decode() {
+        let codes = [[-0.2, 0.3, 1.1, 0.5]];
+        let decoded = decode_styles_thumbnail(
+            &codes,
+            LinearThumbnailEncoding {
+                gain: 1.,
+                minimum: -1.,
+                maximum: 100.,
+            },
+        )
+        .unwrap();
+        for (actual, code) in decoded[0][..3].iter().zip(codes[0][..3].iter()) {
+            assert_eq!(*actual, styles_thumbnail_to_linear(*code));
+        }
+        assert_eq!(decoded[0][3], codes[0][3]);
+    }
+
+    #[test]
+    fn thumbnail_decode_rejects_invalid_encoding_and_pixel_data() {
+        let codes = [[0.2, 0.3, 0.4, 1.]];
+        for gain in [0., -1., f32::NAN, f32::INFINITY] {
+            assert!(
+                decode_styles_thumbnail(
+                    &codes,
+                    LinearThumbnailEncoding {
+                        gain,
+                        minimum: -1.,
+                        maximum: 4.,
+                    },
+                )
+                .is_err(),
+                "gain {gain}"
+            );
+        }
+        for (minimum, maximum) in [
+            (f32::NAN, 1.),
+            (0., f32::NAN),
+            (f32::NEG_INFINITY, 1.),
+            (0., f32::INFINITY),
+            (1., 0.),
+        ] {
+            assert!(
+                decode_styles_thumbnail(
+                    &codes,
+                    LinearThumbnailEncoding {
+                        gain: 1.,
+                        minimum,
+                        maximum,
+                    },
+                )
+                .is_err(),
+                "range {minimum}..{maximum}"
+            );
+        }
+        let encoding = LinearThumbnailEncoding {
+            gain: 1.,
+            minimum: -1.,
+            maximum: 100.,
+        };
+        assert!(decode_styles_thumbnail(&[], encoding).is_err());
+        for bad in [
+            [f32::NAN, 0.2, 0.2, 1.],
+            [0.2, 0.2, 0.2, f32::INFINITY],
+            [-0.251, 0.2, 0.2, 1.],
+            [0.2, 1.251, 0.2, 1.],
+        ] {
+            assert!(decode_styles_thumbnail(&[bad], encoding).is_err());
+        }
+    }
+
+    #[test]
+    fn reconstruction_uses_source_channel_range_before_guidance() {
+        let (w, h) = (32, 8);
+        let primary = (0..w * h)
+            .map(|i| {
+                let v = if i % w < w / 2 { 0.2 } else { 0.8 };
+                [v, v, v, 1.]
+            })
+            .collect::<Vec<_>>();
+        let codes = (0..w * h)
+            .map(|i| {
+                let red = if i % w < w / 2 { 0.2 } else { 4. };
+                [encode(red), encode(0.4), encode(0.8), 1.]
+            })
+            .collect::<Vec<_>>();
+        let encoding = LinearThumbnailEncoding {
+            gain: 2.,
+            minimum: -0.005,
+            maximum: 0.5,
+        };
+        let reconstructed = reconstruct_relative_scene(
+            &primary,
+            &primary,
+            &primary,
+            (w, h),
+            &codes,
+            (w, h),
+            encoding,
+            policy(),
+        )
+        .unwrap();
+        let expected_ratio =
+            display_p3_luminance(&[0.5, 0.2, 0.4, 1.]) / display_p3_luminance(&[0.1, 0.2, 0.4, 1.]);
+        let actual_ratio = display_p3_luminance(&reconstructed.pixels[4 * w + 28])
+            / display_p3_luminance(&reconstructed.pixels[4 * w + 4]);
+        assert!((actual_ratio / expected_ratio).log2().abs() < 0.001);
+        assert!(reconstruct_relative_scene(
+            &primary,
+            &primary,
+            &primary,
+            (w, h),
+            &codes,
+            (w, h),
+            LinearThumbnailEncoding {
+                gain: 0.,
+                ..encoding
+            },
+            policy(),
+        )
+        .is_err());
+    }
+    #[test]
     fn restores_luminance_relationship_without_raw_or_image_specific_parameters() {
         let codes: Vec<_> = (0..256)
             .map(|i| {
@@ -398,6 +599,7 @@ mod tests {
             (16, 16),
             &codes,
             (16, 16),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -413,13 +615,41 @@ mod tests {
     #[test]
     fn rejects_mismatched_orientation_and_nonfinite_or_empty_guidance() {
         let p = vec![[0.2, 0.2, 0.2, 1.]; 128];
-        assert!(reconstruct_relative_scene(&p, &p, &p, (16, 8), &p, (8, 16), policy()).is_err());
+        assert!(reconstruct_relative_scene(
+            &p,
+            &p,
+            &p,
+            (16, 8),
+            &p,
+            (8, 16),
+            synthetic_encoding(),
+            policy()
+        )
+        .is_err());
         let bad = vec![[f32::NAN, 0., 0., 1.]; 128];
-        assert!(reconstruct_relative_scene(&p, &p, &p, (16, 8), &bad, (16, 8), policy()).is_err());
+        assert!(reconstruct_relative_scene(
+            &p,
+            &p,
+            &p,
+            (16, 8),
+            &bad,
+            (16, 8),
+            synthetic_encoding(),
+            policy()
+        )
+        .is_err());
         let black = vec![[0., 0., 0., 1.]; 128];
-        assert!(
-            reconstruct_relative_scene(&p, &p, &p, (16, 8), &black, (16, 8), policy()).is_err()
-        );
+        assert!(reconstruct_relative_scene(
+            &p,
+            &p,
+            &p,
+            (16, 8),
+            &black,
+            (16, 8),
+            synthetic_encoding(),
+            policy()
+        )
+        .is_err());
     }
     #[test]
     fn weak_primary_structure_does_not_inherit_all_thumbnail_blotches_or_lose_detail() {
@@ -444,6 +674,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (tw, th),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -490,6 +721,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (w, h),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -528,6 +760,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (w, h),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -563,6 +796,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (w, h),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -598,6 +832,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (w, h),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -649,6 +884,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (tw, th),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();
@@ -699,6 +935,7 @@ mod tests {
                 (w, h),
                 &thumbnail,
                 (tw, th),
+                synthetic_encoding(),
                 policy(),
             )
             .unwrap();
@@ -774,6 +1011,7 @@ mod tests {
             (w, h),
             &thumbnail,
             (tw, th),
+            synthetic_encoding(),
             policy(),
         )
         .unwrap();

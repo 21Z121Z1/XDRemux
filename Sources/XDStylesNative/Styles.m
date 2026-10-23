@@ -159,6 +159,14 @@ static NSDictionary *Decode(NSDictionary *request) {
         @"unstyled":u,@"original_hdr":b,@"thumbnail":l,@"coefficient_bytes":@(coeff.length),@"coefficient_float16":@(half),
         @"configuration":configuration,@"tuning":tuning,@"os":NSProcessInfo.processInfo.operatingSystemVersionString,
         @"native_version":[[properties valueForKey:@"version"] description]} mutableCopy];
+    NSMutableDictionary *encoding=[NSMutableDictionary new];
+    for(NSString *key in @[@"linearGain",@"linearRangeMin",@"linearRangeMax"]) {
+        Require([properties respondsToSelector:NSSelectorFromString(key)],@"Missing native Linear Thumbnail encoding property");
+        id value=[properties valueForKey:key];
+        Require([value isKindOfClass:NSNumber.class] && isfinite([value doubleValue]),@"Invalid native Linear Thumbnail encoding property");
+        encoding[key]=value;
+    }
+    facts[@"linear_thumbnail_encoding"]=encoding;
     // Decode only documented-by-measurement buffers; no claim to invert GTC here.
     for(NSString *key in @[@"globalToneCurveData",@"lightMapData",@"linearLightMapData"]) {
         if([properties respondsToSelector:NSSelectorFromString(key)]) {

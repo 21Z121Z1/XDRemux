@@ -165,6 +165,11 @@ metadata is generated:
   There is no luminance reduction and no percentile normalization. The curve is
   the monotone projection of those observed primary-channel means. The
   consumer's extra exposure `E` is a render parameter and is not folded in.
+  Downstream `LinearGTCImage` statistics and the reported fit error use the
+  written key-3 nodes after the measured macOS inverse-sRGB decode on the fixed
+  65535 scale. They do not use the pre-quantization fit. The 256 decoded nodes
+  remain f32, and the repeated final wire word is ignored. The iPhone firmware
+  endpoint-normalized half table belongs to a separate binding.
 - Keys `c` and `d` stay 32×32. Each cell stores the area mean of one guide:
   `c` is the primary image and `d` is the linear thumbnail. The consumer
   upsamples them with its guided filter (`r = 1`, `eps ≈ 0.05`) and forms

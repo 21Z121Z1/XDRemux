@@ -30,7 +30,10 @@ fn exact_auxiliary_uri(source: &[u8], range: std::ops::Range<usize>, uri: &[u8])
     let Some(payload) = source.get(property.data_start + 4..property.data_end) else {
         return false;
     };
-    payload.split(|b| *b == 0).next() == Some(uri.strip_suffix(&[0]).unwrap_or(uri))
+    let Some(terminator) = payload.iter().position(|b| *b == 0) else {
+        return false;
+    };
+    &payload[..terminator] == uri.strip_suffix(&[0]).unwrap_or(uri)
 }
 
 /// Exact, primary-linked roles. Legacy portrait is an explicitly declared
@@ -129,7 +132,7 @@ fn auxiliary(source: &[u8], meta: &ParsedMeta, uri: &[u8]) -> Result<u32> {
                 meta.properties.iter().any(|p| {
                     p.index == u32::from(a.property_index)
                         && p.kind == FourCC::new(*b"auxC")
-                        && source[p.box_range.clone()].ends_with(uri)
+                        && exact_auxiliary_uri(source, p.box_range.clone(), uri)
                 })
             });
             (matches && linked(meta, entry.item_id, b"auxl")).then_some(entry.item_id)
@@ -468,6 +471,46 @@ mod tests {
                 .all(|a| a.property_index == 1));
         }
         assert!(!primary_image_signature(&source).unwrap().is_empty());
+    }
+    #[test]
+    fn reconstruction_auxiliary_uri_rejects_prefixed_roles() {
+        let mut prefixed_linear = b"vendor:".to_vec();
+        prefixed_linear.extend(LINEAR_URI);
+        let mut prefixed_delta = b"vendor:".to_vec();
+        prefixed_delta.extend(DELTA_URI);
+        let rejected = [
+            fixture_with_auxiliaries(&prefixed_linear, DELTA_URI),
+            fixture_with_auxiliaries(LINEAR_URI, &prefixed_delta),
+        ]
+        .map(|source| extract_style_reconstruction_resources(&source).is_err());
+        assert_eq!(rejected, [true, true]);
+    }
+    #[test]
+    fn reconstruction_auxiliary_uri_rejects_unterminated_roles() {
+        let rejected = [
+            fixture_with_auxiliaries(&LINEAR_URI[..LINEAR_URI.len() - 1], DELTA_URI),
+            fixture_with_auxiliaries(LINEAR_URI, &DELTA_URI[..DELTA_URI.len() - 1]),
+        ]
+        .map(|source| extract_style_reconstruction_resources(&source).is_err());
+        assert_eq!(rejected, [true, true]);
+    }
+    #[test]
+    fn reconstruction_auxiliary_uri_accepts_subtype_bytes_after_terminator() {
+        let mut linear_with_subtype = LINEAR_URI.to_vec();
+        linear_with_subtype.extend([1, 2, 3]);
+        let mut delta_with_subtype = DELTA_URI.to_vec();
+        delta_with_subtype.extend([4, 5, 6]);
+        for source in [
+            fixture_with_auxiliaries(&linear_with_subtype, DELTA_URI),
+            fixture_with_auxiliaries(LINEAR_URI, &delta_with_subtype),
+        ] {
+            let before = source.clone();
+            let resources = extract_style_reconstruction_resources(&source).unwrap();
+            assert_eq!(resources.linear_thumbnail_item_id, 2);
+            assert_eq!(resources.delta_map_item_id, 3);
+            assert_eq!(resources.metadata, b"bplist00fake");
+            assert_eq!(source, before);
+        }
     }
     #[test]
     fn unrelated_auxiliaries_are_not_person_or_skin_aliases() {

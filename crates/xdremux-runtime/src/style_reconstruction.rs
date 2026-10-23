@@ -12,7 +12,7 @@ use xdremux_engine::{
 use xdremux_format::ChromaSampling;
 use xdremux_hdr::{
     display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, DisplayFamily,
-    DisplayFamilyPolicy, DisplayMethods, LinearPixel, SceneGuidancePolicy,
+    DisplayFamilyPolicy, DisplayMethods, LinearPixel, LinearThumbnailEncoding, SceneGuidancePolicy,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, extract_style_display_mattes,
@@ -45,7 +45,7 @@ fn read_pixels(path: &Path, count: usize) -> Result<Vec<LinearPixel>> {
         ));
     }
     let mut pixels = Vec::with_capacity(count);
-    for p in bytes.chunks_exact(16) {
+    for p in bytes.as_chunks::<16>().0 {
         let mut v = [0.; 4];
         for c in 0..4 {
             v[c] = f32::from_le_bytes(p[c * 4..c * 4 + 4].try_into().expect("four bytes"));
@@ -95,6 +95,25 @@ fn hash_file(path: &Path) -> Result<String> {
         hash.update(&buffer[..n]);
     }
     Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn thumbnail_encoding(native: &Value) -> Result<LinearThumbnailEncoding> {
+    let fields = &native["linear_thumbnail_encoding"];
+    let scalar = |key: &str| -> Result<f32> {
+        let value = fields[key]
+            .as_f64()
+            .ok_or_else(|| error(format!("missing native thumbnail {key}")))?
+            as f32;
+        if !value.is_finite() {
+            return Err(error(format!("nonfinite native thumbnail {key}")));
+        }
+        Ok(value)
+    };
+    Ok(LinearThumbnailEncoding {
+        gain: scalar("linearGain")?,
+        minimum: scalar("linearRangeMin")?,
+        maximum: scalar("linearRangeMax")?,
+    })
 }
 
 fn hdr_transport_metrics(target: &[LinearPixel], actual: &[LinearPixel]) -> Result<Value> {
@@ -340,8 +359,10 @@ fn display_matte(
         return Err(error("matte geometry mismatch"));
     }
     let pixels = bytes
-        .chunks_exact(4)
-        .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|v| f32::from_le_bytes(*v))
         .collect();
     Ok((
         pixels,
@@ -471,6 +492,7 @@ pub fn reconstruct_styles_hdr_with_display(
             return Err(error("native HDR and reverse extents differ"));
         }
         let (tw, th) = geometry(&native["thumbnail"])?;
+        let thumbnail_encoding = thumbnail_encoding(&native)?;
         let unstyled = read_pixels(&dir.join("unstyled.f32"), w * h)?;
         let hdr = read_pixels(&dir.join("original_hdr.f32"), w * h)?;
         let codes = read_pixels(&dir.join("thumbnail_codes.f32"), tw * th)?;
@@ -482,6 +504,7 @@ pub fn reconstruct_styles_hdr_with_display(
             (w, h),
             &codes,
             (tw, th),
+            thumbnail_encoding,
             SceneGuidancePolicy {
                 analysis_edge: plan.guidance_analysis_edge,
                 primary_span_ev: plan.guidance_primary_span_ev,
@@ -652,13 +675,15 @@ pub fn reconstruct_styles_hdr_with_display(
                     "detail_seed_background_only":reconstructed.guidance.detail_seed_accepted-reconstructed.guidance.detail_seed_photometric,
                     "detail_model":"positive local affine fit with primary blur candidates 0/1/2; alternate-pixel validation for foreground tone; strong structural-only evidence protects matching background without rewriting foreground; no registration search",
                     "adjustment_rms_ev":reconstructed.guidance.adjustment_rms_ev,"maximum_adjustment_ev":reconstructed.guidance.maximum_adjustment_ev});
-        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v7",
+        let report = json!({"schema_version":1,"algorithm":"embedded-styles-relative-scene-v8",
             "source":input,"source_sha256":source_hash,"source_preserved":true,
             "resources":{"metadata_item_id":resources.metadata_item_id,"linear_thumbnail_item_id":resources.linear_thumbnail_item_id,"delta_map_item_id":resources.delta_map_item_id},
             "native":native,"scene":{"width":w,"height":h,"color_space":"extended-linear Display P3","exposure_ev":reconstructed.exposure_ev,
                 "guidance_valid_fraction":reconstructed.guidance_valid_fraction,"limited_fraction":reconstructed.limited_fraction,
                 "guidance_stabilization":guidance_report,
-                "runtime_raw_inputs":0,"transfer":"measured native Apple Log exponential inverse","absolute_nit_calibration":false},
+                "runtime_raw_inputs":0,"transfer":"measured native Apple Log exponential inverse, divide by native linearGain, then per-channel original-range clamp",
+                "thumbnail_encoding":{"gain":thumbnail_encoding.gain,"minimum":thumbnail_encoding.minimum,"maximum":thumbnail_encoding.maximum},
+                "absolute_nit_calibration":false},
             "sdr_policy":"original compressed primary and its colour/geometry properties preserved; only HDR Gain Map changes appearance",
             "outputs":{"scene_linear.exr":scene,"hdr.heic":heic,"unstyled.exr":reverse},"display":display_facts,
             "limitations":["Approximate relative scene luminance; not complete capture ISP inversion or RAW recovery.",
@@ -682,6 +707,23 @@ pub fn reconstruct_styles_hdr_with_display(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_thumbnail_encoding_requires_explicit_finite_fields() {
+        for value in [
+            json!({}),
+            json!({"linear_thumbnail_encoding":{"linearGain":1.,"linearRangeMin":0.}}),
+            json!({"linear_thumbnail_encoding":{"linearGain":1e300,"linearRangeMin":0.,"linearRangeMax":1.}}),
+        ] {
+            assert!(thumbnail_encoding(&value).is_err());
+        }
+        let decoded = thumbnail_encoding(&json!({"linear_thumbnail_encoding":{
+            "linearGain":1.998046875,"linearRangeMin":-0.154541015625,"linearRangeMax":1.158203125}})).unwrap();
+        assert_eq!(
+            (decoded.gain, decoded.minimum, decoded.maximum),
+            (1.998_046_9, -0.154_541_02, 1.158_203_1)
+        );
+    }
 
     #[test]
     fn negative_consumer_luminance_remains_in_hdr_error_tails() {
@@ -723,7 +765,7 @@ mod tests {
             "fixture coefficients must appear once in its bplist"
         );
         let mut identity = vec![0u8; coeff.len()];
-        for block in identity.chunks_exact_mut(60) {
+        for block in identity.as_chunks_mut::<60>().0 {
             for c in 0..3 {
                 let i = ((c + 1) * 3 + c) * 2;
                 block[i..i + 2].copy_from_slice(&0x3c00u16.to_le_bytes());
