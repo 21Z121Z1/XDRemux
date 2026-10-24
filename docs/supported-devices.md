@@ -1,12 +1,23 @@
-# 支持设备
+# 设备与文件兼容性
 
 [English](supported-devices.en.md) | 简体中文
 
-本文档列出已知能够拍摄 ProXDR HEIC 的设备型号。
+XDRemux 根据输入文件的结构和元数据选择转换方式，不以手机型号作为输入白名单。单个文件转换成功，不代表该型号的所有系统版本、相机模式和文件均受支持。
 
-型号在列表中，不代表每个系统版本、相机模式或单个文件都一定可以使用。XDRemux 会验证所选转换链路要求的文件结构和 metadata。
+## 仓库样本覆盖范围
 
-## 已知 ProXDR 拍摄机型
+版本化样本为重复验证提供明确输入：
+
+| 资产 | 已收录来源 | 样本能够证明的范围 |
+| --- | --- | --- |
+| ProXDR | OPPO Find X6 Pro 的 LHDR v1；Find X7 Ultra 的 LHDR v2，含 XPAN；Find X9 Ultra 的 UHDR，含高分辨率、大师和人像拍摄。 | 对应测试实际检查的格式和产品策略。 |
+| Motion Photo | Samsung、Xiaomi、OPPO 和 vivo 的 JPEG、HEIC/HEIF 输入。 | 对应测试实际检查的解析、转换和验证行为。 |
+
+[测试样本说明](../fixtures/README.md)介绍样本集，[SHA256SUMS](../fixtures/SHA256SUMS)标识具体文件。这些检查不能证明所有相机模式均受支持，也不能证明原厂相册或 Apple Photos 接受输出。
+
+## 已有 ProXDR 拍摄型号记录
+
+下表保留项目设备文档中已有的型号记录。仓库没有为每个条目分别提供样本或验证报告。因此，该表用于说明曾报告的拍摄格式范围，不是已验证的兼容性矩阵。
 
 | 品牌或系列 | 机型 |
 | --- | --- |
@@ -18,42 +29,31 @@
 | realme Neo 系列 | 真我 GT Neo6 SE、真我 GT Neo6、真我 Neo7、真我 Neo7 SE、真我 Neo7x、真我 Neo8 |
 | realme 数字系列 | 真我 12 Pro、真我 12 Pro+、真我 13 Pro+、真我 13 Pro 至尊版、真我 13 Pro、真我 14 Pro+、真我 14 Pro、真我 14、真我 15、真我 15 Pro |
 
-这个列表记录已知拍摄支持，不是代码 allow-list。
-
 ## Gain Map 差异
 
-已知文件可能使用不同的 Gain Map 布局。
+ProXDR 文件可能包含不同布局的 Gain Map。项目此前记录中，OPPO Find X8 Ultra、Find X9 系列和真我 GT8 Pro 理光模式可能使用 YCbCr 4:4:4 HDR Gain Map。其他文件可能使用 4:2:0 或单色 Gain Map。这些记录不能替代对实际输入的检查。
 
-在已知实现中，OPPO Find X8 Ultra、Find X9 系列和真我 GT8 Pro 理光模式可能使用 YCbCr 4:4:4 HDR Gain Map。
+所选输出方式支持时，标准转换保留源 Gain Map 特征。`--oppo-compatible` 可能将其转换为兼容表示。不能只根据手机型号判断 Gain Map 布局。
 
-其他文件可能使用 4:2:0 或单色 Gain Map。
+## Motion Photo 要求
 
-标准转换链路会在所选输出链路支持时保留源 Gain Map 特征。`--oppo-compatible` 可能把表示降低为兼容形式。
+Motion Photo 支持取决于能否识别所需资源，以及对应格式行为是否经过测试，不由 ProXDR 型号记录控制。
 
-不要只根据手机型号推断 Gain Map 布局。
+输入必须包含照片资源、解析器能够定位的视频资源，以及转换所需的时间和容器信息。精确时间处理与遗漏资源说明见 [LibLivePhoto 接入契约](liblivephoto-integration.md)。
 
-## Motion Photo 支持
+## Apple 人像要求
 
-Motion Photo 采用能力检测和 fixture 验证，不由上方 ProXDR 型号表控制。
+Apple 人像转换要求单张源照片包含兼容的人像资源。型号能够拍摄 ProXDR，不代表每张照片都包含景深、焦点、语义蒙版或恢复原图所需的数据。
 
-Motion Photo 输入必须包含静态资源、解析器可以确定的动态视频资源，以及所需的 timing/container 信息。
+完整模式与 OPPO 源数据模式的资源要求不同。选择模式前，参见 [Apple 功能文档](apple-features.md)。
 
-当前公开 fixture 集包含多种 Android Motion Photo 布局。见 [fixture 说明](../fixtures/README.md)。
+## 报告不受支持的文件
 
-## Apple 人像支持
-
-Apple 人像转换要求单个源照片中存在兼容的人像资源。
-
-设备型号支持 ProXDR，不代表每张照片都包含景深、焦点、语义或 restore-original 数据。
-
-## 报告新文件
-
-如果新设备或新系统生成的文件无法转换：
+除非明确决定公开，否则保留照片隐私。经过脱敏的容器诊断可能足以定位问题。
 
 1. 保留原始文件。
 2. 记录设备型号、系统版本和相机模式。
-3. 提供准确的 XDRemux 错误信息。
-4. 在足够定位问题时提供已去敏的容器诊断。
-5. 除非你明确希望公开，否则不要发布包含个人内容的照片。
+3. 记录准确的 XDRemux 错误信息。
+4. 提供脱敏诊断，或已获授权的可复现样本。
 
-新增兼容性结论应该有可复现文件或测试支持。只有设备型号不足以作为证据。
+新增兼容性结论需要可复现文件或测试支持。仅有型号名称不足以作为证据。

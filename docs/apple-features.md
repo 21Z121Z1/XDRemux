@@ -1,172 +1,253 @@
-# Apple 功能
+# Apple 编辑功能
 
 [English](apple-features.en.md) | 简体中文
 
-摄影风格和 Apple 人像已经是 XDRemux 中由 Rust 持有的产品 intent。它们不是第二套产品栈。
+XDRemux 通过 Rust `xdremux` CLI 提供 Apple 编辑功能。Rust 负责产品策略和文件发布，Swift/Objective-C 适配器执行所需的 Apple 框架操作。
 
-Canonical 公开产品是 Rust `xdremux` CLI。Swift target 只作为无法跨平台完成的 Apple framework adapter，例如 ImageIO consumer probing、Vision observation 和 VideoToolbox encoding。
+本文说明摄影风格、纹理风格和 Apple 人像。实验性视频命令单独见[电影效果指南](cinematic.md)。
 
-## 当前可用性
+## 可用范围与命令
 
-完整 XDRemux 产品、App 与 Apple adapter 要求 **arm64 / macOS 27 或更新版本**。adapter 不构建 Intel 版本，并在报告 capability 或执行操作前检查支持的 host。Rust 核心保留 Linux、Windows、macOS 测试，不代表这些 host 有 Apple 功能。满足 OS/架构下限不能替代逐操作 API、资源、GPU 回执和最终文件验证。
+完整产品、App 和 Apple 适配器要求 Apple silicon（`arm64`）和 macOS 27 或更新版本。适配器不提供 Intel 构建，并在报告能力或执行操作前检查运行环境。
 
-标准 HDR、OPPO 兼容输出、Motion Photo → Live Photo、batch、分类、inspect 和 portable validation 已属于 canonical Rust 产品。
+可移植的 Rust 核心仍保留 Linux、Windows 和 macOS 测试。这些检查不能证明各平台均可使用 Apple 功能。即使系统和架构受支持，仍需验证具体 API、源资源、GPU 执行结果和最终文件。
 
-摄影风格和 Apple 人像通过 `convert`/`batch` 的产品 intent 表达，不新增 Apple 专用 CLI 子命令，也不把 adapter 或 solver 的底层控制暴露为公开契约。
+| `convert` 或 `batch` 选项 | 请求的结果 |
+| --- | --- |
+| `--apple-styles` | 为 ProXDR 照片生成摄影风格和推理所得的纹理风格。 |
+| `--apple-portrait` | 生成包含完整语义资源集的 Apple 人像。 |
+| `--apple-portrait-oppo` | 使用 OPPO 深度与已有源蒙版生成 Apple 人像，不调用 Vision。 |
+| `--apple-cinematic` | 为普通视频生成实验性的待预处理电影元数据。详见[电影效果指南](cinematic.md)。 |
 
-Rust 持有 feature request/result model、routing、fallback、validation policy、metadata synthesis、assembly 和 publication lifecycle。Apple-native 代码只执行 Rust 请求的平台 operation，并返回事实 observation。
+这些选项互斥，并且都不能与 `--oppo-compatible` 组合使用。它们不增加独立的 Apple CLI 子命令。适配器、供体、后端和求解器的底层控制不属于公开产品选项。当前组合规则由 [CLI 解析器](../crates/xdremux-cli/src/lib.rs)定义。
+
+标准 HDR、OPPO 兼容输出、Motion Photo 转换、批处理、分类、检查和可移植验证仍属于 Rust 产品操作。
 
 ## 平台边界
 
-CLI 使用以下结构：
+| 层级 | 职责 |
+| --- | --- |
+| Rust CLI | 表达用户请求的产品操作。 |
+| Rust 引擎 | 定义资源模型、兼容规则和验证策略。 |
+| Rust 运行时 | 执行操作、组装资源、验证输出并发布文件。 |
+| Apple 适配器 | 调用 ImageIO、Core Image、Vision、Core ML、AVFoundation、VideoToolbox 等所需框架。 |
 
-```text
-xdremux CLI
-    ↓
-Rust runtime
-    ↓
-Rust engine policy
-    ↓
-portable providers + Apple platform adapter
-                         ↓
-          ImageIO / Core Image / Vision /
-          Core ML / AVFoundation / ...
-```
+`xdremux-apple-adapter` 是 Rust 使用的可分发组件，不是公开转换 CLI。
 
-`xdremux-apple-adapter` 是由 Rust 产品消费的可分发平台组件。它不是用户 CLI，也不持有产品 policy。
+运行时通过带版本号的辅助进程协议与适配器通信，限制消息大小和操作时长。每次转换复用一个按需启动的会话。超时、崩溃或消息帧错误会终止该会话。传输方式仍是运行时的私有实现。
 
-CLI/runtime 使用有版本号、生命周期有界的 helper-process protocol。每次转换复用一个延迟启动的 adapter session。超时、崩溃或帧格式错误会终止该 session。transport 保持为 Rust runtime 的私有实现，因此更换 transport 不会改变 engine 或 CLI 语义。
+ImageIO 辅助资源检查只报告具体观测结果，包括 ISO Gain Map、视差、Portrait Effects Matte，以及皮肤、头发、牙齿和眼镜蒙版。适配器不判断完整产品输出是否有效。`xdremux-engine` 通过 `AppleImageAuxiliaryFacts` 和资源契约作出该判断。
 
-## Rust 持有的 policy
+新增适配器操作必须返回 Rust 所需的框架事实或操作结果，产品决策仍由 Rust 负责。实现见 [apple_adapter.rs](../crates/xdremux-runtime/src/apple_adapter.rs) 和 [apple.rs](../crates/xdremux-engine/src/apple.rs)。
 
-Rust 已把用户层 Apple feature intent 建模为两个事实：摄影风格和人像。旧 Swift 的 producer、donor、backend、research control 不作为产品配置重新暴露。
+## 摄影风格
 
-第一项真实 Apple adapter operation 是 ImageIO auxiliary-resource probing。adapter 只报告 observation，例如：
+Rust 根据源文件生成风格，负责约束搜索、key 1 与 plist 合成、资源图、验证和发布。适配器提供框架观测和编码操作。
 
-- ISO Gain Map 是否存在；
-- disparity 是否存在；
-- Portrait Effects Matte 是否存在；
-- skin、hair、teeth、glasses semantic matte 是否存在。
-
-adapter 不回答“这是不是有效人像输出”这类业务问题。该判断由 `xdremux-engine` 中的 `AppleImageAuxiliaryFacts` 和 Portrait resource contract 持有。
-
-新增操作必须沿用同一边界：返回最窄且足够的 framework fact 或 operation result，再由 Rust 持有 policy。
-
-## 摄影风格迁移
-
-Rust 持有 style generation 语义、constrained search、source-bound policy、key1/property-list synthesis、graph assembly、validation policy 和 publication。adapter 只执行 Rust runtime 请求的 framework observation 或 encoding primitive。
-
-研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
+研究生成器、模型实验、供体诊断和 RAW 实验仍属于研究工具，不定义另一套运行时或公开转换方式。
 
 ### 同一开关生成纹理风格
 
-`--apple-styles` 与 App 的“Apple 摄影风格”开关会一并生成纹理风格，不增加独立的 Texture 选项。App 在跳过已有输出前调用 `validate --apple-styles`；普通 HDR 输出不能通过此检查。此功能需要已在 macOS 27 验证的私有 Vision 和 CMImaging API。API 缺失或任一步骤失败时，整个摄影风格事务在发布前报错。
+`--apple-styles` 和 App 的「Apple 摄影风格」开关在同一次操作中生成纹理风格，不增加独立纹理选项。App 复用已有输出前会运行 `validate --apple-styles`。普通 HDR 输出不能通过这项检查。
 
-Rust 请求 ImageIO 生成已校正方向、长边最多 1024 像素的 sRGB 推理图。此图仅用于分析；输出保留完整尺寸主图、HDR Gain Map、Styles Linear Thumbnail 和已有项目载荷。分析不能恢复 RAW 或 Apple 拍摄时的处理数据。
+纹理生成需要已在 macOS 27 测试的私有 Vision 和 CMImaging API。API 缺失或原生操作失败时，整个风格事务在发布前失败。
 
-Vision 提供人脸关键点、有符号姿态角、人物实例与语义蒙版。通过最大总重叠匹配，每个人脸只关联一个独立实例。Rust 为每人调用原生 Mattify、UnderEyeBrighten 和 SkinSmoothStandalone 统计生产端，共享同一套实际几何与蒙版。调用顺序为 setup、prewarm、prepare、calculateStats、process、GPU 等待及最后一次 finishProcessing。
+分析图与输出承担不同用途：
 
-运行时适配器为分析、推理、统计和最终读回使用各自的类型化请求与结果，并负责原生报告解码及工作文件命名。仅有 helper acknowledgement 不能提供已测统计，也不能接纳最终文件；GPU、生命周期、输入绑定与最终字节读回检查仍然适用。
+- ImageIO 生成方向已校正、最长边不超过 1024 像素的 sRGB 分析图。
+- 输出保留完整主图、HDR Gain Map、Styles Linear Thumbnail 和已有项目载荷。
+- 分析不能恢复 RAW 数据或 Apple 拍摄时的处理信息。
 
-Rust 只合并原生实际返回的统计。成功但为空的可选统计组会省略。没有匹配人脸时写入空人物数组，不创建模板人物。鼻、唇、眉和手部保护使用原生关键点或手势检测推导的区域；本次派生编辑禁用耳部和纹身保护。这不等同于完整的相机 FSINC 生产端。
+Vision 提供人脸关键点、有符号姿态角、人物实例和语义蒙版。系统按蒙版总重叠最大原则，将每张实测人脸匹配到独立人物实例。Rust 为每个匹配人物请求 Mattify、UnderEyeBrighten 和 SkinSmoothStandalone 统计。所有效果使用同一组推理几何和蒙版。
 
-Rust HEIF 写入器向已有摄影风格输出添加 v3 Texture plist、独立编码的蒙版和精确的实例 XMP 引用键。调参配置仅选择派生编辑，不替换 EXIF 相机身份、曝光、镜头、时间或拍摄 UUID。搬移后逐项核对原有载荷。原子发布前，由原始 Apple 解析器读回并校验人物数量、引用键、几何和统计。
+原生调用顺序为 `setup`、`prewarm`、`prepareToProcess:`、`calculateStats`、`process`、GPU 同步等待和最后的 `finishProcessing`。分析、推理、统计和最终回读分别使用类型化请求与结果。适配器负责解析原生报告和命名工作文件。
 
-在 macOS 27 运行 `python3 scripts/apple/check_texture_styles.py --all-fixtures --output <dir>`，验证真实 ProXDR fixture、批处理、主图与 Gain Map HEVC 保持一致，以及失败时保留已有输出。此前 SDR 研究候选已有用户报告 Photos 激活成功。该反馈不代表每份新生成的完整尺寸 HDR 产品输出、效果响应、保存及重新打开均已通过设备测试。
+仅有辅助进程确认消息，不能证明统计已经生成，也不能允许发布。GPU 完成状态、生命周期、输入绑定和最终字节回读检查仍然适用。
+
+Rust 只合并原生操作实际返回的统计，省略成功但为空的可选统计组。没有匹配人脸的场景写入空人物数组，不创建模板人物。鼻、唇、眉和手部保护采用原生关键点或手势推导的区域。本次派生编辑禁用耳部和纹身保护，不复现完整的相机 FSINC 生成端。
+
+Rust HEIF 写入器添加版本 3 的 Texture plist、单独编码的蒙版和精确的逐实例 XMP 引用键。调参配置选择的是派生编辑，不替换 EXIF 相机身份、曝光、镜头、日期或拍摄 UUID。
+
+资源搬移后，写入器逐项检查原有载荷。原子发布前，Apple 解析器必须回读到相同的人物数量、引用键、几何和统计。
+
+在 macOS 27 上运行样本检查：
+
+```bash
+python3 scripts/apple/check_texture_styles.py --all-fixtures --output /absolute/path/new-texture-results
+```
+
+检查覆盖真实 ProXDR 转换、批处理、主图与 Gain Map HEVC 保持不变，以及失败时保留已有输出。此前的 SDR 研究候选有用户报告 Photos 激活成功。这不能证明每份完整分辨率 HDR 产品输出、效果响应、保存和重新打开均已通过。
+
+实现见 [apple_texture.rs](../crates/xdremux-runtime/src/apple_texture.rs) 和 [XDTextureNative](../Sources/XDTextureNative)。
 
 ### SmartStyle 编辑状态
 
-生成的 Standard 风格资源还需要在 Apple MakerNote 标签 84（`0x0054`）中记录 SmartStyle 状态。系数 plist 是另一个独立输入；解析成功不能证明照片具备完整编辑状态。Rust 定义旧 Swift writer 使用的所需的整数编辑字段（包括 Standard 纹理状态），ImageIO 原语将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID，并保留字典中其他条目和未修改的字段。
+Standard 风格资源集还需要 Apple MakerNote 标签 84（`0x0054`）中的 SmartStyle 状态。系数 plist 是独立输入，解析成功不能证明照片的编辑状态完整。
 
-发布前，Rust 暂存最终组装的完整字节，并要求 ImageIO 回读其中的整数字典字段。必需状态缺失或变化时，转换在替换已有输出前失败。旧 adapter 即使忽略新增的可选元数据请求，也不能静默发布不完整的风格文件。此原生回读不代表 Photos 控件、Tone/Color 响应或保存重开已通过；这些行为仍需实机证据。
+Rust 定义必需的整数编辑字段，包括 Standard 纹理状态。ImageIO 将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID。其他条目及未修改字段保持不变。
+
+发布前，Rust 暂存组装后的完整文件，并要求 ImageIO 回读整数字典字段。必需字段缺失或变化时，转换在替换已有输出前失败。旧适配器即使忽略新增的元数据请求，也不能静默发布不完整的风格文件。
+
+原生回读不能证明 Photos 控件、Tone/Color 响应或保存后重新打开的行为。这些结论需要设备证据。
 
 ### Linear Thumbnail 的 HDR 参照
 
-Styles Linear Thumbnail 是由 SDR base image 与 Gain Map 重建出的 scene-linear Display P3 HDR 的 Apple Log 编码。Rust 在 base image 的原始分辨率上应用 Gain Map：先在码值域对 Gain Map 做双线性重采样，再按源文件实际携带的 ISO 21496-1 / Apple tmap 参数重建每个样本，包括 log2 最小/最大值、26A434 `_flexMap` 解码所用的 gamma 倒数指数、逐通道偏移，以及 alternate image 的 headroom 权重。缩到 1024 像素级缩略图发生在这次重建之后，并在线性光下做面积盒式滤波。随后 Rust 将每个通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log。此资源不再直接复制 SDR 图像码值。
+Styles Linear Thumbnail 保存由 SDR 主图和 Gain Map 重建出的场景线性 Display P3 HDR，经 Apple Log 编码后的码值，不是 SDR 图像码值的副本。
 
-Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不变。编码器是 macOS 26A434 指数解码器（`_appleLogToLinear` / `sw_appleLogToLinear`）的逆变换。该解码器不使用二次 toe，因此编码器也不使用。相机端编码器 toe 尚未核实。此变换保留 Display P3 原色，不会将图像转换成 Apple Log 视频所用的 BT.2020，也不会把缩略图改标成 sRGB、PQ、HLG 或线性。
+Rust 在主图原始分辨率上应用 Gain Map。它先对增益图码值进行双线性重采样，再重建 HDR。重建采用源文件的 ISO 21496-1 或 Apple `tmap` 参数：
 
-系数使用已解码的显示方向场景。RGB16 Linear Thumbnail 编码前，Rust 撤销主图完整的旋转与镜像序列。存储的 Linear Thumbnail 和 Style Delta Map 使用主图编码几何，并保留其 `irot` 和 `imir` 的相对顺序。Gain Map 或 Styles 图像的宽高比与主图编码尺寸不一致时，转换会被拒绝。`encoding_gain` 属于渲染器元数据，不是第二次曝光除法。
+- 最小和最大 log2 增益。
+- 26A434 `_flexMap` 解码器采用的 gamma 倒数指数。
+- 逐通道偏移。
+- 替代图像的亮度余量权重。
 
-编码原语接收 16 位 Apple Log 码值。VideoToolbox 将这些码值转成 10 位 video-range 4:2:0，并编码为 Main10 HEVC。码值在进入编码前不再量化成 RGB8，因此编码器可以使用 10 位范围。超过 SDR 白的 HDR 数值仍然保留。该参照仍来自已经渲染过的 HDR look，不能恢复源文件已丢失的 RAW 或拍摄时处理信息。
+重建后，面积盒式滤波在线性光下将图像缩小到 1024 像素级缩略图。Rust 将每个通道除以 Styles plist key `4` 中的 `baseline_exposure`，再应用 Apple Log。
 
-同一个 26A434 consumer `PISemanticStyleFilter` 也决定风格元数据如何生成：
+Apple Log 传递函数、`[0, 1]` 码值范围和辅助色彩标记保持不变。编码器是 macOS 26A434 指数解码器 `_appleLogToLinear` / `sw_appleLogToLinear` 的逆变换。该解码器不使用二次暗部曲线，因此此编码器也不使用。相机端编码器的暗部曲线尚未核实。
 
-- key 3 是一条 256 节点曲线，逐通道独立采样。横坐标是乘过 plist base gain 之后的线性缩略图码值 `min(S, 1)`，不做亮度合并，也不做分位数归一化。曲线是这些主图通道观测均值的单调投影。consumer 额外曝光 `E` 是渲染参数，不写入曲线。
-- key `c` 和 `d` 保持 32×32。每格保存一个 guide 的面积均值：`c` 是主图，`d` 是线性缩略图。consumer 用自己的 guided filter（`r = 1`，`eps ≈ 0.05`）上采样，再计算 `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`。这两张图不再乘固定仿射，也不直接乘到亮度上。消费 `q` 的后续 shader 阶段没有反解，因此这些均值不是解出来的局部调性。
-- key 1 是 x-major 的 12×9×8×10×3 half 数组，二次基为 `[1, R, G, B, R², RG, RB, G², GB, B²]`。每个 spotlight 格子和每个亮度 plane 分开拟合。拟合方向是 remove-style：多项式读取显示中的主图，目标是缩略图码值。局部样本无法确定的系数保持恒等残差。plane 权重使用已核实的 `inputIsLinear = false` 公式，计算在 `f64` 中进行，不模拟 half，也不应用可选的 3×3 空间滤波。
+变换保留 Display P3 原色，不把缩略图转换为 Apple Log 视频采用的 BT.2020，也不将缩略图改标为 sRGB、PQ、HLG 或线性。
 
-背景和前景 LTM 都为 1 时，也就是已捕获的 tone=0 设置，semantic-tone 阶段返回主图，不读取缩略图或曲线。因此 tone=0 的渲染测不到 key 3 和缩略图。Photos 的 Tone ±1 与 Color ±1 滑块位置不是源事实。可移植公式检查是 `apple_style_semantic_tone_channel`。
+系数使用解码后按显示方向排列的图像。RGB16 编码前，Rust 撤销主图完整的旋转和镜像序列。存储的 Linear Thumbnail 与 Style Delta Map 使用主图编码几何，并保留 `irot` 和 `imir` 的相对顺序。
 
-原生 tone 检查与产品路径分开。它检出 `21Z121Z1/Photographic_Style_Research` 的 `37dd551`，并在 `xcode-27` 镜像上运行 `consumer-model/harness/run_tone_sweep.py`。该 harness 只设置 `inputToneBias`，没有颜色控制。扫描的 tone 为 −1、−0.75、−0.5、−0.35、−0.15、0、0.15、0.35、0.5、0.75 和 1。Apple 样本是 `Apple_Native_Samples/IMG_0032.HEIC`、`IMG_0033.HEIC`，以及 `research/vm-native/samples/IMG_2600.HEIC`、`IMG_2604.HEIC` 和 `IMG_2608.HEIC`。转换后的三个 ProXDR 夹具使用同一组 tone。`IMG_0032.HEIC` 在 tone 0 必须报告 0 个不同的 half 分量，之后的渲染才可采信。报告记录平均亮度、逐通道均值、`|L(−1)−L(0)| / |L(+1)−L(0)|`、单调性，以及与 tone 相关的 plist 字段。工作流是 `.github/workflows/research.yml`。
+Gain Map 或 Styles 项目的宽高比不匹配时，转换失败。`encoding_gain` 是渲染器元数据，不是另一个曝光除数。
 
-原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。baseline exposure 和 base gain 仍使用现有的源分布校准；这次改动不替换那组系数。
+编码器接收 16 位 Apple Log 码值。VideoToolbox 将其转换为 10 位视频范围的 4:2:0，再编码为 Main10 HEVC。输入不经过 RGB8 量化，因此编码器可以使用 10 位范围。超过 SDR 白的 HDR 值仍有对应表示。
 
-设置 `XDREMUX_STYLES_ACCEPTANCE_DIR` 时，该检查保留真实 v15 产品 HEIC、原生 Texture 资源及逐 fixture 的 `linear-thumbnail-roundtrip.json`。它们是诊断，不是 Photos 验收。只读检查根据 item 声明的 file/idat 存储读取并验证 extent 边界，不把产品修改为 v16。独立的版本号研究对照仍是单字节实验。
+该参照来自已经渲染的 HDR 外观，不能恢复源文件已经丢失的 RAW 或拍摄时处理信息。
 
-### 临时的系统 gain map
+### 风格系数字段
 
-默认编码器仍然写入 XDRemux 自己的 log gain。`XDREMUX_SYSTEM_GAIN_MAP=1` 是一条单独的原型路径。Rust 重建 scene-linear Display P3 HDR，用临时 guided filter 生成 HDR look，并用 local weight 1 保持 SDR look，这个权重就是恒等变换。然后把两张图交给 Apple adapter。adapter 调用 `CIContext.writeHEIFRepresentationOfImage`（`format` 为 `.RGBA8`，色彩空间为 Display P3），并通过 `kCIImageRepresentationHDRImage` 传入 half 线性 HDR。headroom 使用头文件方法 `-imageBySettingContentHeadroom:`（macOS 26）。该头文件没有给出这个方法的 Swift overlay 名称。`kCIImageRepresentationHDRGainMapAsRGB` 设为 true，要求 Core Image 计算颜色比值。Rust 不提供 `kCIImageRepresentationHDRGainMapImage`。
+26A434 的 `PISemanticStyleFilter` 消费端决定 XDRemux 如何构造以下字段。
 
-Styles 系数与 Linear Thumbnail 复用真正提交给系统编码器的 SDR/HDR 图像对，包括 SDR 量化和提交的 half-float HDR，不会继续用原 OPPO Gain Map 的通道或 scale 参数解释新 Gain Map。回读失败会在原子替换已有输出前拒绝测量。
+| 字段 | 存储形式 | 构造方法与限制 |
+| --- | --- | --- |
+| Key `3` | 一条 256 节点曲线，逐通道独立采样。 | 横坐标是应用 plist 基础增益后的 `min(S, 1)`，不进行亮度合并或分位数归一化。 |
+| Key `c` 和 `d` | 两张 32×32 引导图。 | 每格保存面积均值。`c` 表示主图，`d` 表示线性缩略图。 |
+| Key `1` | 按 x 优先排列的 12×9×8×10×3 半精度数组。 | 每个 spotlight 网格和亮度平面分别使用二次基拟合。 |
 
-这些名称和可用版本来自 macOS 27 SDK 头文件（`CIContext.h`、`CIImage.h`、`CGImage.h`、`CGImageSource.h`、`CGImageDestination.h`、`CGImageProperties.h`），不是猜出来的 selector。`writeHEIFRepresentationOfImage` 从 macOS 10.13.4 起可用。HDR image 选项和 `contentHeadroom` 从 macOS 15 起可用，`imageBySettingContentHeadroom` 从 macOS 26 起可用。Rust 送出的 headroom 是交给编码器的 half 数值的 `max(1, measured peak)`。头文件不允许 `(0, 1)` 区间内的 headroom。ImageIO 的 `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` 从 macOS 16 起存在，但它的字典值类型没有文档，因此原型不调用它。
-这些是个别 API 的 SDK 引入版本，不是完整 arm64/macOS 27 产品或 Styles/Texture 私有 SPI 的支持下限。
+Key `3` 是实测主图通道均值的单调投影。消费端的额外曝光 `E` 属于渲染参数，不包含在该曲线中。
 
-回读使用 `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR`，并把 `kCGImageSourceGenerateImageSpecificLumaScaling` 设为 false，然后渲染成 extended-linear Display P3 half。它同时报告 `kCGImageAuxiliaryDataTypeHDRGainMap` 和 `kCGImageAuxiliaryDataTypeISOGainMap`。系统文件实际包含哪一种是测量结果，不是头文件事实。Styles 组装器仍然要求恰好一个 `tmap` item 及其 `dimg` 图。如果系统文件没有这张图，组装会失败关闭，报告记下这个冲突。Photos 导入和编辑仍需实机证据。
+消费端使用自己的引导滤波器（`r = 1`、`eps ≈ 0.05`）上采样 key `c` 和 `d`，然后计算：
 
-这个 guided filter 不是 `guided.py` 的移植；公开研究仓库里没有该文件。半径 1、epsilon 0.05、以 `f16` 保存的半尺寸系数、HDR local weight 0 和 SDR local weight 1 都是临时值。`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` 限制原型几何尺寸。工作流把它设为 256。
+```text
+q = mix(mix(d, c, l_b), mix(d, c, l_f), m)
+```
 
-## Apple 人像迁移
+这些图不采用固定仿射缩放，也不直接与亮度相乘。消费 `q` 的后续着色器阶段尚未反解，因此这些均值不代表局部色调变换已经求解。
 
-Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。
+Key `1` 使用基 `[1, R, G, B, R², RG, RB, G², GB, B²]`。多项式读取显示中的主图，以缩略图码值为目标，属于去除风格的拟合方向。局部样本无法确定的系数保持恒等残差。平面权重采用已核实的 `inputIsLinear = false` 公式，并以 `f64` 计算，不模拟半精度。可选的 3×3 空间滤波不参与计算。
 
-完整人像模式通过独立的 image request handler 逐个提交 Vision 分割请求，避免把不同分割请求类型一起提交到曾在 macOS 27 beta 上观察到崩溃的 compound request 路径。请求的语义资源和输出校验要求保持一致。任何请求失败都会终止本次操作；adapter 不会重试该请求，也不会改用源数据模式。
+背景和前景局部色调映射（LTM）均为 1 时，语义色调阶段返回主图，这对应已捕获的 `tone=0` 设置。该阶段不读取缩略图或曲线，因此零色调渲染无法测量这两项资源。
 
-### 源数据模式和效果降级
+Photos 的 Tone ±1 和 Color ±1 滑块位置不是源文件事实。可移植公式检查为 `apple_style_semantic_tone_channel`。基准曝光和基础增益仍采用源图像分布校准；重建不替换这些校准系数。
 
-`convert` 和 `batch` 支持 `--apple-portrait-oppo`。此模式不调用 Vision，包括其私有分割 SPI。它使用公开的 ImageIO 和 Core Image 操作，因此仍需要 macOS。
+实现见 [apple_photographic_styles.rs](../crates/xdremux-engine/src/apple_photographic_styles.rs) 和 [apple_styles.rs](../crates/xdremux-runtime/src/apple_styles.rs)。
+
+### 原生摄影风格检查
+
+原生色调实验独立于产品转换。它检出 `21Z121Z1/Photographic_Style_Research` 的 `37dd551`，通过 [research.yml](../.github/workflows/research.yml) 在 `xcode-27` 镜像上运行 `consumer-model/harness/run_tone_sweep.py`。
+
+测试只设置 `inputToneBias`，没有颜色控制。色调取值为 −1、−0.75、−0.5、−0.35、−0.15、0、0.15、0.35、0.5、0.75 和 1。
+
+Apple 样本为 `Apple_Native_Samples/IMG_0032.HEIC`、`IMG_0033.HEIC`，以及 `research/vm-native/samples/IMG_2600.HEIC`、`IMG_2604.HEIC` 和 `IMG_2608.HEIC`。三个转换后的 ProXDR 样本使用相同色调取值。只有 `IMG_0032.HEIC` 的零色调检查报告 0 个不同的半精度分量后，其他渲染结果才可采信。
+
+报告记录平均亮度、通道均值、单调性、色调相关 plist 字段，以及 `|L(−1)−L(0)| / |L(+1)−L(0)|`。
+
+产品消费端回归采用 RGB UHDR 和单色 LHDR 样本，解码已编码的缩略图，检查 HDR Log 目标及主图 HEVC 是否保持不变。在符合要求的 Mac 上运行：
+
+```bash
+bash scripts/apple/check_rust_style_consumer.sh
+```
+
+设置 `XDREMUX_STYLES_ACCEPTANCE_DIR` 时，检查保留真实的 v15 产品 HEIC、原生纹理资源和各样本的 `linear-thumbnail-roundtrip.json` 报告。这些是诊断文件，不是 Photos 验收证据。
+
+只读检查器根据声明的 file/idat 存储位置读取资源，并验证数据范围，不把产品修改为 v16。独立的版本号研究对照仍是单字节实验。Photos 导入、编辑、保存和重新打开需要设备检查。
+
+## 临时系统 Gain Map 方案
+
+默认编码器写入 XDRemux 自己的对数增益。`XDREMUX_SYSTEM_GAIN_MAP=1` 选择独立的原型实现。
+
+Rust 重建场景线性 Display P3 HDR，并使用临时引导滤波器生成 HDR 外观。SDR 局部权重 1 对应恒等变换，保留 SDR 外观。随后 Rust 将两张图像提交给 Apple 适配器。
+
+适配器对 SDR 图像调用 `CIContext.writeHEIFRepresentationOfImage`，采用 `.RGBA8` 格式和 Display P3 色彩空间。半精度浮点线性 HDR 通过 `kCIImageRepresentationHDRImage` 提交，亮度余量通过 `-imageBySettingContentHeadroom:` 设置。头文件没有为该方法提供 Swift 映射名称。
+
+`kCIImageRepresentationHDRGainMapAsRGB` 为 true，要求 Core Image 计算颜色比值。Rust 不提供 `kCIImageRepresentationHDRGainMapImage`。
+
+风格系数与 Linear Thumbnail 复用实际提交的 SDR/HDR 图像对，包括 SDR 量化和半精度浮点 HDR，不会使用原 OPPO 增益图的通道或缩放参数解释新图。回读失败时，测量在替换已有输出前失败。
+
+### API 要求
+
+API 名称及引入版本来自 macOS 27 SDK 头文件。已检查的头文件包括 `CIContext.h`、`CIImage.h`、`CGImage.h`、`CGImageSource.h`、`CGImageDestination.h` 和 `CGImageProperties.h`。
+
+| API 或属性 | SDK 引入版本或限制 |
+| --- | --- |
+| `writeHEIFRepresentationOfImage` | macOS 10.13.4。 |
+| HDR 图像选项和 `contentHeadroom` | macOS 15。 |
+| `imageBySettingContentHeadroom` | macOS 26。不允许 `(0, 1)` 范围内的亮度余量。 |
+| `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` | macOS 16。字典值类型没有文档，因此原型不调用它。 |
+
+这些版本不降低完整产品的 arm64/macOS 27 要求，也不证明私有摄影风格和纹理风格 SPI 可用。Rust 根据实际提交的半精度浮点值发送 `max(1, measured peak)`。
+
+### 回读与尚未确认的行为
+
+回读将 `kCGImageSourceDecodeRequest` 设为 `kCGImageSourceDecodeToHDR`，将 `kCGImageSourceGenerateImageSpecificLumaScaling` 设为 false，然后渲染为扩展线性 Display P3 半精度浮点值。
+
+报告同时包含 `kCGImageAuxiliaryDataTypeHDRGainMap` 和 `kCGImageAuxiliaryDataTypeISOGainMap`。输出是否具有这些资源，需要实际测量，不能根据头文件声明推断。
+
+风格组装仍要求恰好一个 `tmap` 项目及其 `dimg` 图。系统输出缺少该图时，组装失败，报告记录冲突。Photos 导入和编辑仍需要设备证据。
+
+该引导滤波器不是 `guided.py` 的移植，公开研究检出中没有这个文件。临时参数包括半径 1、epsilon 0.05、以 `f16` 保存的半尺寸系数、HDR 局部权重 0 和 SDR 局部权重 1。`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` 限制原型几何尺寸，工作流将其设为 256。
+
+实现见 [system_heif_hdr.rs](../crates/xdremux-runtime/src/system_heif_hdr.rs) 和 [CoreImageHeifHdr.swift](../Sources/XDRemuxAppleAdapter/CoreImageHeifHdr.swift)。
+
+## Apple 人像
+
+Rust 负责源数据预检、OPPO 数据块解析、焦点与方向策略、容器处理、Gain Map 策略、REND 生成和辅助资源清单，也负责路由、输出命名、验证及原子发布。ImageIO 报告辅助资源事实。适配器执行 Rust 事务需要的框架操作。
+
+完整模式为每个 Vision 分割请求使用独立的图像请求处理器，避开曾在 macOS 27 beta 观察到崩溃的混合分割请求提交方式。所需语义角色和输出验证要求不变。
+
+任一请求失败都会终止操作。适配器不重试该请求，也不改用 OPPO 源数据模式。
+
+### 源数据模式与效果限制
+
+`--apple-portrait-oppo` 使用 OPPO 源数据，不调用 Vision 或其私有分割 SPI。由于仍使用公开 ImageIO 和 Core Image 操作，该模式依然需要 macOS。
 
 | 资源 | 源数据模式 |
 | --- | --- |
 | ISO Gain Map | 从源文件保留。 |
-| Disparity、焦点、光圈、REND | 由 Rust 根据 OPPO 深度、拍摄数据和源元数据生成。 |
-| Portrait Effects Matte | OPPO 人物平面存在可信前景时才附加。 |
-| Hair matte | OPPO 头发平面存在可信前景时才附加。 |
-| 皮肤、牙齿、眼镜蒙版 | 保持缺失，不生成替代蒙版。 |
+| 视差、焦点、光圈和 REND | Rust 根据 OPPO 深度、拍摄数据和源元数据生成。 |
+| Portrait Effects Matte | 仅在 OPPO 人物平面具有可信前景时添加。 |
+| 头发蒙版 | 仅在 OPPO 头发平面具有可信前景时添加。 |
+| 皮肤、牙齿和眼镜蒙版 | 保持缺失，不生成替代蒙版。 |
 
-相比完整的 `--apple-portrait` 模式，人像效果会降级。源蒙版分辨率较低或缺失时，主体分离和发丝细节可能降低，语义光效及相关编辑可能受限。仅包含深度的输出可以满足源数据模式的资源契约，但不等同于完整语义资源集。OPPO pet 平面不会被冒充成人物或头发蒙版。
+与完整的 `--apple-portrait` 模式相比，此模式的效果受限。蒙版分辨率较低或缺失时，主体分离和发丝细节可能减少，语义光效及相关编辑也可能受限。
 
-源数据模式不会回退到 Vision。缺少必要深度或源元数据时，在发布输出前报错。完整模式保持原有严格资源要求。两种模式共用 Rust 转换和发布路径。
+只有深度的输出可以满足源数据模式契约，但不等于完整语义资源集。OPPO 宠物平面不会被改标为人物或头发蒙版。
 
-源数据模式回归使用两张真实 OPPO 人像样张，以 ImageIO 核对单文件及串行、并行批处理输出，并拒绝任何 Vision 操作。它还验证预处理失败时保留已有输出。运行命令为 `python3 scripts/apple/check_rust_cli_oppo_portrait.py`。
+源数据模式从不回退到 Vision。缺少必需深度或元数据时，操作在发布前失败。完整模式保留严格资源要求。两种模式共用 Rust 转换和发布方式。
 
-## Live Photo
+原生回归采用两张真实 OPPO 人像样本。ImageIO 检查单文件转换及串行、并行批处理输出，测试会拒绝任何 Vision 操作。测试还检查预检失败后已有输出是否保持完整。在符合要求的 Mac 上运行：
 
-普通 Motion Photo → Live Photo 已经是 Rust 产品能力，不应绕回 Apple capability adapter。
+```bash
+python3 scripts/apple/check_rust_cli_oppo_portrait.py
+```
 
-如果未来组合功能需要对 Live Photo 静态照片执行 Apple-only operation，Rust 仍必须持有 Live Photo asset lifecycle、pair identity、publication 和 validation ordering。Apple adapter 只接收它真正需要执行的窄平台 operation。
+## Live Photo 与兼容策略
 
-## 兼容规则
+普通 Motion Photo 转 Live Photo 属于 Rust 操作，不使用 Apple 适配器。未来若对 Live Photo 照片增加 Apple 专用操作，配对身份、验证顺序和发布仍必须由 Rust 负责。
 
-产品级 compatibility rule 属于 Rust。例如 Apple editing feature 是否能与 OPPO-compatible output 组合、源资产是否具备 Portrait editing 所需资源，以及组合请求如何 atomic publish，都应由 Rust 决策。
-
-扩展 CLI 时，不要把这些策略移入 adapter protocol。
+产品兼容性决策保留在 Rust，包括源资源要求、与 OPPO 兼容输出的冲突，以及受支持请求的发布规则。扩展适配器协议时，不能把这些决策移入适配器。
 
 ## 验证与验收
 
-把证据分成三类：
+| 证据类型 | 能够证明的内容 |
+| --- | --- |
+| 结构 | 预期 HEIF/MOV 资源与元数据存在且可解析。 |
+| 原生框架 | 被测 Apple 框架在该环境接受或暴露预期资源。 |
+| 设备 | 指定设备和 Apple Photos 版本上的实际操作成立。 |
 
-1. 结构证据证明 HEIF/MOV resource 和 metadata 存在且可解析；
-2. 原生 framework 证据证明被测试的 Apple framework 能接受或暴露预期资源；
-3. 真机证据证明特定真实设备和 Apple Photos 版本上的行为。
+完成检查要求 Rust 工作区及真实的 Rust 与适配器握手在 macOS 上通过。功能检查调用 Rust CLI，再检查原生消费端结果。结构和原生检查不能证明视觉等同或 Photos 设备验收。
 
-涉及 Apple Photos 交互式编辑的结论，不能用结构证据替代真机证据。
+CLI 验收覆盖命令、媒体转换、与源文件匹配的资源契约和 Apple 适配器。App 集成属于独立范围。源数据模式的效果限制仍是产品取舍，Photos 交互式编辑需要单独证据。
 
-Canonical completion gate 要求 Rust workspace 和真实 Rust → Apple adapter handshake 在 macOS 上通过。feature-specific gate 驱动 Rust CLI 后查询 Apple consumer facts。结构和 native-framework evidence 本身不等于 visual equivalence 或 Photos 真机验收。
-
-CLI 迁移验收覆盖唯一的 Rust 命令入口、媒体转换、与源数据匹配的资源契约和 Apple adapter。macOS App 集成属于独立范围。源数据模式的效果降级是已记录的产品取舍。Photos 交互式编辑仍是独立消费端结论；CLI 通过不代表 Photos 效果或编辑界面完全一致。
-
-## 研究材料
-
-仓库仍保留摄影风格研究代码和 `ReverseKey1Ensemble` 等可选模型。它们属于研究/训练资产，不是产品模式。需要时见[模型卡](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.md)。
+`ReverseKey1Ensemble` 等研究模型属于训练资产，不是产品模式。详见[模型卡](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.md)。
