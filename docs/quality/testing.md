@@ -77,7 +77,9 @@ macOS 27 性能基线保留原始测量值。`apple-styles` 场景允许历史�
 
 唯一可复用的 `research.yml` 工作流持有可移植研究测试、原生 carrier 回读、固定版本的 Photographic Styles tone 扫描、临时 system HEIF HDR 测量和 PVT 接受探针。各 job 使用只读权限并检出准确的 PR 或 main SHA。手动重放不接受替代源码或 secret。原生 tone 与 system HEIF job 使用标准 `xcode-27` runner，测量 artifact 保留一天。它们不提供 `exact-head`，也不能证明 Photos 编辑、滑块响应、保存重开或 Gallery 接受情况。
 
-PVT job 的就绪控制与产品探针使用同一份干净检出。选择的 iPhone 必须在目标 runtime 的显式支持列表中，且满足机型的 runtime 版本范围。创建模拟器前还会独立检查支持列表。只有本次创建的控制模拟器通过检查且已确认删除后，才最多运行一次产品探针。产品回执必须绑定同一源码 SHA、runtime 和机型。控制通过不代表 PVT 已被接受；接受结论需要整个包的身份校验和独立 PhotoKit 回读。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
+PVT job 的就绪控制与产品探针使用同一份干净检出。CI 显式要求已安装的 iOS 27.0 / iPhone 11 配对，避免较新 runtime 或特殊机型悄悄改变基线。任一项缺失或不兼容时，控制会在创建模拟器前阻止执行。直接运行且未指定这两个固定选项时，仍依据目录选择。选择的 iPhone 必须在目标 runtime 的显式支持列表中，且满足机型的 runtime 版本范围。创建模拟器前还会独立检查支持列表。只有本次创建的控制模拟器通过检查且已确认删除后，才最多运行一次产品探针。产品回执必须绑定同一源码 SHA、runtime 和机型。控制将准确的配对通过 `--required-runtime` 和 `--required-device-type` 传入产品探针；探针依据最新目录校验该配对，不重新选择替代项。构建和准备完成后，创建前还会再次校验同一配对。配对缺失或不兼容时阻止创建。控制通过不代表 PVT 已被接受；接受结论需要整个包的身份校验和独立 PhotoKit 回读。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
+
+控制和产品的启动监视器除要求进程零退出外，还要求输出包含本次持有设备的 `Finished` 终态记录。迁移失败、已启动快捷返回或未知输出都会阻止库存查询或安装。这项检查不替代库存查询、Photos Save 或独立 PhotoKit 回读。
 
 PVT 阶段观察绑定源码和本次会话，并在各自标明的进程时钟内保留单调时间。未开始或超时的阶段不会产生接受结论。cleanup 命令结果与独立观察到的资源缺席是不同事实；后续缺席观察不会改写原回执的失败或不确定状态。控制包装层用 `status` 保留整次运行的接受状态，用 `product_observations` 保留原生事实；清理失败不会抹去已验证的准入观察。可移植事件测试和历史回放只验证 harness 报告行为。声明变更后的原生 runner 可运行，需要一次本次持有模拟器的实际执行；Photos 接受结论仍需完整保存和独立回读路径。
 
