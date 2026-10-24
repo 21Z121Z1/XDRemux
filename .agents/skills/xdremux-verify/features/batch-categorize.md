@@ -1,21 +1,36 @@
 # Batch and categorize
 
-Exercise the batch and classification interfaces separately from single-file conversion, including receipts, provenance, paired assets, and output reservations when affected.
+Exercise batch and categorization separately from single-file conversion. If affected, check receipts, provenance, paired assets, and output reservations.
 
-## Sub-features
+## Select the affected behavior
 
-Check input discovery, converted/failed/skipped outcomes, collision handling, checkpoint identity, resource-omission reporting, and categorization dry-run effects as applicable to the change.
+Check the behavior changed by the task:
 
-## How to get to it (user POV)
+- Input discovery and converted, failed, or skipped outcomes.
+- Collision handling and checkpoint identity.
+- Resource-omission reporting and categorization dry-run effects.
 
-Use `xdremux batch --input INPUT --output-dir NEW_DIRECTORY --jobs 1 --json`. Use `xdremux categorize --input INPUT --output-dir NEW_DIRECTORY --dry-run --json` for a classification plan. `--input-dir`, `--recursive`, `--resume`, and `--skip-existing` add distinct behaviors; select those that changed.
+## Use the public entry points
 
-## Driving it with the Rust CLI
+For batch conversion, use `xdremux batch --input INPUT --output-dir NEW_DIRECTORY --jobs 1 --json`.
 
-Preconditions: create isolated output/checkpoint roots and record fixture identity. Use the public Samsung HEIF Motion Photo to avoid a large JPEG encode for a small batch check. Inspect the receipt and independently validate the resulting pair. Check both members stay together and the source hash remains unchanged.
+For a classification plan, use `xdremux categorize --input INPUT --output-dir NEW_DIRECTORY --dry-run --json`.
 
-Run `bash scripts/validation/check_rust_cli_smoke.sh` for its existing CLI/receipt/categorization journey. For related changes, use `bash scripts/validation/verify_batch_categorize_idempotence.sh` and the owning runtime batch/provenance tests. Observe the filesystem before and after a dry-run instead of assuming its name proves no writes. Retain transcripts and output identities outside scripts' disposable work directories.
+The options `--input-dir`, `--recursive`, `--resume`, and `--skip-existing` select distinct behavior. Exercise the options affected by the change.
 
-## Gotchas
+## Run the checks
 
-Single convert success does not prove batch receipts, omitted-resource reporting, resume identity, or parallel path reservations. An input hash match alone does not establish all output identity/provenance requirements. Do not reuse a shared checkpoint or output directory from another worker.
+Before starting, create separate output and checkpoint roots. Record the fixture identity. For a small batch check, use the public Samsung HEIF Motion Photo. This avoids encoding a large JPEG.
+
+1. Inspect the receipt and independently validate the output pair.
+2. Check that both pair members stay together and the source hash is unchanged.
+3. Run `bash scripts/validation/check_rust_cli_smoke.sh` for its existing CLI, receipt, and categorization journey.
+4. For related changes, run `bash scripts/validation/verify_batch_categorize_idempotence.sh` and the owning runtime batch and provenance tests.
+5. Observe the filesystem before and after a dry-run. The option name alone does not prove that no writes occurred.
+6. Keep transcripts and output identities outside the scripts' disposable work directories.
+
+## Interpret the evidence
+
+Single-file conversion does not establish batch receipts, omitted-resource reporting, resume identity, or parallel path reservations. A matching input hash does not establish every output identity or provenance requirement.
+
+Do not reuse another worker's shared checkpoint or output directory.
