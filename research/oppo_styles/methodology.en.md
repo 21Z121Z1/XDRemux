@@ -1,60 +1,135 @@
-# Native-consumer and low-dimensional experiments
+# Methods for native-response and calibration experiments
 
 English | [简体中文](methodology.md)
 
-This preserves the solver branch's **research methodology**, not an alternate converter or a claim that private experiments have been reproduced. The previously referenced convergence ledger is not present in this tree. Recover the original ledger and source identities before relying on retired-ref provenance; this methodology is not a substitute for those records. The unchanged public model and historical measurements are documented separately in its [model card](models/UniversalPhotographicStyleStateNet.model-card.en.md).
+This document preserves methods and limitations from the historical solver experiments. It does not reproduce the private experiments or define another converter. The [model card](models/UniversalPhotographicStyleStateNet.model-card.en.md) identifies the public model and its historical measurements.
 
-## Data boundaries and prospective cohorts
+The earlier convergence ledger is absent from this tree. Claims about retired references require the original ledger and source identities. This account cannot replace that evidence.
 
-The historical native dataset reported 603 samples in 472 capture sessions; 417/89/97 are **sample** counts in session-disjoint train/calibration/heldout splits, not three session counts. The private manifest and source bytes are absent from Git. Reproduction requires those inputs and their identities; the public model package cannot establish the claimed split by itself.
+## Separate the data cohorts
 
-The native-consumer freezer selected the lexicographically smallest source SHA-256 within each existing split/device, without inspecting image quality or metrics: four devices × one calibration session and four different heldout sessions. A proper replay must hash the actual bytes, reject missing/repeated/session-overlapping samples, pin dataset/model/checkpoint/code/OS identities, and publish a new immutable manifest. The old script trusted inventory hashes and overwrote its destination; those mechanics are not retained.
+The historical native dataset contained 603 samples from 472 capture sessions. The training, calibration, and heldout splits contained 417, 89, and 97 samples. These are sample counts, not session counts. The account reports session-disjoint splits, but the private manifest and source bytes are absent from Git.
 
-The prospective OPPO freezer excluded four historical A/B scenes and every SHA-256 found in their earlier audit, then selected one available image per canonical device by source hash. Five device groups were reported. The inventory had already been observed without labels: “prospective consumer cohort” is not an untouched image-distribution claim. Exclude both scene and byte identities, document previous exposure, and never resample after looking at responses. A path's existence does not establish its recorded hash.
+The native-response cohort used the lexicographically smallest source SHA-256 in each existing split and device group. Selection did not inspect image quality or metrics. The reported cohort covered four devices, with one calibration session and a different heldout session for each device.
 
-Historical A/B scenes were used for model/scale selection and are explicitly **unlocked**. The OOD trial's calibration-p95 uncertainty admission measures coverage, not native rendering accuracy. DNG previews do not constitute decoded RAW observations. Maintained `training.py` and `inference.py` enforce the decoded-modality and byte-identity contracts instead of restoring marker/suffix heuristics.
+For a new run, hash the actual bytes. Reject missing files, repeated identities, and sessions shared between splits. Record the dataset, model, checkpoint, code, and OS identities in a new immutable manifest. The retired selector trusted inventory hashes and overwrote its destination. Those operations are not a reproducible identity check.
 
-## Native response matrix and causal controls
+The prospective OPPO cohort excluded four historical A/B scenes and every SHA-256 in their earlier audit. It then selected one available image per device group by source hash. Five device groups were reported. The inventory had already been inspected without labels, so "prospective consumer cohort" does not mean an unseen image distribution.
 
-Freeze all eight states before rendering: `disabled`, `neutral`, `tone_+1`, `tone_-1`, `color_+1`, `color_-1`, `tc100_mid`, `tc100_plus`. Preserve the original and candidate carriers, state requests, actual returned pixels, source/candidate/model/checkpoint hashes, framework/OS identity, commands, exit status and errors. A structural Styles graph, a finite proxy response, and an actual private-renderer response are different evidence.
+Exclude both scene identities and byte identities. Record earlier exposure to the inventory. Do not select new images after examining model responses. A path that exists does not prove that its contents match the recorded hash.
 
-The native alpha grid was `[0, .25, .5, .625, .75, 1]`, with current baseline `.625`; proposed residual gains were `[.5, .75, 1, 1.25, 1.5]`. Selection used calibration only: at least 1% improvement, no device regression above 10%, and no increase in missing/failed responses or direction reversals. All required states/cohorts must actually be present before making that comparison. The score was a mean of per-state encoded-RGB RMSE values, not a pooled linear-light error. Keep color-space, orientation, dimensions and bit-depth interpretation fixed; do not silently convert incompatible pixel contracts.
+Historical A/B scenes influenced model and scale selection. They are therefore **unlocked**. The out-of-distribution trial used calibration-p95 uncertainty as an admission threshold. That threshold measures coverage, not native rendering accuracy. DNG previews are not decoded RAW observations.
 
-The old alpha summarizer had an invalid generalization: it labeled heldout baseline cached pixels with `chosenAlpha` even when another alpha could be selected. It also averaged partial state sets and used multiple filename fallbacks. The old consumer summarizer's Markdown conclusion could say calibration was complete even when its JSON said otherwise. **These report writers are intentionally retired, not transplanted.** A missing candidate/state stays missing; candidate results must reference that exact candidate, never a baseline cache. Write heldout results only after persisting the selected parameters and their provenance, and make the machine-readable and human-readable decision agree.
+Current [training.py](training.py) and [inference.py](inference.py) require decoded optional inputs and checked byte identities. They do not infer input availability from file extensions or marker strings.
 
-A no-cache control compared alpha 0, .625 and 1: distinct key1 inputs, distinct carriers and separate requests/output paths for `neutral` and `tone_plus`. Identical rendered pixels can legitimately show consumer insensitivity; unequal pixel hashes are not an acceptance requirement. Conversely, different filenames do not prove different requests or execution. Hash the actual request-to-carrier chain and retain the renderer's output identity. Never replace an unavailable renderer with identity output or a semantic proxy.
+## Freeze the response matrix
 
-Issue #32 described private-ABI drift on macOS 27.0 `26A5416b` / Xcode 27 `27A5218g`: the old `PLPhotoEditSource` initializer lost an image argument, and `_NUStyleTransferApplyProcessor` gained displacement before color space. Those old Swift producer/oracle callers are not the Rust product or current narrow adapter. Future local consumer harnesses must inventory and validate exact method signatures before calling; a timeout, missing selector or ABI mismatch is blocked evidence, not successful identity fallback. No firmware acquisition or private renderer is enabled in CI by this convergence.
+The historical matrix used these eight states:
 
-## Frozen low-dimensional correction
+| State | Role |
+| --- | --- |
+| `disabled` | Disabled-style reference. |
+| `neutral` | Neutral-style reference. |
+| `tone_+1` | Positive Tone endpoint. |
+| `tone_-1` | Negative Tone endpoint. |
+| `color_+1` | Positive Color endpoint. |
+| `color_-1` | Negative Color endpoint. |
+| `tc100_mid` | Historical combined-control state. |
+| `tc100_plus` | Historical combined-control state. |
 
-The useful contract from `evaluate_selfpair_lowdim_adapter.py` is now `calibration.py`: fit thirty normalized polynomial/output-channel biases shared across space and planes, serialize them, and apply **only those stored values**. The fit uses observed blocks and positive ridge regularization; application has no target or mask argument. Neither call mutates its inputs. Finite values, array shapes, scale positivity, bounded size and arithmetic overflow are checked.
+Freeze the complete matrix before rendering. Preserve the original and candidate carriers, requests, returned pixels, and source, candidate, model, and checkpoint hashes. Record the framework, OS, commands, exit status, and errors.
+
+A complete Styles resource graph, a finite proxy response, and a native-renderer response are different evidence. Keep color space, orientation, dimensions, and bit-depth interpretation fixed. Do not silently convert incompatible pixel representations.
+
+The alpha grid was `[0, .25, .5, .625, .75, 1]`, with baseline `.625`. Proposed residual gains were `[.5, .75, 1, 1.25, 1.5]`. Calibration selected a candidate only when all these conditions held:
+
+- Improvement was at least 1%.
+- No device regressed by more than 10%.
+- Missing responses, failed responses, and direction reversals did not increase.
+- Every required state and cohort was present.
+
+The score averaged encoded-RGB RMSE across states. It was not a pooled linear-light error.
+
+## Preserve failures in the reports
+
+The old alpha summarizer could label cached heldout baseline pixels with `chosenAlpha`, even when selection chose another alpha. It also averaged incomplete state sets and tried multiple filename fallbacks. Another summarizer could report complete calibration in Markdown while its JSON reported incomplete calibration. These report writers are retired.
+
+A missing candidate or state must remain missing. Candidate measurements must use that exact candidate, not a baseline cache. Persist selected parameters and their provenance before evaluating heldout data. Machine-readable results and prose must report the same decision.
+
+A no-cache control compared alpha 0, .625, and 1. It used distinct Key 1 inputs and carriers, with separate `neutral` and `tone_plus` requests and outputs. Equal pixels can show that a consumer ignores a change. Unequal hashes are not an acceptance requirement.
+
+Different filenames do not prove different requests or executions. Hash the request-to-carrier sequence and retain the renderer output identity. Do not replace an unavailable renderer with identity output or a semantic proxy.
+
+The historical account of Issue #32 describes private-ABI changes on macOS 27.0 `26A5416b` with Xcode 27 `27A5218g`. The old `PLPhotoEditSource` initializer lost an image argument. `_NUStyleTransferApplyProcessor` gained a displacement argument before color space. Those retired Swift callers are not the current Rust product or narrow adapter.
+
+Before calling a private method in a local experiment, inspect and validate its exact signature. A timeout, missing selector, or ABI mismatch is blocked evidence. It is not a successful identity fallback. Current research CI is defined separately in [research.yml](../../.github/workflows/research.yml), including its pinned tone-response experiment. This historical account does not certify those runs.
+
+## Apply a frozen correction
+
+[calibration.py](calibration.py) preserves the useful contract from `evaluate_selfpair_lowdim_adapter.py`. It fits thirty normalized polynomial/output-channel biases shared across all spatial and plane positions. The fit uses observed blocks and positive ridge regularization.
+
+Application uses only stored coefficients. Its interface has no target or mask argument. Fitting and application leave their inputs unchanged. Both check finite values, array shapes, positive scales, bounded size, and arithmetic overflow.
+
+Fit on the designated training cohort:
 
 ```python
 from research.oppo_styles.calibration import ChannelBias, fit_channel_bias, apply_channel_bias
 
-# Fit from a designated training cohort; calibrate/select without refitting it.
 fitted = fit_channel_bias(train_prediction, train_target, train_mask, scales, ridge=10.0)
-frozen_record = fitted.to_dict()  # bind this record to code/cohort/model hashes
-# After selection has been persisted, restore it for heldout application.
+frozen_record = fitted.to_dict()
+```
+
+Bind the saved record to code, cohort, and model hashes. Use calibration for selection without fitting those coefficients again. After selection is recorded, restore the coefficients for heldout application:
+
+```python
 restored = ChannelBias.from_dict(frozen_record)
 heldout_prediction = apply_channel_bias(heldout_base_prediction, scales, restored)
 ```
 
-The old script saved fitted biases but ignored them in its heldout channel-ridge branch, calling a function that read heldout targets and fitted again. That violates its “never refit on heldout” comment. The new application interface cannot do this. Tests vary labels after freezing, change spatial/plane dimensions, round-trip the record and reject non-finite/overflowing inputs. These tests establish a frozen-parameter contract, not native accuracy.
+The retired script saved biases but ignored them in its heldout channel-ridge branch. That branch read heldout targets and fitted again, contrary to its own comment. The maintained application interface cannot accept those labels.
 
-Other historical families remain hypotheses rather than supported estimators: blend alpha in .05 increments; global residual gains .85–1.15 and normalized biases −.02–.02; per-device/profile or luminance blends; shared/channel bias; one-parameter device bias with ridge 1/3/10/30/100/300; rank-1/2/3 session-mean residual PCA with image RGB means/deviations and ridge 100; and kNN 3/5 with .25/.5/1 shrink. Train sessions supplied fits; calibration supplied selection/promotion, with fixed `.625` fallback for unknown device profiles. Use session-cluster bootstrap (the old experiment used 20,000 draws, seed 260819), not independent-pixel confidence intervals. Independent heldout must not fit coefficients or choose the family.
+Tests change labels after the fit, vary spatial and plane dimensions, restore saved coefficients, and reject non-finite or overflowing inputs. They prove the frozen-coefficient contract, not native accuracy.
 
-The 17 Pro scripts unconditionally emitted rejection strings. One “30-parameter term/channel gain” candidate was actually an identity no-op; its “bias” used one scalar. Some profile reconstruction paths implemented only device-alpha variants. Those labels are not proof that every declared family was fitted or evaluated correctly. Preserve them as negative/limited historical attempts; any renewed estimator needs a faithful mathematical implementation, explicit fitted state, source-order/session checks, and a genuinely executed promotion rule. Do not reuse those scripts' hard-coded verdicts as acceptance.
+## Distinguish proposed estimators from executed fits
 
-## Training attempts and export parity
+Other historical families remain research hypotheses:
 
-True paired input and single-image self-pair are explicit `TrainingInputMode` values in the maintained research training package. Self-pair changes observations, not native targets or cached bytes. The historical heads-only mixed experiment combined true/self-pair Huber losses and a detached true-prediction consistency target, with a tiny learning rate; it used permissive checkpoint loading and unguarded reusable outputs. Its checkpoint/report wrapper is retired. A future repeat must use provenance-checked restricted loading, fresh run directories, finite optimization, frozen splits and actual calibration-selected checkpoints.
+| Family | Recorded search space |
+| --- | --- |
+| Alpha blend | Increments of .05. |
+| Global correction | Residual gain .85–1.15 and normalized bias −.02–.02. |
+| Conditional blend | Device/profile or luminance-dependent blends. |
+| Shared correction | Shared bias or channel bias. |
+| Device correction | One bias parameter with ridge 1/3/10/30/100/300. |
+| Session residual PCA | Rank 1/2/3, image RGB means and deviations, ridge 100. |
+| kNN | 3/5 neighbors with .25/.5/1 shrink. |
 
-The old card reported short self-pair candidates at normalized heldout MAE .80226 and .78751, both worse than the .78220 self-pair baseline; neither was promoted. Universal → frozen paired cascade reported .82674, worse than standalone universal .82233. The cascade used the universal model's predicted unstyled thumbnail; an oracle supplied the real native disabled thumbnail. Do not conflate those inputs or present the oracle as runtime capability. These are historical private measurements, not newly executed CI results.
+Training sessions supplied fits. Calibration selected the family and promotion decision. Unknown device profiles used a fixed `.625` fallback. The historical bootstrap used capture-session clusters, 20,000 draws, and seed 260819. Independent pixels are not independent samples for these confidence intervals. Heldout data must neither fit coefficients nor select a family.
 
-The old Core ML parity harness compared key1/light-map errors at .02 tolerance, GTC byte error up to 2 and scalar discrepancy .1, against Python candidate outputs. Repeating that claim requires the exact training checkpoint, normalization/layout, source bytes, Core ML package, compute configuration and orientation-aware serialization. Those private inputs are not available from the package alone. Current `CoreMLProbe.swift` compiles and executes the public package on synthetic inputs with finite shape checks; it deliberately does not claim Python/native-renderer parity or actual Neural Engine placement.
+The 17 Pro scripts emitted rejection strings unconditionally. A candidate named "30-parameter term/channel gain" was an identity operation, and its "bias" used one scalar. Some profile reconstruction paths implemented only device-alpha variants. Their names do not prove that the declared families were correctly fitted or evaluated.
 
-## Promotion gate
+A renewed estimator needs its actual mathematical implementation, explicit fitted state, source-order and session checks, and an executed promotion rule. Hard-coded verdicts are not acceptance evidence.
 
-A research result may advance only with frozen identities/splits, a complete relevant response matrix, no hidden fallback or label leakage, meaningful identity/shuffle/paired/ablated controls, declared device guards and repeatable source-conditioned resources. Product promotion additionally requires integration into the existing Rust intent/capability/publication owners, role-correct metadata, native-consumer checks and—when claimed—real Photos import/edit/save/reopen evidence. None of the preserved hypotheses is automatically a product defect or a shipped feature.
+## Interpret training and export attempts
+
+The maintained training package distinguishes paired input and single-image self-pair through `TrainingInputMode`. Self-pair changes observations, not native targets or cached bytes.
+
+A historical heads-only experiment combined true-pair and self-pair Huber losses with a detached true-prediction consistency target. It used a very small learning rate, permissive checkpoint loading, and reusable output directories without safeguards. Its checkpoint/report wrapper is retired. A repeat needs checked provenance, restricted loading, fresh run directories, finite optimization, fixed splits, and calibration-selected checkpoints.
+
+| Historical attempt | Reported normalized heldout MAE | Comparison |
+| --- | ---: | --- |
+| Short self-pair candidate 1 | .80226 | Worse than self-pair baseline .78220. |
+| Short self-pair candidate 2 | .78751 | Worse than self-pair baseline .78220. |
+| Universal followed by frozen paired model | .82674 | Worse than standalone universal .82233. |
+
+Neither short self-pair candidate was promoted. The cascade used an unstyled thumbnail predicted by the universal model. The oracle used a real native disabled thumbnail. These inputs are different. Oracle accuracy is not a runtime capability. The figures are private historical measurements, not new CI results.
+
+The former Core ML comparison allowed .02 error for Key 1 and light maps, up to 2 for GTC byte values, and .1 for scalars. A repeat needs the exact checkpoint, normalization, layout, source bytes, Core ML package, compute configuration, and orientation-aware serialization. The package alone does not supply the private inputs.
+
+Current [CoreMLProbe.swift](CoreMLProbe.swift) compiles the public package and executes synthetic inputs with finite-value and shape checks. It uses `.cpuOnly`. It does not establish Python-output equivalence, native-renderer equivalence, or Neural Engine placement.
+
+## Requirements for product use
+
+A research result requires fixed identities and splits, a complete response matrix, and no hidden fallback or label leakage. Controls must include meaningful identity, shuffled, paired, and ablated cases. Device limits and source-conditioned resources must be explicit and reproducible.
+
+Product integration also requires the existing Rust intent, capability, and publication owners. Metadata must have the correct role, and native consumers must be tested. Claims of Photos editability require actual import, edit, save, and reopen evidence. A preserved hypothesis is not automatically a product defect or a shipped feature.
