@@ -2317,9 +2317,9 @@ pub fn transplant_apple_semantic_auxiliary_heif(
         iref.entries.iter().any(|reference| {
             reference.kind == AUXL
                 && reference.from_item_id != source_gain_image
-                && !source_alpha
+                && source_alpha
                     .as_ref()
-                    .is_some_and(|alpha| alpha.root == reference.from_item_id)
+                    .is_none_or(|alpha| alpha.root != reference.from_item_id)
         })
     }) {
         return Err(semantic_graph_error(

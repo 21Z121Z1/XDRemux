@@ -6,6 +6,7 @@ import AppKit
 private enum WorkspaceMode: String, CaseIterable, Identifiable {
     case convert = "转换"
     case categorize = "按模式分类"
+    case hdrLook = "摄影风格 HDR"
 
     var id: String { rawValue }
 }
@@ -13,6 +14,7 @@ private enum WorkspaceMode: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @State private var viewModel = XDRemuxViewModel()
     @State private var categorizationViewModel = PhotoCategorizationViewModel()
+    @State private var hdrLookViewModel = HDRLookViewModel()
     @State private var workspaceMode = WorkspaceMode.convert
     @State private var isTargeted = false
     @State private var isSettingsPresented = false
@@ -23,8 +25,10 @@ struct ContentView: View {
         Group {
             if workspaceMode == .convert {
                 conversionWorkspace
-            } else {
+            } else if workspaceMode == .categorize {
                 PhotoCategorizationView(viewModel: categorizationViewModel)
+            } else {
+                HDRLookView(viewModel: hdrLookViewModel)
             }
         }
         .navigationTitle("XDRemux")
@@ -37,7 +41,7 @@ struct ContentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .frame(width: 360)
             }
 
             if workspaceMode == .convert {

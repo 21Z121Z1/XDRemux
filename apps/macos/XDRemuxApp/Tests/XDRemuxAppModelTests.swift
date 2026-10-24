@@ -56,6 +56,7 @@ struct XDRemuxAppModelTests {
         try testSimplifiedProductSwitches()
         try testIndependentAppleFeatureConfiguration()
         try await testCLIClientDrainsBothPipesWhileRunning()
+        try await testHDRLookUsesCanonicalCLIAndDisplaysPartialFailure()
         try await testSkipRequiresValidationForTheRequestedFeature()
         try testOutputCannotOverwriteQueuedInputsOrAliases()
         try await testCategorizedConversionCreatesDirectories()
@@ -99,6 +100,45 @@ struct XDRemuxAppModelTests {
             try? FileManager.default.removeItem(at: root.deletingLastPathComponent())
         }
         try await body(root)
+    }
+
+    @MainActor
+    private static func testHDRLookUsesCanonicalCLIAndDisplaysPartialFailure() async throws {
+        try await withCLI(#"""
+        printf '%s\n' "$@" > "$(dirname "$0")/arguments"
+        cat <<'JSON'
+        {"output_dir":"/tmp/hdr-look-results","failures":1,"results":[
+          {"input":"good.heic","output":"good.hdr-look.heic","status":"success"},
+          {"input":"bad.heic","output":"bad.hdr-look.heic","status":"failed","error":"missing Styles metadata"}]}
+        JSON
+        exit 1
+        """#) { root in
+            let input = root.appendingPathComponent("中文 $(literal) image.HEIC")
+            let output = root.appendingPathComponent("output folder")
+            let model = HDRLookViewModel()
+            model.addInputs([input, input])
+            model.outputDirectory = output
+            model.headroom = 4
+            model.run()
+            try expect(model.isRunning && !model.canRun, "HDR operation must disable repeated runs")
+            model.clear()
+            model.addInputs([root])
+            try expect(model.inputURLs == [input], "busy HDR queue must remain stable")
+            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            while model.isRunning, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try expect(!model.isRunning, "HDR operation timed out")
+            try expect(model.errorMessage == nil && model.receipt?.failures == 1,
+                       "partial CLI failure must retain per-photo results")
+            try expect(model.receipt?.results[1].error == "missing Styles metadata", "show native failure")
+            let arguments = try String(contentsOf: root.appendingPathComponent("arguments"), encoding: .utf8)
+                .split(separator: "\n").map(String.init)
+            try expect(arguments == ["hdr-look", "--recursive", "--headroom", "4", "--json",
+                                     "--output-dir", output.path, "--", input.path],
+                       "HDR app must preserve paths and delegate to the Rust entry point")
+            try expect(!FileManager.default.fileExists(atPath: output.path), "Swift transport must not write reports")
+        }
     }
 
     private static let conversionCLI = #"""

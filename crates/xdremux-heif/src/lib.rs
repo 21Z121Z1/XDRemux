@@ -7,6 +7,7 @@ pub mod error;
 mod native;
 mod orientation;
 mod semantic;
+mod style_reconstruction;
 mod styles;
 mod texture;
 mod validation;
@@ -22,6 +23,10 @@ pub use error::{HeifError, Result};
 pub use native::IsoGainMapAssembly;
 pub use orientation::{primary_coded_geometry, PrimaryCodedGeometry};
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
+pub use style_reconstruction::{
+    extract_style_display_mattes, extract_style_reconstruction_resources, primary_image_signature,
+    StyleDisplayMatte, StyleReconstructionResources,
+};
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
 pub use texture::{
     assemble_texture_styles_heif, has_texture_style_metadata, TextureStyleMask,

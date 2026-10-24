@@ -6,7 +6,7 @@ enum ConversionSmokeError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .usage:
-            return "Usage: XDRemuxAppConversionSmoke <input.heic> <output.heic> [--apple-styles] [--apple-portrait] [--oppo-compatible]"
+            return "Usage: XDRemuxAppConversionSmoke <input.heic> <output> [--apple-styles|--apple-portrait|--oppo-compatible|--hdr-look]"
         }
     }
 }
@@ -21,6 +21,14 @@ struct XDRemuxAppConversionSmoke {
 
         let inputURL = URL(fileURLWithPath: args[0])
         let outputURL = URL(fileURLWithPath: args[1])
+        if args.count == 3, args[2] == "--hdr-look" {
+            let receipt = try RustCLIClient.hdrLook(inputs: [inputURL], outputDirectory: outputURL, headroom: 8)
+            guard receipt.failures == 0, !receipt.results.isEmpty else {
+                throw RustCLIClient.ClientError.launchFailed(String(describing: receipt))
+            }
+            for item in receipt.results { print(item.output) }
+            return
+        }
         var config = ConversionConfig()
 
         var index = 2

@@ -2,6 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import Darwin
+import XDStylesNative
 import XDCinematicNative
 
 #if !arch(arm64)
@@ -758,6 +759,17 @@ private func encodedResponse(for input: Data) throws -> Data {
 
     guard nativeProductHostIsSupported else {
         fail("XDRemux Apple adapter requires arm64 and macOS 27 or newer", status: 1)
+    }
+
+    if ["styles-decode-reverse", "styles-encode-linear", "styles-readback", "styles-decode-matte"].contains(request.operation) {
+        let object = try JSONSerialization.jsonObject(with: input) as! [String: Any]
+        var nativeError: NSError?
+        guard let result = XDStylesPerform(object, &nativeError) else {
+            throw nativeError ?? NSError(domain: "XDStylesNative", code: 1)
+        }
+        var encoded = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+        encoded.append(0x0A)
+        return encoded
     }
 
     let response: AdapterResponse

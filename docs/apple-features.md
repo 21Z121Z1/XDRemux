@@ -92,7 +92,7 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 
 同一个 26A434 consumer `PISemanticStyleFilter` 也决定风格元数据如何生成：
 
-- key 3 是一条 256 节点曲线，逐通道独立采样。横坐标是乘过 plist base gain 之后的线性缩略图码值 `min(S, 1)`，不做亮度合并，也不做分位数归一化。曲线是这些主图通道观测均值的单调投影。consumer 额外曝光 `E` 是渲染参数，不写入曲线。
+- key 3 是一条 256 节点曲线，逐通道独立采样。横坐标是乘过 plist base gain 之后的线性缩略图码值 `min(S, 1)`，不做亮度合并，也不做分位数归一化。曲线是这些主图通道观测均值的单调投影。consumer 额外曝光 `E` 是渲染参数，不写入曲线。下游 `LinearGTCImage` 统计和报告中的拟合误差使用实际写出的 key 3 节点，按实测 macOS 合同在固定 65535 尺度执行 inverse-sRGB，不再使用量化前的拟合曲线。256 个解码节点保留 f32，忽略末尾重复的 wire word。iPhone 固件按终点归一化的 half 表属于另一条绑定。
 - key `c` 和 `d` 保持 32×32。每格保存一个 guide 的面积均值：`c` 是主图，`d` 是线性缩略图。consumer 用自己的 guided filter（`r = 1`，`eps ≈ 0.05`）上采样，再计算 `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`。这两张图不再乘固定仿射，也不直接乘到亮度上。消费 `q` 的后续 shader 阶段没有反解，因此这些均值不是解出来的局部调性。
 - key 1 是 x-major 的 12×9×8×10×3 half 数组，二次基为 `[1, R, G, B, R², RG, RB, G², GB, B²]`。每个 spotlight 格子和每个亮度 plane 分开拟合。拟合方向是 remove-style：多项式读取显示中的主图，目标是缩略图码值。局部样本无法确定的系数保持恒等残差。plane 权重使用已核实的 `inputIsLinear = false` 公式，计算在 `f64` 中进行，不模拟 half，也不应用可选的 3×3 空间滤波。
 

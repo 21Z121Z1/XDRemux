@@ -9,6 +9,7 @@ CANONICAL_BILINGUAL_PAIRS = (
     ("README.en.md", "README.md"),
     ("docs/README.en.md", "docs/README.md"),
     ("docs/cli.en.md", "docs/cli.md"),
+    ("docs/styles-reconstruction.en.md", "docs/styles-reconstruction.md"),
     ("docs/apple-features.en.md", "docs/apple-features.md"),
     ("docs/development.en.md", "docs/development.md"),
     ("docs/architecture.en.md", "docs/architecture.md"),

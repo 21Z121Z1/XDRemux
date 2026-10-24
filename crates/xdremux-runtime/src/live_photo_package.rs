@@ -111,14 +111,14 @@ pub(crate) fn planned_members(package: &Path) -> Result<PackageMembers> {
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn rename_exclusive(source: &Path, destination: &Path) -> io::Result<()> {
+pub(crate) fn rename_exclusive(source: &Path, destination: &Path) -> io::Result<()> {
     use rustix::fs::{renameat_with, RenameFlags, CWD};
     // Darwin maps NOREPLACE to RENAME_EXCL and fails if renameatx_np is absent.
     renameat_with(CWD, source, CWD, destination, RenameFlags::NOREPLACE).map_err(io::Error::from)
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-fn rename_exclusive(_source: &Path, _destination: &Path) -> io::Result<()> {
+pub(crate) fn rename_exclusive(_source: &Path, _destination: &Path) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
         "atomic exclusive PVT directory publication is unavailable on this platform",
