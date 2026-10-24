@@ -159,7 +159,7 @@ For broader Motion Photo changes, use `scripts/validation/check_rust_motion_phot
 
 ## Check native PVT admission
 
-Use an arm64 macOS host with the required Xcode SDK and iOS simulator runtime. From a clean, committed checkout, run:
+Use an arm64 macOS host with the required Xcode SDK. For the CI baseline, the installed iOS 27.0 runtime must support iPhone 11. From a clean, committed checkout, run:
 
 ```bash
 pvt_repo="$(git rev-parse --show-toplevel)"
@@ -170,18 +170,26 @@ python3 scripts/apple/pvt_native_import/readiness_control.py \
   --expected-head "$pvt_head" \
   --output-root "$pvt_proof/control" \
   --product-output-root "$pvt_proof/product" \
+  --required-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-0 \
+  --required-device-type com.apple.CoreSimulator.SimDeviceType.iPhone-11 \
   --execute-owned-simulator
 ```
 
 The `pvt-native-import` job in `research.yml` runs this control and product sequence against one exact PR or main checkout. The receipt records the full source SHA, source tree, product owner trees, and probe-file hashes.
 
+The CI job requires this exact runtime and device pair. A missing or incompatible pair blocks simulator creation. For a separate catalog-selected experiment, omit both pin options. Supplying only one is a usage error.
+
 Keep both output roots outside the checkout. The product output root must not exist before the run.
 
 ### Require a passed readiness control
 
-The selector chooses from runtime-supported device identifiers that are also version-compatible iPhones. Before creating its own simulator, the readiness control independently checks this membership.
+The selector checks explicit runtime support and the device type's runtime version bounds. Before creating its simulator, the readiness control independently verifies membership in the supported list. With both pin options, it validates only that pair and selects no replacement.
 
-The control boots its simulator and reads the installed-app inventory once. It then checks deletion in both the device registry and the host directory. Only a passed and cleaned control permits one product probe.
+The control starts and monitors its simulator with `simctl bootstatus OWNED_UDID -b`. Both control and product require exit code `0` and a recognized `Finished` terminal record for the owned device. Migration failure, an already-booted shortcut, or unknown output blocks further work.
+
+After successful boot monitoring, the control reads the installed-app inventory once. It then checks deletion in both the device registry and the host directory. Only a passed and cleaned control permits one product probe.
+
+The control passes its exact pair through `--required-runtime` and `--required-device-type`. The product validates that pair against fresh catalogs without selecting a replacement. After build and preparation, it checks the same pair again immediately before creation. A changed or incompatible pair blocks creation.
 
 The product receipt must match the control's source SHA, runtime, and device type. The control can warm CoreSimulator. It does not establish a cold-start repair or Photos admission.
 
