@@ -1,21 +1,42 @@
-# 厂商 Live Photo 几何证据摘要
+# 厂商 Live Photo 几何：证据摘要
 
 [English](vendor-live-photo-geometry.summary.en.md) | 简体中文
 
-这是证据记录 [vendor-live-photo-geometry.md](vendor-live-photo-geometry.md) 的当前语言摘要。
+[原始记录](vendor-live-photo-geometry.md)描述了早期 Swift 实现及其厂商几何实验，保留了 ColorOS 16、Samsung、压缩媒体和 Apple 元数据方面的观察。文中的 Vision 轨迹处理流程不是当前 Rust 执行路径。
 
-原文件记录厂商特有 Live Photo 几何工作的证据边界。保留其中的详细观察作为证据。
+## 当前 Rust 行为
 
-## 当前稳定结论
+[Live Photo 运行时](../../crates/xdremux-runtime/src/live_photo.rs)选择主要动态视频流，并通过 LibLivePhoto 重新封装。几何信息以元数据表示。该路径不会把形变、缩放、模糊边框或画布扩展渲染到视频像素中。
 
-production Live Photo 链路保留配套 Motion Video bitstream，不把几何校正直接渲染到视频像素。
+对于 Oplus 方言，运行时解析 OPPO 元数据并交给 [`presentation_geometry`](../../crates/xdremux-motion-photo/src/geometry.rs)。选择变换时，它不调用历史 Vision 估计器，也不分析辅助视频流。
 
-对于 vendor geometry policy 覆盖的输入，转换器可以使用源 metadata 和只用于分析的辅助资源，选择 Live Photo transform metadata。
+| 源元数据 | 当前变换策略 |
+| --- | --- |
+| 元数据版本 1 或更高 | 优先使用有效的 `photo_eis_crop_factor`，其次使用 `eis_crop_factor`。两者都不可用时，使用既有 `0.90` 缩放。 |
+| 裁剪因子大于 1 | 使用倒数；`1.11` 变为 `1 / 1.11`。 |
+| 裁剪因子为正且不大于 1 | 保留原值；`0.90` 仍为 `0.90`。 |
+| 可逆的 `photo_crop_matrix` 或 `photo_eis_matrix` | 将逆矩阵与缩放组合。 |
+| 旧版元数据含矩阵及封面帧 PTS | 选择时间戳最接近封面帧的矩阵。可逆时使用逆矩阵；否则保留所选矩阵，再进行归一化。 |
+| 缺少可用变换，或归一化后接近单位变换 | 不写入变换。 |
 
-几何分析失败不一定导致整个 Live Photo 转换失败。实现允许时，production 链路可以使用受支持的 metadata fallback。
+归一化检查拒绝非有限输入值或不可用分母。裁剪因子无效时，继续尝试下一个受支持的来源或兼容性默认值。因子无效本身不会使转换失败。
 
-## 证据边界
+存在变换时，参考尺寸来自有效的元数据 `video_width` 和 `video_height`，两者都必须为正且不超过 16,777,216。这是源元数据定义的坐标空间，不会自动替换为完整静态图像的尺寸。
 
-不能因为某个 Apple 私有逐帧 payload 或其他私有 metadata 的二进制形状看起来合理，就直接写入。
+当前职责和照片对发布规则见 [LibLivePhoto 集成](../liblivephoto-integration.md)。修改几何策略时，应核对上述实现及其测试。
 
-当前可以写哪些几何 metadata，以当前代码和测试为准。原记录用于解释为什么部分私有 payload 被有意排除。
+## 需要保留的历史观察
+
+原记录区分了 ColorOS 16 的主要动态视频流和仅用于分析的第二视频流。它还记录：对于所测 Samsung 资源，仅凭类似 BMFF 的字节，不能推断存在另一条视频流。
+
+Swift 实验使用统一的 `1920×1440` 分析空间、`±0.12 s` 封面窗口和 60% 轨迹一致性阈值。它记录了一张本地 ColorOS 16 样本，封面时间约为 `1.36612 s`，并给出实测变换矩阵。准确矩阵、样本身份和回读观察均保留在原文件中。
+
+这些测量描述的是该实验，不能证明当前 Rust 产品运行同一个估计器、设置其私有动态显示标志，或重现同一矩阵。
+
+## 证据要求
+
+私有载荷在结构上看似合理，不足以支持写入。原记录尚未解决 Track 4 和静态处理 MakerNote 元数据的 Vision 到 Apple 坐标约定。评估新实现时，应保留这些限制。
+
+压缩样本相等、容器解析和 PhotoKit 照片对构造，与 Photos 视觉行为是不同层面的证据。横向滑动模糊、几何运动和封面稳定过程，需要在适用设备及 Photos 版本上观察。
+
+将原正文保留为历史证据。提出新的几何行为结论时，应重新记录源文件/输出文件哈希、环境、命令，以及预期和实际结果。当前证据要求见[验证指南](README.md)。
