@@ -60,7 +60,7 @@ Rust 根据源文件生成风格，负责约束搜索、key 1 与 plist 合成�
 
 Vision 提供人脸关键点、有符号姿态角、人物实例和语义蒙版。系统按蒙版总重叠最大原则，将每张实测人脸匹配到独立人物实例。Rust 为每个匹配人物请求 Mattify、UnderEyeBrighten 和 SkinSmoothStandalone 统计。所有效果使用同一组推理几何和蒙版。
 
-原生调用顺序为 `setup`、`prewarm`、`prepareToProcess:`、`calculateStats`、`process`、GPU 同步等待和最后的 `finishProcessing`。分析、推理、统计和最终回读分别使用类型化请求与结果。适配器负责解析原生报告和命名工作文件。
+原生调用顺序为 `setup`、`prewarm`、`prepareToProcess:`、`calculateStats`、`process`、GPU 同步等待和最后的 `finishProcessing`。分析、推理、统计和最终回读分别使用类型化请求与结果。Rust 运行时的[适配器客户端](../crates/xdremux-runtime/src/apple_adapter/texture.rs)负责解析原生报告和命名工作文件。
 
 仅有辅助进程确认消息，不能证明统计已经生成，也不能允许发布。GPU 完成状态、生命周期、输入绑定和最终字节回读检查仍然适用。
 

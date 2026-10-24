@@ -19,12 +19,12 @@ Help and the CLI reference define the supported arguments.
 
 ## Run the checks
 
-Before starting, verify that the fixture SHA matches the manifest. Use outputs owned by this run. The Motion Photo recipe produces a pair ready for validation.
+Before starting, verify the selected fixture against `fixtures/SHA256SUMS`. Use outputs owned by this run. The Motion Photo recipe produces a pair ready for validation.
 
 1. If wording or the output schema changes, run both human and JSON forms.
 2. Capture stdout, stderr, and exit status separately.
 3. Select cases that reach the documented exit outcomes. Assert success 0, runtime failure 1, or usage failure 2 only for the corresponding case.
-4. For relevant error contracts, run `bash scripts/validation/verify_error_messages.sh`. Use the existing CLI parser and validation tests for the affected behavior.
+4. For relevant error contracts, run `bash scripts/validation/verify_error_messages.sh fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic`. Use the existing CLI parser and validation tests for the affected behavior.
 5. On macOS 27, use `validate STYLES_OUTPUT --apple-styles` to reach the actual adapter and required final state. Confirm that a plain HDR file fails the feature check.
 
 ## Interpret the evidence

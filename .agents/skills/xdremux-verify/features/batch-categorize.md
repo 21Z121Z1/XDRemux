@@ -20,12 +20,12 @@ The options `--input-dir`, `--recursive`, `--resume`, and `--skip-existing` sele
 
 ## Run the checks
 
-Before starting, create separate output and checkpoint roots. Record the fixture identity. For a small batch check, use the public Samsung HEIF Motion Photo. This avoids encoding a large JPEG.
+Before starting, create separate output and checkpoint roots. Verify each selected fixture against `fixtures/SHA256SUMS`. For a small batch check, use the public Samsung HEIF Motion Photo. This avoids encoding a large JPEG.
 
 1. Inspect the receipt and independently validate the output pair.
 2. Check that both pair members stay together and the source hash is unchanged.
 3. Run `bash scripts/validation/check_rust_cli_smoke.sh` for its existing CLI, receipt, and categorization journey.
-4. For related changes, run `bash scripts/validation/verify_batch_categorize_idempotence.sh` and the owning runtime batch and provenance tests.
+4. For categorization idempotence, run `bash scripts/validation/verify_batch_categorize_idempotence.sh fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic`. Run the owning runtime batch and provenance tests for related changes.
 5. Observe the filesystem before and after a dry-run. The option name alone does not prove that no writes occurred.
 6. Keep transcripts and output identities outside the scripts' disposable work directories.
 

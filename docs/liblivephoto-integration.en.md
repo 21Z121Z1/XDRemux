@@ -78,7 +78,7 @@ PVT is a runtime container for an already validated Apple pair. The runtime writ
 
 PVT does not introduce another MOV/HEIF parser, asset identifier, codec operation, or remux. LibLivePhoto still owns media parsing, pairing identity, and exact presentation time. Pair output remains the default.
 
-See [CLI packaging](cli.en.md#optional-pvt-packaging) and [publication](architecture.en.md#publication) for collision and recovery rules. A valid package structure does not establish Photos import or dynamic wallpaper support.
+See [CLI packaging](cli.en.md#pvt-directory-output) and [publication](architecture.en.md#publication) for collision and recovery rules. A valid package structure does not establish Photos import or dynamic wallpaper support.
 
 ## Verification and evidence limits
 

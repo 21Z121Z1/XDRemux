@@ -60,7 +60,7 @@ The analysis and output have different roles:
 
 Vision provides face landmarks, signed pose angles, person instances, and semantic masks. Maximum total mask overlap matches each measured face to a distinct person instance. Rust requests Mattify, UnderEyeBrighten, and SkinSmoothStandalone statistics for each matched person. All effects use the same inferred geometry and masks.
 
-The native operation order is `setup`, `prewarm`, `prepareToProcess:`, `calculateStats`, `process`, GPU fence, and final `finishProcessing`. Analysis, inference, statistics, and final readback use separate typed requests and results. The adapter owns native report decoding and workfile names.
+The native operation order is `setup`, `prewarm`, `prepareToProcess:`, `calculateStats`, `process`, GPU fence, and final `finishProcessing`. Analysis, inference, statistics, and final readback use separate typed requests and results. The Rust runtime's [adapter client](../crates/xdremux-runtime/src/apple_adapter/texture.rs) owns native report decoding and workfile names.
 
 A helper acknowledgement alone does not prove statistics generation or permit publication. GPU completion, lifecycle, input binding, and final-byte readback checks still apply.
 

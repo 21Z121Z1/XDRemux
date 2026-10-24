@@ -6,7 +6,7 @@ The Rust CLI owns terminal output and exit status. This policy applies to its hu
 
 ## Keep output streams separate
 
-Normal product commands write progress and result lines to stdout. Errors use stderr. Do not add another general logging protocol unless the CLI contract requires one.
+In human-readable mode, normal product commands write progress and results to stdout. They write errors to stderr. Do not add another general logging protocol unless the CLI contract requires one.
 
 These command forms write JSON to stdout:
 
@@ -15,7 +15,7 @@ These command forms write JSON to stdout:
 - `categorize --json`
 - `validate --json`
 
-Keep unrelated progress text out of their JSON stream. Diagnostics and structured results serve different consumers.
+When a command reports failures in JSON, keep them in the structured stdout result. Parser and diagnostic errors can still use stderr. Keep unrelated progress text out of the JSON stream. Diagnostics and structured results serve different consumers.
 
 ## Write actionable errors
 
@@ -28,8 +28,8 @@ If the batch UI consumes one line per failure, preserve that format. When a high
 | Status | Meaning |
 | --- | --- |
 | `0` | Success, help, or version output. |
-| `1` | Runtime conversion or validation failure. |
-| `2` | Command syntax or usage error. |
+| `1` | Runtime conversion, validation, or output failure. |
+| `2` | Syntax, usage, input discovery, or planning error. |
 
 The adapter and research tools must not define a second product exit-code contract.
 
@@ -37,7 +37,7 @@ The adapter and research tools must not define a second product exit-code contra
 
 Some conversion paths report source facts or product outcomes as diagnostic lines. Before changing a diagnostic string, search for tests that assert its exact text.
 
-Supported conversion paths can retain diagnostic artifacts through `--debug-dir`. An Apple capability failure can also retain evidence or helper output when the platform operation requires it.
+The public CLI does not expose `--debug-dir`. Use the documented validation or diagnostic script for the affected feature. An Apple capability failure can retain evidence or helper output when the platform operation requires it.
 
 ## Keep formatting out of libraries
 
