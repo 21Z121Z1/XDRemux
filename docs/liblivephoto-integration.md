@@ -29,8 +29,10 @@ JPEG、原始 EXIF 和 BMFF 基础类型。产品 codec profile 检查仍在本�
 runtime 的私有 pair publisher 只接收已完成严格 pair 校验、期望 identity 与精确时间
 检查、源视频与输出视频压缩媒体比较的自有字节。publisher 负责 staging 和同步，
 通过有界读取将 staging 及最终字节与不可变 buffer 比较。第二成员发布失败或最终
-字节读回失败时，保留完整 staging，并记录观察到的最终目录项供显式恢复。
-这些观察不构成删除权限。调用方必须保持路径解析稳定；检查不能阻止同一用户的
+字节读回失败时，保留 staging 并记录观察到的最终目录项。publisher 尝试从已校验的
+buffer 写入并验证独立的 `recovery.heic` 和 `recovery.mov`；只有读回成功才声明
+完整恢复副本已保留，否则报告 `recovery-unverified`。原 `capture.*` 文件可能
+与受损的最终文件共享 inode。这些观察不构成删除权限。调用方必须保持路径解析稳定；检查不能阻止同一用户的
 其他 writer 在读回后继续改写文件。文件系统要求与两文件事务边界见
 [发布与恢复契约](architecture.md#发布)。
 
