@@ -2,48 +2,53 @@
 
 [English](AGENTS.md) | 简体中文
 
-XDRemux 只有一套产品栈：Rust `xdremux` CLI、runtime、engine 和媒体 crate。Swift 只保留窄 Apple framework adapter。Python 只用于研究和训练。
+本指南规定 XDRemux 的修改与验证流程。Rust `xdremux` CLI、运行时、引擎和媒体 crate 构成唯一产品栈。Swift 提供 Apple 框架适配器，Python 提供研究和训练工具。
 
-所有权见[开发文档](docs/development.md)，证据选择见[测试政策](docs/quality/testing.md)，准确 `HEAD` 回执见[验证文档](docs/validation/README.md)，平台边界见 [Apple 功能](docs/apple-features.md)。
+组件职责见[开发文档](docs/development.md)，证据选择见[测试政策](docs/quality/testing.md)。[验证操作指南](docs/validation/README.md)说明如何生成绑定具体提交的回执。[Apple 功能文档](docs/apple-features.md)规定平台边界。
 
-## 不变量
+## 保持产品契约
 
-- 保留真实源事实和已验证的资源关系。不要只为通过 parser 而虚构 Apple 或厂商 metadata。
-- `xdremux-engine` 持有源事实、用户意图、能力、确定性 policy 和转换计划。`xdremux-runtime` 持有执行、验证顺序、文件系统副作用以及原子或可恢复发布。
-- Apple adapter 只执行必须使用 Apple framework 的操作，并返回事实或 primitive result。它不持有产品 policy。
-- 缺少必需源数据、能力或验证时必须 fail closed。失败操作不得破坏现有输入或已发布输出。
-- 结构、原生 framework 和真机证据属于不同层级。parser 通过不能证明 Apple Photos 编辑或相册行为。
-- 公开 fixture 的字节和 provenance 必须保持准确。私有或只可真机验证的媒体不得进入公开 Git 或公开 artifact。
+- 保留源媒体的真实信息和已经验证的资源关系。不得为使解析器接受文件而虚构 Apple 或厂商元数据。
+- `xdremux-engine` 负责源信息、用户意图、能力要求、确定性策略和转换计划。
+- `xdremux-runtime` 负责执行、验证顺序、文件系统操作，以及原子或可恢复的输出发布。
+- Apple 适配器只执行必须调用 Apple 框架的操作，返回框架观察结果或操作结果。产品决策由 Rust 负责。
+- 缺少必需的源数据、能力或验证时，停止操作。失败不得损坏输入或已有的发布输出。
+- 区分结构检查、原生框架检查和真机测试。解析器检查通过不能证明 Photos 编辑或相册行为。
+- 保持公开测试样本的字节和来源记录准确。私有媒体和只可用于真机验证的媒体不得进入公开 Git 或公开产物。
 
-## 修改流程
+## 修改与验证
 
-1. 从 Git 和 GitHub 推导当前 branch、PR、changed path 和 CI 状态。不要信任 prose 中复制的状态。
-2. 修改前读取 canonical owner、附近测试和适用 contract。
-3. 只做最小且完整的修改。不要在 Swift、Python、脚本或研究代码中建立第二份产品 policy。
-4. 可行时增加验证可观察行为的 regression。除非源码结构本身就是 contract，不要让测试绑定局部变量名或某次 helper 调用。
-5. 运行最小但完整的证据集。产品代码或验证基础设施变化时，完成证据必须绑定已提交的 `HEAD`。
-6. 只报告证据真正证明的行为，并明确写出依赖真机的缺口。
+1. 从 Git 和 GitHub 读取当前分支、PR、修改路径和 CI 状态。不得把复制的状态文字当作当前证据。
+2. 读取负责该行为的实现、附近测试和适用契约。
+3. 完成最小且完整的修改。不得在 Swift、Python、脚本或研究代码中建立第二套产品策略。
+4. 可行时，添加验证可观察行为的回归测试。只有源码结构本身属于契约时，才检查局部变量名或辅助函数调用。
+5. 运行最小但完整的检查集。修改产品或验证基础设施时，完成证据必须绑定已提交的 `HEAD`。
+6. 只报告证据能够证明的行为，明确列出仍需真机验证的部分。
 
-先直接编写并定稿英文 canonical 文档，再把相同技术范围和限制翻译成中文。
+先定稿作为权威来源的英文文档，再翻译为中文。两种语言必须保留相同的技术范围和限制。
 
-## 项目技能与自动检查
+## 使用项目技能
 
-按各自适用条件使用项目级 [pstack 流程](.agents/skills/pstack-workflow/SKILL.md)、[行为 TDD](.agents/skills/pstack-tdd/SKILL.md)、[工程原则](.agents/skills/pstack-engineering-principles/SKILL.md)、[审查](.agents/skills/pstack-review/SKILL.md)和[文字整理](.agents/skills/pstack-unslop/SKILL.md)。这些是固定版本的项目适配，不依赖 Cursor 运行环境。实际 CLI 验证与证据选择见 [XDRemux 验证](.agents/skills/xdremux-verify/SKILL.md)。
+按适用条件使用 [pstack 流程](.agents/skills/pstack-workflow/SKILL.md)、[行为 TDD](.agents/skills/pstack-tdd/SKILL.md)、[工程原则](.agents/skills/pstack-engineering-principles/SKILL.md)、[审查](.agents/skills/pstack-review/SKILL.md)和[文字整理](.agents/skills/pstack-unslop/SKILL.md)。这些技能是固定来源版本的项目适配，不依赖 Cursor 运行环境。
 
-| 契约 | 执行检查 |
+实际 CLI 操作与证据选择见 [XDRemux 验证](.agents/skills/xdremux-verify/SKILL.md)。
+
+| 契约 | 现有检查 |
 | --- | --- |
-| HDR 资源与方向变换关系 | HEIF/codec 图与 RGB16 回归；`ci.yml` 中的 ImageIO 回读。 |
-| 原生执行和编辑状态完整 | Texture 回执/状态回归及原生 consumer 检查。 |
-| 失败或并发发布保留媒体 | runtime batch 与 Live Photo 负例；App 模型测试。 |
-| 证据对应实际源码与环境 | 现有准确 HEAD 完成门禁；原生/真机结论必须在相应环境证明。 |
-| 可复用 CI 所有者 | 工作流配置测试要求产品检查归 `ci.yml`，实验归 `research.yml`。 |
+| HDR 资源与变换保持正确关系。 | HEIF 与编解码器资源图测试、RGB16 回归，以及 `ci.yml` 中的 ImageIO 回读。 |
+| 原生执行与编辑状态完整。 | Texture 回执和状态回归，以及原生消费者检查。 |
+| 失败或并发发布保留媒体。 | 运行时批处理和 Live Photo 失败测试，以及 App 模型测试。 |
+| 证据标明实际测试的源码与主机。 | 完成门禁将回执绑定到 `HEAD`；原生和真机结论需要对应环境。 |
+| CI 使用可复用的工作流。 | 工作流测试将产品检查归入 `ci.yml`，研究检查归入 `research.yml`。 |
 
-## 研究生命周期
+## 完成研究任务
 
-产品实现、稳定研究证据和诊断 probe 是三类不同资产。每个实验都必须进入一种终态：
+区分产品实现、可长期保留的研究证据和诊断探针。每项实验必须以以下一种状态结束：
 
-- **PROMOTE**：把已验证 contract 移入 canonical 代码、测试或当前文档，然后删除已被取代的 probe。
-- **ARCHIVE**：只保留具有长期价值且可复现的证据、provenance、结果和剩余缺口。
-- **DISCARD**：结论已经吸收或实验没有稳定价值时，删除 probe。
+- **PROMOTE**。把已验证的契约纳入产品代码、测试或当前文档，删除已被取代的探针。
+- **ARCHIVE**。保留具有长期价值的可复现证据、来源记录、结果和剩余缺口。
+- **DISCARD**。结论已被吸收或实验没有长期价值时，删除探针。
 
-branch 名称、commit 数量、结构 artifact 或离线指标都不能让 feature 自动晋升。只有跨 session 或 PR、依赖私有 fixture 或真机，或者具有长期 promotion ladder 的任务才使用 execution plan。不要把聊天记录、思维链、session journal、branch SHA、ahead/behind 数量或当前 workflow 状态保存成稳定仓库知识。
+分支名称、提交数量、结构产物和离线指标都不能证明产品已经支持某项功能。只有跨会话或 PR、依赖私有样本或真机，或需要经过多个阶段才能纳入产品的任务，才使用执行计划。
+
+不得将聊天记录、思维链、会话日志、分支 SHA、ahead/behind 数量或当前工作流状态作为稳定的仓库知识保存。

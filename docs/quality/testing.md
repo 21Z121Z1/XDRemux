@@ -2,85 +2,87 @@
 
 [English](testing.en.md) | 简体中文
 
-只有验证证据与实际修改的行为匹配时，才能认为修改完成。
+验证证据必须覆盖实际修改的行为，才能认为修改完成。根据下列层级选择检查。命令见[测试指南](../../tests/README.md)，回执操作见[验证操作指南](../validation/README.md)。
 
-测试命令见 [tests/README.md](../../tests/README.md)。completion gate 计划见[验证 runbook](../validation/README.md)。
+## 让证据与结论对应
 
-## 证据层级
-
-| 层级 | 常用命令或来源 | 能证明什么 |
+| 证据 | 命令或来源 | 能证明的范围 |
 | --- | --- | --- |
-| Unit 和 contract | `cargo test --workspace --locked` | Rust 产品、parser、格式、Apple feature policy 和 transaction 契约。 |
-| 仓库 policy | `python3 -m unittest discover -s tests -t . -v` | 跨文件 policy、Python 行为、文档和架构契约。 |
-| 真实 fixture | `fixtures/` 和 `scripts/validation/` | 版本化或提供的真实媒体行为。 |
-| 原生框架 | macOS validation job | 被测试的 ImageIO、PhotoKit 或其他 Apple framework 行为。 |
-| 真机 | 手工或记录的真实设备验证 | 依赖具体相册、Photos 版本、显示或设备的行为。 |
-| Completion receipt | `scripts/ci/agent_completion_gate.py` | 选定检查在准确 commit 上通过。 |
+| 单元与契约测试 | `cargo test --workspace --locked` | Rust 产品、解析器、格式、Apple 功能策略和事务行为。 |
+| 仓库规则检查 | `python3 -m unittest discover -s tests -t . -v` | 跨文件规则、Python 行为、文档和架构契约。 |
+| 真实媒体测试 | `fixtures/` 与 `scripts/validation/` | 版本化或提供的媒体上的行为。 |
+| 原生框架测试 | macOS 验证任务 | 测试实际调用的 ImageIO、PhotoKit 或其他 Apple 框架行为。 |
+| 真机测试 | 记录或手动执行的设备验证 | 被测相册、Photos 版本、显示器和设备上的行为。 |
+| 完成回执 | `scripts/ci/agent_completion_gate.py` | 声明的检查在指定提交上通过。 |
 
-静态 policy test 不是功能转换证据。
+源码检查只能证明静态契约，不能证明转换行为。解析器检查通过不能证明设备行为或相册渲染正确。
 
-parser test 不是真机测试。
+## 选择最小且完整的检查集
 
-容器 parser 通过不能证明相册一定正确渲染结果。
+完整产品门禁面向 arm64/macOS 27，包含 App、适配器、解包运行、源文件保全、HDR、Styles 和性能检查。Linux、Windows 和 macOS 继续运行 Rust 核心测试。Intel 产品包不在支持的分发范围内。
 
-## 最低验证要求
+原生环境不可用、操作失败或设备行为未经测试时，仍须列为缺口。平台范围的规定不能使这些检查自动通过。
 
-完整产品门禁面向 arm64/macOS 27：App、adapter、解包运行、原媒体保全、HDR/Styles 和性能检查均保留。Linux、Windows、macOS 的 Rust 核心测试继续执行，Intel 产品包不再属于分发范围。范围调整不把原生缺测、操作失败或未验设备行为变成通过。
+| 修改类型 | 最低验证要求 |
+| --- | --- |
+| 仅文档 | 文档规则和链接检查。 |
+| CLI 解析器或消息 | 受影响的解析和输出行为测试。 |
+| HDR 或容器 | 单元测试，以及真实转换或等价功能样本。 |
+| Motion Photo | 解析器、写入器测试，以及适用的真实样本检查。 |
+| Apple 功能 | 结构测试，以及适用的原生框架或真机检查。 |
+| App 行为 | App 构建，以及受影响的模型或 UI 测试。 |
+| 验证框架 | 完成门禁自测，以及一次实际门禁运行。 |
 
-macOS 27 性能基线保留原始测量值。`apple-styles` 场景允许历史中位数和 p95 耗时的两倍，
-用于容纳 Linear Thumbnail 缩小前的全分辨率 HDR 重建。该场景的 RSS 和 helper 启动次数限制保持不变，
-其他场景继续使用公共耗时容差。参见[版本化预算](../../benchmarks/macos27-arm64-product-baseline.json)。
+可行时，添加能够在原源码缺陷上失败的回归断言。检查集应当尽量小，但必须覆盖修改的行为。
 
-使用最小但完整的证据集。
+### 保留性能参考值
 
-- 纯文档修改：文档 policy 和链接检查。
-- CLI parser 或消息修改：对应 parser/output 回归。
-- HDR 或容器修改：unit test 加真实转换或等价 functional fixture。
-- Motion Photo 修改：parser/writer test 加适用的真实 Motion Photo fixture gate。
-- Apple 功能修改：结构测试加适用的原生框架或真机证据。
-- App 修改：App 构建和受影响的 model/UI test。
-- 验证框架修改：completion gate 自测加一次真实 gate 运行。
+[macOS 27 预算](../../benchmarks/macos27-arm64-product-baseline.json)保留原始测量值。`apple-styles` 用例允许历史中位数和 p95 耗时的两倍，用于容纳 Linear Thumbnail 缩小前的全分辨率 HDR 重建。
 
-实际可行时，每个源码 bug fix 都应该增加一个能在原缺陷上失败的回归断言。
+RSS 和辅助进程启动次数的限制保持不变。其他工作负载使用公共耗时容差。[测量指南](evals.md)说明当前报告要求及性能结论的边界。
 
-## 公开 Motion Photo fixture
+## 保留样本并限制媒体上传
 
-仓库的 `fixtures/` 目录包含版本化真实 Motion Photo fixture。
+`fixtures/` 包含版本化的真实 Motion Photo 文件。文件的准确字节属于测试契约，`fixtures/SHA256SUMS` 记录文件身份。严格 Rust CI 检查使用这些文件验证 JPEG 和 HEIC/HEIF 布局。
 
-它们的准确字节属于测试契约。`fixtures/SHA256SUMS` 是文件身份 manifest。
+部分旧 ProXDR、Apple 功能和只可真机验证的样本可以保持私有或留在仓库之外。不要将所有真实样本都描述为私有样本。
 
-严格 Rust CI gate 使用这些 fixture 测试多种 JPEG 和 HEIC/HEIF Motion Photo 布局。
+原生检查可以在运行器中生成媒体和像素缓冲区。Actions 自动上传必须仅包含明确命名的诊断报告、哈希和日志。不得上传原片、转换后的人像、渲染对比图或像素字典。
 
-不要再把所有真实样本描述为 private。部分旧 ProXDR、只可真机验证和 Apple feature 样本仍可能位于仓库之外或保持私有。
+测试必须保留媒体生成、原生回读和失败断言。限制上传内容时，不得跳过这些检查。需要真机验证时，在本地生成 Photos 导入文件。
 
-原生检查可以在 runner 内生成媒体和像素缓冲。Actions 自动上传只包含明确命名的诊断报告、
-哈希和日志，不包含原片、转换后的人像、渲染对比图或像素字典。测试仍须完成媒体生成、
-原生回读和失败断言；收窄上传边界，不跳过检查。需要设备验证时，在本地生成 Photos 导入文件。
+## 报告设备验证边界
 
-## 依赖真机的结论
+Photos 编辑、OPPO 相册显示或其他设备 UI 的结论，必须有对应环境的证据。环境不可用时，只报告实际测试的行为。不得将未经测试的设备行为标记为通过。
 
-涉及 Apple Photos 编辑、OPPO 相册显示或其他设备 UI 的结论，需要来自对应环境的证据。
+## 保持文档与代码一致
 
-环境不可用时，只能把结论限制到实际验证的行为。
+命令名、选项、默认值、输出安全规则和支持范围都属于产品契约。代码改变契约时，同一修改必须更新中英文文档。写作遵循[技术写作规范](../style-guide.md)。
 
-未测试的真机行为不能标记为通过。
+## 单独说明研究证据
 
-## 文档也是可测试契约
+可复用的 [`research.yml`](../../.github/workflows/research.yml) 工作流包含可移植研究测试、原生载体回读和固定版本的 Photographic Styles 影调扫描。它还包含临时的系统 HEIF HDR 测量和 PVT 接受探针。
 
-面向用户的命令名、参数、默认值、输出安全规则和支持边界都属于产品契约。
+各任务使用准确的 PR 或 `main` SHA，并采用只读权限。手动重放不接受替代源码或密钥。原生影调和系统 HEIF 任务使用 `xcode-27`，测量产物保留一天。
 
-代码改变这些契约时，同一个修改中必须同时更新英文和中文文档。
+研究结果不代替 `exact-head` 产品门禁，也不能证明 Photos 编辑、滑块响应、保存重开或相册接受情况。
 
-当前技术文档遵循[技术写作规范](../style-guide.md)。
+### 解释 PVT 探针结果
 
-## 研究回归证据
+就绪控制与产品探针使用同一份干净检出。CI 要求已安装的 iOS 27.0 运行时和 iPhone 11 机型。配对缺失或不兼容时，控制在创建模拟器前停止。直接运行且不提供两个固定选项时，仍从运行时和机型清单中选择。
 
-唯一可复用的 `research.yml` 工作流持有可移植研究测试、原生 carrier 回读、固定版本的 Photographic Styles tone 扫描、临时 system HEIF HDR 测量和 PVT 接受探针。各 job 使用只读权限并检出准确的 PR 或 main SHA。手动重放不接受替代源码或 secret。原生 tone 与 system HEIF job 使用标准 `xcode-27` runner，测量 artifact 保留一天。它们不提供 `exact-head`，也不能证明 Photos 编辑、滑块响应、保存重开或 Gallery 接受情况。
+创建模拟器前，任务检查所选运行时是否支持选定的 iPhone 类型，同时检查机型的运行时版本范围，并独立复核支持列表。
 
-PVT job 的就绪控制与产品探针使用同一份干净检出。CI 显式要求已安装的 iOS 27.0 / iPhone 11 配对，避免较新 runtime 或特殊机型悄悄改变基线。任一项缺失或不兼容时，控制会在创建模拟器前阻止执行。直接运行且未指定这两个固定选项时，仍依据目录选择。选择的 iPhone 必须在目标 runtime 的显式支持列表中，且满足机型的 runtime 版本范围。创建模拟器前还会独立检查支持列表。只有本次创建的控制模拟器通过检查且已确认删除后，才最多运行一次产品探针。产品回执必须绑定同一源码 SHA、runtime 和机型。控制将准确的配对通过 `--required-runtime` 和 `--required-device-type` 传入产品探针；探针依据最新目录校验该配对，不重新选择替代项。构建和准备完成后，创建前还会再次校验同一配对。配对缺失或不兼容时阻止创建。控制通过不代表 PVT 已被接受；接受结论需要整个包的身份校验和独立 PhotoKit 回读。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
+产品探针最多运行一次。只有控制模拟器检查通过，且任务已确认删除该模拟器后，才启动产品探针。控制通过 `--required-runtime` 和 `--required-device-type` 传入准确的配对。产品探针依据最新清单检查该配对，不另选替代项。构建和准备完成后，创建模拟器前再次检查同一配对。配对改变或不兼容时停止创建。
 
-控制和产品的启动监视器除要求进程零退出外，还要求输出包含本次持有设备的 `Finished` 终态记录。迁移失败、已启动快捷返回或未知输出都会阻止库存查询或安装。这项检查不替代库存查询、Photos Save 或独立 PhotoKit 回读。
+产品回执必须标明同一源码 SHA、运行时和机型。控制检查通过不能证明 PVT 已被接受。接受结论需要整个包的身份校验和独立 PhotoKit 回读。
 
-PVT 阶段观察绑定源码和本次会话，并在各自标明的进程时钟内保留单调时间。未开始或超时的阶段不会产生接受结论。cleanup 命令结果与独立观察到的资源缺席是不同事实；后续缺席观察不会改写原回执的失败或不确定状态。控制包装层用 `status` 保留整次运行的接受状态，用 `product_observations` 保留原生事实；清理失败不会抹去已验证的准入观察。可移植事件测试和历史回放只验证 harness 报告行为。声明变更后的原生 runner 可运行，需要一次本次持有模拟器的实际执行；Photos 接受结论仍需完整保存和独立回读路径。
+控制和产品的启动监视器要求进程零退出，并报告本次持有设备的 `Finished` 终态记录。迁移失败、已启动快捷返回或未知输出都会阻止应用清单查询或安装。这项检查不替代应用清单查询、Photos Save 或独立 PhotoKit 回读。
 
-实验命令和晋升条件放在对应代码附近，不为每个假设新建工作流。产品方向回读在 `ci.yml` 中运行，与 Rust 产品测试使用同一准确 SHA，由 ImageIO 读取合成方向 HEIF 及其预期几何。
+阶段观察记录源码和会话，并在各自标明的进程时钟内保存单调时间。阶段未开始或超时时，接受情况仍为未观察。
+
+清理命令的结果，与独立观察到资源已经不存在，是两类不同事实。后续观察到资源消失，不会改变原回执的失败或不确定状态。控制包装层将整体接受状态写入 `status`，将原生事实写入 `product_observations`。清理失败不会抹去已验证的接受观察。
+
+可移植事件测试和历史重放只验证探针的报告行为。要声明修改后的原生运行程序可用，必须使用本次创建的模拟器实际执行。Photos 接受结论仍需要完整保存和独立回读流程。参见 [Motion Photo 验证步骤](../../.agents/skills/xdremux-verify/features/motion-photo.md)。
+
+实验命令和纳入产品的条件放在对应代码附近，不为每个假设新建工作流。产品方向回读在 `ci.yml` 中运行，与 Rust 产品测试使用同一 SHA。ImageIO 读取合成方向 HEIF，并检查预期几何信息。

@@ -1,3 +1,5 @@
+> **历史验证记录——2026-10-14。** 下列测量与后续实现说明保留各自的原始范围。「当前」或「本 PR」指记录中的开发上下文。本次文档修订未重新运行这些测量。当前行为见 [Apple 功能](../apple-features.md)，新证据要求见[验证说明](README.md)。
+
 # HDR Log Linear Thumbnail 验证
 
 简体中文 | [English](20261014-hdr-log-thumbnail.en.md)

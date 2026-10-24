@@ -5,21 +5,33 @@ description: Fix an XDRemux bug with a focused failing-before, passing-after reg
 
 # Focused TDD bug fix
 
-Make broken behavior executable before changing production code when a clear, cheap test path exists. Prefer an existing Rust test, repository regression, or fixture command. Do not build a broad new test framework merely to satisfy this sequence.
+If a clear, cheap test path exists, make the broken behavior executable before changing production code. Prefer an existing Rust test, repository regression, or fixture command. Do not create a broad test framework only to follow this sequence.
 
-1. Identify intended behavior, current behavior, affected caller, and smallest observable reproduction.
-2. Choose the narrowest existing executable check that reaches that contract. Derive the expected result from the requirement rather than the implementation under test.
-3. Write the smallest test that would have caught the defect. Assert return values, errors, readback state, or external effects observed by the caller.
-4. Run it before the fix. Confirm it fails for the intended defect. Repair an unrelated test/setup failure before using it as evidence. A passing test does not establish a reproduced bug.
+## Reproduce and fix the defect
+
+1. Identify the intended behavior, current behavior, affected caller, and smallest observable reproduction.
+2. Choose the narrowest existing executable check that reaches the contract. Derive its expected result from the requirement, not from the implementation under test.
+3. Write the smallest test that would have caught the defect. Assert return values, errors, readback state, or external effects that the caller can observe.
+4. Run the test before the fix. Confirm that it fails for the intended defect. Repair unrelated test or setup failures before using the result as evidence. A passing test does not reproduce the defect.
 5. Fix the first wrong decision in the owning product layer. Preserve nearby contracts and failure-safe publication.
-6. Rerun the regression, then the smallest additional checks required by [testing policy](../../../docs/quality/testing.en.md).
+6. Rerun the regression. Then run the smallest additional checks required by [testing policy](../../../docs/quality/testing.en.md).
 
-If a new failing test is impractical, use the closest useful executable check and state the limitation. Acceptable evidence can be a focused reproduction command, real fixture conversion, native readback, or recorded device action. Do not invent native results from a portable proxy. Prefer no new test over a brittle mock, timing dependency, implementation mirror, or unrelated fixture churn.
+## Choose useful evidence
 
-Do not weaken assertions to match an incorrect implementation. Keep exact bytes, messages, schema, order, and native lifecycle assertions when they are the actual public, wire, durability, or framework contract. Internal helper names and local variables usually are not that contract.
+If a new failing test is impractical, use the closest useful executable check. State its limits. Evidence can include a focused reproduction command, real fixture conversion, native readback, or recorded device action. Do not infer native results from a portable proxy.
 
-If production code is already changed, say that failing-before evidence was not captured. A safe isolated comparison against the original implementation can establish it when practical; do not overwrite another worker's changes or claim an unexecuted baseline. This skill does not authorize staging or ordering commits.
+Do not add a brittle mock, timing dependency, implementation mirror, or unrelated fixture changes to produce a new test. In those cases, retain the useful evidence without a new test.
 
-Report the exact failing-before check and failure, the passing-after run, nearby validation, and any missing native/device evidence. Read [engineering principles](../pstack-engineering-principles/SKILL.md) when the failure involves boundaries or publication.
+Do not weaken assertions to match an incorrect implementation. Keep exact bytes, messages, schema, order, and native lifecycle assertions when they define a public, wire, durability, or framework contract. Internal helper names and local variables usually do not define that contract.
+
+## Handle code that has already changed
+
+If production code has already changed, state that failing-before evidence was not captured. When practical, use a safe, isolated comparison with the original implementation to establish that evidence. Do not overwrite another worker's changes or claim an unexecuted baseline. This skill does not authorize staging or ordering commits.
+
+## Report the result
+
+Report the exact failing-before check and its failure. Report the passing-after run, nearby validation, and any missing native or device evidence.
+
+If the failure involves boundaries or publication, read [engineering principles](../pstack-engineering-principles/SKILL.md).
 
 Adapted from pstack at `a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4`, `pstack/skills/tdd/SKILL.md`. See [source hashes](sources.json) and [LICENSE](LICENSE).

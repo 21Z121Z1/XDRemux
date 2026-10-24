@@ -1,3 +1,5 @@
+> **Historical validation record — 2026-10-14.** The measurements and later implementation notes below retain their original scope. References to “current” or “this PR” belong to the recorded development context. The measurements have not been rerun for this documentation revision. See [Apple features](../apple-features.en.md) for current behavior and [validation](README.en.md) for new evidence requirements.
+
 # HDR Log Linear Thumbnail validation
 
 English | [简体中文](20261014-hdr-log-thumbnail.md)

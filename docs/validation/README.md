@@ -1,43 +1,31 @@
-# 验证 Runbook
+# 运行验证并检查完成回执
 
 [English](README.en.md) | 简体中文
 
-本目录用于保存验证依据、验收条件和证据记录。
+本目录保存验证依据、验收条件和证据记录。可执行测试放在 `tests/` 或 `scripts/`。以下流程用于记录已提交修改的检查结果。
 
-可执行测试放在 `tests/` 或 `scripts/`。
+## 选择证据类别
 
-## 证据类别
-
-以下类别保持分离：
-
-| 类别 | 示例 | 能证明什么 |
+| 类别 | 示例 | 能证明的范围 |
 | --- | --- | --- |
-| Static | 源码或文档 policy check | 文本、结构或架构契约。 |
-| Regression | 针对已知缺陷的测试 | 指定缺陷在被测试条件下不再复现。 |
-| Functional | 真实转换或等价媒体 fixture | 受影响产品链路可以在代表性数据上运行。 |
-| Integration | framework 或 App 集成 | 多个组件在被测试环境中协同工作。 |
-| Device | 真实相册、Photos、显示或设备测试 | 对应环境中的真机依赖行为。 |
+| `static` | 源码或文档规则检查。 | 文本、结构或架构契约。 |
+| `regression` | 针对已知缺陷的测试。 | 缺陷在被测条件下不再复现。 |
+| `functional` | 真实转换或等价媒体样本。 | 受影响的产品流程能在代表性数据上运行。 |
+| `integration` | 框架或 App 集成。 | 组件能在被测环境中共同工作。 |
+| `device` | 相册、Photos、显示器或真机测试。 | 对应环境中的设备相关行为。 |
 
-更高层级证据可以包含低层检查，但不能改变无关检查本身能证明的范围。
+较高层级测试可以包含较低层级检查，但不会扩大无关证据的证明范围。例如，框架回读不能证明 Photos 编辑、保存和重新打开的交互。
 
-## Completion gate
+## 准备并运行完成门禁
 
-仓库 Agent 在目标修改提交后使用 `scripts/ci/agent_completion_gate.py`。
+提交目标修改后，使用 [`scripts/ci/agent_completion_gate.py`](../../scripts/ci/agent_completion_gate.py)。已跟踪文件的工作树必须干净。计划中声明的每项检查都必须通过。
 
-示例：
+1. 根据修改的行为选择检查。
+2. 编写验证计划，以参数数组表示每条命令。
+3. 选择基准提交并运行门禁。
+4. 验证生成的回执。
 
-```bash
-python3 scripts/ci/agent_completion_gate.py run \
-  --base origin/main \
-  --plan /tmp/xdremux-agent-verification.json
-
-python3 scripts/ci/agent_completion_gate.py verify \
-  .codex/verification-receipts/$(git rev-parse HEAD).json
-```
-
-plan 中每个命令使用参数数组。gate 不会添加隐式 shell 解析。
-
-示例 plan：
+文档计划可以使用现有规则和链接检查：
 
 ```json
 {
@@ -51,7 +39,8 @@ plan 中每个命令使用参数数组。gate 不会添加隐式 shell 解析。
         "python3",
         "-m",
         "unittest",
-        "tests.test_public_documentation"
+        "tests.test_public_documentation",
+        "tests.validation.test_repository_layout"
       ],
       "timeout_seconds": 120
     }
@@ -59,57 +48,55 @@ plan 中每个命令使用参数数组。gate 不会添加隐式 shell 解析。
 }
 ```
 
-确实需要 shell 组合时，在命令数组中显式调用 shell。
+本例将计划保存为 `/tmp/xdremux-agent-verification.json`。在仓库根目录运行：
 
-## Receipt 契约
+```bash
+python3 scripts/ci/agent_completion_gate.py run \
+  --base origin/main \
+  --plan /tmp/xdremux-agent-verification.json
 
-receipt 会绑定：
+python3 scripts/ci/agent_completion_gate.py verify \
+  .codex/verification-receipts/$(git rev-parse HEAD).json
+```
 
-- 当前 `HEAD`；
-- 选定 base commit；
-- changed-file set；
-- clean tracked worktree；
-- 每个声明检查的退出状态和有限输出。
+门禁不会对参数数组隐式执行 shell 解析。命令需要 shell 组合时，在数组中显式调用 shell。
 
-之后的 commit 或 tracked edit 会让 receipt 失效。
+## 理解回执的绑定范围
 
-plan 中声明的所有检查都是必需项。
+完成回执记录以下内容：
 
-gate 将 canonical Rust `crates/` 和 Apple adapter/App 源码归为产品 ownership。
-Rust `.rs` 文件需要 regression evidence；产品修改还需要 functional、integration
-或 device evidence。Cargo/Swift manifest、lockfile、toolchain configuration 和 App
-build project 属于 build input，而不是纯文档修改。删除，以及跨 ownership 移动的
-两端都计入变更。changed paths 和 dirty tracked status 使用 NUL 分隔的 Git
-记录，避免引号显示、内嵌空白或任意路径字节隐藏变更。research 中的 `.rs` 文件
-仍属于研究，不会仅因语言为 Rust 而成为产品。
+- 当前 `HEAD` 和选定的基准提交。
+- 修改文件集合。
+- 已跟踪文件的干净工作树状态。
+- 每项声明检查的退出状态和有限长度输出。
 
+后续提交或已跟踪文件的修改会使回执失效。发生这类变化后，重新运行适用检查。
 
-## 根据修改选择检查
+门禁将 Rust `crates/` 和 Apple 适配器或 App 源码视为产品实现。源码修改需要回归证据；产品修改还需要功能、集成或真机证据。
 
-默认使用有针对性的验证。
+Cargo 和 Swift 清单、锁文件、工具链配置和 App 的 Xcode 工程属于构建输入，不能当作纯文档修改。删除文件和跨组件职责移动的两端都计入修改。Git 路径与已跟踪状态使用 NUL 分隔记录，避免引号、内嵌空白或任意路径字节隐藏修改。
 
-纯文档修改一般只需要文档一致性和链接检查。
+研究目录中的 `.rs` 文件仍属于研究代码。不能仅因使用 Rust 语法就将文件归为产品实现。
 
-转换核心修改一般需要针对性 regression 加 functional media evidence。
+## 使用有针对性的检查
 
-Motion Photo 修改应该在公开 fixture gate 能覆盖相关 parser、writer、timing 或 publication 行为时使用这些 gate。
+| 修改类型 | 选择的证据 |
+| --- | --- |
+| 仅文档 | 文档一致性和本地链接检查。 |
+| 转换核心 | 针对性回归与功能媒体证据。 |
+| Motion Photo | 覆盖受影响的解析、写入、时间或发布行为的公开样本检查。 |
+| Photos 交互 | 实际执行所述交互的原生框架或真机证据。 |
 
-涉及 Apple Photos 交互的结论，需要真正到达该行为的原生 framework 或 device evidence。
+不得仅为增加检查数量而运行无关且昂贵的矩阵。完整选择规则见[测试政策](../quality/testing.md)。
 
-不要为了增加检查数量而运行昂贵且无关的矩阵。
+## 处理公开和私有媒体
 
-## 公开和私有媒体
+版本化的真实 Motion Photo 位于 `fixtures/`。其他 ProXDR、Apple 功能和仅用于真机验证的样本可以留在 Git 之外。
 
-仓库的 `fixtures/` 下包含版本化真实 Motion Photo fixture。
+运行器能读取外部样本时，计划可以用绝对路径引用该文件。仍须遵守测试政策中的样本隐私和产物上传限制。
 
-其他 ProXDR、Apple feature 或只可真机验证的样本仍可以放在 Git 之外。
+## 保留历史验证记录
 
-runner 能访问外部本地样本时，verification plan 可以使用绝对路径引用它。
-
-## 历史验证记录
-
-本目录中带日期的文件可能描述旧实现状态。
-
-不要修改旧测量值来迎合当前实现。证据变化时，编写新的当前文档或新的带日期记录。
+本目录中的带日期文件可能描述旧实现。不得修改旧测量值以符合当前代码。证据变化时，编写新的当前文档或新的带日期记录。
 
 当前文档遵循[技术写作规范](../style-guide.md)。
