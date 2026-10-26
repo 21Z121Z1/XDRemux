@@ -67,7 +67,9 @@ def run_control(run, choose_device, report, name, device_root, *, capture_diagno
         stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1
         stages.record('readiness', 'observed', 'inventory_submitted')
-        result = run('control-listapps', ['xcrun', 'simctl', 'listapps', owned], timeout=20)
+        # Keep one query, with a finite startup observation window. Bootstatus
+        # completion alone does not establish the application service's readiness.
+        result = run('control-listapps', ['xcrun', 'simctl', 'listapps', owned], timeout=120)
         if result.returncode:
             raise ReadinessBlocked('control inventory returned nonzero')
         try:

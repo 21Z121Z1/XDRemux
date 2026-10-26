@@ -98,6 +98,9 @@ python -m unittest tests.test_apple_reverse_key1_training
 
 包依赖 `Pillow` 和 `numpy`。可选 `training` 依赖会加入 PyTorch。训练和评估代码属于研究工具，可以保留在 Python 中。
 
+独立的 `model_adapters/geocalib/` 组件是 runtime ML 原语，不属于研究 package。Rust 通过有时限的进程边界调用已安装的 `xdremux-geocalib` helper。它只返回观测，由 engine 持有解释与准入。见[安装及观测约定](../model_adapters/geocalib/README.md)。产品压缩包不包含其 Python 环境、权重、FFmpeg 或 ExifTool。Cinematic 自动输入需要这些本地依赖，显式焦距则绕过它们。转换不会自动下载模型。
+
+
 ## 查找对应文件
 
 | 路径 | 用途 |
@@ -105,6 +108,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `crates/` | Rust 产品实现与 Rust 测试。 |
 | `Sources/XDRemuxAppleAdapter/` | 运行时调用的 Swift Apple 框架适配器。 |
 | `Sources/XDCinematicNative/` 与 `Sources/XDTextureNative/` | 适配器使用的原生操作。 |
+| `model_adapters/` | 向 Rust 返回观测的本地模型原语。 |
 | `xdremux_py/` | Python 研究和训练工具。 |
 | `apps/macos/XDRemuxApp/` | SwiftUI App、Xcode 工程、App 测试与构建脚本。 |
 | `tests/` | Python 回归、仓库规则检查、验证框架自测和小型合成样本。 |

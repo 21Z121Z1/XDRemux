@@ -10,6 +10,7 @@ import inspect
 import json
 import os
 import plistlib
+import subprocess
 from pathlib import Path
 import tempfile
 import sys
@@ -20,6 +21,39 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_failed_share_retains_owned_native_log_without_rewriting_failure(self):
+        owned = '12345678-1234-1234-1234-123456789ABC'
+        bundle = 'org.xdremux.audit.PVTReadback.u' + 'a' * 32
+        for error in (None, probe.Blocked('diagnostic timeout'), OSError('service unavailable')):
+            with self.subTest(error=error):
+                report = {'owned_udid': owned, 'status': 'blocked', 'reason': 'test-share-ui: exit 65'}
+                calls = []
+                def run(name, argv, **kwargs):
+                    calls.append(name)
+                    self.assertEqual(argv[:4], ['xcrun', 'simctl', 'spawn', owned])
+                    self.assertIn(bundle, argv[-1])
+                    self.assertEqual(kwargs, {'timeout': 15, 'required': False})
+                    if error:
+                        raise error
+                    return subprocess.CompletedProcess(argv, 0, b'native exception', b'')
+                probe.capture_share_failure_diagnostics(run, owned, bundle, report)
+                self.assertEqual(calls, ['share-native-log'])
+                self.assertEqual(report['status'], 'blocked')
+                self.assertEqual(report['reason'], 'test-share-ui: exit 65')
+                self.assertEqual(report['share_failure_diagnostics']['status'],
+                                 'not-collected' if error else 'collected')
+
+    def test_share_failure_diagnostics_refuse_foreign_simulator_or_bundle(self):
+        for owned, bundle in ((None, 'org.xdremux.audit.PVTReadback.u' + 'a' * 32),
+                              ('foreign', 'org.xdremux.audit.PVTReadback.u' + 'a' * 32),
+                              ('owned', 'unrelated.app')):
+            with self.subTest(owned=owned, bundle=bundle):
+                def run(*args, **kwargs):
+                    self.fail('invalid diagnostic identity must not issue a native query')
+                report = {'owned_udid': 'owned'}
+                probe.capture_share_failure_diagnostics(run, owned, bundle, report)
+                self.assertEqual(report['share_failure_diagnostics']['status'], 'not-collected')
+
     def test_product_boot_monitor_starts_device_without_a_prior_unobserved_boot(self):
         # External simctl lifecycle: the monitor owns startup, not a second
         # command that can see an already-Booted device and short-circuit.
@@ -113,6 +147,7 @@ class PVTNativeImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             (root / "test-share-ui.stderr").write_text("native rejection: unsupported directory\n")
+            (root / "share-native-log.stdout").write_text("native exception from owned reader\n")
             (root / "compile-reader.stderr").write_text("FIRST-ERROR" + "x" * 13000 + "LAST-ERROR")
             (root / "media.jpg").write_bytes(b"never-print-media")
             (root / "unexpected.stderr").write_text("not-an-allowed-diagnostic")
@@ -126,6 +161,7 @@ class PVTNativeImportTests(unittest.TestCase):
             self.assertIn('"direct_import_exit_code": 2', text)
             self.assertIn('"status": "blocked"', text)
             self.assertIn("native rejection: unsupported directory\n", text)
+            self.assertIn("native exception from owned reader\n", text)
             self.assertIn("FIRST-ERROR", text)
             self.assertIn("LAST-ERROR", text)
             self.assertIn("complete text retained in artifact", text)
@@ -136,10 +172,26 @@ class PVTNativeImportTests(unittest.TestCase):
         shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}
         package = Path("/owned/container/Documents/capture.pvt")
         hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
-        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file", "share_phase": "share",
-                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes}
+        bundle_facts = {"url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True}
+        bundle_facts.update({"live_photo_readable_types": ["com.apple.live-photo-bundle"],
+                             "file_representation_conforms_to_package": True,
+                             "whole_package_decode": {"status": "loaded", "type_identifier": "com.apple.live-photo-bundle",
+                                                      "member_sha256": hashes, "width": 256, "height": 256}})
+        transfer = {"type_identifier": "com.apple.live-photo-bundle", "representation": "file", "share_phase": "share",
+                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes,
+                    "native_bundle_facts": bundle_facts}
         probe.check_share_receipt(shared, transfer, package, hashes)
         for mutation in ({}, {"type_identifier": "public.jpeg"}, {"representation": "data"},
+                         {"native_bundle_facts": {}}, {"native_bundle_facts": []},
+                         {"native_bundle_facts": {**bundle_facts, "package_is_package": False}},
+                         {"native_bundle_facts": {**bundle_facts, "contents_provider_registered_types": ["public.file-url"]}},
+                         {"native_bundle_facts": {**bundle_facts, "live_photo_readable_types": []}},
+                         {"native_bundle_facts": {**bundle_facts, "file_representation_conforms_to_package": False}},
+                         {"native_bundle_facts": {**bundle_facts, "whole_package_decode": {"status": "failed"}}},
+                         {"native_bundle_facts": {**bundle_facts, "whole_package_decode": {
+                             **bundle_facts["whole_package_decode"], "member_sha256": {"capture.heic": "other"}}}},
                          {"is_in_place": True}, {"whole_package_url": str(package / "capture.heic")},
                          {"member_sha256": {"capture.heic": "still"}}):
             with self.subTest(mutation=mutation):
@@ -166,6 +218,76 @@ class PVTNativeImportTests(unittest.TestCase):
         after["photo_live"] = False
         with self.assertRaises(probe.Blocked):
             self.check(baseline, after)
+
+    def test_filesystem_bundle_alias_is_not_native_live_photo_reader_support(self):
+        shared = {"status": "completed", "activity_completed": True,
+                  "is_save_to_camera_roll": True, "share_phase": "share"}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        # Measured on iOS: Foundation registers the private filesystem alias,
+        # while PHLivePhoto reads the distinct whole-bundle interchange type.
+        transfer = {"type_identifier": "com.apple.private.live-photo-bundle", "representation": "file",
+                    "share_phase": "share", "is_in_place": False, "whole_package_url": str(package),
+                    "member_sha256": hashes, "native_bundle_facts": {
+                        "url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True,
+                        "live_photo_readable_types": ["com.apple.live-photo-bundle"],
+                        "file_representation_conforms_to_package": True,
+                        "whole_package_decode": {"status": "loaded", "type_identifier": "com.apple.live-photo-bundle",
+                                                 "member_sha256": hashes, "width": 256, "height": 256}}}
+        with self.assertRaises(probe.Blocked):
+            probe.check_share_receipt(shared, transfer, package, hashes)
+
+    def test_file_promise_cannot_relabel_a_native_bundle_as_public_live_photo(self):
+        shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file", "share_phase": "share",
+                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes,
+                    "native_bundle_facts": {"url_content_type": "com.apple.private.live-photo-bundle",
+                        "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                        "package_is_directory": True, "package_is_package": True}}
+        with self.assertRaises(probe.Blocked):
+            probe.check_share_receipt(shared, transfer, package, hashes)
+
+    def test_whole_package_native_object_handoff_requires_opaque_decoder_provenance(self):
+        shared = {"status": "completed", "activity_completed": True,
+                  "is_save_to_camera_roll": True, "share_phase": "share"}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        native = {"url_content_type": "com.apple.private.live-photo-bundle",
+                  "contents_provider_registered_types": ["com.apple.private.live-photo-bundle", "public.file-url"],
+                  "package_is_directory": True, "package_is_package": True,
+                  "live_photo_type": "com.apple.live-photo",
+                  "live_photo_readable_types": ["com.apple.live-photo-bundle"],
+                  "file_representation_conforms_to_package": True,
+                  "whole_package_decode": {"status": "loaded", "type_identifier": "com.apple.live-photo-bundle",
+                                           "member_sha256": hashes, "width": 256, "height": 256,
+                                           "object_class": "PHLivePhoto"}}
+        transfer = {"type_identifier": "com.apple.live-photo", "representation": "whole-package-native-live-photo",
+                    "native_object_class": "PHLivePhoto", "native_object_is_live_photo": True,
+                    "share_phase": "share", "is_in_place": False, "whole_package_url": str(package),
+                    "member_sha256": hashes, "native_bundle_facts": native}
+        probe.check_share_receipt(shared, transfer, package, hashes)
+        for mutation in ({"native_object_is_live_photo": False}, {"native_object_class": "UIImage"},
+                         {"type_identifier": "public.jpeg"}, {"representation": "assembled-resources"},
+                         {"native_bundle_facts": {}},
+                         {"native_bundle_facts": {**native, "whole_package_decode": {
+                             **native["whole_package_decode"], "type_identifier": "com.apple.live-photo"}}},
+                         {"native_bundle_facts": {**native, "whole_package_decode": {
+                             **native["whole_package_decode"], "member_sha256": {"capture.heic": "other"}}}}):
+            with self.subTest(mutation=mutation), self.assertRaises(probe.Blocked):
+                probe.check_share_receipt(shared, {**transfer, **mutation}, package, hashes)
+
+    def test_probe_does_not_assemble_members_or_create_photokit_assets(self):
+        source = Path(probe.__file__).parent
+        for name in ('PVTReadback.swift', 'ReadbackCore.swift'):
+            text = (source / name).read_text()
+            for api in ('PHLivePhoto.request', 'requestLivePhotoWithResourceFileURLs',
+                        'PHAssetCreationRequest', 'PHAssetChangeRequest', 'performChanges'):
+                with self.subTest(file=name, api=api):
+                    self.assertNotIn(api, text)
 
     def test_ui_project_is_bound_only_to_the_created_probe_bundle(self):
         source = Path(probe.__file__).parent

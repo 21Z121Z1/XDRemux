@@ -4,6 +4,8 @@
 
 本指南规定 XDRemux 的修改与验证流程。Rust `xdremux` CLI、运行时、引擎和媒体 crate 构成唯一产品栈。Swift 提供 Apple 框架适配器，Python 提供研究和训练工具。
 
+`model_adapters/` 中的模型原语只返回观测；相机选择、准入和转换策略由 Rust 负责。
+
 组件职责见[开发文档](docs/development.md)，证据选择见[测试政策](docs/quality/testing.md)。[验证操作指南](docs/validation/README.md)说明如何生成绑定具体提交的回执。[Apple 功能文档](docs/apple-features.md)规定平台边界。
 
 ## 保持产品契约

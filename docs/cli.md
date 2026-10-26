@@ -75,7 +75,8 @@ xdremux convert --input IMG_001.jpg
 | `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
 | `--apple-styles` | 在 macOS 27 上生成摄影风格和推理得到的纹理风格，需要支持的 ProXDR 源数据。 |
 | `--apple-cinematic` | 在 macOS 27 上为普通视频生成待处理的电影效果元数据，属于实验性功能。 |
-| `--focal-length-35mm MM` | 需要 `--apple-cinematic`，默认为 `24`，提供假定的 35 mm 等效焦距。 |
+| `--focal-length-35mm MM` | 需要 `--apple-cinematic`，覆盖自动记录元数据或 GeoCalib 焦距选择。 |
+| `--cinematic-camera-estimate PATH` | 仅用于 `convert`。提供绑定源视频的显式相机观测，优先级低于显式焦距、高于自动选择。 |
 | `--aperture F` | 需要 `--apple-cinematic`，默认为 `2.8`，提供假定拍摄光圈。 |
 
 `--oppo-compatible`、`--apple-portrait`、`--apple-portrait-oppo`、`--apple-styles` 和 `--apple-cinematic` 相互排斥。功能失败后不会静默切换模式。发布输出前，必须具备所需源数据和原生能力。
@@ -209,7 +210,10 @@ xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jo
 
 命令保留压缩媒体，不缩放或转码。候选视频能否解码由 AVFoundation 判断。批处理结果使用 `cinematic` 类型，并预留不冲突的 MOV 名称。
 
-`--focal-length-35mm` 与 `--aperture` 为缺少相机几何信息的输入提供假定拍摄值，不是恢复出的物理测量值。已验证范围和独立原生消费端检查见[电影效果约定](cinematic.md)。
+两个入口都自动选择焦距：显式 `--focal-length-35mm MM` 优先，然后是 ExifTool 读取的固定 35mm 等效焦距，字段缺失或未知时调用已安装的 GeoCalib helper。只有物理焦距还不够，不再默认代入 24 mm。依赖缺失、元数据冲突或模型观测被拒绝时，在发布输出前失败。`--aperture F` 仍是独立假设，默认为 2.8。显式传入任一参数都需要 `--apple-cinematic`。支持的标签、限制和原生验证见 [Cinematic 元数据封装约定](cinematic.md)。
+
+
+`convert --cinematic-camera-estimate camera.json` 保留为高于自动选择的显式观测输入，显式 `--focal-length-35mm` 优先。正常使用不需要 JSON 参数，`batch` 会逐个解析输入。[GeoCalib 模型适配器](../model_adapters/geocalib/README.md) 需要一次性本地安装，目前支持固定视角 SDR 视频。准入和焦距选择由 Rust 持有。它不能恢复拍摄光圈、对焦距离或未知 EIS 裁切；模型不确定度较低也不等于物理精度已验证。
 
 ## 退出码与 JSON
 

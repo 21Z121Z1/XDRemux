@@ -16,12 +16,15 @@ The [Rust runtime](../crates/xdremux-runtime/src/lib.rs) hashes the source befor
 
 The current implementation requires macOS 27 or later, a macOS 27 SDK build, and available Apple inference resources. It also requires the private Portrait/Cinematic methods used by the [native adapter](../Sources/XDCinematicNative/cinematic_envelope.m). Before each required private Objective-C call, the adapter checks the method's type encoding. An unsupported method, SDK, system, or resource causes failure. Older SDK builds retain other adapter operations but reject Cinematic generation before inference.
 
-| Option | Default | Permitted range | Meaning |
-| --- | --- | --- | --- |
-| `--focal-length-35mm MM` | `24` | `1` through `300` | Focal-length assumption for every frame |
-| `--aperture F` | `2.8` | `1` through `64` | Aperture assumption |
+Focal input is automatic on both `convert` and `batch`. An explicit `--focal-length-35mm MM` takes priority. Otherwise Rust reads a fixed recorded 35mm-equivalent value through ExifTool; if no known value is present, it runs the installed GeoCalib model helper. It does not default to 24 mm. Only explicit equivalent-focal tags on the main asset qualify: EXIF/XMP `FocalLengthIn35mmFormat` and QuickTime `camera.focal_length.35mm_equivalent`. Physical `FocalLength`, lens names, composites and embedded thumbnail metadata do not qualify. EXIF zero means unknown. Multiple known values must agree within 0.001 mm; malformed or conflicting values fail and require explicit input.
 
-Both values must be finite. Either option requires `--apple-cinematic`. When camera geometry is absent, these values are capture assumptions. They are not measured optical properties.
+Before accepting a recorded value, Rust also requires ExifTool to identify exactly one video track on the main asset. `VideoKeys` names a metadata namespace, not the owning track, while the native adapter processes the first video track. Multiple video tracks or missing track facts therefore reject recorded-metadata selection before model or native execution; matching focal values alone do not establish a track binding. Explicit focal input bypasses this check. When no known recorded value exists, the existing GeoCalib fallback remains available.
+
+Accepted focal lengths are finite and between 1 and 300 mm. `--aperture F` remains a separate capture assumption, defaulting to 2.8 with a finite range of 1 to 64. Either explicit parameter requires `--apple-cinematic`. Recorded equivalents may omit stabilization crop; model estimates are effective view-angle estimates and can be wrong. Neither recovers capture aperture or focus distance.
+
+GeoCalib samples five frames independently, then fits a shared fixed-view camera. Rust checks provenance, source hash, uncertainty and cross-frame consistency before native generation. Missing dependencies, model errors and rejected estimates fail without publishing a MOV or substituting a guessed focal length. The initial model path supports fixed-view SDR video with square pixels. It does not estimate a zoom timeline. Each batch input is resolved independently. The `convert`-only `--cinematic-camera-estimate camera.json` option remains an explicit source-bound observation override above automatic metadata/model selection; an explicit focal value takes priority over it without reading the JSON.
+
+Install ExifTool and, for the fallback, FFmpeg/FFprobe plus the [GeoCalib helper](../model_adapters/geocalib/README.en.md). Rust finds helpers beside the Apple adapter or on `PATH`; `XDREMUX_EXIFTOOL` and `XDREMUX_GEOCALIB` can select their executable paths. The runtime bounds ExifTool to 30 seconds, GeoCalib to 600 seconds, stdout/JSON to 1 MiB and diagnostics to 64 KiB. It kills the owned process group and reaps the child on completion or failure. The normal command does not require a manually generated JSON file. `convert` reports `focal-length-source` as `explicit`, `recorded-metadata`, `geocalib` or `camera-estimate`.
 
 ### Recorded compatibility results
 
@@ -65,7 +68,9 @@ The Rust CLI is the product entry point. The Swift/Objective-C adapter performs 
 
 ### Decode and select subject seeds
 
-AVFoundation decodes the selected color-video track. `PTMonocularDisparityProvider` uses each decoded frame and the assumed focal length to infer temporary disparity. Vision receives the video's display orientation. Detected rectangles are then mapped back to encoded coordinates.
+AVFoundation decodes the selected color-video track. `PTMonocularDisparityProvider` uses each decoded frame and the resolved focal length to infer temporary disparity. Vision receives the video's display orientation. Detected rectangles are then mapped back to encoded coordinates.
+
+The generator keeps the selected focal length constant. Optional external observations estimate effective field of view from sampled images; the native generator does not infer optical zoom or recover physical calibration. Original Cinematic geometry, disparity maps, and focus decisions are diagnostic references only. Subject continuity is an independent selection rule. It does not reproduce Apple's closed automatic director or guarantee the original camera's focus decisions.
 
 Subject selection follows this order:
 
@@ -110,7 +115,7 @@ Before publication, public `CNAssetInfo` must accept all three conditions: capab
 
 Hardware/sensor fields and the virtual sensor region are synthetic. Scene illuminance is a proxy derived from luma. These values do not recover camera calibration, stabilization crop, or original focus choices.
 
-The supplied focal-length assumption stays constant. The generator does not infer optical zoom or absolute field of view from image motion. Original Cinematic geometry, disparity maps, and focus decisions are diagnostic references only. Subject continuity uses independent selection rules. It does not reproduce Apple's closed automatic director or guarantee the original focus decisions.
+The resolved focal length stays constant throughout generation. The model estimates effective field of view from sampled images; the native generator does not infer optical zoom.
 
 ## Verification
 

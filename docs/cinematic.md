@@ -16,12 +16,15 @@ xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 
 当前实现需要 macOS 27 或更新版本、macOS 27 SDK 构建及可用的 Apple 推理资源。它还需要[原生适配器](../Sources/XDCinematicNative/cinematic_envelope.m)使用的 Portrait/Cinematic 私有方法。适配器在调用每个必要的私有 Objective-C 方法前检查其类型编码。方法、SDK、系统或资源不受支持时，命令会失败。旧 SDK 构建保留其他适配器操作，但会在推理前拒绝 Cinematic 生成。
 
-| 参数 | 默认值 | 允许范围 | 含义 |
-| --- | --- | --- | --- |
-| `--focal-length-35mm MM` | `24` | `1` 到 `300` | 每帧使用的焦距假设 |
-| `--aperture F` | `2.8` | `1` 到 `64` | 光圈假设 |
+`convert` 和 `batch` 都会自动选择焦距输入。显式 `--focal-length-35mm MM` 优先；否则 Rust 通过 ExifTool 读取固定的已记录 35mm 等效焦距，没有已知值时运行已安装的 GeoCalib helper。不再默认填入 24 mm。只有主资源上明确的等效焦距标签合格：EXIF/XMP `FocalLengthIn35mmFormat` 和 QuickTime `camera.focal_length.35mm_equivalent`。物理 `FocalLength`、镜头名称、合成字段和嵌入缩略图信息不合格。EXIF 零值表示未知。多个已知值须在 0.001 mm 内一致；格式错误或冲突会失败，需显式指定焦距。
 
-两个值都必须是有限数值。显式传入任一参数时，都必须指定 `--apple-cinematic`。源文件缺少相机几何信息时，这些值是生成元数据所用的拍摄假设，不是实测光学属性。
+接受已记录焦距前，Rust 还要求 ExifTool 确认主资源恰好有一条视频轨道。`VideoKeys` 是元数据命名空间，不标识所属轨道，而原生 adapter 处理第一条视频轨道。因此，多视频轨或轨道事实缺失时，会在模型或原生执行前拒绝已记录元数据选择；焦距值一致也不能证明轨道绑定。显式焦距输入绕过此检查。没有已知记录值时，保留现有的 GeoCalib 回退路径。
+
+焦距必须有限且处于 1 至 300 mm。`--aperture F` 仍是独立拍摄假设，默认为 2.8，允许有限的 1 至 64。显式传入任一参数都需要 `--apple-cinematic`。记录的等效焦距可能没有计入防抖裁切；模型估计的是有效视角等效值，也可能出错。两者都不能恢复拍摄光圈或对焦距离。
+
+GeoCalib 独立估计五个采样帧，再拟合共享固定视角相机。Rust 在原生生成前检查来源、源哈希、不确定度和跨帧一致性。依赖缺失、模型错误或估计被拒绝时会失败，不发布 MOV，也不代入猜测焦距。首版模型路径支持正方形像素的固定视角 SDR 视频，不估计变焦时间线。批量处理中每个输入独立解析。仅供 `convert` 的 `--cinematic-camera-estimate camera.json` 仍是高于自动元数据/模型选择的显式源绑定观测；显式焦距优先级更高，且此时不读取 JSON。
+
+安装 ExifTool；需要模型回退时，再安装 FFmpeg/FFprobe 和 [GeoCalib helper](../model_adapters/geocalib/README.md)。Rust 从 Apple adapter 同目录或 `PATH` 查找 helper；`XDREMUX_EXIFTOOL` 和 `XDREMUX_GEOCALIB` 可指定可执行文件路径。runtime 将 ExifTool 限时 30 秒、GeoCalib 限时 600 秒、stdout/JSON 限为 1 MiB、诊断限为 64 KiB。结束或失败时终止所持进程组并回收子进程。正常命令不需要手工生成 JSON。`convert` 输出的 `focal-length-source` 为 `explicit`、`recorded-metadata`、`geocalib` 或 `camera-estimate`。
 
 ### 已记录的兼容性结果
 
@@ -48,6 +51,8 @@ xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 | 逐帧摄制数据（cinematography） | 包含有效的检测 ID 和对焦决策 |
 | 逐帧渲染数据（rendering） | 包含相机几何假设 |
 | 视频与元数据时间 | 描述相同的可见时间线 |
+
+生成器保持选定的焦距不变。可选的外部观测从采样图像估计有效视场；原生生成器不推理光学变焦，也不恢复物理相机标定。原始 Cinematic 几何、视差图和对焦决策仅作为诊断参考。主体连续性使用独立的选择规则，不复现 Apple 封闭的自动选焦算法，也不保证与原相机的对焦决策一致。
 
 `needsPreprocessing` 不要求已有栅格视差轨道。
 
@@ -110,7 +115,7 @@ AVFoundation 解码选定的彩色视频轨道。`PTMonocularDisparityProvider` 
 
 硬件/传感器字段和虚拟传感器区域是合成值。场景照度是从亮度推导的代理值。这些值不能恢复相机标定、防抖裁切或原始对焦选择。
 
-输入的焦距假设保持不变。生成器不从图像运动推理光学变焦或绝对视场角。原始 Cinematic 几何、视差图和对焦决策仅作为诊断参考。主体连续性使用独立的选择规则，不复现 Apple 封闭的自动选焦算法，也不保证原始对焦决策一致。
+生成时保持解析出的焦距不变。模型从采样图像估计有效视场；原生生成器不推理光学变焦。
 
 ## 验证
 

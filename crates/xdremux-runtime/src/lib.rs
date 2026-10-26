@@ -9,6 +9,8 @@ mod apple_texture;
 mod batch;
 mod batch_checkpoint;
 mod categorize;
+#[cfg(target_os = "macos")]
+mod cinematic_camera;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
@@ -22,12 +24,14 @@ pub use apple_adapter::AppleStylePropertiesFacts;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
-    CinematicEnvelopeOptions,
+    CinematicEnvelopeOptions, CinematicFocalLength,
 };
 pub use batch_checkpoint::{
     motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
     MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
 };
+#[cfg(target_os = "macos")]
+pub use cinematic_camera::CinematicFocalLengthSource;
 
 #[cfg(target_os = "macos")]
 pub fn validate_apple_styles_file(
@@ -172,6 +176,8 @@ pub struct PhotographicStylesFileReceipt {
 pub struct CinematicEnvelopeFileReceipt {
     pub output: PathBuf,
     pub processed_frames: u64,
+    pub camera_estimate: Option<xdremux_engine::CinematicCameraSummary>,
+    pub focal_length_source: CinematicFocalLengthSource,
     pub focal_length_35mm: f32,
     pub aperture: f32,
     pub disparity_track_written: bool,
@@ -208,8 +214,7 @@ impl PortableRuntime {
         executable: impl AsRef<Path>,
         input: impl AsRef<Path>,
         output: impl AsRef<Path>,
-        focal_length_35mm: f32,
-        aperture: f32,
+        options: &CinematicEnvelopeOptions,
     ) -> Result<CinematicEnvelopeFileReceipt> {
         use std::fs::File;
         use std::io::Read;
@@ -225,11 +230,14 @@ impl PortableRuntime {
                 "input is not a regular file",
             ));
         }
-        if !focal_length_35mm.is_finite() || !(1.0..=300.0).contains(&focal_length_35mm) {
-            return Err(RuntimeError::new(
-                "Cinematic configuration",
-                "35mm-equivalent focal length must be finite and between 1 and 300",
-            ));
+        let aperture = options.aperture;
+        if let CinematicFocalLength::Assumed(focal) = options.focal_length {
+            if !focal.is_finite() || !(1.0..=300.0).contains(&focal) {
+                return Err(RuntimeError::new(
+                    "Cinematic configuration",
+                    "35mm-equivalent focal length must be finite and between 1 and 300",
+                ));
+            }
         }
         if !aperture.is_finite() || !(1.0..=64.0).contains(&aperture) {
             return Err(RuntimeError::new(
@@ -285,15 +293,32 @@ impl PortableRuntime {
             source_digest.update(&buffer[..count]);
         }
         let original_digest = source_digest.finalize();
-
         let staging = tempfile::Builder::new()
             .prefix(".xdremux-cinematic-")
             .tempdir_in(&output_parent)
             .map_err(|error| RuntimeError::external("Cinematic staging", error))?;
+        let source_hash: String = original_digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let camera = cinematic_camera::resolve(
+            executable.as_ref(),
+            &input,
+            staging.path(),
+            &options.focal_length,
+            &source_hash,
+        )?;
+        let focal_length_35mm = camera.focal;
         let candidate = staging.path().join("pending-cinematic.mov");
         let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
         let facts =
             adapter.generate_cinematic_envelope(&input, &candidate, focal_length_35mm, aperture)?;
+        if facts.focal_length_35mm != focal_length_35mm || facts.aperture != aperture {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "adapter camera values do not match the requested focal length and aperture",
+            ));
+        }
         let candidate_metadata = fs::metadata(&candidate)
             .map_err(|error| RuntimeError::external("Cinematic candidate", error))?;
         if !candidate_metadata.is_file() || candidate_metadata.len() == 0 {
@@ -327,6 +352,8 @@ impl PortableRuntime {
         Ok(CinematicEnvelopeFileReceipt {
             output,
             processed_frames: facts.processed_frames,
+            camera_estimate: camera.estimate,
+            focal_length_source: camera.source,
             focal_length_35mm: facts.focal_length_35mm,
             aperture: facts.aperture,
             disparity_track_written: facts.disparity_track_written,

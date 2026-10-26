@@ -42,6 +42,11 @@ Swift 包只发布 `xdremux-apple-adapter` 可执行文件。原生纹理风格�
 
 `xdremux_py/` 不参与 Rust 运行时，也不定义公开转换方式。研究结果可以为产品修改提供依据，但不能替代产品测试或原生验收。
 
+### 模型原语
+
+`model_adapters/geocalib/` 是独立的本地推理组件。Rust runtime 通过 ExifTool 读取已记录的等效焦距，只有缺失时才调用模型。Python helper 返回绑定源视频的像素内参和不确定度。来源优先级、固定相机准入、等效焦距换算、原生生成和发布均由 Rust 持有。helper 不构成第二套转换器或用户 CLI。固定版本环境与权重需要单独安装，不上传媒体。
+
+
 ## 媒体契约
 
 ### 标准 HDR

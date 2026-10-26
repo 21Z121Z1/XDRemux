@@ -75,6 +75,37 @@ Before simulator creation, the job checks that the selected runtime supports the
 
 The product probe runs at most once. It starts only after the control simulator passes and the job verifies deletion of that simulator. The control passes its exact pair through `--required-runtime` and `--required-device-type`. The product checks that pair against fresh catalogs without selecting a replacement. After build and preparation, it checks the same pair again immediately before simulator creation. A changed or incompatible pair blocks creation.
 
+The control submits one application-inventory query with a 120-second deadline.
+A timeout keeps readiness blocked and collects bounded host diagnostics for the
+owned simulator before cleanup. These diagnostics do not establish readiness or
+Photos admission.
+
+The product probe permits at most three startup inventory queries, each with a
+120-second deadline. A real inventory reply is required before its single reader
+installation. The registration query after that command has a 20-second deadline;
+matching installed bytes and both owned containers must still be verified.
+
+The file promise uses the package interchange type declared readable by
+`PHLivePhoto`, rather than assuming the filesystem's content-type alias is a
+Photos reader type. Before sharing, a separate provider must load the exact
+whole directory through that native reader, with positive dimensions and
+unchanged member hashes. UIKit receives that native decoder result, with its
+object class and the opaque whole-package origin bound to the input receipt.
+Receipts distinguish native decoding from the later system save callback and
+independent library readback; decoding alone is not admission. They retain both
+the filesystem/provider facts and the consumer type, native decode and hashes.
+Neither a Live Photo object type label nor assembly from extracted resources can
+substitute for whole-package decoding, system save and independent readback.
+
+All system share sheets use the invoking button as their popover source view
+and its bounds as the source rectangle. The image availability control and both
+whole-package routes use the same presentation path, including regular-width
+windows.
+
+When the UI test fails, the probe collects a bounded native log for its reader
+inside the owned simulator before deletion. A failed diagnostic query preserves
+the original test failure and does not prevent cleanup.
+
 The product receipt must identify the same source SHA, runtime, and device type. A passing control does not prove PVT admission. Admission requires whole-package identity and independent PhotoKit readback.
 
 The control and product boot monitors require a zero process exit and an owned-device `Finished` terminal record. Migration failure, an already-booted shortcut, or unknown output blocks inventory or installation. This check does not replace inventory, Photos Save, or independent PhotoKit readback.

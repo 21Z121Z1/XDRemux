@@ -98,6 +98,9 @@ python -m unittest tests.test_apple_reverse_key1_training
 
 The package depends on `Pillow` and `numpy`. The optional `training` dependency adds PyTorch. Training and evaluation code can remain in Python because it is research tooling.
 
+The separate `model_adapters/geocalib/` component is a runtime ML primitive, outside the research package. Rust invokes the installed `xdremux-geocalib` helper through a bounded process boundary. It returns observations only; the engine owns their interpretation and admission. See [installation and the observation contract](../model_adapters/geocalib/README.en.md). Product archives do not include its Python environment, weights, FFmpeg or ExifTool. Automatic Cinematic input requires those local dependencies; explicit focal input bypasses them. No conversion downloads models automatically.
+
+
 ## Find the relevant files
 
 | Path | Purpose |
@@ -105,6 +108,7 @@ The package depends on `Pillow` and `numpy`. The optional `training` dependency 
 | `crates/` | Rust product implementation and Rust tests. |
 | `Sources/XDRemuxAppleAdapter/` | Swift Apple framework adapter called by the runtime. |
 | `Sources/XDCinematicNative/` and `Sources/XDTextureNative/` | Native operations used by the adapter. |
+| `model_adapters/` | Local model primitives that return observations to Rust. |
 | `xdremux_py/` | Python research and training tools. |
 | `apps/macos/XDRemuxApp/` | SwiftUI app, Xcode project, app tests, and app build scripts. |
 | `tests/` | Python regressions, repository policy tests, verification self-tests, and small synthetic fixtures. |

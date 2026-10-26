@@ -75,7 +75,8 @@ The following options are available to both `convert` and `batch`.
 | `--apple-portrait-oppo` | Uses OPPO depth and available masks. Requires macOS ImageIO and Core Image. Effects are reduced. |
 | `--apple-styles` | Generates Photographic Styles and inferred Texture Styles on macOS 27. Requires supported ProXDR source data. |
 | `--apple-cinematic` | Generates pending Cinematic metadata for ordinary video on macOS 27. Experimental. |
-| `--focal-length-35mm MM` | Requires `--apple-cinematic`. Defaults to `24`. Supplies an assumed 35 mm equivalent focal length. |
+| `--focal-length-35mm MM` | Requires `--apple-cinematic`. Overrides automatic recorded-metadata or GeoCalib focal selection. |
+| `--cinematic-camera-estimate PATH` | `convert` only. Supplies explicit source-bound camera observations below explicit focal input and above automatic selection. |
 | `--aperture F` | Requires `--apple-cinematic`. Defaults to `2.8`. Supplies an assumed capture aperture. |
 
 `--oppo-compatible`, `--apple-portrait`, `--apple-portrait-oppo`, `--apple-styles`, and `--apple-cinematic` are mutually exclusive. A failed feature does not silently switch to another profile. Required source data or native capabilities must exist before the program publishes output.
@@ -209,7 +210,10 @@ Import the pending MOV into Photos and enable Cinematic for native processing. T
 
 The command preserves encoded media without resizing or transcoding. AVFoundation decides whether discovered video candidates can be decoded. Batch results use kind `cinematic` and reserve unique MOV names.
 
-`--focal-length-35mm` and `--aperture` provide assumed capture values for input without camera geometry. They are not recovered physical measurements. See the [Cinematic contract](cinematic.en.md) for the tested scope and separate native consumer checks.
+Both entry points choose focal input automatically: explicit `--focal-length-35mm MM`, then a fixed recorded 35mm-equivalent tag read by ExifTool, then the installed GeoCalib helper when the tag is absent or unknown. Physical focal length alone is insufficient. There is no default 24 mm substitution. Missing dependencies, conflicting metadata or rejected model observations fail before output publication. `--aperture F` remains a separate assumption with default 2.8. Either explicit parameter requires `--apple-cinematic`. See the [Cinematic envelope contract](cinematic.en.md) for admitted tags, limits and native verification.
+
+
+`convert --cinematic-camera-estimate camera.json` remains an explicit observation override above automatic selection. An explicit `--focal-length-35mm` takes priority. Normal use needs no JSON argument, and `batch` resolves each source independently. The [GeoCalib model adapter](../model_adapters/geocalib/README.en.md) requires one-time local setup and currently supports fixed-view SDR video. Rust owns admission and focal selection. It does not recover capture aperture, focus distance or unknown EIS crop, and low model uncertainty does not establish physical accuracy.
 
 ## Exit status and JSON
 

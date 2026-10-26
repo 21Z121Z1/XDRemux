@@ -4,6 +4,8 @@ English | [简体中文](AGENTS.zh-CN.md)
 
 Use this guide to change and verify XDRemux. The Rust `xdremux` CLI, runtime, engine, and media crates form the only product stack. Swift provides the Apple framework adapter. Python provides research and training tools.
 
+Model primitives in `model_adapters/` return observations; Rust owns camera selection, admission, and conversion policy.
+
 Read the [development guide](docs/development.en.md) for component ownership and the [testing policy](docs/quality/testing.en.md) to select evidence. The [validation runbook](docs/validation/README.en.md) explains receipts for a specific commit. The [Apple feature guide](docs/apple-features.en.md) defines platform limits.
 
 ## Preserve the product contracts
