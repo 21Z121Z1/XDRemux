@@ -1,36 +1,27 @@
-# 视频 Smart Style 载体假设
+# 视频 Smart Style 载体实验
 
 [English](README.md) | 简体中文
 
-**仅用于研究。** 这里比较四种候选 MOV 表达，不是 XDRemux 支持的转换功能，
-也不能证明 Apple Photos 支持可逆的视频摄影风格编辑。Rust 仍独占产品策略和编排；
-此处的独立 Swift 程序只执行实验所需的公开 AVFoundation 操作。
+这个实验比较四种承载视频 Smart Style 元数据的候选 MOV 表达。**它仅用于研究。** 实验结果不能确立 XDRemux 的产品支持，也不能证明 Apple Photos 支持可逆的视频风格编辑。
 
-## 保留的问题与观察
+Rust 负责产品策略和编排。本目录中的独立 Swift 程序只执行实验所需的公开 AVFoundation 操作。
 
-历史实验尝试了六个静态 `com.apple.quicktime.smartstyle.*` 字段，以及 boxed
-时序元数据轨道中 binary plist 的 `lower`、`compact`、`upper` 三种拼写。
-`static` 是不添加时序轨道的对照。版本/cast 为 1、强度为 1、tone/color 为 0、
-bypass 为 false、reversible 为 true，均为**人工假设**，不是场景事实或已验证格式。
-各拼写在同一个构造器中比较，不形成多个产品后端。
+## 候选定义
 
-历史任务出现过下载/LFS 和 Swift 桥接、并发错误。旧校验器只读取第一帧，不能证明
-完整音视频保留、元数据载荷回读、Photos 准入或编辑/保存/重开。旧写入器还会先删除
-已有目标，再检查输入；缺少时长时猜测 30 fps。这些做法已废弃。
+四种候选都写入六个静态 `com.apple.quicktime.smartstyle.*` 字段。其中三种还写入带盒装格式描述的时序元数据轨道，载荷为二进制属性列表。
 
-已删除的固件分析 workflow 请求 iOS 27 `24A437`，探测目标包括
-`PESupport.assetCanRenderStyles:`、`PESupport.canPerformEditOnAsset:`、
-`PISemanticStyleAutoCalculator.canRenderStylesOnComposition:`、
-`PISemanticStyleAutoCalculator.isStylableFromImageProperties:error:`、
-`PHAssetPhotosSmartStyleExtendedProperties.isCurrentlySmartStyleable` 和
-`PHAsset._setupSmartStyleFromFetchDictionary:`。这些只是**探测目标**，不是成功结果：
-反汇编产物未提交，且脚本容许失败后仍成功退出。CameraUI 的两个特定构建地址
-`0x1bdd478fc`、`0x1bdf25490` 也不是可移植入口。这里不恢复固件下载器、私有二进制
-或一次性的固件分析 Actions。
+| 变体 | 时序元数据 |
+| --- | --- |
+| `static` | 无；作为不含时序轨道的对照。 |
+| `lower` | 使用首字母小写的完整字段名。 |
+| `compact` | 使用缩短的字段名。 |
+| `upper` | 使用首字母大写的完整字段名。 |
 
-## 复现实验
+[`CarrierProbe.swift`](CarrierProbe.swift) 在同一个构造器中定义所有变体。常量包括版本/cast 为 1、强度为 1、tone/color 为 0、bypass 为 false；包含 reversible 字段时，该值为 true。这些值都是合成假设，不是恢复出的场景事实，也不是经过验证的原生格式。
 
-在安装 Xcode 命令行工具和 `ffprobe` 的 macOS 上，从仓库根目录运行：
+## 运行实验
+
+需要 macOS、Xcode 命令行工具和 `ffprobe`。合成冒烟测试还需要 `ffmpeg`。从仓库根目录运行：
 
 ```sh
 swiftc -swift-version 5 -parse-as-library research/video_styles/CarrierProbe.swift -o /tmp/CarrierProbe
@@ -38,66 +29,97 @@ python -m research.video_styles.probe input.mov candidate.mov --helper /tmp/Carr
 python -m research.video_styles.smoke --helper /tmp/CarrierProbe
 ```
 
-只处理具有相应权限的媒体。包装器不上传照片或视频。CI 自行生成带音轨和旋转矩阵的
-H.264、HEVC 10-bit 视频，不把它们当作原生摄影风格正样本。输入上限为 2 GiB，子进程
-超时为 120 秒，时间戳读取器最多接受 100,000 个视频样本。这些限制用于约束诊断过程，
-不是产品性能指标。
+用 Python 包装器发布经过验证的候选。单独运行 Swift 构造器只会写入私有输出路径，不执行完整的发布检查。
 
-`probe.py` 要求目标尚不存在、父目录已存在，在同目录私有临时文件夹内构造候选。
-原生静态/时序载荷回读通过后，还必须核对全部编码包 SHA-256、各轨道内的顺序和数量、
-精确有理数 PTS/DTS/时长、codec 配置、位深/色度/色彩和显示矩阵。源文件由 ffprobe
-识别的标签须保留，但容器 brand/encoder 与轨道 handler/vendor/encoder 等封装信息
-不在比较范围内；不宣称保留所有未解释的 MOV atom。输入哈希必须未变。全部通过后才
-以同文件系统硬链接原子发布；若其他写入者抢先创建目标，本进程拒绝覆盖。原子名称发布
-不等于断电或文件系统故障后的持久性保证。
+目标路径必须尚不存在，父目录必须已存在。只处理你有权处理的媒体。包装器不上传媒体。
 
-当前只支持一条视频和可选音轨。章节、其他源轨道、缺失或重叠时间信息、变化的 codec
-描述、已存在的 Smart Style 字段、对比失败、不支持硬链接的文件系统均明确失败；不重新
-编码、不静默降级、不猜测帧时长、不替换输入。应通过 Python 包装器发布，而不是直接
-使用只面向私有临时输出的 Swift 构造器。原生错误和超时不会被转成成功。
+| 限制 | 数值 |
+| --- | --- |
+| 输入文件大小 | 最多 2 GiB |
+| 子进程超时 | 120 秒 |
+| Swift 读写循环超时 | 100 秒 |
+| 时间戳读取器接受的视频样本数 | 最多 100,000 个 |
 
-## 原生时间戳回归
+这些限制用于约束诊断工作量，不是产品性能指标。
 
-在 macOS 26.6.2（25G83）上，压缩格式 `AVAssetReader` 会在轨道呈现终点
-输出零长度 `EmptyMedia` 控制缓冲区。直接交给 `AVAssetWriter` 后，即使编码
-数据与轨道呈现时长未变，最后一个 H.264 B 帧的包时长仍从 1/12 秒变为
-1/4 秒。显式调用 `endSession` 无法修复。仅消费终点处的空标记后，
-H.264、HEVC10、音频和旋转矩阵中的所有包与时间戳均保持一致。
-其他控制缓冲区和真实采样（含音频裁剪附件）仍原样传递。中间空编辑显式
-失败，不会悄悄删除；完整包校验仍是发布门禁。合成 smoke 测试断言实际
-经过此控制缓冲区路径。这只证明所测公开框架行为，不证明 iOS 27 Photos。
+## 发布前检查
 
-## 晋升门槛
+[`probe.py`](probe.py) 在目标目录内的私有临时文件夹中构造候选。发布前必须通过以下检查：
 
-结构可读不够。还需要带 OS/设备来源记录、可合法使用的原生正样本和对照；证明逐样本
-元数据语义正确而非重复常量；核对完整时长、音轨、色彩/HDR 和方向；在支持设备上验证
-Photos 导入、独立参数编辑、保存、重开和撤销。对照矩阵否定的假设应淘汰。原始消费者
-观察和失败须绑定输入/输出哈希。通过前，无论 CI 如何，`photosEditingValidated` 都为 false。
+- 原生接口回读静态和时序元数据载荷。
+- 每个音视频编码包的 SHA-256 一致，各轨道内的包顺序和数量一致。
+- PTS、DTS 和时长的精确有理数值一致。
+- 编码器配置、位深、色度、色彩信息和显示矩阵一致。
+- `ffprobe` 报告的源标签一致，但下述容器和轨道封装字段除外。
+- 源文件哈希保持不变。
 
-## 设计依据与验证
+标签比较排除容器的 brand/encoder 字段，以及轨道的 handler/vendor/encoder 字段。上述检查不能证明所有未解释的 MOV 数据盒均被保留。
 
-[AVFoundation 导出指南](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/AVFoundationPG/Articles/05_Export.html)
-说明 nil output settings 请求压缩数据直通，并须检查 reader/writer 完成状态和错误。
-[元数据 adaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor)
-结合明确的 boxed 格式描述写入时序组；本机 SDK 和原生回读构成可执行依据。
-[ffprobe](https://ffmpeg.org/ffprobe.html) 的 `-show_packets -show_streams -show_data_hash sha256`
-提供全部编码包与 codec extradata 的校验值；有理数时间避免把舍入误差当作等价。
+包装器用原子硬链接发布完成的候选。如果其他写入者先创建了目标，本进程会拒绝覆盖。原子名称发布不保证文件在断电或文件系统故障后仍然持久保存。
 
-可移植回归：`python -m unittest tests.test_video_style_research -v`。
-原生结构检查位于 `.github/workflows/research.yml`，与产品验收分开，成功也不改变上述支持状态。
+实验接受一条视频轨道和可选音轨。章节、其他轨道类型、缺失或重叠的时间信息、变化的编码格式描述，以及已存在的 Smart Style 字段都会导致失败。数据不一致或文件系统不支持所需操作时也会明确失败。
 
-## 失败证据
+工具直通传递编码媒体，不重新编码、不猜测帧时长、不替换输入，也不把原生错误或超时转成成功。
 
-probe 失败时输出 JSON receipt 并返回非零退出码。timing mismatch 保留媒体类型、
-source/candidate track ID 和 stream index、packet index（stream timing 为 null）、
-原始 tick/time base 和精确有理数。临时 candidate 在清理前计算 hash；parity 失败后
-不会发布，也不会作为 artifact 保留。source hash/readback 区分未改变、改变和证据
-不可用；不可用值为 null。
+## 原生时间戳观察
 
-synthetic gate 即使遇到前序失败也记录 H.264/HEVC10 × static/lower/compact/upper
-全部八项。八项结果、terminal empty-marker coverage、no-clobber/source immutability
-和 malformed-input rejection 都是必需项。prerequisite 缺失不能让 malformed control
-通过。CI 在成功或失败时均上传 JSON 诊断，但不会豁免失败退出码。carrier trial 成功
-而后续 smoke control 失败时，整体仍失败，并如实记录此前已完成的 publication。
+以下结果来自已记录的 macOS 26.6.2（25G83）实验，不代表本次重新运行，也不能证明 iOS 27 Photos 的行为。
 
-诊断回归：`python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v`。
+压缩格式 `AVAssetReader` 在轨道呈现终点输出了零长度 `EmptyMedia` 控制缓冲区。将标记直接交给 `AVAssetWriter` 后，最后一个 H.264 B 帧的包时长从 1/12 秒变为 1/4 秒。编码载荷和轨道呈现时长仍然相同。显式调用 `endSession` 也未修复这个变化。
+
+仅消费终点处的空标记后，所测 H.264、HEVC10、音频和旋转矩阵组合中的包及时间信息均得到保留。其他控制缓冲区和真实样本，包括音频裁剪附件，仍然原样传递。轨道内部的空编辑会明确失败。完整编码包比较仍是发布的必要条件。
+
+合成冒烟测试要求实际执行终点标记处理路径。这个检查仅覆盖所测公开框架的行为。
+
+## 失败报告与回归测试
+
+探测失败时，程序输出 JSON 报告并返回非零退出码。时间信息不一致的报告保留：
+
+- 媒体类型、源文件和候选文件的轨道 ID、流索引。
+- 包索引；若差异位于流级时间信息，则为 null。
+- 原始时间戳刻度、时基和精确有理数值。
+
+工具在清理前计算临时候选的哈希。数据校验失败后，不发布该候选，也不将它保留为产物。源文件回读结果区分未改变、已改变和证据不可用三种情况。不可用证据记为 null。
+
+合成检查覆盖 H.264/HEVC10 × `static`/`lower`/`compact`/`upper`，共八项。即使前面的项目失败，也会记录全部项目。八项都必须通过，并且必须执行终点空标记路径。检查还包括拒绝覆盖、源文件不变和拒绝无效输入三个对照。
+
+缺少前置条件不能算作拒绝无效输入的对照通过。CI 在成功和失败后都会上传 JSON 诊断，但上传成功不能覆盖测试失败。如果载体实验已成功发布，而后续对照失败，整体测试仍然失败。报告会如实记录此前的发布。
+
+运行可移植回归：
+
+```sh
+python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v
+```
+
+原生结构检查位于[研究工作流](../../.github/workflows/research.yml)。工作流生成带音轨和旋转信息的 H.264 与 HEVC 10-bit 视频。这些合成视频不是原生 Smart Style 正样本。研究 CI 通过不改变产品支持范围。
+
+## 历史实验与已弃用方法
+
+早期任务在源文件下载、LFS 处理、Swift 桥接或并发检查中出现过失败。旧校验器只读取第一个视频样本，无法证明完整媒体保留、元数据回读、Photos 准入或编辑、保存、重新打开的行为。
+
+旧写入器先删除已有目标，再验证输入。缺少时长时，它还假定帧率为 30 fps。这两种方法均已停用。
+
+已删除的固件分析工作流请求过 iOS 27 构建 `24A437`，探测目标包括：
+
+- `PESupport.assetCanRenderStyles:`
+- `PESupport.canPerformEditOnAsset:`
+- `PISemanticStyleAutoCalculator.canRenderStylesOnComposition:`
+- `PISemanticStyleAutoCalculator.isStylableFromImageProperties:error:`
+- `PHAssetPhotosSmartStyleExtendedProperties.isCurrentlySmartStyleable`
+- `PHAsset._setupSmartStyleFromFetchDictionary:`
+
+这些名称表示探测目标，不表示成功观察。反汇编输出未提交，工作流也允许部分失败以成功状态退出。CameraUI 地址 `0x1bdd478fc` 和 `0x1bdf25490` 只适用于特定构建，不能用作可移植入口。本目录不恢复固件下载器、私有二进制或一次性固件分析工作流。
+
+## 进入产品前的要求
+
+进入产品前，需要可合法共享的原生正样本和对照样本，并记录操作系统与设备来源。每个样本都必须具备正确的元数据语义。重复写入静态值不能确立这些语义。
+
+验证必须覆盖完整时长、音轨、色彩/HDR 和方向保留。在适用设备上，还必须覆盖 Photos 导入、独立参数编辑、保存、重新打开和撤销。当对照或负测试否定某个候选时，应淘汰该候选。
+
+将原始相册端观察及失败记录与源文件、输出文件哈希一同保存。在上述要求通过前，无论 CI 状态如何，`photosEditingValidated` 都保持 false。
+
+## 一手参考资料
+
+- [AVFoundation 导出指南](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/AVFoundationPG/Articles/05_Export.html)：将输出设置设为 nil 可请求压缩数据直通。必须检查读写器的完成状态和错误。
+- [元数据适配器](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor)：时序组需要明确的盒装格式描述。以安装的 SDK 和原生回读结果核对行为。
+- [ffprobe](https://ffmpeg.org/ffprobe.html)：`-show_packets -show_streams -show_data_hash sha256` 提供编码包和编码器附加数据的校验值。精确有理数时间戳可避免基于舍入值的比较。

@@ -46,6 +46,10 @@ class ControlModel:
             self.assert_owned(argv)
             if self.failure == name:
                 raise control.ReadinessBlocked(name + ' result unknown')
+            if name == 'control-bootstatus':
+                result.stdout = (f'Monitoring boot status for owned ({self.uuid}).\n'
+                                 '[2026-10-23 08:00:00 +0000] Status=4294967295, isTerminal=YES, Elapsed=00:54.\n'
+                                 '\tFinished\n').encode()
             if name == 'control-delete': (self.devices / self.uuid).rmdir()
             return result
         elif name == 'control-listapps':
@@ -70,7 +74,8 @@ class ControlModel:
     def assert_owned(self, argv):
         assert self.uuid in argv and self.foreign not in argv
 
-    def probe(self):
+    def probe(self, runtime=None, device=None):
+        assert (runtime, device) == (self.runtime, self.device)
         self.probes += 1
         self.assert_control_cleaned()
         assert self.report['status'] == 'product-probe-running'
@@ -82,13 +87,220 @@ class ControlModel:
     def assert_control_cleaned(self):
         assert not (self.devices / self.uuid).exists() and (self.devices / self.foreign).exists()
 
-    def execute(self, probe=None):
+    def execute(self, probe=None, *, capture_diagnostics=None):
         return control.run_control_and_probe(self.run, product.select_device, probe or self.probe,
                                              self.report, 'pvt-readiness-control-' + 'a' * 32, self.devices,
-                                             expected_head=self.source_sha)
+                                             expected_head=self.source_sha, capture_diagnostics=capture_diagnostics)
 
 
 class ReadinessControlTests(unittest.TestCase):
+    def test_zero_exit_migration_failure_never_queries_inventory_or_product(self):
+        stdout = (Path(__file__).parent / 'fixtures/pvt_boot_status/data-migration-failed.stdout').read_bytes()
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw))
+            model.uuid = '481E73B6-B8CB-49EC-9C8F-42C86B91A2E2'
+            original = model.run
+            def run(name, argv, **kwargs):
+                result = original(name, argv, **kwargs)
+                if name == 'control-bootstatus': result.stdout = stdout
+                return result
+            model.run = run
+            model.execute()
+            self.assertEqual(model.probes, 0)
+            self.assertEqual(model.report['control']['listapps_attempts'], 0)
+            self.assertEqual(model.report['status'], 'control-environment-blocked')
+            self.assertIn('Data Migration Failed', model.report['control']['reason'])
+            model.assert_control_cleaned()
+
+    def test_main_pinned_pair_cannot_follow_new_runtime_or_fall_back_when_absent(self):
+        repo = Path(control.__file__).resolve().parents[3]
+        original_control = control.run_control_and_probe
+        for absent in (False, True):
+            with self.subTest(absent=absent), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                model = ControlModel(root)
+                original_run = model.run
+                def run(name, argv, **kwargs):
+                    result = original_run(name, argv, **kwargs)
+                    if name == 'control-runtimes':
+                        data = json.loads(result.stdout)
+                        newer = {**data['runtimes'][0], 'identifier': model.runtime + '-new', 'version': '27.1'}
+                        data['runtimes'] = ([] if absent else data['runtimes']) + [newer]
+                        result.stdout = json.dumps(data).encode()
+                    return result
+                def environment(run_ignored, choose, invoke, report, name, device_root, **kwargs):
+                    model.report = report
+                    original_control(run, choose, model.probe, report, name, model.devices,
+                                     expected_head=model.source_sha)
+                argv = ['control', '--repo', str(repo), '--expected-head', model.source_sha,
+                        '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
+                        '--required-runtime', model.runtime, '--required-device-type', model.device,
+                        '--execute-owned-simulator']
+                with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts', return_value={}), \
+                        patch.object(control, 'source_bindings', return_value={}), \
+                        patch.object(control.platform, 'system', return_value='Darwin'), \
+                        patch.object(control.platform, 'machine', return_value='arm64'), \
+                        patch.object(control, 'run_control_and_probe', side_effect=environment), \
+                        redirect_stdout(io.StringIO()):
+                    self.assertEqual(control.main(), 2 if absent else 0)
+                self.assertEqual(model.probes, 0 if absent else 1)
+                if absent:
+                    self.assertEqual([name for name, _, _ in model.commands],
+                                     ['control-runtimes', 'control-device-types'])
+                    self.assertEqual(model.report['control']['cleanup_status'], 'not-created')
+                else:
+                    self.assertEqual(model.report['control']['selected_runtime'], model.runtime)
+                    self.assertEqual(model.report['control']['selected_device_type'], model.device)
+
+    def test_partial_control_pin_is_rejected_before_output_or_source_reads(self):
+        for flag in ('--required-runtime', '--required-device-type'):
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                argv = ['control', '--repo', str(root), '--expected-head', 'a' * 40,
+                        '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
+                        flag, 'value']
+                with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts') as checkout, \
+                        redirect_stdout(io.StringIO()), patch.object(sys, 'stderr', io.StringIO()):
+                    with self.assertRaises(SystemExit) as error: control.main()
+                self.assertEqual(error.exception.code, 2)
+                checkout.assert_not_called()
+                self.assertFalse((root / 'control').exists())
+
+    def test_boot_monitor_starts_the_owned_device_before_inventory(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw))
+            model.execute()
+            boot_commands = [(argv, timeout) for _, argv, timeout in model.commands
+                             if argv[2] in ('boot', 'bootstatus')]
+            self.assertEqual(boot_commands, [
+                (['xcrun', 'simctl', 'bootstatus', model.uuid, '-b'], 180)])
+            names = [name for name, _, _ in model.commands]
+            self.assertLess(names.index('control-bootstatus'), names.index('control-listapps'))
+
+    def test_boot_monitor_failure_cleans_up_without_inventory_or_product(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = ControlModel(Path(raw), 'control-bootstatus')
+            model.execute()
+            self.assertEqual(model.probes, 0)
+            self.assertEqual(model.report['control']['listapps_attempts'], 0)
+            self.assertEqual(model.report['status'], 'control-environment-blocked')
+            self.assertFalse(any(argv[2] in ('boot', 'listapps') for _, argv, _ in model.commands))
+            model.assert_control_cleaned()
+
+    def test_main_persists_failed_control_diagnostics_without_running_product(self):
+        repo = Path(control.__file__).resolve().parents[3]
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            m = ControlModel(root, 'inventory-timeout')
+            host_commands = []
+            def owned_process(argv, cwd, stdout_path, stderr_path, **kwargs):
+                stdout_path.write_bytes(b''); stderr_path.write_bytes(b'')
+                if stdout_path.stem == 'host-simulator-log':
+                    self.assertTrue((m.devices / m.uuid).exists())
+                    self.assertIn(m.uuid, argv[-1])
+                    host_commands.append(argv)
+                    return {'exit_code': 0}
+                result = m.run(stdout_path.stem, argv, timeout=kwargs['timeout'])
+                stdout_path.write_bytes(result.stdout)
+                return {'exit_code': result.returncode}
+            def host_command(argv, **kwargs):
+                self.assertEqual(argv, ['/usr/bin/vm_stat'])
+                return subprocess.CompletedProcess(argv, 0, b'', b'')
+            original_exec = control.importlib.util.module_from_spec
+            def probe_module(spec):
+                module = original_exec(spec)
+                original_loader = spec.loader.exec_module
+                def load(target):
+                    original_loader(target)
+                    target.run_owned_process = owned_process
+                spec.loader.exec_module = load
+                return module
+            argv = ['readiness_control.py', '--repo', str(repo), '--expected-head', m.source_sha,
+                    '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
+                    '--execute-owned-simulator']
+            with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts', return_value={}), \
+                    patch.object(control, 'source_bindings', return_value={}), \
+                    patch.object(control.platform, 'system', return_value='Darwin'), \
+                    patch.object(control.platform, 'machine', return_value='arm64'), \
+                    patch.object(Path, 'home', return_value=root), \
+                    patch.object(control.importlib.util, 'module_from_spec', side_effect=probe_module), \
+                    patch.object(control.subprocess, 'run', side_effect=host_command), redirect_stdout(io.StringIO()):
+                self.assertEqual(control.main(), 2)
+            report = json.loads(next((root / 'control').glob('control-*/result.json')).read_text())
+            self.assertEqual(report['reason'], 'inventory timeout')
+            self.assertEqual(report['product_probe_invocations'], 0)
+            self.assertEqual(report['control']['host_simulator_diagnostics']['owned_udid'], m.uuid)
+            self.assertEqual(len(host_commands), 1)
+            m.assert_control_cleaned()
+
+    def test_failed_control_captures_owned_diagnostics_before_cleanup(self):
+        for error in (None, control.ReadinessBlocked('diagnostic timeout'), ValueError('bad diagnostic'),
+                      product.Blocked('host query failed')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as raw:
+                m = ControlModel(Path(raw), 'inventory-timeout')
+                calls = []
+                def capture(run, owned, facts, *, include_host_processes):
+                    self.assertFalse(include_host_processes)
+                    self.assertEqual(owned, m.uuid)
+                    self.assertEqual(facts['source_head'], m.source_sha)
+                    self.assertEqual(facts['name'], 'pvt-readiness-control-' + 'a' * 32)
+                    self.assertTrue((m.devices / owned).is_dir())
+                    self.assertFalse(any(c[0] == 'control-shutdown' for c in m.commands))
+                    calls.append(owned)
+                    if error: raise error
+                    facts['host_simulator_diagnostics'] = {'owned_udid': owned}
+                control.run_control_and_probe(m.run, product.select_device, m.probe, m.report,
+                    'pvt-readiness-control-' + 'a' * 32, m.devices, expected_head=m.source_sha,
+                    capture_diagnostics=capture)
+                self.assertEqual(calls, [m.uuid])
+                self.assertEqual(m.report['control']['reason'], 'inventory timeout')
+                self.assertEqual(m.report['control']['cleanup_status'], 'verified-absent')
+                self.assertEqual(m.report['product_probe_invocations'], 0)
+                self.assertEqual(m.probes, 0)
+                self.assertEqual([c[2] for c in m.commands if c[0] == 'control-listapps'], [120])
+                self.assertEqual('host_diagnostic_error' in m.report['control'], error is not None)
+                m.assert_control_cleaned()
+
+    def test_control_without_owned_uuid_or_with_passed_inventory_skips_diagnostics(self):
+        for failure in ('create-timeout', None, 'control-shutdown'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as raw:
+                m = ControlModel(Path(raw), failure)
+                with patch.object(product, 'capture_host_simulator_diagnostics') as capture:
+                    control.run_control_and_probe(m.run, product.select_device, m.probe, m.report,
+                        'pvt-readiness-control-' + 'a' * 32, m.devices, expected_head=m.source_sha,
+                        capture_diagnostics=capture)
+                capture.assert_not_called()
+
+    def test_control_diagnostic_mode_never_queries_host_processes(self):
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            owned = ControlModel.uuid
+            device = home / 'Library/Developer/CoreSimulator/Devices' / owned
+            device.mkdir(parents=True)
+            (device / 'device.plist').write_bytes(plistlib.dumps({'UDID': owned, 'state': 3}))
+            log = home / 'Library/Logs/CoreSimulator' / owned / 'system.log'
+            log.parent.mkdir(parents=True); log.write_text('owned simulator log')
+            facts = {'owned_udid': owned, 'source_head': ControlModel.source_sha,
+                     'name': 'pvt-readiness-control-' + 'a' * 32}
+            commands = []
+            def host_command(argv, **kwargs):
+                self.assertEqual(argv, ['/usr/bin/vm_stat'])
+                return subprocess.CompletedProcess(argv, 0, b'Pages free: 4.\n', b'')
+            def run(name, argv, **kwargs):
+                commands.append(argv)
+                self.assertEqual(kwargs['timeout'], 5)
+                self.assertIn(owned, argv[-1])
+                return subprocess.CompletedProcess(argv, 0, b'', b'')
+            with patch.object(Path, 'home', return_value=home), \
+                    patch.object(product.subprocess, 'run', side_effect=host_command):
+                result = product.capture_host_simulator_diagnostics(run, owned, facts, include_host_processes=False)
+            self.assertEqual(result['device']['UDID'], owned)
+            self.assertEqual(result['source_head'], facts['source_head'])
+            self.assertEqual(result['session_id'], facts['name'])
+            self.assertEqual(result['system_log']['text'], 'owned simulator log')
+            self.assertEqual(result['processes'], [])
+            self.assertEqual(len(commands), 1)
+
     def test_checkout_binding_refuses_a_different_head_or_dirty_source(self):
         for replies in (['b' * 40, 'c' * 40, ''], ['a' * 40, 'c' * 40, ' M file']):
             with self.subTest(replies=replies), patch.object(control.subprocess, 'check_output', side_effect=replies):
@@ -120,16 +332,18 @@ class ReadinessControlTests(unittest.TestCase):
                     model.assert_control_cleaned()
                     receipt = root / 'product' / 'pvt-native-test' / 'result.json'
                     receipt.parent.mkdir()
-                    _, result = model.probe()
+                    _, result = model.probe(model.runtime, model.device)
                     receipt.write_text(json.dumps(result))
                     return subprocess.CompletedProcess(argv, 0)
-                def environment(run, choose, invoke, report, name, device_root, *, expected_head):
+                def environment(run, choose, invoke, report, name, device_root, *, expected_head, capture_diagnostics=None):
                     model.report = report
                     original_control(model.run, choose, invoke, report, name, model.devices,
                                      expected_head=expected_head)
                 argv = ['readiness_control.py', '--repo', str(repo), '--expected-head', expected,
                         '--output-root', str(root / 'control'), '--product-output-root', str(root / 'product'),
                         '--execute-owned-simulator']
+                if expected == 'b' * 40:
+                    argv += ['--required-runtime', model.runtime, '--required-device-type', model.device]
                 facts = {'head': expected, 'tree': 'c' * 40, 'status': ''}
                 with patch.object(sys, 'argv', argv), patch.object(control, 'checkout_facts', return_value=facts) as checkout, \
                         patch.object(control.platform, 'system', return_value='Darwin'), \
@@ -144,6 +358,8 @@ class ReadinessControlTests(unittest.TestCase):
                 self.assertEqual(command[command.index('--repo') + 1], str(repo))
                 self.assertEqual(command[command.index('--expected-head') + 1], expected)
                 self.assertEqual(command[command.index('--cli') + 1], str(repo / 'target/debug/xdremux'))
+                self.assertEqual(command[command.index('--required-runtime') + 1], model.runtime)
+                self.assertEqual(command[command.index('--required-device-type') + 1], model.device)
                 report = json.loads(next((root / 'control').glob('control-*/result.json')).read_text())
                 self.assertEqual(report['source'], facts)
                 self.assertEqual(report['expected_head'], expected)
@@ -226,13 +442,15 @@ class ReadinessControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             m = ControlModel(Path(raw), 'inventory-timeout')
             m.report['commands'].append({'name': 'control-listapps', 'outcome': 'uncertain-after-timeout'})
-            def diagnose(run, owned, report):
+            def diagnose(run, owned, report, *, include_host_processes):
+                self.assertFalse(include_host_processes)
                 self.assertEqual(owned, m.uuid)
                 self.assertTrue((m.devices / owned).is_dir())
                 self.assertEqual(report['owned_udid'], owned)
-                report['host_simulator_diagnostics'] = {'owned_udid': owned, 'processes': []}
-            with patch.object(control, 'capture_host_simulator_diagnostics', side_effect=diagnose, create=True) as collector:
-                m.execute()
+                report['host_simulator_diagnostics'] = {'owned_udid': owned, 'processes': [],
+                    'source_head': report['source_head'], 'session_id': report['name']}
+            with patch.object(product, 'capture_host_simulator_diagnostics', side_effect=diagnose) as collector:
+                m.execute(capture_diagnostics=collector)
             collector.assert_called_once()
             facts = m.report['control']
             self.assertEqual(facts['host_simulator_diagnostics']['owned_udid'], m.uuid)
@@ -247,11 +465,11 @@ class ReadinessControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             m = ControlModel(Path(raw), 'inventory-timeout')
             m.report['commands'].append({'name': 'control-listapps', 'outcome': 'uncertain-after-timeout'})
-            with patch.object(control, 'capture_host_simulator_diagnostics', side_effect=OSError('diagnostic unavailable'), create=True):
-                m.execute()
+            with patch.object(product, 'capture_host_simulator_diagnostics', side_effect=OSError('diagnostic unavailable')) as collector:
+                m.execute(capture_diagnostics=collector)
             facts = m.report['control']
             self.assertEqual(facts['reason'], 'inventory timeout')
-            self.assertIn('diagnostic unavailable', facts['host_simulator_diagnostics_error'])
+            self.assertIn('diagnostic unavailable', facts['host_diagnostic_error'])
             self.assertEqual(m.probes, 0)
             self.assertEqual(facts['cleanup_status'], 'verified-absent')
             m.assert_control_cleaned()
@@ -281,8 +499,8 @@ class ReadinessControlTests(unittest.TestCase):
                                    ({'package_bytes_unchanged': False}, 0)]:
             with self.subTest(changes=changes), tempfile.TemporaryDirectory() as raw:
                 m = ControlModel(Path(raw))
-                def probe():
-                    code, result = m.probe(); return exit_code, {**result, **changes}
+                def probe(runtime, device):
+                    code, result = m.probe(runtime, device); return exit_code, {**result, **changes}
                 m.execute(probe)
                 self.assertEqual(m.probes, 1)
                 self.assertEqual(m.report['status'], 'product-probe-not-accepted')
@@ -292,8 +510,8 @@ class ReadinessControlTests(unittest.TestCase):
             m = ControlModel(Path(raw))
             observed = {'source_head': m.source_sha, 'session_id': 'owned-product-session',
                         'admission': 'verified'}
-            def probe():
-                _, result = m.probe()
+            def probe(runtime, device):
+                _, result = m.probe(runtime, device)
                 return 1, {**result, 'status': 'native-validation-passed-cleanup-failed',
                            'cleanup_status': 'failed', 'stage_observations': observed}
             m.execute(probe)

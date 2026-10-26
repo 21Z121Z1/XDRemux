@@ -2,84 +2,151 @@
 
 [English](README.en.md) | 简体中文
 
-**仅限研究。** Rust 产品不会伪造 Texture Style 支持。本目录保存原生契约观察、已否定的捷径、合成探针和明确的晋升门槛，不是第二套转换器，也不会写入 HEIF。先前引用的收敛台账不在当前目录树中。历史提交及退休资产的来源必须核对原始记录，不能从本文摘要推断。
+本目录保存 Texture Styles 的历史观察、已否定方法和诊断探针。**这些探针仅用于研究。** 它们不写入 HEIF 文件，也不是另一套产品转换器。
 
-## Carrier 实验证明了什么，又没有证明什么
+当前 Rust 产品有独立的派生 Texture Styles 处理流程，见 [Apple 功能](../../docs/apple-features.md)和[运行时实现](../../crates/xdremux-runtime/src/apple_texture.rs)。该流程不声称恢复了完整的相机 FSINC 生成器。
 
-历史矩阵分别改变三个层次：2023 Styles 资源、2026 Texture 元数据 item，以及 Apple MakerNote tag 84。把任一层的解析成功当作完整可编辑照片契约是错误的。实验也改变了 `idat`/method 1 与 `mdat`/method 0 存放方式、元数据 item 名称、全局 `mdat` 布局和语义资源。某一 carrier 的读取结果，不是 HEIF 或所有原生 reader 的通用要求。
+先前引用的收敛台账不在当前目录树中。历史提交和归档源码必须与原始来源记录核对。本文摘要不能证明所有旧产物仍可获取。
 
-| 资源 | 观察到或假设的契约 | 限制 |
+## 历史载体实验的问题
+
+载体实验分别改变了三个层次：2023 Styles 资源、2026 Texture 元数据项和 Apple MakerNote 标签 84。解析器接受其中一层，不能证明整个照片符合可编辑格式要求。
+
+实验还比较了 `idat`/方法 1 与 `mdat`/方法 0 存放方式、项目名称、全局 `mdat` 布局和语义资源。某个候选的存放位置实验不能确立 HEIF 或原生读取器的通用要求。
+
+| 资源 | 观察到或提出的表达 | 解释边界 |
 | --- | --- | --- |
-| 既有 Styles | `tag:apple.com,2023:photo:metadata:styles`、binary plist、到 primary/tone-map 资源的 `cdsc` 关系 | 原生 v8、生成的 v15 和实验 v16 不可混为一谈；产品保留已验证的 producer 格式。 |
-| Texture 元数据 | `tag:apple.com,2026:photo:metadata:texture_styles`；实验使用 item 名 `metadata` | URI 或名称匹配不等于语义有效。必须精确识别资源及关系，而不是选择最大 payload 或首个相似 URI。 |
-| Texture 信息 | `Preset`、`CaptureType`、`CaptureMode`、`PortType`、`HardwareModel`、`TextureStylePeopleDataVersion`、`FilmGrainSeed`、可选后处理 people data | 其中包含拍摄事实，不能从 donor 复制，也不能给 OPPO 来源填入 iPhone 默认值。无人场景候选省略 people data，而非伪造人物。 |
-| Apple MakerNote | 保留字节序、未知字段和源 `PhotoIdentifier`（tag 43）；tag 84 是有类型的 binary plist | Boolean、integer、Float32、Float64 的线格式不因 Python 解码值相等而等价。缺少 Apple MakerNote 不代表可以编造。 |
-| 语义资源 | 每个 role 对应的辅助图像、descriptor、`auxC` 身份、`ipma` 关联和 `auxl`/`cdsc` 边 | 重复标签或可被解析的资源不能证明按 role 推理。Per-person instance 也不是可与 category mask 互换的第十三类。 |
+| 既有 Styles | `tag:apple.com,2023:photo:metadata:styles`、二进制属性列表，以及到主图/色调映射资源的 `cdsc` 关系 | 原生 v8、生成的 v15 和实验 v16 是不同格式。保留已验证的生成格式。 |
+| Texture 元数据 | `tag:apple.com,2026:photo:metadata:texture_styles`；实验项目名为 `metadata` | URI 或名称匹配不等于语义有效。按准确身份和关系选择资源，不能选择最大载荷或首个相似 URI。 |
+| Texture 信息 | `Preset`、`CaptureType`、`CaptureMode`、`PortType`、`HardwareModel`、`TextureStylePeopleDataVersion`、`FilmGrainSeed` 和可选的后处理人物数据 | 拍摄字段必须反映源数据事实。供体字段或 iPhone 默认值不能描述 OPPO 拍摄。无人候选省略人物数据。 |
+| Apple MakerNote | 既有字节序、未知字段、源 `PhotoIdentifier`（标签 43）和有类型的二进制属性列表标签 84 | Boolean、integer、Float32 和 Float64 的编码不同，即使解码值相等也不能互换。不得伪造缺失的拍摄元数据。 |
+| 语义资源 | 每种角色对应的辅助图像、描述符、`auxC` 身份、`ipma` 关联和 `auxl`/`cdsc` 关系 | 标签和可解析资源不能证明推理。单个人物的实例资源不是可互换的第十三类类别掩膜。 |
 
-十二个新增 category URI 的前缀是 `tag:apple.com,2026:photo:aux:`，后缀分别为 `semanticnosematte`、`semanticskinmattev2`、`semanticnonfaceskinmatte`、`semanticlipsmatte`、`semanticteethmattev2`、`semanticpersonmatte`、`semanticglassesmattev2`、`semanticeyebrowsmatte`、`semantictattoomatte`、`semantichandsmatte`、`semanticearsmatte`、`semanticfaceskinmatte`。准确的 role-to-producer 映射仍是晋升要求；private Vision 结果中的 category 编号本身不是这种映射。
+以下十二个类别 URI 后缀使用前缀 `tag:apple.com,2026:photo:aux:`。后缀拼写必须保持不变。
 
-`evidence/native-standard-matrix.json` 逐字节保留历史 B–E 候选定义。其中营销名称、`iPhone19,2`、`iPhone19,3` 是**候选假设**，不是任意输入的已验证拍摄事实。产品或 writer 均不读取该文件。旧 validator 检查解码值、单 extent 和结构关系，并未证明线格式类型忠实度、所有 location 语义或 Photos 可编辑性。
+| 类别 URI 后缀 | 类别 URI 后缀 |
+| --- | --- |
+| `semanticnosematte` | `semanticskinmattev2` |
+| `semanticnonfaceskinmatte` | `semanticlipsmatte` |
+| `semanticteethmattev2` | `semanticpersonmatte` |
+| `semanticglassesmattev2` | `semanticeyebrowsmatte` |
+| `semantictattoomatte` | `semantichandsmatte` |
+| `semanticearsmatte` | `semanticfaceskinmatte` |
 
-## 被否定的 carrier 产品晋升
+要声称完成原生类别生成，必须明确每种角色与生成器的对应关系。私有 Vision 类别编号本身不足以确立该关系。当前产品的派生编辑语义更窄：部分保护区域来自原生关键点或手部姿态，耳部和文身保护则被禁用。这些限制由[当前功能约定](../../docs/apple-features.md)定义。
 
-历史 Rust carrier 构造 v16 Styles plist，把同一张 2019 skin 图像及 MIME descriptor 别名化为全部十二个 2026 role；它还合成固定 216 字节 Texture plist（包含 iPhone 硬件/拍摄声明）、133 字节 tag-84 plist，并在缺失时创建 Apple MakerNote，用源哈希生成 UUID 形状的标识符。从源字节派生标识符，并不能把编造的 Apple 拍摄元数据变成源事实；“没有使用 donor 图像字节”也不能证明语义标签正确。
+[`evidence/native-standard-matrix.json`](evidence/native-standard-matrix.json) 逐字节保留历史 B–E 候选定义。其中的营销名称、`iPhone19,2` 和 `iPhone19,3` 都是候选假设，不是任意输入的已验证拍摄事实。产品和写入器均不读取该文件。
 
-这些自动产品 hook、元数据模板和构造 helper 被有意退休，历史源码通过台账中的 annotated archive tag 恢复。有效的结构性教训保留在此：隔离变量时保留无关 payload、未知 box 和布局；检查所有 extent 的边界及溢出；保留已有标识符；验证**实际原子发布的同一份最终字节**。这些不变量归当前 Rust format/HEIF/runtime owner 所有，而不是复活 carrier backend。
+已停用的校验器检查了解码值、单个数据区间和结构关系。它没有证明序列化类型准确、全部存放位置规则正确，或 Photos 支持编辑。
 
-独立编码的空 mask、同源别名及十三类资源存在性扫描是有用的负对照，不是原生推理。哈希相同也不一定错误：两个实际推理出的缺席类别可能都是空白。因此晋升要求 producer 身份和 role 含义，而不只是哈希互异。原生形态 MakerNote 的细化和最终发布测试没有消除语义阻塞。当前 lifecycle 测试保留最终发布不变量，不依赖历史局部变量名。
+## 已否定的产品迁入方法
 
-## Person 输入和 ROI 实验
+早期 Rust 载体生成 v16 Styles 属性列表，将同一张 2019 skin 图像及其 MIME 描述符别名化为全部十二个 2026 角色。它还生成包含 iPhone 拍摄声明的固定 216 字节 Texture 属性列表，以及固定 133 字节的标签 84 属性列表。
 
-`PersonInputProbe.m` 保留九种合成输入：CGRect dictionary/NSValue、可选 yaw/pitch/roll、四种 landmark key 及 all-aliases 对照。合成人脸的归一化矩形是 `(0.20, 0.25, 0.40, 0.40)`，face ID 为 17，76 个椭圆 landmark 刻意不是实测数据。可选 crop 矩阵隔离 `normalizePersonInputDataArray:toCropRect:` 的变换，不声称 face ROI 等于 skin ROI，也没有恢复原生图像推理模型。
+当 Apple MakerNote 缺失时，该载体会新建一个，并用源哈希派生 UUID 形状的标识符。标识符来自源字节，并不能让编造的拍摄字段成为事实。未使用供体图像字节，也不能证明语义标签正确。
 
-探针动态解析 `kFigCaptureStreamMetadata_*`，记录哪些是实际符号、哪些仍是 fallback-string 假设；观察 `faceROI`、`faceSkinROI`、`faceROIAndLandmarksROIRelativeScalingROI`、pose/landmark 字段及 instance 引用。在 `NSInvocation` 写入或读取参数存储**之前**检查参数数量、object/CGRect 类型和返回类型。未知 ABI、缺失所请求的 normalization 方法、异常、nil/非数组结果或缺失人物均是失败，不是成功的空报告。每种 case 使用独立、有限时的子进程，一次 abort 不会抹掉后续矩阵。
+这些自动调用入口、元数据模板和构造辅助函数均已停用。恢复历史源码需要原始归档记录。仍然有效的结构要求由当前 Rust 格式、HEIF 和运行时模块负责：
 
-`InputTrace.m` 观察 `personInputDataArrayFromDetectedFaces:`、`personInputDataFromStillProperties:`、`setInputPersonData:`、`setInputSkinSmoothingFaceDetections:` 的输入/输出。只 hook 自身定义且 ABI 匹配的方法，始终转发到原实现；日志失败不会吞掉原调用。它只供主动启用的自有本地研究 harness 使用，CI 不向 Photos 或系统进程注入。
+- 隔离实验变量时，保留无关载荷、未知数据盒和布局。
+- 检查每个数据区间的边界与溢出。
+- 保留既有标识符。
+- 验证运行时实际原子发布的同一份最终字节。
+
+独立编码的空掩膜、同源别名和十三类资源存在性扫描都属于负对照，不能证明原生推理。相同哈希也不一定错误：两个经真实推理确认缺席的类别都可能为空。
+
+证据必须说明生成器身份和角色含义。哈希不同本身不足以证明正确。MakerNote 细化和最终发布测试没有消除这个语义缺口。当前生命周期测试保留了发布要求，不依赖历史局部变量名。
+
+## 人物输入与感兴趣区域探针
+
+[`PersonInputProbe.m`](PersonInputProbe.m) 定义九种合成输入，比较 CGRect 字典与 NSValue、可选 yaw/pitch/roll、四种关键点键名，以及使用全部别名的对照。合成人脸的归一化矩形为 `(0.20, 0.25, 0.40, 0.40)`，人脸 ID 为 17，76 个椭圆关键点均为人工构造。
+
+可选的裁剪实验单独测试 `normalizePersonInputDataArray:toCropRect:`。它不能证明人脸感兴趣区域（ROI）等于皮肤 ROI，也没有恢复图像推理模型。
+
+探针动态解析 `kFigCaptureStreamMetadata_*` 键，报告中区分真实解析的符号与回退字符串假设。它观察 `faceROI`、`faceSkinROI`、`faceROIAndLandmarksROIRelativeScalingROI`、姿态/关键点字段和实例引用。
+
+在 `NSInvocation` 访问参数或返回值存储前，探针检查参数数量、object/CGRect 类型和返回类型。未知 ABI、缺少所请求的归一化方法、异常、nil/非数组输出或缺失人物都会导致失败。每项测试使用独立且有限时的子进程。单个进程中止不会抹掉其他测试结果。
+
+[`InputTrace.m`](InputTrace.m) 观察以下方法：
+
+- `personInputDataArrayFromDetectedFaces:`
+- `personInputDataFromStillProperties:`
+- `setInputPersonData:`
+- `setInputSkinSmoothingFaceDetections:`
+
+跟踪器只替换目标类自身定义且 ABI 匹配的方法。它始终转发到原实现，日志记录失败也不会阻止原调用。跟踪器仅供主动启用的自有本地研究测试程序使用。CI 不会将其注入 Photos 或系统进程。
+
+### 运行探针
+
+需要 macOS 和 Xcode 命令行工具。每条命令都要求输出目录尚不存在，且父目录已存在。
 
 ```sh
-# 每个命令要求一个尚不存在、但父目录已存在的输出目录。
 python -m research.texture_styles.probe self-test --output /tmp/texture-abi-check
 python -m research.texture_styles.probe person --output /tmp/texture-person-matrix \
   --normalize 0.03 0.04 0.94 0.92
 python -m research.texture_styles.probe runtime --output /tmp/texture-runtime-inventory
 ```
 
-`self-test` 使用公开 macOS SDK 编译，在合成 NSObject 类上验证 ABI guard，不调用 private selector；研究 CI 执行此模式。`person` 和 `runtime` 是显式本地研究操作，framework/方法不可用不算产品缺陷。报告保留源码哈希、编译器/SDK、OS/架构、命令、退出码、timeout 和日志哈希。矩阵未完成时退出码非零并标为 incomplete。wrapper 不下载固件，也不接收私人照片。
+`self-test` 使用公开 SDK 和合成 NSObject 类检查 ABI 防护，不调用私有选择器。研究工作流运行此模式。
 
-自有、未 hardened 的 harness 可使用 `dlopen`，或显式设置 `DYLD_INSERT_LIBRARIES`、`XDREMUX_TEXTURE_TRACE=1`、`XDREMUX_TEXTURE_TRACE_FILE` 加载 trace。不要禁用 SIP、削弱签名应用校验或上传私人 trace/媒体。CI 只编译 trace，不注入。
+`person` 和 `runtime` 是明确的本地实验。框架或方法不可用属于实验限制，不是产品失败。报告保留源码哈希、编译器/SDK、操作系统/架构、命令、退出码、超时和日志哈希。矩阵未完成时会保留 incomplete 标记并以非零状态退出。包装器不下载固件，也不接受私有照片。
 
-## FSINC / E5 探索与修正后的稀疏 oracle
+没有强化运行时限制的自有测试程序可以通过 `dlopen` 加载跟踪器。另一种显式方式是使用 `DYLD_INSERT_LIBRARIES`、`XDREMUX_TEXTURE_TRACE=1` 和 `XDREMUX_TEXTURE_TRACE_FILE`。不要禁用 SIP、削弱签名应用的校验或上传私有跟踪记录/媒体。CI 仅编译跟踪器，不进行注入。
 
-历史本地探针探索 ANSTKit 的 FSINC configuration、descriptor、E5 network wrapper、instance/category mask API。版本候选为 `0x2012c`（2.3）和 `0x20190`（2.4）；分辨率候选为 0 = 768×576、1 = 576×768、2 = 256×256。旧图像探针使用居中 aspect-fill BGRA/sRGB 输入，顺序是具体类选择 → configuration → algorithm → `prepareWithError:` → input binding → inference → instance/category masks。尝试 compute-device 整数 0–7、导出 category 编号或打印非 nil wrapper，不等于证明 ANE 执行受支持，也不能证明十二个 role 正确。
+## FSINC 与 E5 观察
 
-后续实验比较 macOS 26/Xcode 27 环境、descriptor factory、E5 preparation、MIL version/opset namespace、`constexpr_*` sparse operator、Core ML loading 及 model/blob reader；这些是假设不同的实验。仅修改 opset/header 不能提供缺失的 compiler operator、解码专有打包 blob 或证明模型等价。旧 workflow 包括宽松 diagnostic step 和 binary dump；job 绿色不能被解释为 inference 成功。不恢复这些采集、内存 dump 和一次性 runner workflow。`RuntimeInventory.m` 用类声明、method encoding、符号可用性的只读清单替代无边界的 raw-memory/ivar 读取，不按猜测的 native function ABI 调用函数。
+历史探针研究了 ANSTKit 的 FSINC 配置、描述符、E5 网络包装器，以及实例/类别掩膜 API。候选参数如下：
 
-历史 r10 中的等式对非零 offset 明确错误：
+| 参数 | 历史候选值 |
+| --- | --- |
+| 版本 | `0x2012c`（2.3）；`0x20190`（2.4） |
+| 分辨率 | 0 = 768×576；1 = 576×768；2 = 256×256 |
+| 计算设备值 | 整数 0–7 |
+| 图像输入 | 居中、保持比例填满的 BGRA/sRGB 图像 |
+
+调用顺序为类选择、配置、算法创建、`prepareWithError:`、输入绑定、推理，以及实例/类别掩膜获取。尝试某个计算设备整数不能证明支持 Apple 神经网络引擎（ANE）执行。类别编号或非 nil 包装器也不能确立十二种语义角色。
+
+后续实验涉及 macOS 26/Xcode 27、描述符工厂、E5 准备、MIL 版本/算子集、`constexpr_*` 稀疏算子、Core ML 加载，以及模型/数据块读取器。这些实验验证不同的假设。重命名算子集或文件头无法补齐编译器缺失的算子、解码专有打包数据或证明模型等价。
+
+部分旧工作流允许诊断失败，并生成二进制转储。因此，任务显示绿色不能证明推理成功。当前目录不恢复这些采集、内存转储或一次性工作流。[`RuntimeInventory.m`](RuntimeInventory.m) 只读取类声明、方法编码和符号可用性，不读取任意原始内存，也不按猜测的原生函数 ABI 发起调用。
+
+## 正确的稀疏运算
+
+历史 r10 等式在偏移非零时不成立：
 
 ```text
-错误：sparse_shift_scale_then_dense(mask, q, scale, offset)
-      == dense_shift_scale(sparse_to_dense(q, mask), scale, offset)
+wrong: sparse_shift_scale_then_dense(mask, q, scale, offset)
+       == dense_shift_scale(sparse_to_dense(q, mask), scale, offset)
 
-正确：仅当 mask[index] == 1 时，
-      materialized[index] = scale[block] * (q[next] - offset[block])；其余仍为零。
+correct: materialized[index] = scale[block] * (q[next] - offset[block])
+         only where mask[index] == 1; every other entry remains zero.
 ```
 
-例如 mask `[[1,0],[0,1]]`、q `[4,7]`、scale `0.5`、offset `2`，正确结果为 `[[1,0],[0,2.5]]`，不是 `[[1,-1],[-1,2.5]]`。`sparse.py` 独立实现有边界、显式解包的运算。测试覆盖 block 坐标、两种浮点宽度、可选/非零 offset、C-order 遍历、畸形输入和溢出。`oracle.py` 将十二种合成输入与 **coremltools 9.0** 的公开 operator 对比。这是算子等价性测试，不是原生 FSINC 模型转换或 inference 声明。旧 materialization recipe 连同已否定等式的说明一起归档，不把错误结论默默保留为有效。
+也就是说，只对 `mask[index] == 1` 的位置计算上述值，其余位置保持零。对于 mask `[[1,0],[0,1]]`、q `[4,7]`、scale `0.5` 和 offset `2`，正确结果为 `[[1,0],[0,2.5]]`。`[[1,-1],[-1,2.5]]` 是错误结果。
 
-## 晋升阶梯与证据边界
+[`sparse.py`](sparse.py) 使用显式解包的输入，实现有边界检查的运算。测试覆盖块坐标、两种浮点宽度、可选/非零偏移、C 顺序遍历、无效输入和溢出。
 
-产品变化首先要求来源可信的 capture 字段及所有声称的 semantic role、明确的尺寸/方向/ROI 变换和资源关系、有限的模型输出、畸形输入拒绝，以及 primary/Gain Map 媒体保真。随后需要最终字节 HEIF 校验、适用 OS/device 的原生 framework 消费、Photos 控件和 edit/save/reopen/re-render/reversible-edit 证据，以及经当前 Rust runtime 的失败安全发布。缺失原生输入必须维持缺失或显式失败；合成对照不满足晋升门槛。
+[`oracle.py`](oracle.py) 将十二种合成输入与 **coremltools 9.0** 的公开算子进行比较。这只检查算子等价性，不转换原生 FSINC 模型，也不证明原生推理。历史展开方案保留了已否定等式，作为错误记录。
 
-历史 device-positive carrier 报告只能支撑其报告的 admission 观察，不能独立证明通用可编辑性或 role 真值。这里不重建私人样本字节、已删除或过期的 Actions 输出，也不声称重跑了它们。归档保存受 Git 跟踪的源码和方法；当前 CI/receipt 只证明其实际执行的检查。重启一个假设时，需要新的 artifact 哈希、OS/device/software 身份、精确命令、预期与实际观察，以及明确的晋升门槛。
+## 后续产品修改的要求
 
-## 一手参考
+产品修改必须说明拍摄字段的来源，以及每种声称支持的语义角色由哪个生成器产生。还必须明确尺寸、方向、ROI 变换和资源关系，检查输出是否为有限值，拒绝无效输入，并保留主图和 Gain Map 媒体。
 
-- [NSMethodSignature 参数数量](https://developer.apple.com/documentation/foundation/nsmethodsignature/numberofarguments)：包括隐藏的 `self` 和 `_cmd`。
-- [NSInvocation 参数存储](https://developer.apple.com/documentation/foundation/nsinvocation/setargument:atindex:)及[返回值所有权](https://developer.apple.com/documentation/foundation/nsinvocation/getreturnvalue:)：先检查大小/类型，再调用。
-- [Objective-C 方法替换](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:))：保留原 IMP，不假定 selector ABI。
-- [Core ML sparse operator 源码](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale)：只对 mask 选中的元素反量化。
-- [固定版本的公开 oracle](https://pypi.org/project/coremltools/9.0/)：可选、隔离的研究依赖，不是产品依赖。
+验证最终 HEIF 字节，以及适用操作系统/设备上的原生读取行为。随后验证 Photos 控件、编辑、保存、重新打开、渲染和可逆性。发布必须经过当前 Rust 运行时，并在失败时保留既有输出。缺少原生输入时，应保持缺失或明确失败。合成对照不能替代原生证据。
 
-## 历史字面证据
+历史设备正结果只支持其中记录的准入行为，不能独立证明通用可编辑性或角色真实性。本文没有重建或重新运行私有样本字节，以及已删除或过期的 Actions 输出。
 
-`evidence/historical-contracts.json` 保留七份小型 RC/数字键/候选契约记录及其原始 commit/blob/SHA-256 身份。原文和合成值被明确包装为历史假设，不是当前拍摄事实；可据此恢复实验，不保留七套互相竞争的 patcher，也不重新获取私有框架或固件字节。`native-standard-matrix.json` 另保留字节完全一致的原件；它在来源索引中的重复记录只是历史证据，不是第二份运行时配置。
+重新验证某个假设时，应记录新的产物哈希、操作系统/设备/软件身份、精确命令、预期结果、实际结果和验收要求。当前 CI 与报告只证明其实际执行的检查。
+
+## 历史原始证据
+
+[`evidence/historical-contracts.json`](evidence/historical-contracts.json) 保留七份小型 RC/数字键/候选记录，以及原始提交、Git 对象和 SHA-256 身份。其中的原始声明与合成值仍是历史假设，不是当前拍摄事实。
+
+这些记录保留实验定义，无需保留多套相互竞争的修改工具，也无需重新获取私有框架和固件。`native-standard-matrix.json` 保持逐字节一致。来源索引中的副本是历史证据，不是另一份运行时配置。
+
+## 一手参考资料
+
+- [NSMethodSignature 参数数量](https://developer.apple.com/documentation/foundation/nsmethodsignature/numberofarguments)：包括 `self` 和 `_cmd`。
+- [NSInvocation 参数存储](https://developer.apple.com/documentation/foundation/nsinvocation/setargument:atindex:)和[返回值所有权](https://developer.apple.com/documentation/foundation/nsinvocation/getreturnvalue:)：调用前检查大小和类型。
+- [Objective-C 方法替换](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:))：保留原 IMP，并验证选择器 ABI。
+- [Core ML 稀疏算子源码](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale)：只对选中的位置执行反量化。
+- [固定版本的公开对照实现](https://pypi.org/project/coremltools/9.0/)：可选研究依赖，不是产品依赖。

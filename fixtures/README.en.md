@@ -1,47 +1,52 @@
-# Real Media Fixtures
+# Real media fixtures
 
 English | [简体中文](README.md)
 
-This directory contains immutable real-device media inputs used to validate XDRemux's portable Rust implementation and Apple framework consumer boundaries.
+This directory stores original device media for tests of the portable Rust implementation and Apple framework consumers. The files are immutable test inputs. A sample's presence does not establish support for every capture mode on its device.
 
-## Layout
+## Find a fixture
 
-- `motion-photo/<vendor>/...` contains Android Motion Photo inputs across JPEG and HEIC/HEIF layouts.
-- `proxdr/<vendor>/<device>/...` contains original vendor ProXDR HEIC inputs used to exercise HDR extraction, family detection, Gain Map reconstruction, HEIF assembly, and CLI conversion.
+| Path | Test purpose |
+| --- | --- |
+| `motion-photo/<vendor>/...` | Android Motion Photos with JPEG and HEIC/HEIF layouts. |
+| `proxdr/<vendor>/<device>/...` | Original ProXDR HEIC files for HDR extraction, format-family detection, Gain Map reconstruction, HEIF assembly, and CLI conversion. |
 
-Paths are part of the fixture contract. Prefer stable capability-oriented names over capture timestamps. A vendor or device directory records the provenance of a test input; it is not a product allow-list.
+Paths are part of the test contract. Prefer names that identify a stable capability or layout instead of a capture timestamp. Vendor and device directories record provenance. They are not product allow-lists.
 
-## Identity contract
+## Preserve file identity
 
-Media files are committed byte-for-byte. `SHA256SUMS` is the canonical identity manifest for every versioned real-media fixture in this directory.
+Media files retain their original bytes. [`SHA256SUMS`](SHA256SUMS) is the canonical identity manifest for every versioned real-media file in this directory.
 
-A strict real-fixture gate must reject a file whose bytes do not match its recorded digest. Do not rewrite a source fixture to normalize metadata, orientation, container layout, vendor tails, or embedded resources when those bytes are part of the behavior being tested.
+A strict fixture check must reject a file whose digest differs from the manifest. Do not normalize source metadata, orientation, container layout, vendor tails, or embedded resources when those bytes define the tested behavior.
 
-## Data retained in fixtures
+## Check data before publication
 
-A real fixture can contain EXIF, capture timestamps, vendor metadata, embedded motion-video resources, HDR Gain Maps, portrait data, orientation data, local-HDR metadata, and other source payloads needed by parsers and validators. These are part of the original test input.
+Real fixtures can retain Exif, capture times, vendor metadata, embedded video, Gain Maps, portrait resources, orientation, and local-HDR metadata. Parsers and validators can depend on these original payloads.
 
-Do not assume that a committed real photo is sanitized merely because it is stored under `fixtures/`.
+Do not assume that a photo has been sanitized because it is under `fixtures/`. Confirm that a new sample can be published before adding it.
 
 ## Current coverage
 
-The Motion Photo corpus covers Samsung, Xiaomi, OPPO, and vivo samples, including JPEG and HEIC/HEIF containers.
+Motion Photo fixtures include Samsung, Xiaomi, OPPO, and vivo samples in JPEG and HEIC/HEIF containers.
 
-The ProXDR corpus currently covers OPPO Find X6 Pro LHDR v1, Find X7 Ultra LHDR v2 including XPAN, and Find X9 Ultra UHDR samples including high-resolution, Master, and Portrait captures. These fixtures are intended to expose format and product-policy differences, not to imply support for every capture mode on every device.
+ProXDR fixtures include these OPPO inputs:
 
-## Generated output
+- Find X6 Pro with LHDR v1.
+- Find X7 Ultra with LHDR v2, including XPAN.
+- Find X9 Ultra with UHDR, including high-resolution, Master, and Portrait captures.
 
-Generated ISO HDR HEIC and Live Photo HEIC/MOV files are temporary test or workflow artifacts. Do not commit converted output here unless a future test explicitly defines it as a versioned golden artifact.
+These inputs expose differences in formats and product policy. They do not cover every firmware or capture mode on each device.
 
-## Adding a fixture
+## Keep generated media separate
 
-When adding a real fixture:
+Generated ISO HDR HEIC files and Live Photo pairs are temporary test or workflow artifacts. Do not commit them here unless a test explicitly defines a versioned golden output.
 
-1. Confirm that it can be published in the repository.
-2. Commit the original file without byte modification.
-3. Place it under the appropriate capability/vendor/device hierarchy.
+## Add a fixture
+
+1. Confirm that the file can be published in this repository.
+2. Choose the appropriate capability, vendor, and device path.
+3. Commit the original file without changing its bytes.
 4. Add its SHA-256 digest to `SHA256SUMS`.
-5. Add or update a test that states exactly what the fixture proves.
-6. Do not infer unrelated device support from one fixture.
+5. Add or update a test that states what the fixture proves.
 
-The repository testing policy is in [docs/quality/testing.en.md](../docs/quality/testing.en.md).
+Do not infer unrelated device support from one fixture. The [testing policy](../docs/quality/testing.en.md) defines evidence and upload limits.

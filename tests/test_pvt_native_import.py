@@ -10,6 +10,7 @@ import inspect
 import json
 import os
 import plistlib
+import subprocess
 from pathlib import Path
 import tempfile
 import sys
@@ -20,6 +21,51 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_failed_share_retains_owned_native_log_without_rewriting_failure(self):
+        owned = '12345678-1234-1234-1234-123456789ABC'
+        bundle = 'org.xdremux.audit.PVTReadback.u' + 'a' * 32
+        for error in (None, probe.Blocked('diagnostic timeout'), OSError('service unavailable')):
+            with self.subTest(error=error):
+                report = {'owned_udid': owned, 'status': 'blocked', 'reason': 'test-share-ui: exit 65'}
+                calls = []
+                def run(name, argv, **kwargs):
+                    calls.append(name)
+                    self.assertEqual(argv[:4], ['xcrun', 'simctl', 'spawn', owned])
+                    self.assertIn(bundle, argv[-1])
+                    self.assertEqual(kwargs, {'timeout': 15, 'required': False})
+                    if error:
+                        raise error
+                    return subprocess.CompletedProcess(argv, 0, b'native exception', b'')
+                probe.capture_share_failure_diagnostics(run, owned, bundle, report)
+                self.assertEqual(calls, ['share-native-log'])
+                self.assertEqual(report['status'], 'blocked')
+                self.assertEqual(report['reason'], 'test-share-ui: exit 65')
+                self.assertEqual(report['share_failure_diagnostics']['status'],
+                                 'not-collected' if error else 'collected')
+
+    def test_share_failure_diagnostics_refuse_foreign_simulator_or_bundle(self):
+        for owned, bundle in ((None, 'org.xdremux.audit.PVTReadback.u' + 'a' * 32),
+                              ('foreign', 'org.xdremux.audit.PVTReadback.u' + 'a' * 32),
+                              ('owned', 'unrelated.app')):
+            with self.subTest(owned=owned, bundle=bundle):
+                def run(*args, **kwargs):
+                    self.fail('invalid diagnostic identity must not issue a native query')
+                report = {'owned_udid': 'owned'}
+                probe.capture_share_failure_diagnostics(run, owned, bundle, report)
+                self.assertEqual(report['share_failure_diagnostics']['status'], 'not-collected')
+
+    def test_product_boot_monitor_starts_device_without_a_prior_unobserved_boot(self):
+        # External simctl lifecycle: the monitor owns startup, not a second
+        # command that can see an already-Booted device and short-circuit.
+        calls = []
+        for node in ast.walk(ast.parse(inspect.getsource(probe.main))):
+            if not isinstance(node, ast.Call) or len(node.args) < 2 or not isinstance(node.args[1], ast.List):
+                continue
+            argv = [item.value if isinstance(item, ast.Constant) else None for item in node.args[1].elts]
+            if argv[:2] == ['xcrun', 'simctl'] and argv[2] in ('boot', 'bootstatus'):
+                calls.append((argv, next((k.value.value for k in node.keywords if k.arg == 'timeout'), None)))
+        self.assertEqual(calls, [(['xcrun', 'simctl', 'bootstatus', None, '-b'], 180)])
+
     def test_installation_is_not_gated_on_redundant_cli_help_probes(self):
         # Native service replies are the readiness contract. Merely printing
         # usage must not block those requests (observed15s native help timeout).
@@ -101,6 +147,7 @@ class PVTNativeImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             (root / "test-share-ui.stderr").write_text("native rejection: unsupported directory\n")
+            (root / "share-native-log.stdout").write_text("native exception from owned reader\n")
             (root / "compile-reader.stderr").write_text("FIRST-ERROR" + "x" * 13000 + "LAST-ERROR")
             (root / "media.jpg").write_bytes(b"never-print-media")
             (root / "unexpected.stderr").write_text("not-an-allowed-diagnostic")
@@ -114,6 +161,7 @@ class PVTNativeImportTests(unittest.TestCase):
             self.assertIn('"direct_import_exit_code": 2', text)
             self.assertIn('"status": "blocked"', text)
             self.assertIn("native rejection: unsupported directory\n", text)
+            self.assertIn("native exception from owned reader\n", text)
             self.assertIn("FIRST-ERROR", text)
             self.assertIn("LAST-ERROR", text)
             self.assertIn("complete text retained in artifact", text)
