@@ -127,7 +127,7 @@ The 26A434 `PISemanticStyleFilter` consumer determines how XDRemux constructs th
 
 Key `3` is the monotone projection of observed primary-channel means. The consumer's extra exposure `E` is a render parameter. It is not included in this curve.
 
-Downstream `LinearGTCImage` statistics and fit error use the written key-3 nodes after the measured macOS inverse-sRGB decode on a fixed 65535 scale. The 256 decoded nodes remain f32; the repeated final wire word is ignored. They do not use the pre-quantization fit. The iPhone firmware endpoint-normalized half table has a separate binding.
+Downstream `LinearGTCImage` statistics and the reported fit error use the written key-3 nodes after the measured macOS inverse-sRGB decode on the fixed 65535 scale. They do not use the pre-quantization fit. The 256 decoded nodes remain f32, and the repeated final wire word is ignored. The iPhone firmware endpoint-normalized half table belongs to a separate binding.
 
 For keys `c` and `d`, the consumer upsamples both guides with its guided filter (`r = 1`, `eps ≈ 0.05`). It then forms:
 
