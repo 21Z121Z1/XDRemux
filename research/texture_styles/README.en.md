@@ -2,61 +2,116 @@
 
 English | [简体中文](README.md)
 
-**Research only.** The Rust product does not fabricate Texture Style support. This directory preserves native-contract observations, rejected shortcuts, synthetic probes and explicit promotion gates. It is not a second converter and does not write HEIF files. The previously referenced convergence ledger is not present in this tree. Check historical commits and retired-artifact provenance against the original records, not this summary.
+This directory contains historical observations, rejected methods, and diagnostic probes for Texture Styles. **The probes are research tools.** They do not write HEIF files or provide another product converter.
 
-## What the carrier experiments established—and did not
+The current Rust product has a separate derived Texture Styles transaction. See [Apple features](../../docs/apple-features.en.md) and the [runtime owner](../../crates/xdremux-runtime/src/apple_texture.rs). That transaction does not claim to recover the complete camera FSINC producer.
 
-The historical matrix varied three independent layers: the 2023 Styles resource, the 2026 Texture metadata item, and Apple MakerNote tag 84. Treating any one layer's parser result as a complete editable-photo contract was incorrect. The experiments also varied item placement (`idat`/method 1 versus `mdat`/method 0), metadata item names, the global `mdat` layout and semantic resources. A placement result for one tested carrier is not a universal requirement of HEIF or every native reader.
+The previously referenced convergence ledger is absent from this tree. Verify historical commits and archived source against their original provenance records. This summary does not establish that every old artifact remains available.
 
-The useful structural vocabulary is:
+## Historical carrier questions
 
-| Resource | Observed/hypothesized contract | Limit |
+The carrier experiments varied three independent layers: the 2023 Styles resource, the 2026 Texture metadata item, and Apple MakerNote tag 84. A parser accepting one layer did not establish a complete editable-photo contract.
+
+The experiments also varied `idat`/method 1 versus `mdat`/method 0 placement, item names, global `mdat` layout, and semantic resources. A placement result for one candidate does not define a universal HEIF or native-reader requirement.
+
+| Resource | Observed or proposed representation | Interpretation limit |
 | --- | --- | --- |
-| Existing Styles | `tag:apple.com,2023:photo:metadata:styles`, binary plist and `cdsc` relationship to primary/tone-map resources | Native v8, generated v15, and experimental v16 cannot be conflated. The product keeps its verified producer format. |
-| Texture metadata | `tag:apple.com,2026:photo:metadata:texture_styles`; experiments used item name `metadata` | A matching URI or item name is not evidence of valid semantics. Select by exact identity/relationship, never largest payload or first URI-like item. |
-| Texture information | `Preset`, `CaptureType`, `CaptureMode`, `PortType`, `HardwareModel`, `TextureStylePeopleDataVersion`, `FilmGrainSeed`, optional postprocessed people data | These include capture facts. They cannot be copied from a donor or filled with iPhone defaults for an OPPO source. No-person variants omitted postprocessed people data rather than inventing people. |
-| Apple MakerNote | Preserve its byte order, unknown fields and source `PhotoIdentifier` (tag 43); tag 84 is a typed binary plist | Boolean, integer, Float32 and Float64 wire representations are not interchangeable merely because decoded Python values compare equal. A missing Apple MakerNote is not permission to invent one. |
-| Semantic resources | Role-specific auxiliary image, descriptor, `auxC` identity, `ipma` associations and `auxl`/`cdsc` edges | Repeated labels or parser-visible resources do not prove role-specific inference. Per-person instance resources are not a thirteenth interchangeable category mask. |
+| Existing Styles | `tag:apple.com,2023:photo:metadata:styles`, binary plist, and `cdsc` links to primary/tone-map resources | Native v8, generated v15, and experimental v16 are distinct formats. Keep the verified producer format. |
+| Texture metadata | `tag:apple.com,2026:photo:metadata:texture_styles`; experimental item name `metadata` | A matching URI or name does not prove valid semantics. Select the exact identity and relationship, not the largest payload or first similar URI. |
+| Texture information | `Preset`, `CaptureType`, `CaptureMode`, `PortType`, `HardwareModel`, `TextureStylePeopleDataVersion`, `FilmGrainSeed`, and optional postprocessed people data | Capture fields must represent source facts. Donor fields and iPhone defaults cannot describe an OPPO capture. No-person candidates omitted people data. |
+| Apple MakerNote | Existing byte order, unknown fields, source `PhotoIdentifier` (tag 43), and typed binary-plist tag 84 | Boolean, integer, Float32, and Float64 encodings are distinct even when decoded values compare equal. Missing capture metadata must not be fabricated. |
+| Semantic resources | Per-role auxiliary image, descriptor, `auxC` identity, `ipma` associations, and `auxl`/`cdsc` relationships | Labels and parseable resources do not prove inference. A per-person instance resource is not an interchangeable thirteenth category mask. |
 
-The twelve added category URIs use the `tag:apple.com,2026:photo:aux:` prefix with `semanticnosematte`, `semanticskinmattev2`, `semanticnonfaceskinmatte`, `semanticlipsmatte`, `semanticteethmattev2`, `semanticpersonmatte`, `semanticglassesmattev2`, `semanticeyebrowsmatte`, `semantictattoomatte`, `semantichandsmatte`, `semanticearsmatte`, and `semanticfaceskinmatte`. Their exact role-to-producer mapping remains a promotion requirement. A category enumeration from a private Vision result is not itself that mapping.
+The twelve category URI suffixes below use the prefix `tag:apple.com,2026:photo:aux:`. Keep each suffix exact.
 
-`evidence/native-standard-matrix.json` preserves the historical B–E candidate definitions byte-for-byte. In particular, the marketing-name, `iPhone19,2`, and `iPhone19,3` alternatives are **candidate hypotheses**, not verified capture facts for arbitrary input. The file is never consumed by the product or by a writer. The retired validator checked decoded values, a single extent, and structural relationships; it did not establish wire-type fidelity, all location semantics, or Photos editability.
+| Category URI suffix | Category URI suffix |
+| --- | --- |
+| `semanticnosematte` | `semanticskinmattev2` |
+| `semanticnonfaceskinmatte` | `semanticlipsmatte` |
+| `semanticteethmattev2` | `semanticpersonmatte` |
+| `semanticglassesmattev2` | `semanticeyebrowsmatte` |
+| `semantictattoomatte` | `semantichandsmatte` |
+| `semanticearsmatte` | `semanticfaceskinmatte` |
 
-## Rejected carrier promotion
+A claim about native category production requires an exact mapping from each role to its producer. Private Vision category numbers alone do not supply that mapping. The current derived product context has narrower semantics: some protection regions come from native landmarks or hand poses. It disables ears and tattoo protection. Its [current feature contract](../../docs/apple-features.en.md) defines those limits.
 
-The historical Rust carrier built a v16 Styles plist, then aliased the same 2019 skin image and MIME descriptor into all twelve 2026 roles. It synthesized a fixed 216-byte Texture plist with iPhone hardware/capture claims, a fixed 133-byte tag-84 plist, and—when absent—a new Apple MakerNote with a source-hash-derived UUID-shaped identifier. Deriving an identifier from source bytes does not turn fabricated Apple capture metadata into a source fact. “No donor image bytes” also does not prove the correctness of a semantic label.
+[`evidence/native-standard-matrix.json`](evidence/native-standard-matrix.json) preserves the historical B–E definitions byte-for-byte. Marketing-name values, `iPhone19,2`, and `iPhone19,3` are candidate hypotheses, not verified capture facts for arbitrary input. Neither the product nor a writer consumes this file.
 
-Those automatic product hooks, metadata templates and construction helpers are intentionally retired. Their historical source remains recoverable through the ledger's annotated archive tags. Their valid structural lessons are retained here: preserve unrelated payloads/unknown boxes and layout when isolating one variable; resolve all extents with bounds/overflow checks; retain existing identifiers; and validate the **same final bytes** that are atomically published. Current Rust format/HEIF/runtime owners, not a revived carrier backend, own those invariants.
+The retired validator checked decoded values, one extent, and structural relationships. It did not establish wire-type fidelity, every location rule, or Photos editability.
 
-Blank independently encoded masks, same-source aliases and 13-way resource-presence scans were useful negative controls. They are not native inference. Equal hashes are not universally invalid either: two genuinely inferred absent categories can both be empty. Promotion needs producer identity and role meaning, not merely unequal hashes. The native-shaped MakerNote refinement and the final-publication test did not remove this semantic blocker. The publication invariant is retained in the current lifecycle tests without depending on a historical local variable name.
+## Rejected promotion method
 
-## Person input and ROI experiment
+An earlier Rust carrier generated a v16 Styles plist. It aliased one 2019 skin image and its MIME descriptor into all twelve 2026 roles. It also generated a fixed 216-byte Texture plist with iPhone capture claims and a fixed 133-byte tag-84 plist.
 
-`PersonInputProbe.m` retains the nine synthetic cases: CGRect dictionary versus NSValue, optional yaw/pitch/roll, four landmark-key alternatives and the all-aliases control. The synthetic face is normalized `(0.20, 0.25, 0.40, 0.40)` with face ID 17; the 76 ellipse landmarks are deliberately artificial. The optional crop matrix isolates the native `normalizePersonInputDataArray:toCropRect:` transformation. It does not claim that a face ROI and a skin ROI are identical or recover a native image inference model.
+When an Apple MakerNote was absent, that carrier created one with a UUID-shaped identifier derived from the source hash. A source-derived identifier did not make the invented capture fields true. Avoiding donor image bytes did not prove that the semantic labels were correct.
 
-The probe resolves `kFigCaptureStreamMetadata_*` keys dynamically and records which resolutions are real and which remain fallback-string hypotheses. It observes `faceROI`, `faceSkinROI`, `faceROIAndLandmarksROIRelativeScalingROI`, pose/landmark fields and instance references. It checks argument count, object/CGRect types and return types **before** `NSInvocation` writes or reads argument storage. Unknown ABI, a missing requested normalization method, exception, nil/non-array result, or missing person produces a failure, not a successful empty report. Each case runs in its own bounded child process, so an abort does not erase the rest of the matrix.
+Those automatic hooks, metadata templates, and construction helpers are retired. Any recovery of their historical source requires the original archive records. The remaining structural requirements belong to the current Rust format, HEIF, and runtime owners:
 
-`InputTrace.m` observes the input/output of `personInputDataArrayFromDetectedFaces:`, `personInputDataFromStillProperties:`, `setInputPersonData:` and `setInputSkinSmoothingFaceDetections:`. It hooks only owned methods with the expected ABI and always forwards to the original implementation. Logging failures do not suppress that call. The trace is opt-in for an owned local research harness; it is not installed into Photos or a system process by CI.
+- Preserve unrelated payloads, unknown boxes, and layout while isolating an experimental variable.
+- Check bounds and overflow for every extent.
+- Preserve existing identifiers.
+- Validate the same final bytes that the runtime publishes atomically.
+
+Blank independently encoded masks, same-source aliases, and 13-way resource-presence scans were negative controls. They did not demonstrate native inference. Equal hashes are not always wrong: two genuinely inferred absent categories can both be empty.
+
+Producer identity and role meaning are required evidence. Different hashes alone are insufficient. MakerNote refinement and final-publication tests did not remove that semantic gap. Current lifecycle tests retain the publication requirement without depending on a historical local variable name.
+
+## Person input and region-of-interest probes
+
+[`PersonInputProbe.m`](PersonInputProbe.m) defines nine synthetic cases. They compare CGRect dictionaries with NSValue, optional yaw/pitch/roll, four landmark-key alternatives, and an all-aliases control. The synthetic face rectangle is `(0.20, 0.25, 0.40, 0.40)` in normalized coordinates. Its face ID is 17, and its 76 ellipse landmarks are artificial.
+
+The optional crop experiment isolates `normalizePersonInputDataArray:toCropRect:`. It does not establish that a face region of interest (ROI) equals a skin ROI. It does not recover an image inference model.
+
+The probe resolves `kFigCaptureStreamMetadata_*` keys dynamically. Its report distinguishes resolved symbols from fallback-string hypotheses. It observes `faceROI`, `faceSkinROI`, `faceROIAndLandmarksROIRelativeScalingROI`, pose/landmark fields, and instance references.
+
+Before `NSInvocation` accesses argument or return storage, the probe checks argument count, object/CGRect types, and return types. Unknown ABI, a missing requested normalization method, an exception, nil/non-array output, or a missing person causes failure. Each case has a separate child process and deadline. A process abort does not erase the other cases.
+
+[`InputTrace.m`](InputTrace.m) observes these methods:
+
+- `personInputDataArrayFromDetectedFaces:`
+- `personInputDataFromStillProperties:`
+- `setInputPersonData:`
+- `setInputSkinSmoothingFaceDetections:`
+
+The trace replaces only methods owned by the target class with the expected ABI. It always forwards to the original implementation, including after logging failure. It is opt-in for an owned local research harness. CI does not inject it into Photos or a system process.
+
+### Run the probes
+
+Use macOS and the Xcode command-line tools. Each command needs a new output directory whose parent already exists.
 
 ```sh
-# Each command needs a new directory whose parent already exists.
 python -m research.texture_styles.probe self-test --output /tmp/texture-abi-check
 python -m research.texture_styles.probe person --output /tmp/texture-person-matrix \
   --normalize 0.03 0.04 0.94 0.92
 python -m research.texture_styles.probe runtime --output /tmp/texture-runtime-inventory
 ```
 
-`self-test` compiles with the public macOS SDK and checks the ABI guard against a synthetic NSObject class; it invokes no private selector. The research CI runs that mode. `person` and `runtime` are explicit local research operations; unavailable frameworks/methods are not product failures. Reports retain source hashes, compiler/SDK, OS/architecture, each command, exit code, timeout and log hashes. An incomplete matrix exits nonzero and remains marked incomplete. The wrapper never downloads firmware or accepts a private photo.
+`self-test` uses the public SDK and a synthetic NSObject class to check the ABI guard. It invokes no private selector. The research workflow runs this mode.
 
-A trace may be loaded by an owned non-hardened harness with `dlopen`, or explicitly through `DYLD_INSERT_LIBRARIES`, `XDREMUX_TEXTURE_TRACE=1`, and `XDREMUX_TEXTURE_TRACE_FILE`. Do not disable SIP, weaken a signed application's validation, or upload private traces/media. CI compiles the trace but does not inject it.
+`person` and `runtime` are explicit local experiments. An unavailable framework or method is an experiment limitation, not a product failure. Reports retain source hashes, compiler/SDK, OS/architecture, commands, exit codes, timeouts, and log hashes. An incomplete matrix remains marked incomplete and exits nonzero. The wrapper neither downloads firmware nor accepts private photos.
 
-## FSINC / E5 exploration and corrected sparse oracle
+An owned harness without hardened-runtime restrictions can load the trace with `dlopen`. An explicit alternative uses `DYLD_INSERT_LIBRARIES`, `XDREMUX_TEXTURE_TRACE=1`, and `XDREMUX_TEXTURE_TRACE_FILE`. Do not disable SIP, weaken a signed application's validation, or upload private traces/media. CI compiles the trace without injecting it.
 
-Historical local probes explored ANSTKit's FSINC configuration, descriptor, E5 network wrapper and instance/category mask APIs. Version candidates were `0x2012c` (2.3) and `0x20190` (2.4); resolution candidates were 0 = 768×576, 1 = 576×768, and 2 = 256×256. The old image probe used centered aspect-fill BGRA/sRGB input. Its call order was concrete-class selection → configuration → algorithm → `prepareWithError:` → input binding → inference → instance/category masks. Trying compute-device integers 0–7, exporting category numbers, or printing a non-nil wrapper was not proof of supported ANE execution or the correct twelve semantic roles.
+## FSINC and E5 observations
 
-Further experiments compared macOS 26/Xcode 27 environments, descriptor factories, E5 preparation, MIL version/opset namespaces, `constexpr_*` sparse operators, Core ML loading and model/blob readers. These are distinct hypotheses. Merely renaming an opset or header cannot supply a missing compiler operator, decode proprietary packed blobs, or prove model parity. Historical workflows included permissive diagnostic steps and binary dumps; their green job result must not be reinterpreted as successful inference. No such acquisition, memory-dump or one-shot runner workflow is restored. `RuntimeInventory.m` replaces unbounded raw-memory/ivar reads with a read-only inventory of relevant class declarations, method encodings and symbol availability. It does not call a guessed native function ABI.
+Historical probes explored ANSTKit FSINC configuration, descriptors, an E5 network wrapper, and instance/category mask APIs. The candidates were:
 
-One historical r10 identity was demonstrably wrong for nonzero offsets:
+| Parameter | Historical candidates |
+| --- | --- |
+| Version | `0x2012c` (2.3); `0x20190` (2.4) |
+| Resolution | 0 = 768×576; 1 = 576×768; 2 = 256×256 |
+| Compute-device value | Integers 0–7 |
+| Image input | Centered aspect-fill BGRA/sRGB |
+
+The call order was class selection, configuration, algorithm creation, `prepareWithError:`, input binding, inference, and instance/category mask retrieval. Trying a compute-device integer did not establish supported Apple Neural Engine (ANE) execution. Category numbers and non-nil wrappers did not establish the twelve semantic roles.
+
+Further experiments covered macOS 26/Xcode 27, descriptor factories, E5 preparation, MIL versions/opsets, `constexpr_*` sparse operators, Core ML loading, and model/blob readers. These were separate hypotheses. Renaming an opset or header cannot supply a missing compiler operator, decode proprietary packed data, or prove model equivalence.
+
+Some old workflows allowed diagnostic failures and produced binary dumps. A green job did not establish successful inference. The current directory does not restore those acquisition, memory-dump, or one-shot workflows. [`RuntimeInventory.m`](RuntimeInventory.m) reads class declarations, method encodings, and symbol availability. It does not read arbitrary raw memory or call a guessed native function ABI.
+
+## Correct sparse operation
+
+The historical r10 identity was wrong when offsets were nonzero:
 
 ```text
 wrong: sparse_shift_scale_then_dense(mask, q, scale, offset)
@@ -66,22 +121,32 @@ correct: materialized[index] = scale[block] * (q[next] - offset[block])
          only where mask[index] == 1; every other entry remains zero.
 ```
 
-For mask `[[1,0],[0,1]]`, q `[4,7]`, scale `0.5`, offset `2`, the correct result is `[[1,0],[0,2.5]]`, not `[[1,-1],[-1,2.5]]`. `sparse.py` independently implements the bounded, explicitly unpacked operation. Tests cover block coordinates, both float widths, optional/nonzero offsets, C-order traversal, malformed inputs and overflow. `oracle.py` compares twelve synthetic cases against **coremltools 9.0**'s public operator implementation. This is an operator-equivalence test, not a native FSINC model conversion or inference claim. The exact old materialization recipe is archived with its rejected identity recorded, rather than silently preserved as valid.
+For mask `[[1,0],[0,1]]`, q `[4,7]`, scale `0.5`, and offset `2`, the correct result is `[[1,0],[0,2.5]]`. The result `[[1,-1],[-1,2.5]]` is wrong.
 
-## Promotion ladder and evidence limits
+[`sparse.py`](sparse.py) implements the bounded operation with explicitly unpacked input. Tests cover block coordinates, both float widths, optional/nonzero offsets, C-order traversal, malformed input, and overflow.
 
-A product change requires source-backed capture fields and every advertised semantic role, explicit dimensions/orientation/ROI transforms and resource relationships, finite model outputs, malformed-input rejection, and preservation of primary/Gain Map media. Then it needs final-byte HEIF validation, native framework consumption on the applicable OS/device, Photos controls, edit/save/reopen/re-render/reversible-edit evidence, and failure-safe publication through the current Rust runtime. Missing native inputs must stay missing or fail explicitly; synthetic controls never satisfy the ladder.
+[`oracle.py`](oracle.py) compares twelve synthetic cases with the public operator in **coremltools 9.0**. This checks operator equivalence only. It does not convert a native FSINC model or establish native inference. The historical materialization recipe retains its rejected identity as evidence of the error.
 
-Historical device-positive carrier reports support their reported admission observations only. They do not independently establish general editability or role truth. Private sample bytes and deleted/expired Actions outputs are not reconstructed or claimed to have been rerun here. The archive preserves the tracked source and methodology; the current CI and receipts establish only the checks they actually execute. Reopening a hypothesis requires a fresh artifact hash, OS/device/software identity, exact command, expected versus actual observations and a declared promotion gate.
+## Requirements for further product changes
 
-## Primary references
+A product change must document source-backed capture fields and the producer of each advertised semantic role. It also needs explicit dimensions, orientation, ROI transforms, resource relationships, finite outputs, malformed-input rejection, and preservation of primary/Gain Map media.
 
-- [NSMethodSignature argument count](https://developer.apple.com/documentation/foundation/nsmethodsignature/numberofarguments): includes hidden `self` and `_cmd`.
-- [NSInvocation argument storage](https://developer.apple.com/documentation/foundation/nsinvocation/setargument:atindex:) and [return ownership](https://developer.apple.com/documentation/foundation/nsinvocation/getreturnvalue:): size/type guards precede invocation.
-- [Objective-C method replacement](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:)): retain the original IMP; do not assume a selector's ABI.
-- [Core ML sparse operator source](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale): dequantization applies only to mask-selected entries.
-- [Pinned public oracle release](https://pypi.org/project/coremltools/9.0/): optional isolated research dependency, not a product dependency.
+Validate the final HEIF bytes and native consumption on the applicable OS/device. Then verify Photos controls, editing, saving, reopening, rendering, and reversibility. Publication must use the current Rust runtime and preserve existing outputs on failure. Missing native inputs must remain absent or cause explicit failure. Synthetic controls cannot replace native evidence.
+
+Historical positive device reports support only the admission behavior that they recorded. They do not independently establish general editability or role truth. Private sample bytes and deleted or expired Actions outputs have not been reconstructed or rerun for this document.
+
+To reopen a hypothesis, record a fresh artifact hash, OS/device/software identity, exact command, expected result, actual result, and acceptance requirement. Current CI and reports establish only the checks they execute.
 
 ## Literal historical evidence
 
-`evidence/historical-contracts.json` retains seven small RC/numeric-key/candidate records with their original commit/blob/SHA-256 identities. Original statements and synthetic values are explicitly wrapped as historical hypotheses, not current capture facts. This preserves experiment definitions without keeping seven competing patchers or reacquiring private frameworks or firmware bytes. The `native-standard-matrix.json` file also remains byte-exact; its duplicated record in the provenance index is historical evidence, not a second runtime configuration.
+[`evidence/historical-contracts.json`](evidence/historical-contracts.json) retains seven small RC/numeric-key/candidate records with original commit, blob, and SHA-256 identities. Its original statements and synthetic values remain historical hypotheses. They are not current capture facts.
+
+The records preserve experiment definitions without keeping competing patchers or reacquiring private frameworks and firmware. `native-standard-matrix.json` remains byte-exact. Its duplicate in the provenance index is historical evidence, not another runtime configuration.
+
+## Primary references
+
+- [NSMethodSignature argument count](https://developer.apple.com/documentation/foundation/nsmethodsignature/numberofarguments): includes `self` and `_cmd`.
+- [NSInvocation argument storage](https://developer.apple.com/documentation/foundation/nsinvocation/setargument:atindex:) and [return ownership](https://developer.apple.com/documentation/foundation/nsinvocation/getreturnvalue:): check size and type before invocation.
+- [Objective-C method replacement](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:)): retain the original IMP and verify the selector ABI.
+- [Core ML sparse operator source](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale): dequantization applies only to selected entries.
+- [Pinned public oracle release](https://pypi.org/project/coremltools/9.0/): optional research dependency, not a product dependency.

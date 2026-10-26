@@ -1,78 +1,66 @@
-# 回归和真实样本验证
+# 验证回归与真实媒体
 
 [English](evals.en.md) | 简体中文
 
-修改需要 unit test 之外的证据时，优先使用可复用 harness。
+修改需要单元测试之外的证据时，使用现有验证脚本。[测试政策](testing.md)规定各类修改所需的证据。
 
-需要哪一类证据由[测试政策](testing.md)定义。
+## 检查版本化 Motion Photo
 
-## 版本化 Motion Photo gate
+仓库的 `fixtures/` 目录包含真实 Motion Photo 测试样本。严格 Rust 检查在转换前将每个输入与 `fixtures/SHA256SUMS` 比较。摘要不一致时，检查失败。
 
-仓库的 `fixtures/` 下包含真实 Motion Photo fixture。
+样本集覆盖多种 JPEG 和 HEIC/HEIF 布局。具体断言以工作流和测试源码为准。适用的单元、真实样本和原生检查共同验证以下契约：
 
-当前 strict gate 由 Rust 路径执行。转换前会检查输入文件身份，fixture 字节与 `fixtures/SHA256SUMS` 不一致时会拒绝。
+- 解析器能够识别 Motion Photo 的资源边界。
+- 选定封面时间能够映射到 Apple `still-image-time`。
+- 输出静态照片与 MOV 具有预期的共同 Live Photo 标识符。
+- 转换要求保留源 Gain Map 时，输出保留该资源。
+- 常规压缩样本直通路径保留编码视频样本和源文件中的音频样本。
+- 输出发布不会静默复用来源未知的文件对。
+- 适用的 macOS 检查通过被测 Apple 框架接口加载生成的文件对。
 
-fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体断言可能随着实现变化，因此 workflow 和测试源码是最终依据。
+## 选择现有脚本
 
-当前重要断言包括：
+可移植验证脚本位于 `scripts/validation/`。App 模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
 
-- Motion Photo 资源边界可解析；
-- 选定封面时间可以映射到 Apple `still-image-time`；
-- 输出静态照片和 MOV 共享预期 Live Photo asset identity；
-- 需要时保留源 Gain Map；
-- 正常 passthrough 路径保留压缩视频样本；
-- 源文件有音频时保留压缩音频样本；
-- 输出发布不会静默复用来源未知的有效 Live Photo pair；
-- 对适用输出，macOS 验证可以通过被测试的 Apple framework 路径加载生成 pair。
-
-## 可复用验证 harness
-
-`scripts/validation/` 包含可复用的可移植脚本；macOS App 的模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
-
-| Harness | 用途 |
+| 脚本 | 用途 |
 | --- | --- |
-| `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | 通过 Rust CLI 转换全部版本化 Motion Photo fixture，并验证 pair 两个成员。 |
-| `scripts/validation/verify_error_messages.sh` | 通过真实 Rust binary 检查部分帮助和错误契约。 |
-| `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复 categorized batch 行为。 |
-| `scripts/validation/verify_validate_only_harness.sh` | 检查 Rust validation-only 行为。 |
-| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 构建并运行 macOS App model test。 |
+| `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | 通过 Rust CLI 转换全部版本化 Motion Photo，并验证两个输出成员。 |
+| `scripts/validation/verify_error_messages.sh` | 通过实际 CLI 检查部分帮助和错误行为。 |
+| `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复执行带分类输出的批量转换。 |
+| `scripts/validation/verify_validate_only_harness.sh` | 检查仅验证模式的行为。 |
+| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 在 macOS 上构建并运行 App 模型测试。 |
 
-## 根据受影响链路选择证据
+根据修改影响的行为选择证据：
 
-- Gain Map 编码或 HEIF 结构：使用 HDR validation harness 和代表性真实输入。
-- Motion Photo parser 或 writer：使用 Rust unit test 和 strict real-fixture gate。
-- Batch provenance 或输出安全：使用 output collision 和 checkpoint 回归。
-- 分类：使用 Rust classification test 和 output-layout 检查。
-- App 状态：使用 macOS App model test。
-- Apple Photos 行为：除结构检查外，还需要原生框架或真机证据。
+| 受影响的行为 | 检查 |
+| --- | --- |
+| Gain Map 编码或 HEIF 结构 | HDR 验证脚本和代表性真实输入。 |
+| Motion Photo 解析或写入 | Rust 单元测试和严格真实样本检查。 |
+| 批处理来源记录或输出安全 | 输出冲突与检查点回归。 |
+| 分类 | Rust 分类测试与输出目录检查。 |
+| App 状态 | App 模型测试。 |
+| Photos 行为 | 结构检查，以及原生框架或真机证据。 |
 
-## 当前产品测量报告
+## 检查当前性能报告
 
-`scripts/performance/benchmark_rust_product.py` 增量写入 schema-v2 报告。
-每次被测转换保留耗时、峰值 RSS、源文件身份、完成工作量和标准 CLI 输出验证。
-验证与哈希计算位于转换计时之外。转换或验证失败时，报告保留失败状态和已观察的样本，
-不会生成成功汇总。batch workload 要求三个输入均完成转换，没有失败或复用项，
-并通过 `xdremux validate` 验证每个发布输出。
+[`benchmark_rust_product.py`](../../scripts/performance/benchmark_rust_product.py) 增量写入 schema-v2 报告。每次被测转换记录耗时、峰值 RSS、源文件身份、完成工作量和 CLI 输出验证。哈希计算与验证位于转换计时之外。
 
-`scripts/performance/check_performance_budget.py` 要求当前 schema-v2 报告中，
-每个 workload 至少有五次完成的测量。它先从样本重算 median、p95 和峰值 RSS，
-再应用现有限制。检查要求可执行文件与 Cargo.lock 的身份，以及记录 host、CPU 数量和
-显式 hosted run 字段的执行身份（本地未记录的字段为 null）。Live Photo 样本保留
-同名 HEIC/MOV 两个成员的身份与验证。缺失观察、汇总不一致、工作量不足、验证失败，
-以及把当前报告降级为只有汇总的 v1，都会使检查失败。
-失败 workload 尚无完整汇总统计时，workflow summary 仍展示部分采集状态、样本数和错误。
+转换或验证失败时，报告保留失败状态和已观察的样本，不生成成功汇总。批处理工作负载要求三个输入均完成转换，不得存在失败或复用项。每个发布输出都必须通过 `xdremux validate`。
 
-历史 baseline 文件保留 schema v1 及其原始参考值。`--historical-replay` 仅用于
-按原有汇总合同检查归档的 v1 run 报告，该模式不提供当前 CI 证据。
-预算通过不构成有因果依据的性能比较。速度或内存结论需要匹配的工作、
-适当的同机测量，以及对限制因素的实际观察。
+[`check_performance_budget.py`](../../scripts/performance/check_performance_budget.py) 要求当前 schema-v2 报告中的每项工作负载至少完成五次测量。应用预算前，脚本从样本重新计算中位数、p95 和峰值 RSS。
 
-## 已知边界
+报告必须标识可执行文件、`Cargo.lock` 和本次执行。执行身份包含主机、CPU 数量和显式的托管运行字段。本地未记录的字段必须为 `null`。Live Photo 样本保留同名照片和视频两个成员的身份与验证结果。
 
-没有单个 harness 可以证明全部用户可见行为。
+观察缺失、汇总不一致、工作量不足、验证失败，或将当前报告降级为只有汇总的 schema v1，都会使检查失败。采集在生成汇总统计前失败时，工作流摘要仍显示采集状态、样本数和错误。
 
-bit-for-bit golden output 不是所有路径的通用要求，因为部分有效输出包含生成的 identifier 或依赖 framework 的编码选择。
+## 解释历史测量
 
-结构验证不能证明视觉完全等价。
+历史基线文件保留 schema v1 和原始数值。`--historical-replay` 仅用于按原有汇总契约检查归档的 v1 运行报告，不能提供当前 CI 证据。
 
-fixture corpus 只能证明这些文件上的行为，不能证明所有固件、设备或拍摄模式。
+预算检查通过不能证明性能变化的原因。速度或内存比较需要匹配的工作量、适当的同机测量，以及对限制因素的实际观察。
+
+## 将结论限制在证据范围内
+
+单个脚本不能证明全部用户可见行为。结构有效不等于视觉等价。样本集只能证明这些文件上的行为，不能覆盖所有固件、设备或拍摄模式。
+
+不要要求每次转换都产生逐字节相同的基准输出。有效输出可能包含生成的标识符，或采用依赖框架的编码选择。

@@ -1,323 +1,255 @@
-# Apple Features
+# Apple editing features
 
 English | [简体中文](apple-features.md)
 
-Photographic Styles and Apple Portrait are Rust-owned product intents in XDRemux. They are not a second product stack.
+XDRemux exposes Apple editing features through the Rust `xdremux` CLI. Rust owns product policy and file publication. The Swift/Objective-C adapter performs the required Apple framework operations.
 
-The canonical public product is the Rust `xdremux` CLI. The Swift target is only the Apple framework adapter for operations that cannot be performed portably, such as ImageIO consumer probing, Vision observations, and VideoToolbox encoding.
+This guide describes Photographic Styles, Texture Styles, and Apple Portrait. The experimental video command has a separate [Cinematic guide](cinematic.en.md).
 
-## Current availability
+## Availability and commands
 
-The complete XDRemux product, App and Apple adapter require **arm64 / macOS 27 or newer**. The adapter is not built for Intel and checks its supported host before reporting capabilities or executing an operation. The portable Rust core retains Linux, Windows and macOS tests; those checks do not imply Apple feature availability on those hosts. A supported OS and architecture do not replace per-operation API, asset, GPU receipt or final-file validation.
+The complete product, App, and Apple adapter require Apple silicon (`arm64`) and macOS 27 or newer. The adapter has no Intel build. It checks the host before it reports capabilities or executes an operation.
 
-Standard HDR, OPPO-compatible output, Motion Photo → Live Photo, batch processing, categorization, inspection, and portable validation belong to the canonical Rust product.
+The portable Rust core retains Linux, Windows, and macOS tests. These checks do not establish Apple feature availability on those hosts. A supported host still needs the required APIs, source resources, GPU results, and final-file validation.
 
-Photographic Styles and Apple Portrait are expressed as `convert`/`batch` product intents. They do not create Apple-specific CLI subcommands, and low-level adapter or solver controls are not part of the public contract.
+| `convert` or `batch` option | Requested result |
+| --- | --- |
+| `--apple-styles` | Photographic Styles and inferred Texture Styles for a ProXDR still. |
+| `--apple-portrait` | Apple Portrait with the complete semantic resource set. |
+| `--apple-portrait-oppo` | Apple Portrait from OPPO depth and available source masks, without Vision. |
+| `--apple-cinematic` | Experimental pending Cinematic metadata for ordinary video. See the [Cinematic guide](cinematic.en.md). |
 
-Rust owns the feature request/result models, routing, fallback, validation policy, metadata synthesis, assembly, and publication lifecycle. Apple-native code performs only the framework operations requested by Rust and returns factual observations.
+These options are mutually exclusive. They also conflict with `--oppo-compatible`. They do not create separate Apple CLI subcommands. Low-level adapter, donor, backend, and solver controls are not public product options. The [CLI parser](../crates/xdremux-cli/src/lib.rs) defines the current combinations.
+
+Standard HDR, OPPO-compatible output, Motion Photo conversion, batching, categorization, inspection, and portable validation remain Rust product operations.
 
 ## Platform boundary
 
-The CLI uses this structure:
+| Layer | Responsibility |
+| --- | --- |
+| Rust CLI | Express the requested product operation. |
+| Rust engine | Define resource models, compatibility rules, and validation policy. |
+| Rust runtime | Run operations, assemble resources, validate output, and publish files. |
+| Apple adapter | Call ImageIO, Core Image, Vision, Core ML, AVFoundation, VideoToolbox, and other required frameworks. |
 
-```text
-xdremux CLI
-    ↓
-Rust runtime
-    ↓
-Rust engine policy
-    ↓
-portable providers + Apple platform adapter
-                         ↓
-          ImageIO / Core Image / Vision /
-          Core ML / AVFoundation / ...
-```
+`xdremux-apple-adapter` is a distributable component used by Rust. It is not a public conversion CLI.
 
-`xdremux-apple-adapter` is a distributable platform component consumed by the Rust product. It is not a user CLI and does not own product policy.
+The runtime communicates with the adapter through a versioned helper-process protocol with bounded messages and operation timeouts. Each conversion reuses one session that starts on demand. A timeout, crash, or framing error terminates that session. Transport remains private to the runtime.
 
-The CLI/runtime uses a versioned, bounded helper-process protocol. Each conversion reuses one lazily started adapter session. Timeout, crash, and framing failures terminate that session. Rust keeps transport private so that a transport change does not change engine or CLI semantics.
+ImageIO auxiliary probing reports concrete observations. These include ISO Gain Map, disparity, Portrait Effects Matte, and skin, hair, teeth, and glasses masks. The adapter does not decide whether the complete product result is valid. `xdremux-engine` makes that decision through `AppleImageAuxiliaryFacts` and the resource contract.
 
-## Rust-owned policy
+New adapter operations must return the framework facts or results that Rust needs. Product decisions remain in Rust. See [apple_adapter.rs](../crates/xdremux-runtime/src/apple_adapter.rs) and [apple.rs](../crates/xdremux-engine/src/apple.rs).
 
-Rust already models the user-level Apple feature intent as two facts: Photographic Styles and Portrait. It does not expose the old Swift producer, donor, backend, or research controls as product configuration.
+## Photographic Styles
 
-The first real Apple adapter operation is ImageIO auxiliary-resource probing. The adapter reports observations such as:
+Rust owns source-dependent style generation, constrained search, key 1 and plist synthesis, resource graphs, validation, and publication. The adapter supplies framework observations and encoding operations.
 
-- ISO Gain Map presence;
-- disparity presence;
-- Portrait Effects Matte presence;
-- skin, hair, teeth, and glasses semantic matte presence.
-
-The adapter does not answer a business-level question such as “is this a valid portrait output?”. `xdremux-engine` owns that decision through `AppleImageAuxiliaryFacts` and the Portrait resource contract.
-
-New operations must follow this boundary: return the narrowest useful framework fact or operation result, then keep policy in Rust.
-
-## Photographic Styles migration
-
-Rust owns style-generation semantics, constrained search, source-bound policy, key1/property-list synthesis, graph assembly, validation policy, and publication. The adapter is limited to framework observations or encoding primitives requested by the Rust runtime.
-
-Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
+Research producers, model experiments, donor diagnostics, and RAW experiments remain research tools. They do not define another runtime or public conversion path.
 
 ### Texture Styles from the same switch
 
-`--apple-styles` and the app's Photographic Styles switch also generate Texture
-Styles. There is no separate Texture option. The app uses `validate --apple-styles` before it skips an existing output. Plain HDR outputs do not satisfy this check. This operation requires the private
-Vision and CMImaging APIs tested on macOS 27. A missing API or failed native
-operation rejects the whole Styles transaction before publication.
+`--apple-styles` and the App's Photographic Styles switch generate Texture Styles as part of the same operation. There is no separate Texture option. Before reusing an output, the App runs `validate --apple-styles`. A plain HDR output does not satisfy that check.
 
-Rust asks ImageIO for an upright sRGB analysis raster with a maximum dimension
-of 1024 pixels. This raster is only an analysis input. The output keeps the full
-primary image, HDR Gain Map, Styles Linear Thumbnail, and existing item payloads.
-The analysis does not reconstruct RAW data or capture-time Apple processing.
+Texture generation needs the private Vision and CMImaging APIs tested on macOS 27. A missing API or failed native operation rejects the entire Styles transaction before publication.
 
-Vision supplies face landmarks, signed pose angles, person instances, and semantic
-masks. Each measured face is matched to a distinct instance by maximum total
-mask overlap. Rust requests the original Mattify, UnderEyeBrighten, and
-SkinSmoothStandalone statistics operations for each matched person. Each effect
-uses the same inferred geometry and masks. The native order is setup, prewarm,
-prepare, calculateStats, process, GPU fence, and terminal finishProcessing.
+The analysis and output have different roles:
 
-The runtime adapter uses separate typed requests and results for analysis,
-inference, statistics, and final readback. It owns native report decoding and
-workfile names. A helper acknowledgement alone cannot supply measured statistics
-or admit the final file; the GPU, lifecycle, input bindings, and final-byte
-readback checks still apply.
+- ImageIO produces an upright sRGB analysis image with a maximum dimension of 1024 pixels.
+- The output retains the full primary image, HDR Gain Map, Styles Linear Thumbnail, and existing item payloads.
+- Analysis cannot recover RAW data or Apple capture-time processing.
 
-Rust combines only the native statistics that each effect actually returned.
-A successful empty optional group is omitted. A scene with no matched faces gets
-an empty people array. It does not get a template person. Nose, lips, eyebrows,
-and hand protection use regions derived from native landmarks or hand poses.
-Ears and tattoo protection are disabled in this derived edit context. This is
-not the complete camera FSINC producer.
+Vision provides face landmarks, signed pose angles, person instances, and semantic masks. Maximum total mask overlap matches each measured face to a distinct person instance. Rust requests Mattify, UnderEyeBrighten, and SkinSmoothStandalone statistics for each matched person. All effects use the same inferred geometry and masks.
 
-The Rust HEIF writer adds the version-3 Texture plist, separate encoded masks,
-and exact per-instance XMP reference keys to the existing Styles output. Its
-tuning profile selects a derived edit; it does not replace EXIF camera identity,
-exposure, lens, date, or capture UUID. The writer checks every original item
-payload after relocation. Before atomic publication, the original Apple parser
-must read back the same person count, reference keys, geometry, and statistics.
+The native operation order is `setup`, `prewarm`, `prepareToProcess:`, `calculateStats`, `process`, GPU fence, and final `finishProcessing`. Analysis, inference, statistics, and final readback use separate typed requests and results. The Rust runtime's [adapter client](../crates/xdremux-runtime/src/apple_adapter/texture.rs) owns native report decoding and workfile names.
 
-Run `python3 scripts/apple/check_texture_styles.py --all-fixtures --output <dir>`
-on macOS 27 for real ProXDR fixture conversions, batch conversion, unchanged
-primary/Gain Map HEVC, and failure-preserves-output checks. The earlier SDR
-research candidates have user-reported Photos activation. That feedback does
-not certify every new full-resolution HDR product output, effect response,
-save, or reopen on a device.
+A helper acknowledgement alone does not prove statistics generation or permit publication. GPU completion, lifecycle, input binding, and final-byte readback checks still apply.
+
+Rust combines only the statistics returned by the native operations. It omits successful but empty optional groups. A scene without matched faces gets an empty people array, not a template person. Nose, lip, eyebrow, and hand protection use regions derived from native landmarks or hand poses. Ear and tattoo protection are disabled for this derived edit. This does not reproduce the complete camera FSINC producer.
+
+The Rust HEIF writer adds a version-3 Texture plist, separately encoded masks, and exact per-instance XMP reference keys. Its tuning profile selects a derived edit. It does not replace EXIF camera identity, exposure, lens, date, or capture UUID.
+
+After relocation, the writer checks every original item payload. Before atomic publication, Apple's parser must read back the same person count, reference keys, geometry, and statistics.
+
+On macOS 27, run the fixture check:
+
+```bash
+python3 scripts/apple/check_texture_styles.py --all-fixtures --output /absolute/path/new-texture-results
+```
+
+This checks real ProXDR conversion, batch conversion, unchanged primary and Gain Map HEVC, and preservation of existing output after failure. Earlier SDR research candidates have user-reported Photos activation. That feedback does not certify every full-resolution HDR product output, effect response, save, or reopen.
+
+The implementation is in [apple_texture.rs](../crates/xdremux-runtime/src/apple_texture.rs) and [XDTextureNative](../Sources/XDTextureNative).
 
 ### SmartStyle edit state
 
-The generated Standard Styles resource set also requires its SmartStyle state
-in Apple MakerNote tag 84 (`0x0054`). The coefficient plist is a separate input;
-its successful parsing does not establish the photo's edit state. Rust defines
-the required integer edit fields, including the Standard Texture state. The ImageIO primitive
-merges those requested fields into the existing MakerApple dictionary without
-adding a camera identity or UUID. Other MakerApple entries and unmodified cells
-remain in the dictionary.
+The Standard Styles resource set also needs SmartStyle state in Apple MakerNote tag 84 (`0x0054`). The coefficient plist is a separate input. Successful plist parsing does not establish the photo's edit state.
 
-Before publication, Rust stages the final assembled bytes and asks ImageIO to
-read their integer dictionary cells. Missing or changed required state rejects
-the conversion before replacing an existing output. An older adapter that
-ignores the additive metadata request therefore cannot silently publish an
-incomplete Styles file. This native readback does not establish Photos UI,
-Tone/Color response, or save/reopen behavior; those still require device evidence.
+Rust defines the required integer edit fields, including Standard Texture state. ImageIO merges those fields into the existing MakerApple dictionary. It does not add camera identity or a UUID. Other entries and unmodified cells remain intact.
+
+Before publication, Rust stages the complete assembled file and asks ImageIO to read its integer dictionary cells. Missing or changed required fields reject the conversion before an existing output is replaced. An older adapter that ignores the added metadata request cannot silently publish an incomplete Styles file.
+
+Native readback does not establish Photos controls, Tone/Color response, or save/reopen behavior. Those claims require device evidence.
 
 ### HDR reference for the Linear Thumbnail
 
-The Styles Linear Thumbnail is an Apple Log encoding of scene-linear Display P3
-HDR reconstructed from the SDR base and its Gain Map. Rust applies that gain
-map at the base image's original resolution. Gain-map samples are bilinearly
-resampled in code space, then the source's ISO 21496-1 / Apple tmap parameters
-reconstruct each sample: log2 minimum and maximum, gamma as the reciprocal
-exponent used by the 26A434 `_flexMap` decoder, per-channel offsets, and the
-alternate-image headroom weight. Reduction to the 1024-pixel-class thumbnail
-happens after that reconstruction, as an area box filter in linear light. Rust
-then divides each channel by the same `baseline_exposure` stored in Styles
-plist key `4` and applies Apple Log. It does not copy SDR image codes into
-this resource.
+The Styles Linear Thumbnail stores Apple Log codes for scene-linear Display P3 HDR reconstructed from the SDR base and Gain Map. It does not store a copy of the SDR image codes.
 
-The Apple Log transfer, [0, 1] code range, and existing auxiliary color
-signaling stay in place. The encoder is the inverse of the macOS 26A434
-exponential decoder (`_appleLogToLinear` / `sw_appleLogToLinear`). That decoder
-does not use the quadratic toe, so the encoder does not either. The camera-side
-encoder toe is unverified. The transform keeps Display P3 primaries. It does
-not change the image to the BT.2020 color space used by Apple Log video or
-retag the thumbnail as sRGB, PQ, HLG, or linear.
+Rust applies the Gain Map at the base image's original resolution. It resamples map codes bilinearly before HDR reconstruction. Reconstruction uses the source's ISO 21496-1 or Apple `tmap` parameters:
 
-Coefficients use the decoded display scene. Before encoding the RGB16 Linear
-Thumbnail, Rust reverses the primary item's complete rotation/mirror sequence.
-The stored Linear Thumbnail and Style Delta Map use the primary coded geometry
-and preserve the relative order of its `irot` and `imir` properties. A Gain Map
-or Styles item whose aspect does not match the primary coded dimensions is
-rejected. `encoding_gain` is renderer metadata, not another exposure division.
+- The minimum and maximum log2 gain.
+- Gamma as the reciprocal exponent used by the 26A434 `_flexMap` decoder.
+- Per-channel offsets.
+- The alternate-image headroom weight.
 
-The codec primitive receives 16-bit Apple Log codes. VideoToolbox converts
-those codes into 10-bit video-range 4:2:0 and encodes Main10 HEVC. The codes
-are not quantized to RGB8 before that encode, so the 10-bit range is available
-to the encoder. HDR values above SDR white still survive. This remains a
-reference derived from the rendered HDR look. It cannot recover RAW or
-capture-time processing that the source has lost.
+After reconstruction, an area box filter reduces the image in linear light to the 1024-pixel-class thumbnail. Rust divides each channel by `baseline_exposure`, stored in Styles plist key `4`, then applies Apple Log.
 
-The same 26A434 consumer, `PISemanticStyleFilter`, also decides how the style
-metadata is generated:
+The Apple Log transfer, `[0, 1]` code range, and auxiliary color signaling remain unchanged. The encoder inverts the macOS 26A434 exponential decoder, `_appleLogToLinear` / `sw_appleLogToLinear`. That decoder does not use a quadratic toe, so this encoder does not use one. The camera-side encoder toe remains unverified.
 
-- Key 3 is one 256-node curve sampled independently on each channel. Its x
-  value is the linear thumbnail code `min(S, 1)` after the plist base gain.
-  There is no luminance reduction and no percentile normalization. The curve is
-  the monotone projection of those observed primary-channel means. The
-  consumer's extra exposure `E` is a render parameter and is not folded in.
-  Downstream `LinearGTCImage` statistics and the reported fit error use the
-  written key-3 nodes after the measured macOS inverse-sRGB decode on the fixed
-  65535 scale. They do not use the pre-quantization fit. The 256 decoded nodes
-  remain f32, and the repeated final wire word is ignored. The iPhone firmware
-  endpoint-normalized half table belongs to a separate binding.
-- Keys `c` and `d` stay 32×32. Each cell stores the area mean of one guide:
-  `c` is the primary image and `d` is the linear thumbnail. The consumer
-  upsamples them with its guided filter (`r = 1`, `eps ≈ 0.05`) and forms
-  `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`. The maps are not scaled by a
-  fixed affine and they are not multiplied onto luminance. The later shader
-  stages that consume `q` are not inverted, so these means are not a solved
-  local tone.
-- Key 1 is a 12×9×8×10×3 half array, x-major, with the quadratic basis
-  `[1, R, G, B, R², RG, RB, G², GB, B²]`. Each spotlight cell and luminance
-  plane is fit separately. The fit is the remove-style direction: the
-  polynomial reads the displayed primary and targets the thumbnail code. A
-  coefficient the local samples do not identify stays on the identity residual.
-  The plane weight uses the verified `inputIsLinear = false` formula in `f64`,
-  not half, and the optional 3×3 spatial filter is not applied.
+The transform keeps Display P3 primaries. It does not convert the thumbnail to the BT.2020 color space used by Apple Log video. It also does not relabel the thumbnail as sRGB, PQ, HLG, or linear.
 
-At background and foreground LTM of 1, which is the captured tone=0 setting,
-the semantic-tone stage returns the primary and does not read the thumbnail or
-the curve. A tone=0 render therefore cannot measure key 3 or the thumbnail.
-The Photos Tone ±1 and Color ±1 slider positions are not source facts. The
-portable formula check is `apple_style_semantic_tone_channel`.
+Coefficients use the decoded image in display orientation. Before RGB16 encoding, Rust reverses the primary item's complete rotation and mirror sequence. Stored Linear Thumbnail and Style Delta Map items use the primary coded geometry. They preserve the relative order of `irot` and `imir`.
 
-The native tone check is separate from the product. It checks out
-`21Z121Z1/Photographic_Style_Research` at `37dd551` and runs
-`consumer-model/harness/run_tone_sweep.py` on the `xcode-27` image. That
-harness sets `inputToneBias` only. It does not expose a color control. The
-sweep uses tones −1, −0.75, −0.5, −0.35, −0.15, 0, 0.15, 0.35, 0.5, 0.75, and
-1. The Apple captures are `Apple_Native_Samples/IMG_0032.HEIC`,
-`IMG_0033.HEIC`, and `research/vm-native/samples/IMG_2600.HEIC`,
-`IMG_2604.HEIC`, and `IMG_2608.HEIC`. The same tones are applied to the three
-ProXDR fixtures after conversion. Tone 0 on `IMG_0032.HEIC` must report zero
-differing half components before the other renders are trusted. The report
-records mean luminance, per-channel means, `|L(−1)−L(0)| / |L(+1)−L(0)|`,
-monotonicity, and the tone-related plist fields. The workflow is
-`.github/workflows/research.yml`.
+A Gain Map or Styles item with an incompatible aspect ratio is rejected. `encoding_gain` is renderer metadata, not another exposure divisor.
 
-The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,
-decodes the encoded thumbnail, and checks the HDR Log target and unchanged
-primary HEVC. Run it with `bash scripts/apple/check_rust_style_consumer.sh`.
-Photos import, editing, save, and reopen require separate device evidence.
-Baseline exposure and base gain still use the existing source-distribution
-calibration; this change does not replace those coefficients.
+The codec receives 16-bit Apple Log codes. VideoToolbox converts them to 10-bit video-range 4:2:0 and encodes Main10 HEVC. The input does not pass through RGB8 quantization, so the encoder can use the 10-bit range. HDR values above SDR white remain represented.
 
-When `XDREMUX_STYLES_ACCEPTANCE_DIR` is set, that check retains the actual v15
-product HEIC with native Texture resources and the per-fixture
-`linear-thumbnail-roundtrip.json` report. These are diagnostics, not Photos
-acceptance. The read-only inspection follows the item's declared file/idat
-storage and validates extent bounds; it does not patch the product to v16.
-The separate version-only research control remains a one-byte experiment.
+This reference derives from the rendered HDR appearance. It cannot recover RAW data or capture-time processing already lost from the source.
 
-### Provisional system gain map
+### Styles coefficient fields
 
-The default encoder still writes XDRemux's own log gain. `XDREMUX_SYSTEM_GAIN_MAP=1`
-is a separate prototype. Rust reconstructs scene-linear Display P3 HDR, builds
-an HDR look with a provisional guided filter, and keeps the SDR look by using
-local weight 1, which is the identity. It then hands both images to the Apple
-adapter. The adapter calls `CIContext.writeHEIFRepresentationOfImage` (`format`
-`.RGBA8`, Display P3) and passes the half-float linear HDR image under
-`kCIImageRepresentationHDRImage`. Headroom is applied with the header method
-`-imageBySettingContentHeadroom:` (macOS 26). The header does not publish a
-Swift overlay name for that method.
-`kCIImageRepresentationHDRGainMapAsRGB` is set true so Core Image is asked for
-a color ratio. Rust does not supply `kCIImageRepresentationHDRGainMapImage`.
+The 26A434 `PISemanticStyleFilter` consumer determines how XDRemux constructs these fields.
 
-Styles coefficients and the Linear Thumbnail reuse the exact SDR/HDR pair
-submitted to the system encoder, including SDR quantization and the submitted
-half-float HDR. They do not reinterpret the newly generated Gain Map with the
-original OPPO map's channels or scale parameters. Failed readback rejects a
-measurement before an existing output can be atomically replaced.
+| Field | Stored form | Construction and limit |
+| --- | --- | --- |
+| Key `3` | One 256-node curve, sampled independently for each channel. | The x value is `min(S, 1)` after the plist base gain. There is no luminance reduction or percentile normalization. |
+| Keys `c` and `d` | Two 32×32 guide maps. | Each cell stores an area mean. `c` represents the primary image. `d` represents the linear thumbnail. |
+| Key `1` | An x-major 12×9×8×10×3 half array. | Each spotlight cell and luminance plane is fit separately with a quadratic basis. |
 
-Those names and their availability come from the macOS 27 SDK headers
-(`CIContext.h`, `CIImage.h`, `CGImage.h`, `CGImageSource.h`,
-`CGImageDestination.h`, `CGImageProperties.h`), not from a guessed selector.
-`writeHEIFRepresentationOfImage` is macOS 10.13.4. The HDR-image option and
-`contentHeadroom` are macOS 15, and `imageBySettingContentHeadroom` is macOS 26.
-These are SDK introduction versions for individual APIs, not the support floor
-for the complete arm64/macOS 27 product or its private Styles/Texture SPI.
-Headroom sent by Rust is `max(1, measured peak)` of the half values handed to
-the encoder. The header forbids a headroom in `(0, 1)`. ImageIO
-`kCGImageDestinationEncodeGenerateGainMapWithBaseImage` exists from macOS 16,
-but its dictionary value type is not documented, so the prototype does not
-call it.
+Key `3` is the monotone projection of observed primary-channel means. The consumer's extra exposure `E` is a render parameter. It is not included in this curve.
 
-Readback uses `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR` and
-sets `kCGImageSourceGenerateImageSpecificLumaScaling` to false, then renders
-extended-linear Display P3 half. It reports both
-`kCGImageAuxiliaryDataTypeHDRGainMap` and `kCGImageAuxiliaryDataTypeISOGainMap`.
-Which of those the system file actually contains is a measurement, not a
-header fact. The Styles assembler still requires one `tmap` item and its
-`dimg` graph. If the system file does not have that graph, assembly fails
-closed and the report records the conflict. Photos import and editing remain
-device evidence.
+Downstream `LinearGTCImage` statistics and the reported fit error use the written key-3 nodes after the measured macOS inverse-sRGB decode on the fixed 65535 scale. They do not use the pre-quantization fit. The 256 decoded nodes remain f32, and the repeated final wire word is ignored. The iPhone firmware endpoint-normalized half table belongs to a separate binding.
 
-The guided filter is not a port of `guided.py`; that file is not in the public
-research checkout. Radius 1, epsilon 0.05, half-size coefficients stored
-through `f16`, HDR local weight 0, and SDR local weight 1 are provisional.
-`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` bounds the prototype geometry. The workflow
-sets it to 256.
+For keys `c` and `d`, the consumer upsamples both guides with its guided filter (`r = 1`, `eps ≈ 0.05`). It then forms:
 
-## Apple Portrait migration
+```text
+q = mix(mix(d, c, l_b), mix(d, c, l_f), m)
+```
 
-Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.
+The maps do not use a fixed affine scale and do not multiply luminance directly. Later shader stages that consume `q` have not been inverted. These means therefore do not solve the local tone transform.
 
-For the complete Portrait profile, the adapter submits each Vision segmentation request through a separate image request handler. This avoids batching different segmentation request types through the compound request path where a macOS 27 beta crash was observed. The requested semantic roles and output validation remain the same. A failed request stops the operation; the adapter does not retry it or substitute the source-native profile.
+Key `1` uses the basis `[1, R, G, B, R², RG, RB, G², GB, B²]`. Its polynomial reads the displayed primary image and targets thumbnail codes. This is the remove-style direction. Coefficients that local samples cannot identify retain the identity residual. Plane weights use the verified `inputIsLinear = false` formula in `f64`, not half precision. The optional 3×3 spatial filter is not applied.
+
+At background and foreground local tone mapping (LTM) values of 1, the semantic-tone stage returns the primary image. This is the captured `tone=0` setting. The stage does not read the thumbnail or curve, so a tone-zero render cannot measure either resource.
+
+Photos Tone ±1 and Color ±1 slider positions are not source facts. The portable formula check is `apple_style_semantic_tone_channel`. Baseline exposure and base gain retain the source-distribution calibration. The reconstruction does not replace those calibration coefficients.
+
+The owning implementations are [apple_photographic_styles.rs](../crates/xdremux-engine/src/apple_photographic_styles.rs) and [apple_styles.rs](../crates/xdremux-runtime/src/apple_styles.rs).
+
+### Native Styles checks
+
+The native tone experiment runs separately from product conversion. It checks out `21Z121Z1/Photographic_Style_Research` at `37dd551`. It runs `consumer-model/harness/run_tone_sweep.py` on the `xcode-27` image through [research.yml](../.github/workflows/research.yml).
+
+The test sets only `inputToneBias`. It has no color control. The tone values are −1, −0.75, −0.5, −0.35, −0.15, 0, 0.15, 0.35, 0.5, 0.75, and 1.
+
+The Apple samples are `Apple_Native_Samples/IMG_0032.HEIC`, `IMG_0033.HEIC`, and `research/vm-native/samples/IMG_2600.HEIC`, `IMG_2604.HEIC`, and `IMG_2608.HEIC`. Three converted ProXDR fixtures use the same tone values. Before other renders are accepted, tone zero for `IMG_0032.HEIC` must report zero differing half components.
+
+The report records mean luminance, channel means, monotonicity, tone-related plist fields, and `|L(−1)−L(0)| / |L(+1)−L(0)|`.
+
+The product consumer regression uses RGB UHDR and monochrome LHDR fixtures. It decodes the encoded thumbnail and checks the HDR Log target and unchanged primary HEVC. Run it on the required Mac host:
+
+```bash
+bash scripts/apple/check_rust_style_consumer.sh
+```
+
+When `XDREMUX_STYLES_ACCEPTANCE_DIR` is set, the check retains the actual v15 product HEIC and its native Texture resources. It also retains each fixture's `linear-thumbnail-roundtrip.json` report. These files are diagnostics, not Photos acceptance evidence.
+
+The read-only inspector follows declared file/idat storage and validates extent bounds. It does not patch the product to v16. The separate version-only research control remains a one-byte experiment. Photos import, editing, save, and reopen require device checks.
+
+## Provisional system Gain Map
+
+The default encoder writes XDRemux's own log gain. `XDREMUX_SYSTEM_GAIN_MAP=1` selects a separate prototype.
+
+Rust reconstructs scene-linear Display P3 HDR and builds an HDR appearance with a provisional guided filter. SDR local weight 1 preserves the SDR appearance as an identity transform. Rust then submits both images to the Apple adapter.
+
+The adapter calls `CIContext.writeHEIFRepresentationOfImage` with `.RGBA8` and Display P3 for the SDR image. It submits half-float linear HDR through `kCIImageRepresentationHDRImage`. It sets headroom with `-imageBySettingContentHeadroom:`. The header provides no Swift overlay name for that method.
+
+`kCIImageRepresentationHDRGainMapAsRGB` is true, which requests a color ratio from Core Image. Rust does not supply `kCIImageRepresentationHDRGainMapImage`.
+
+Styles coefficients and the Linear Thumbnail reuse the exact submitted SDR/HDR pair, including SDR quantization and half-float HDR. They do not interpret the new Gain Map with the original OPPO map's channel or scale parameters. Failed readback rejects the measurement before an existing output can be replaced.
+
+### API requirements
+
+The API names and introduction versions come from macOS 27 SDK headers. The inspected headers are `CIContext.h`, `CIImage.h`, `CGImage.h`, `CGImageSource.h`, `CGImageDestination.h`, and `CGImageProperties.h`.
+
+| API or property | SDK introduction version or restriction |
+| --- | --- |
+| `writeHEIFRepresentationOfImage` | macOS 10.13.4. |
+| HDR-image option and `contentHeadroom` | macOS 15. |
+| `imageBySettingContentHeadroom` | macOS 26. Headroom in `(0, 1)` is not permitted. |
+| `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` | macOS 16. The dictionary value type is undocumented, so the prototype does not call it. |
+
+These versions do not lower the complete product's arm64/macOS 27 requirement or establish availability of private Styles and Texture SPI. Rust sends `max(1, measured peak)` from the half-float values actually submitted to the encoder.
+
+### Readback and unresolved behavior
+
+Readback sets `kCGImageSourceDecodeRequest` to `kCGImageSourceDecodeToHDR`. It sets `kCGImageSourceGenerateImageSpecificLumaScaling` to false, then renders extended-linear Display P3 half-float values.
+
+The report includes both `kCGImageAuxiliaryDataTypeHDRGainMap` and `kCGImageAuxiliaryDataTypeISOGainMap`. Their presence in an output is a measured result, not a consequence of header declarations.
+
+Styles assembly still requires exactly one `tmap` item with its `dimg` graph. If the system output lacks that graph, assembly fails and the report records the conflict. Photos import and editing still require device evidence.
+
+The guided filter is not a port of `guided.py`, which is absent from the public research checkout. Its provisional settings are radius 1, epsilon 0.05, half-size coefficients stored through `f16`, HDR local weight 0, and SDR local weight 1. `XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` limits prototype geometry. The workflow sets it to 256.
+
+See [system_heif_hdr.rs](../crates/xdremux-runtime/src/system_heif_hdr.rs) and [CoreImageHeifHdr.swift](../Sources/XDRemuxAppleAdapter/CoreImageHeifHdr.swift).
+
+## Apple Portrait
+
+Rust owns source preflight, OPPO block parsing, focus and orientation policy, container processing, Gain Map policy, REND generation, and auxiliary manifests. It also owns routing, output names, validation, and atomic publication. ImageIO reports auxiliary-resource facts. The adapter performs framework operations required by the Rust transaction.
+
+For the complete profile, the adapter submits each Vision segmentation request through a separate image request handler. This avoids the compound-request path where mixed segmentation request types caused an observed macOS 27 beta crash. Required semantic roles and output validation remain unchanged.
+
+A failed request stops the operation. The adapter does not retry that request or substitute the OPPO source-native profile.
 
 ### Source-native profile and reduced effects
 
-`convert` and `batch` accept `--apple-portrait-oppo`. This profile does not call Vision, including its private segmentation SPI. It uses public ImageIO and Core Image operations, so macOS is still required.
+`--apple-portrait-oppo` uses OPPO source data without Vision or its private segmentation SPI. It still requires macOS because it uses public ImageIO and Core Image operations.
 
 | Resource | Source-native profile |
 | --- | --- |
 | ISO Gain Map | Preserved from the source. |
-| Disparity, focus, aperture and REND | Derived by Rust from OPPO depth, capture data and source metadata. |
-| Portrait Effects Matte | Added only when the OPPO portrait plane has credible foreground. |
+| Disparity, focus, aperture, and REND | Derived by Rust from OPPO depth, capture data, and source metadata. |
+| Portrait Effects Matte | Added only when the OPPO person plane has credible foreground. |
 | Hair matte | Added only when the OPPO hair plane has credible foreground. |
-| Skin, teeth and glasses mattes | Absent. No substitute masks are generated. |
+| Skin, teeth, and glasses mattes | Absent. No substitute masks are generated. |
 
-Portrait effects are reduced compared with the complete `--apple-portrait` profile. Low-resolution or missing producer masks can reduce subject separation and hair detail. Semantic relighting and related edits can be limited. A depth-only output is valid for this source-native resource contract; it is not equivalent to the complete semantic resource set. An OPPO pet plane is not relabeled as a person or hair matte.
+Effects are reduced compared with the complete `--apple-portrait` profile. Low-resolution or missing masks can reduce subject separation and hair detail. Semantic relighting and related edits can be limited.
 
-The native profile never falls back to Vision. Missing required depth or source metadata causes an error before output publication. The complete profile keeps its existing strict resource requirements. Both profiles use the same Rust conversion and publication path.
+A depth-only output can satisfy the source-native contract. It is not equivalent to the complete semantic resource set. An OPPO pet plane is never relabeled as a person or hair matte.
 
-The native regression uses two real OPPO Portrait fixtures, checks single-file and serial/parallel batch output with ImageIO, and rejects any attempted Vision operation. It also verifies that a failed preflight preserves an existing output. Run it with `python3 scripts/apple/check_rust_cli_oppo_portrait.py`.
+The source-native profile never falls back to Vision. Missing required depth or metadata causes failure before publication. The complete profile retains its strict resource requirements. Both profiles use the same Rust conversion and publication path.
 
-## Live Photo
+The native regression uses two real OPPO Portrait fixtures. ImageIO checks single-file and serial or parallel batch output. The test rejects any attempted Vision operation. It also checks that failed preflight preserves existing output. Run it on the required Mac host:
 
-Normal Motion Photo → Live Photo conversion is already a Rust product capability and should not be routed through the Apple capability adapter.
+```bash
+python3 scripts/apple/check_rust_cli_oppo_portrait.py
+```
 
-If a future combined feature requires applying an Apple-only operation to a Live Photo still, Rust must continue to own the Live Photo asset lifecycle, pair identity, publication, and validation ordering. The Apple adapter should receive only the narrow platform operation it needs to perform.
+## Live Photo and compatibility policy
 
-## Compatibility rules
+Ordinary Motion Photo to Live Photo conversion belongs to Rust and does not use the Apple adapter. Any future Apple-only operation on a Live Photo still must preserve Rust ownership of pair identity, validation order, and publication.
 
-Product-level compatibility rules belong in Rust. Examples include whether OPPO-compatible output can be combined with an Apple editing feature, whether a source asset contains the resources required for Portrait editing, and how a combined request is published atomically.
-
-Do not move these decisions into the adapter protocol when extending the CLI.
+Product compatibility decisions remain in Rust. These include source-resource requirements, conflicts with OPPO-compatible output, and publication rules for supported requests. Extending the adapter protocol must not move these decisions into the adapter.
 
 ## Validation and acceptance
 
-Use three distinct evidence classes:
+| Evidence class | What it establishes |
+| --- | --- |
+| Structural | Expected HEIF/MOV resources and metadata exist and can be parsed. |
+| Native framework | The tested Apple framework accepts or exposes the expected resources on that host. |
+| Device | The recorded operation works on a specific device and Apple Photos version. |
 
-1. Structural evidence proves that HEIF/MOV resources and metadata are present and parseable.
-2. Native framework evidence proves that the tested Apple framework accepts or exposes the expected resources.
-3. Device evidence proves behavior in a specific Apple Photos version on a real device.
+The completion gate requires the Rust workspace and a real Rust-to-adapter handshake on macOS. Feature checks invoke the Rust CLI, then inspect native consumer results. Structural and native checks do not establish visual equivalence or Photos device acceptance.
 
-Structural evidence does not replace device evidence for an interactive Apple Photos editing claim.
+CLI acceptance covers commands, media conversion, source-dependent resource contracts, and the Apple adapter. App integration is a separate scope. Reduced source-native effects remain a product tradeoff. Interactive Photos editing requires its own evidence.
 
-The canonical completion gate requires the Rust workspace and a real Rust → Apple adapter handshake on macOS. Feature-specific gates drive the Rust CLI and then query Apple consumer facts. Structural and native-framework evidence do not by themselves claim visual equivalence or Photos device acceptance.
-
-CLI migration acceptance covers the canonical Rust commands, media conversion, source-dependent resource contracts and the Apple adapter. macOS app integration is a separate scope. Native-profile quality reduction is a documented product tradeoff. Interactive Photos editing remains a separate consumer claim; a CLI pass does not assert identical Photos effects or editing UI.
-
-## Research material
-
-The repository still contains style research code and optional models such as `ReverseKey1Ensemble`. These are research/training assets rather than product modes. See the [model card](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md) where relevant.
+Research models such as `ReverseKey1Ensemble` are training assets, not product modes. See the [model card](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md).

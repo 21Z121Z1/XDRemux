@@ -2,143 +2,124 @@
 
 [English](README.en.md) | 简体中文
 
-XDRemux 将支持的厂商 HDR 照片转换为 ISO/TS 21496-1 HDR HEIC，并把支持的 Android Motion Photo 转换为 Apple Live Photo。
+XDRemux 将支持的厂商 ProXDR 照片转换为 ISO/TS 21496-1 HDR HEIC，也将支持的 Android Motion Photo 转换为 Apple Live Photo 文件对。
 
-产品只有一个入口：Rust `xdremux` CLI。输入类型、源代际、HDR / Gain Map 结构以及 Motion Photo 路由均由程序自动识别。
+Rust `xdremux` CLI 自动识别源类型、HDR 结构和转换方式。macOS App 使用同一套产品实现。能否转换取决于文件的实际结构和资源，不能只按设备型号判断。
 
-完整 Mac 产品面向 Apple silicon（`arm64`）和 macOS 27。Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。这些核心检查不证明每个平台都具备完整 Apple 功能。
+## 支持的任务
 
-## 能做什么
-
-| 输入 / 意图 | 结果 |
+| 任务 | 结果或命令 |
 | --- | --- |
-| ProXDR 照片 | ISO/TS 21496-1 HDR HEIC |
-| 支持的 Motion Photo | 默认 Apple Live Photo HEIC + MOV |
-| `--live-photo-output pvt` | 包含已验证 pair 的可选真实 PVT 目录包 |
-| `--oppo-compatible` | 面向 OPPO 相册的 ProXDR 输出 |
-| `categorize` / `batch --categorize` | 按资产类型和拍摄模式分类 |
-| `inspect` / `validate` | 检查源文件和独立验证输出 |
+| 转换 ProXDR 静态照片 | 含 ISO 增益图的 HDR HEIC。 |
+| 转换支持的 Motion Photo | 标识和时间匹配的 HEIC 与 MOV 文件对。 |
+| 封装 Live Photo | `--live-photo-output pvt` 创建包含已验证文件对和元数据的目录包。 |
+| 请求 OPPO 相册兼容输出 | `--oppo-compatible` 适用于 ProXDR 静态照片。 |
+| 添加 Apple 编辑资源 | 人像、摄影风格和纹理风格需要文档规定的源数据及 macOS 能力。 |
+| 添加待处理的电影效果元数据 | 实验性选项 `--apple-cinematic` 为普通视频准备元数据，后续仍需原生处理。 |
+| 批量转换 | `batch` 规划输出并逐项报告结果。 |
+| 整理资产 | `categorize` 或 `batch --categorize` 按资产类型和拍摄模式分类。 |
+| 检查文件 | `inspect` 报告源数据；`validate` 检查支持的输出。 |
 
-正常转换不要求用户选择设备代际、codec、Gain Map layout、camera tail 或 routing。这些都是程序根据输入事实和期望结果自动决定的实现细节。
+完整 Mac 产品面向 Apple silicon（`arm64`）和 macOS 27。Rust 核心另有 Linux、Windows、macOS 构建及可移植测试。可移植构建通过，不代表 Apple 框架或 Photos 编辑功能可用。
 
-## 构建
+选择编辑功能前，先查看[支持设备与源文件证据](docs/supported-devices.md)和 [Apple 功能要求](docs/apple-features.md)。
 
-跨平台转换栈需要当前 Rust toolchain，以及带 HEVC 支持的 libheif。
-以下命令构建 Rust 核心。Mac 产品包还包含 Apple adapter，使用 Xcode 27，并将 macOS 27 设为部署目标。打包及独立原生验收 gate 见[开发文档](docs/development.md)。
+## 构建 Rust CLI
+
+可移植转换需要当前 Rust 工具链及支持 HEVC 的 libheif。完整 Mac 包还需要 Apple 适配器，构建时使用 Xcode 27，部署目标为 macOS 27。
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git
 cd XDRemux
-cargo build --release -p xdremux-cli
+cargo build --locked --release -p xdremux-cli
 ./target/release/xdremux --help
 ```
 
-开发时也可以直接通过 Cargo 运行：
+下列示例假设 `xdremux` 已加入 `PATH`。从源码构建时，将命令中的 `xdremux` 替换为 `./target/release/xdremux`。
+
+开发时也可以通过 Cargo 运行：
 
 ```bash
-cargo run -p xdremux-cli -- --help
+cargo run --locked -p xdremux-cli -- --help
 ```
 
-## 转换
+App、适配器和可迁移安装目录的打包方法见[开发文档](docs/development.md)。
 
-标准 ProXDR 转换：
+## 转换单张照片
+
+> [!CAUTION]
+> 转换 ProXDR 静态照片时，省略 `--output` 会在转换成功后替换输入文件。需要保留原图时，指定独立输出路径。
+
+转换支持的 ProXDR 静态照片：
 
 ```bash
-xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_hdr.heic
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
 
-支持的 Motion Photo 使用同一个命令，程序会自动识别：
+转换支持的 Motion Photo：
 
 ```bash
 xdremux convert --input IMG_001.jpg
 ```
 
-Motion Photo 会生成同 basename 的 HEIC + MOV Live Photo 资源对，源 Motion Photo 不会被修改。
+Motion Photo 转换生成配套的 HEIC 和 MOV，源文件保持不变。未指定 `--output` 时，程序选择不会与已有文件对成员冲突的名称。
 
-需要面向 OPPO 相册的 ProXDR 输出时：
-
-```bash
-xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_oppo.heic \
-  --oppo-compatible
-```
-
-`--oppo-compatible` 只适用于 ProXDR 静态照片，不适用于 Motion Photo 转换。
-
-> [!IMPORTANT]
-> 对 ProXDR 静态照片，如果省略 `--output`，目标路径就是输入路径，并通过原子 publication 替换。源文件重要时请保留原始副本。
-
-## 批处理
+ProXDR 输出需要面向 OPPO 相册时，添加兼容选项：
 
 ```bash
-xdremux batch \
-  --input-dir photo_dump/ \
-  --recursive \
-  --output-dir converted/
+xdremux convert --input IMG_001.heic --output IMG_001_oppo.heic --oppo-compatible
 ```
 
-Batch 支持重复的文件/目录输入、有界 `--jobs`、确定性输出规划、逐项失败隔离、checkpoint/resume、基于 provenance 的安全复用、结构化 JSON receipt，以及可选的 `--categorize` publication。
+Motion Photo 转换拒绝 `--oppo-compatible`。PVT 封装和 Apple 编辑选项各有前置条件，见 [CLI 参考](docs/cli.md)。
 
-完整命令契约见 [`docs/cli.md`](docs/cli.md)。
-
-## 分类
+## 批量转换
 
 ```bash
-xdremux categorize \
-  --input photo_dump/ \
-  --output-dir categorized/
+xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
 ```
 
-通过验证的 Live Photo HEIC 和 MOV 会作为一个资产处理。使用 `--dry-run` 可以只查看规划而不写入文件。
+批处理先规划输出路径，再写入文件。`--jobs` 控制并发数，每个输入单独报告失败。使用 `--json` 获取结构化执行回执。
+
+Live Photo 检查点复用要求源文件和输出身份匹配，不会跳过任意已有输出。具体条件见[批处理参数与恢复](docs/cli.md#batch)。
+
+## 按类型整理资产
+
+```bash
+xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
+xdremux categorize --input photo_dump/ --output-dir categorized/
+```
+
+第一条命令只报告计划，不发布文件。第二条命令将资产复制到分类目录。通过验证的 Live Photo 照片和 MOV 作为同一资产处理。使用 `batch --categorize` 可直接把转换结果放入分类目录。
 
 ## 检查与验证
 
 ```bash
-xdremux inspect IMG_001.heic
 xdremux inspect IMG_001.heic --json
-
-xdremux validate output.heic
-xdremux validate output.heic --json
+xdremux validate IMG_001_hdr.heic --json
 ```
 
-`inspect` 报告从源文件解析出的事实；`validate` 会自动验证 ISO HDR HEIF 或 Live Photo 资源对。
+`inspect` 报告从源文件解析出的信息。普通 `validate` 检查支持的 HDR HEIF、Live Photo 文件对或 PVT 目录包。结构验证不能证明相册显示或交互编辑行为。
 
-## Apple 编辑能力
+## Apple 编辑功能
 
-摄影风格和 Apple 人像的策略、编排、数据模型和 CLI 由 Rust 持有。Swift adapter 只执行 Apple framework 操作，不是第二套转换后端。
+Rust 负责选择功能、准备资源、验证结果和发布输出。Swift 适配器只执行需要 Apple 框架的操作。
 
-在 macOS 上，`--apple-portrait` 请求完整语义资源集。`--apple-portrait-oppo` 使用 OPPO 深度和有效蒙版，不调用 Vision 或其私有分割 SPI。该模式的人像效果会降级，缺失蒙版保持缺失。它仍依赖公开的 ImageIO 和 Core Image API。用法见 [CLI 参考](docs/cli.md)。
+`--apple-portrait` 请求完整人像资源集。`--apple-portrait-oppo` 使用 OPPO 深度和已有有效蒙版，不调用 Vision 分割。后者的人像效果有所减少，仍需 macOS 上公开的 ImageIO 和 Core Image API。
 
-当前支持和验收边界见 [`docs/apple-features.md`](docs/apple-features.md)。
+`--apple-styles` 在受支持的 macOS 环境生成摄影风格和推理得到的纹理风格。`--apple-cinematic` 为普通视频生成待处理元数据。电影效果达到待处理状态，不保证 Photos 能处理所有输入。
 
-## 架构
+源数据要求和验证边界见 [Apple 功能](docs/apple-features.md)与[电影效果约定](docs/cinematic.md)。
 
-```text
-xdremux-cli
-    ↓
-xdremux-runtime
-    ↓
-xdremux-engine
-    ↓
-source / classification
-motion-photo / hdr / metadata
-container / heif / codec / format
-    ↓
-portable providers + platform adapters
-```
+## 代码与文档
 
-新的产品行为进入这套 Rust 产品栈。迁移期实现和研究工具不定义公开 CLI 契约。
+CLI 调用 Rust runtime。runtime 通过媒体 crate 和平台适配器执行 engine 生成的计划。产品策略保留在 Rust 中，Python 工具用于研究和模型训练。
 
-## 文档
+| 文档 | 用途 |
+| --- | --- |
+| [CLI 参考](docs/cli.md) | 选项、默认值、输出安全和退出码。 |
+| [架构说明](docs/architecture.md) | 模块职责和媒体约定。 |
+| [开发文档](docs/development.md) | 构建、打包和贡献检查。 |
+| [测试政策](docs/quality/testing.md) | 各类修改所需的证据。 |
+| [文档索引](docs/README.md) | 研究工具、验证记录和其他指南。 |
 
-- [CLI 参考](docs/cli.md) — 命令、默认行为、退出状态和 batch 可靠性
-- [Apple 功能](docs/apple-features.md) — 摄影风格和人像的迁移边界
-- [支持设备](docs/supported-devices.md) — 输入兼容性证据
-- [开发文档](docs/development.md) — 架构、所有权和构建/测试流程
-- [测试政策](docs/quality/testing.md) — 必需验证证据
-- [文档索引](docs/README.md) — 其他技术文档
-
-`fixtures/` 下版本化保存的真实媒体 corpus 用于 ProXDR 和 Motion Photo 的严格真实文件 gate。
+`fixtures/` 中纳入版本控制的媒体用于真实文件测试。样本身份和来源记录属于测试约定的一部分。

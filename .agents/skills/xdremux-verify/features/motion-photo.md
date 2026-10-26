@@ -1,24 +1,30 @@
 # Motion Photo conversion
 
-Convert a versioned Samsung HEIF Motion Photo into a new HEIC/MOV Live Photo pair and an optional PVT directory, then validate their media through the public CLI. This path avoids re-encoding a large JPEG fixture.
+Convert a versioned Samsung HEIF Motion Photo into a new HEIC/MOV Live Photo pair. You can also select a PVT directory. Validate the resulting media through the public CLI. This path avoids re-encoding a large JPEG fixture.
 
-## Sub-features
+## Select the affected behavior
 
-- Inspect the source's Motion Photo recognition and source timing.
-- Publish both members at a fresh shared basename.
+- Inspect Motion Photo recognition and source timing.
+- Publish both pair members at a new shared basename.
 - Validate the still and movie through separate public invocations.
 - Preserve the original fixture and retain proof after scratch cleanup.
-- Select optional PVT output, validate its directory/plist and members, unwrap byte-identical media, and reject a duplicate destination without changing it.
+- For PVT output, validate the directory, plist, and members. Unwrap byte-identical media. Reject a duplicate destination and preserve its existing contents.
 
-## How to get to it (user POV)
+## Use the public entry points
 
-Run `xdremux convert --input <source.heic> --output <new.heic>`, then `xdremux validate <new.heic> --json` and `xdremux validate <new.mov> --json`. Select `--live-photo-output pvt --output <new.pvt>` for a package and validate that directory. Batch is a separate entry point described in the feature index.
+Run `xdremux convert --input <source.heic> --output <new.heic>`.
 
-## Driving it with the Rust CLI
+Then run `xdremux validate <new.heic> --json` and `xdremux validate <new.mov> --json` separately.
 
-Preconditions: run from the repository root, set `XDREMUX_VERIFY_CLI` to an executable CLI, and keep the public fixture/manifest unchanged. The recipe deliberately labels an existing binary as unbound to the current source. A new build and completion receipt remain separate evidence.
+For a package, select `--live-photo-output pvt --output <new.pvt>` and validate the output directory. Batch is a separate entry point in the feature index.
 
-Run this standard-library recipe. It writes only two new temporary directories, captures commands and hashes, removes its own output directory, and retains proof on success or failure.
+## Run the portable recipe
+
+Before starting, use the repository root as the current directory. Set `XDREMUX_VERIFY_CLI` to an executable CLI. Keep the public fixture and manifest unchanged.
+
+The recipe labels an existing binary as unbound to the current source. A new build and a completion receipt provide separate evidence.
+
+Run the standard-library recipe below. It creates two temporary directories and records commands and hashes. It removes its own output directory and retains proof on success or failure.
 
 ```python
 import hashlib
@@ -140,12 +146,20 @@ finally:
     print(f"Retained proof: {proof}")
 ```
 
-## Gotchas
+### Interpret the portable result
 
-This recipe proves the exercised binary's portable conversion and structural pair validation. It does not decode the pair in Apple frameworks, import it into Photos, prove all source codecs, test interrupted publication, or establish final-HEAD acceptance. For broader Motion Photo changes, use the existing `scripts/validation/check_rust_motion_photo_real_fixtures.sh` and the owning negative tests. Do not weaken a failed journey for a missing encoder or dependency.
+The recipe proves portable conversion and structural pair validation for the exercised binary. It does not establish these results:
 
-For direct PVT package admission, use an arm64 macOS host with the required
-Xcode SDK and iOS simulator runtime. From a clean committed checkout, run:
+- Apple framework decoding or Photos import.
+- Support for every source codec.
+- Safe publication after interruption.
+- Acceptance of the final committed HEAD.
+
+For broader Motion Photo changes, use `scripts/validation/check_rust_motion_photo_real_fixtures.sh` and the owning negative tests. If an encoder or dependency is missing, retain the failed journey result. Do not weaken the check.
+
+## Check native PVT admission
+
+Use an arm64 macOS host with the required Xcode SDK. For the CI baseline, the installed iOS 27.0 runtime must support iPhone 11. From a clean, committed checkout, run:
 
 ```bash
 pvt_repo="$(git rev-parse --show-toplevel)"
@@ -156,44 +170,55 @@ python3 scripts/apple/pvt_native_import/readiness_control.py \
   --expected-head "$pvt_head" \
   --output-root "$pvt_proof/control" \
   --product-output-root "$pvt_proof/product" \
+  --required-runtime com.apple.CoreSimulator.SimRuntime.iOS-27-0 \
+  --required-device-type com.apple.CoreSimulator.SimDeviceType.iPhone-11 \
   --execute-owned-simulator
 ```
 
-The `pvt-native-import` job in `research.yml` runs this same control and product
-sequence against one exact PR or main checkout. The receipt records the full
-source SHA, source tree, product owner trees and probe-file hashes. Both output
-roots must be outside the checkout; the product root must not already exist.
+The `pvt-native-import` job in `research.yml` runs this control and product sequence against one exact PR or main checkout. The receipt records the full source SHA, source tree, product owner trees, and probe-file hashes.
 
-The selector intersects runtime-supported device identifiers with version-compatible
-iPhones. The readiness control independently checks membership before creating
-its own simulator. It boots that simulator, reads the installed-app inventory
-once, and verifies deletion in both the device registry and host directory.
-Only a passed and cleaned control permits one product probe. The product receipt
-must match the same SHA, runtime and device type. The control can warm
-CoreSimulator; it does not prove a cold-start repair or Photos admission.
+The CI job requires this exact runtime and device pair. A missing or incompatible pair blocks simulator creation. For a separate catalog-selected experiment, omit both pin options. Supplying only one is a usage error.
 
-The product probe builds the current CLI, generates synthetic media, compiles the
-SDK canary and reader, then uses its own simulator. It verifies installed app
-identity and establishes a read-only PhotoKit baseline before offering the whole
-validated PVT directory through system sharing. Admission requires the system
-callback, phase-bound whole-package input hashes, and independent PhotoKit
-asset, resource, identifier, cover-time and exported-byte readback. A callback,
-decomposed-member import or PhotoKit pair creation cannot substitute for these
-checks. Runtime, build, inventory, install, permission, save-action, readback and
-cleanup failures remain non-PASS under the probe's existing process budgets.
+Keep both output roots outside the checkout. The product output root must not exist before the run.
 
-The receipts keep preparation, readiness, XCTest setup/body, each share
-representation, the save callback and independent PhotoKit readback as separate
-observations bound to the source SHA and run session. New native events record
-monotonic elapsed time in their named process clock. An outer timeout preserves
-the last observed boundary and missing stages; it does not establish a hang,
-unsupported representation or Photos rejection. Archived text logs retain their
-missing clock boundaries. Cleanup records command outcomes and independent
-registry/directory absence separately. Both must pass for accepted cleanup;
-later absence observations link the original receipt hash and preserve its status.
+### Require a passed readiness control
 
-Retain the control and product `result.json` receipts and their diagnostics.
-Only the workflow's listed text diagnostics leave the runner; generated media
-and UI result bundles stay local. This checks the iOS simulator sharing path.
-It does not establish macOS Photos library behavior, physical-device Photos
-editing or dynamic wallpaper eligibility.
+The selector checks explicit runtime support and the device type's runtime version bounds. Before creating its simulator, the readiness control independently verifies membership in the supported list. With both pin options, it validates only that pair and selects no replacement.
+
+The control starts and monitors its simulator with `simctl bootstatus OWNED_UDID -b`. Both control and product require exit code `0` and a recognized `Finished` terminal record for the owned device. Migration failure, an already-booted shortcut, or unknown output blocks further work.
+
+After successful boot monitoring, the control reads the installed-app inventory once. It then checks deletion in both the device registry and the host directory. Only a passed and cleaned control permits one product probe.
+
+The control passes its exact pair through `--required-runtime` and `--required-device-type`. The product validates that pair against fresh catalogs without selecting a replacement. After build and preparation, it checks the same pair again immediately before creation. A changed or incompatible pair blocks creation.
+
+The product receipt must match the control's source SHA, runtime, and device type. The control can warm CoreSimulator. It does not establish a cold-start repair or Photos admission.
+
+### Require whole-package admission and readback
+
+The product probe builds the current CLI and generates synthetic media. It compiles the SDK canary and reader, then uses its own simulator.
+
+The probe verifies installed app identity and establishes a read-only PhotoKit baseline. It then offers the whole validated PVT directory through system sharing.
+
+Admission requires all these observations:
+
+- The system callback.
+- Whole-package input hashes bound to the share phase.
+- Independent PhotoKit readback of the asset, resources, identifiers, cover time, and exported bytes.
+
+A callback alone cannot replace these checks. Neither decomposed-member import nor PhotoKit pair creation can replace them.
+
+Use the probe's existing process budgets. Runtime, build, inventory, install, permission, save-action, readback, and cleanup failures remain non-PASS.
+
+### Preserve stages, clocks, and cleanup evidence
+
+The receipts keep preparation, readiness, XCTest setup and body, each share representation, the save callback, and independent PhotoKit readback as separate observations. Each observation is bound to the source SHA and run session.
+
+New native events record monotonic elapsed time in their named process clock. An outer timeout preserves the last observed boundary and the missing stages. It does not establish a hang, an unsupported representation, or Photos rejection. Archived text logs retain their missing clock boundaries.
+
+Cleanup records command outcomes separately from independent registry and directory absence. Both must pass for cleanup to be accepted. If absence is observed later, link the original receipt hash and preserve its status.
+
+### Retain the native evidence
+
+Keep the control and product `result.json` receipts and their diagnostics. Only the workflow's listed text diagnostics leave the runner. Generated media and UI result bundles stay local.
+
+This check covers the iOS simulator sharing path. It does not establish macOS Photos library behavior, physical-device Photos editing, or dynamic wallpaper eligibility.

@@ -2,143 +2,124 @@
 
 English | [简体中文](README.md)
 
-XDRemux converts supported vendor HDR photos to ISO/TS 21496-1 HDR HEIC and supported Android Motion Photos to Apple Live Photo.
+XDRemux converts supported vendor ProXDR photos to ISO/TS 21496-1 HDR HEIC. It also converts supported Android Motion Photos to Apple Live Photo pairs.
 
-There is one product entry point: the Rust `xdremux` CLI. Input type, source generation, HDR/Gain Map structure, and Motion Photo routing are detected automatically.
+The Rust `xdremux` CLI detects source type, HDR structure, and conversion routing. The macOS app uses the same product implementation. Source compatibility depends on the actual file structure and available resources, not only the device name.
 
-The complete Mac product targets Apple silicon (`arm64`) and macOS 27. The Rust core retains Linux, Windows, and macOS builds and portable tests. Those core checks do not establish the complete Apple feature set on each platform.
+## Supported tasks
 
-## What it does
-
-| Input / intent | Result |
+| Task | Result or command |
 | --- | --- |
-| ProXDR photo | ISO/TS 21496-1 HDR HEIC |
-| Supported Motion Photo | Apple Live Photo HEIC + MOV (default) |
-| `--live-photo-output pvt` | Optional real PVT directory containing the validated pair |
-| `--oppo-compatible` | ProXDR output intended for OPPO Gallery |
-| `categorize` / `batch --categorize` | Asset-type and capture-mode folders |
-| `inspect` / `validate` | Source inspection and independent output validation |
+| Convert a ProXDR still | HDR HEIC with an ISO Gain Map. |
+| Convert a supported Motion Photo | A matched HEIC and MOV Live Photo pair. |
+| Package a Live Photo | `--live-photo-output pvt` creates a directory with the validated pair and metadata. |
+| Request OPPO Gallery compatibility | `--oppo-compatible` applies to ProXDR stills. |
+| Add Apple editing resources | Portrait, Photographic Styles, and Texture Styles require the documented source and macOS capabilities. |
+| Add pending Cinematic metadata | Experimental `--apple-cinematic` prepares ordinary video for a separate native processing step. |
+| Convert a collection | `batch` plans outputs and reports each result. |
+| Sort assets | `categorize` or `batch --categorize` uses asset type and capture mode. |
+| Examine files | `inspect` reports source facts. `validate` checks supported outputs. |
 
-The normal path has no device-generation, codec, Gain Map layout, camera-tail, or routing switches. Those are implementation decisions derived from the source and requested result.
+The complete Mac product targets Apple silicon (`arm64`) and macOS 27. The Rust core also has Linux, Windows, and macOS builds and portable tests. A portable build does not establish Apple framework support or Photos editing behavior.
 
-## Build
+See [supported devices and source evidence](docs/supported-devices.en.md) and [Apple feature requirements](docs/apple-features.en.md) before selecting an editing feature.
 
-A current Rust toolchain and a libheif installation with HEVC support are required for the portable conversion stack.
-The commands below build that Rust core. The Mac product package also includes the Apple adapter and uses Xcode 27 with a macOS 27 deployment target. See [development](docs/development.en.md) for packaging and the separate native acceptance gates.
+## Build the Rust CLI
+
+Install a current Rust toolchain and libheif with HEVC support for portable conversion. The complete Mac package also requires the Apple adapter. Its build uses Xcode 27 and a macOS 27 deployment target.
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git
 cd XDRemux
-cargo build --release -p xdremux-cli
+cargo build --locked --release -p xdremux-cli
 ./target/release/xdremux --help
 ```
 
-For development you can run the binary directly through Cargo:
+The following examples assume that `xdremux` is on `PATH`. For a source build, substitute `./target/release/xdremux` for `xdremux`.
+
+For development, invoke the CLI through Cargo:
 
 ```bash
-cargo run -p xdremux-cli -- --help
+cargo run --locked -p xdremux-cli -- --help
 ```
 
-## Convert
+For the app, adapter, and relocatable package, use the [development guide](docs/development.en.md).
 
-Standard ProXDR conversion:
+## Convert one photo
+
+> [!CAUTION]
+> For a ProXDR still, omitting `--output` replaces the input after conversion succeeds. Specify a separate output to retain the original file.
+
+Convert a supported ProXDR still:
 
 ```bash
-xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_hdr.heic
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
 
-Supported Motion Photos use the same command and are detected automatically:
+Convert a supported Motion Photo:
 
 ```bash
 xdremux convert --input IMG_001.jpg
 ```
 
-A Motion Photo produces a matching HEIC + MOV Live Photo pair. The source Motion Photo is not modified.
+Motion Photo conversion creates a matched HEIC and MOV pair and keeps the source unchanged. Without `--output`, the command chooses names that do not collide with existing pair members.
 
-For OPPO Gallery oriented ProXDR output:
-
-```bash
-xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_oppo.heic \
-  --oppo-compatible
-```
-
-`--oppo-compatible` applies to ProXDR still images, not Motion Photo conversion.
-
-> [!IMPORTANT]
-> For a ProXDR still image, omitting `--output` targets the input path and publishes the replacement atomically. Keep an original copy when the source file matters.
-
-## Batch
+For a ProXDR still intended for OPPO Gallery, add the compatibility option:
 
 ```bash
-xdremux batch \
-  --input-dir photo_dump/ \
-  --recursive \
-  --output-dir converted/
+xdremux convert --input IMG_001.heic --output IMG_001_oppo.heic --oppo-compatible
 ```
 
-Batch supports repeated files/directories, bounded `--jobs`, deterministic output planning, per-item failure isolation, checkpoint/resume, provenance-checked reuse, structured JSON receipts, and optional `--categorize` publication.
+Motion Photo conversion rejects `--oppo-compatible`. PVT output and Apple editing options have separate requirements in the [CLI reference](docs/cli.en.md).
 
-See [`docs/cli.en.md`](docs/cli.en.md) for the complete command contract.
-
-## Categorize
+## Convert a batch
 
 ```bash
-xdremux categorize \
-  --input photo_dump/ \
-  --output-dir categorized/
+xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
 ```
 
-A validated Live Photo HEIC and MOV are treated as one asset. Use `--dry-run` to inspect the plan without publishing files.
+Batch plans output paths before it writes files. It limits concurrency with `--jobs` and reports failures per item. Use `--json` for a structured receipt.
+
+Live Photo checkpoint reuse requires matching source and output identity. It does not mean that every existing output can be skipped. See [batch options and recovery](docs/cli.en.md#batch).
+
+## Categorize assets
+
+```bash
+xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
+xdremux categorize --input photo_dump/ --output-dir categorized/
+```
+
+The first command reports the plan without publishing files. The second copies assets into classification folders. A validated Live Photo still and MOV remain one asset. Use `batch --categorize` to place converted results in those folders.
 
 ## Inspect and validate
 
 ```bash
-xdremux inspect IMG_001.heic
 xdremux inspect IMG_001.heic --json
-
-xdremux validate output.heic
-xdremux validate output.heic --json
+xdremux validate IMG_001_hdr.heic --json
 ```
 
-`inspect` reports parsed source facts. `validate` automatically checks ISO HDR HEIF or a Live Photo pair.
+`inspect` reports parsed source facts. Plain `validate` checks supported HDR HEIF, a Live Photo pair, or a PVT package. Structural validation does not establish gallery display or interactive editing.
 
 ## Apple editing features
 
-Rust owns Photographic Styles and Apple Portrait policy, orchestration, data models, and the CLI. A narrow Swift adapter executes Apple framework operations. It is not a second conversion backend.
+Rust selects the feature, prepares resources, validates results, and publishes output. The Swift adapter performs operations that require Apple frameworks.
 
-On macOS, `--apple-portrait` requests the complete semantic resource set. `--apple-portrait-oppo` uses OPPO depth and available masks without Vision or its private segmentation SPI. This mode has reduced portrait effects. Missing masks remain absent. It still requires public ImageIO and Core Image APIs. See the [CLI reference](docs/cli.en.md) for usage.
+`--apple-portrait` requests the complete portrait resource set. `--apple-portrait-oppo` uses OPPO depth and available masks without Vision segmentation. The latter has reduced effects and still requires public ImageIO and Core Image APIs on macOS.
 
-See [`docs/apple-features.en.md`](docs/apple-features.en.md) for the current support and acceptance boundary.
+`--apple-styles` generates Photographic Styles and inferred Texture Styles on the supported macOS host. `--apple-cinematic` generates pending metadata for ordinary video. A pending Cinematic state does not guarantee that Photos can process every input.
 
-## Architecture
+Use the [Apple feature guide](docs/apple-features.en.md) and [Cinematic contract](docs/cinematic.en.md) for source requirements and validation limits.
 
-```text
-xdremux-cli
-    ↓
-xdremux-runtime
-    ↓
-xdremux-engine
-    ↓
-source / classification
-motion-photo / hdr / metadata
-container / heif / codec / format
-    ↓
-portable providers + platform adapters
-```
+## Code and documentation
 
-New product behavior belongs in this Rust stack. Migration or research implementations do not define the public CLI contract.
+The CLI calls the Rust runtime. The runtime executes plans from the engine through media crates and platform adapters. Product policy stays in Rust. Python tools support research and model training.
 
-## Documentation
+| Document | Use it for |
+| --- | --- |
+| [CLI reference](docs/cli.en.md) | Options, defaults, output safety, and exit codes. |
+| [Architecture](docs/architecture.en.md) | Module responsibilities and media contracts. |
+| [Development](docs/development.en.md) | Builds, packaging, and contributor checks. |
+| [Testing policy](docs/quality/testing.en.md) | Evidence required for each type of change. |
+| [Documentation index](docs/README.en.md) | Research tools, validation records, and other guides. |
 
-- [CLI reference](docs/cli.en.md) — commands, defaults, exit status, and batch reliability
-- [Apple features](docs/apple-features.en.md) — Photographic Styles and Portrait migration boundary
-- [Supported devices](docs/supported-devices.en.md) — source compatibility evidence
-- [Development](docs/development.en.md) — architecture, ownership, and build/test workflow
-- [Testing policy](docs/quality/testing.en.md) — required validation evidence
-- [Documentation index](docs/README.en.md) — additional technical documentation
-
-The versioned media corpus under `fixtures/` is used by strict real-file gates for ProXDR and Motion Photo behavior.
+The versioned media in `fixtures/` supports real-file tests. Fixture identity and provenance remain part of the test contract.

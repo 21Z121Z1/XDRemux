@@ -1,3 +1,5 @@
+> **Historical Swift-path evidence.** The implementation names, Vision trajectory gate, and branch-local claims below belong to the recorded implementation. The current Rust path derives its presentation geometry from OPPO metadata; this record does not establish a current Vision analysis path. The original observations remain unchanged. Read the [English summary](vendor-live-photo-geometry.summary.en.md), [中文摘要](vendor-live-photo-geometry.summary.md), and [current LibLivePhoto integration](../liblivephoto-integration.en.md).
+
 # Vendor Live Photo Geometry: ColorOS 16 and Samsung
 
 This document records the evidence boundary for XDRemux's metadata-only Live Photo geometry work.
