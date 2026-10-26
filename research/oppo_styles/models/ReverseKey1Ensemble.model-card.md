@@ -2,65 +2,65 @@
 
 [English](ReverseKey1Ensemble.model-card.en.md) | 简体中文
 
-`ReverseKey1Ensemble` 是摄影风格 Reverse Key 1 链路的可选研究模型。
+`ReverseKey1Ensemble` 根据风格化图像和无风格参考图预测摄影风格 Key 1 资源。它是保留的 Core ML 研究模型，Rust CLI 不加载这个模型包，也不将它用作默认 `constrained-solver`。
 
-它不是默认 style-data producer。
-
-## 启用方式
-
-调用方必须通过当前摄影风格链路使用的研究配置显式提供模型路径。
-
-不要把这个模型描述为默认 `constrained-solver`。
-
-## 模型契约
+## 模型接口
 
 | 项目 | 值 |
 | --- | --- |
 | 格式 | Core ML `mlprogram` |
 | 权重精度 | FP16 |
-| 输入名 | `features` |
-| 输入形状 | `1 × 12 × 256 × 256` |
-| 输出名 | `key1` |
-| 输出形状 | `1 × 34560` |
-| 实际序列化 lattice | `12 × 9 × 8 × 10 × 3` |
-| 序列化 Key 1 大小 | 51,840 bytes Float16 数据 |
-| Core ML compute units | `.all` |
+| 输入 | `features`，形状为 `1 × 12 × 256 × 256` |
+| 输出 | `key1`，形状为 `1 × 34560` |
+| 含填充的输出网格 | `12 × 12 × 8 × 10 × 3` |
+| 实际序列化网格 | 横向为 `12 × 9 × 8 × 10 × 3`，纵向为 `9 × 12 × 8 × 10 × 3` |
+| 序列化 Key 1 | 25,920 个 Float16 数值，共 51,840 字节 |
+| 保留模型的候选混合权重 | `0.625` |
 
-runtime 根据 styled、unstyled 图像数据及其差值构建 feature channel。
+[特征构造器](../../../xdremux_py/apple_reverse_key1_training.py)组合风格化 RGB、无风格 RGB、两者的 RGB 差值及 YCbCr 差值。集成模型组合小型、按设备配置条件化的基线模型和较大的多尺度候选模型。
 
-ensemble 组合小型 profile-conditioned baseline 和更大的 multiscale candidate。当前 candidate blend weight 是 `0.625`。
+输出张量包含填充区域。[Core ML 预测脚本](../tools/predict_reverse_key1_coreml.py)在序列化前，根据图像显示方向选择有效网格。
 
-`.all` 允许 Core ML 选择可用 compute unit，但不能证明某次推理实际运行在 Neural Engine。
+## 运行研究预测器
 
-## 验证边界
+预测器需要 macOS、`coremltools` 和研究用 Python 依赖。输入必须同时包含风格化图像及其无风格参考图。脚本请求 `ComputeUnit.ALL`，允许 Core ML 选择计算单元，但不能证明实际使用了 Neural Engine。
 
-该模型作为研究 fast path，在有限 OPPO 样本和 style-response 对比上进行过评估。
+两个输出文件都应使用新路径。这个诊断脚本直接写入 Key 1 数据和 JSON 报告，可能覆盖已有文件。
 
-这些结果不能证明：
+从仓库根目录运行：
 
-- 对 Apple 私有 producer 的 bit-exact 复现；
-- 在未见设备、镜头或拍摄模式上具有相同质量；
-- 完成 Apple Photos 导入、编辑、保存、重新打开全流程；
-- 每次推理都运行在 Neural Engine。
+```bash
+python -m research.oppo_styles.tools.predict_reverse_key1_coreml \
+  --model research/oppo_styles/models/ReverseKey1Ensemble.mlpackage \
+  --styled /data/styled.png \
+  --unstyled /data/unstyled.png \
+  --output /data/key1.bin \
+  --report /data/key1-report.json
+```
 
-研究模型或 proxy path 失败时，当前研究 envelope 可以回退，因此可选模型不是强制产品依赖。
+结果是 Key 1 数据和诊断报告，不是转换后的 HEIC。`--reference-key1` 可增加与指定参考数据的数值比较。推理失败时，该脚本不提供产品级回退。
 
-## 文件身份
+## 模型包身份
 
-模型 package 包含：
+以下哈希标识保留模型包的字节内容：
 
-- `Manifest.json`；
-- `Data/com.apple.CoreML/model.mlmodel`；
-- `Data/com.apple.CoreML/weights/weight.bin`。
+| 模型包文件 | SHA-256 |
+| --- | --- |
+| `Manifest.json` | `8be470b08161e63d533dc28d9bb500226961adf0db2c1b4cd0c4e9d3b36ea6ef` |
+| `Data/com.apple.CoreML/model.mlmodel` | `2759cc216f91ebe5fd5e1e5c3ba55c4d714080435a7b21f91efac0894ecd6a2a` |
+| `Data/com.apple.CoreML/weights/weight.bin` | `88bb5c96b5a1e18a818267bed9cc7c0a0a998196ddc073c9c85b1f2507697f2c` |
 
-实验需要准确模型身份时，使用对应仓库或 release 的 hash。模型 package 变化后，不要把旧 hash 复制到新模型卡。
+模型变化后，记录新哈希并单独评估新模型包。不能将这些身份信息复制给替换后的文件。
 
-## 训练和导出
+## 证据边界
 
-仓库的 `research/oppo_styles/tools/` 下包含模型导出和评估脚本。
+历史研究在有限 OPPO 图像和风格响应对比中评估过该模型。这些观察不能证明：
 
-除非独立 artifact 明确发布，否则训练数据和 checkpoint 不属于公开模型 package。
+- 逐字节复现 Apple 私有生成器；
+- 在未见过的设备、镜头或拍摄模式上保持相同精度；
+- 完成 Apple Photos 导入、编辑、保存和重新打开的全过程；
+- 每次预测都使用 Neural Engine。
 
-研究模型的修改不能改变文档中的默认摄影风格 producer，除非 CLI 默认值和 production test 在同一 revision 中一起改变。
+除非另有产物明确发布，公开模型包不包含训练数据和检查点。导出与评估脚本位于 [tools](../tools/)。这些脚本的存在不代表 Rust CLI 提供模型选择选项。
 
-当前产品边界见 [Apple 功能文档](../../../docs/apple-features.md)。
+接入产品时，必须同时修改主实现、默认行为文档和产品测试。当前产品边界见 [Apple 功能文档](../../../docs/apple-features.md)。

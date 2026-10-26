@@ -5,11 +5,15 @@ description: Verify XDRemux through its real Rust CLI, fixture conversion, outpu
 
 # Verify XDRemux
 
-Read [AGENTS.md](../../../AGENTS.md), [testing policy](../../../docs/quality/testing.en.md), the [validation runbook](../../../docs/validation/README.en.md), the relevant [CLI contract](../../../docs/cli.en.md), and [Apple feature limits](../../../docs/apple-features.en.md). Use the [feature index](features/README.md) to select the affected entry points. The existing scripts, CI, and completion gate remain the verification owners. Do not create another runner, result ledger, installer, or test framework.
+Verify the affected behavior through the actual product entry point. Keep portable, native, device, and exact-HEAD evidence separate.
 
-## Launch
+Read [AGENTS.md](../../../AGENTS.md), [testing policy](../../../docs/quality/testing.en.md), and the [validation runbook](../../../docs/validation/README.en.md). Check the relevant [CLI contract](../../../docs/cli.en.md) and [Apple feature limits](../../../docs/apple-features.en.md). Use the [feature index](features/README.md) to select the affected entry points.
 
-The primary product is a short-lived Rust CLI. From the repository root, use the existing documented build:
+The existing scripts, CI, and completion gate own verification. Do not create another runner, result ledger, installer, or test framework.
+
+## Build or identify the CLI
+
+The primary product is a Rust CLI that exits after each command. From the repository root, use the documented build:
 
 ```bash
 export CARGO_TARGET_DIR="$PWD/target"
@@ -17,34 +21,50 @@ cargo build --locked -p xdremux-cli
 export XDREMUX_VERIFY_CLI="$CARGO_TARGET_DIR/debug/xdremux"
 ```
 
-Use a separate Cargo target for each worktree; the launch command overrides an inherited shared target. Completion plans that set a custom target must bind every Cargo check and CLI path to that worktree's own directory. Use the session's already configured Rust/libheif environment. Do not install or upgrade dependencies without existing task authority. If the user or lead supplies an existing binary, set `XDREMUX_VERIFY_CLI` to its absolute path and record its hash and unverified build binding. That binary can prove the exercised behavior of those bytes; it cannot prove that the latest source or final committed HEAD produced them.
+Use a separate Cargo target for each worktree. The launch command overrides an inherited shared target. If a completion plan uses a custom target, bind every Cargo check and CLI path to that worktree's target directory.
 
-No server or interactive session must remain running. Give each run its own temporary output directory. Never reuse the input path for a verification conversion, even when ordinary ProXDR supports intentional in-place conversion. Do not drive a shared app/helper instance that the run does not own.
+Use the session's configured Rust/libheif environment. Do not install or upgrade dependencies without existing task authority.
 
-## Doctor
+If the user or lead supplies an existing binary, set `XDREMUX_VERIFY_CLI` to its absolute path. Record the binary hash and state that its build binding is unverified. That binary can prove the behavior of the exercised bytes. It cannot prove that the latest source or final committed HEAD produced them.
 
-Run `"$XDREMUX_VERIFY_CLI" --help` and `"$XDREMUX_VERIFY_CLI" inspect fixtures/motion-photo/samsung/heif-ultrahdr-01.heic --json`. Require successful exit, the documented commands, and a Motion Photo inspection. Check fixture bytes against `fixtures/SHA256SUMS`. Capture binary hash, source HEAD/dirty state, actual commands, stdout, stderr, and exit codes. A failed doctor is a failed prerequisite; repair or report the actual issue before driving a feature.
+Give each run its own temporary output directory. Never use the input path as the conversion output during verification. This restriction also applies when ordinary ProXDR supports intentional in-place conversion. Do not operate a shared app or helper instance that the run does not own. No server or interactive session needs to remain running.
 
-On macOS, read the feature's host requirement and use `bash scripts/apple/check_apple_adapter_handshake.sh` before relying on the adapter. Record `sw_vers`, architecture, SDK/Xcode, and helper identity. A successful generic handshake does not establish availability of every private feature API.
+## Check the prerequisites
 
-## Drive
+1. Run `"$XDREMUX_VERIFY_CLI" --help`. Require a successful exit and the documented commands.
+2. Run `"$XDREMUX_VERIFY_CLI" inspect fixtures/motion-photo/samsung/heif-ultrahdr-01.heic --json`. Require a successful exit and Motion Photo recognition.
+3. Check the fixture bytes against `fixtures/SHA256SUMS`.
+4. Capture the binary hash, source HEAD, dirty state, actual commands, stdout, stderr, and exit codes.
+5. If a prerequisite fails, repair or report the actual issue before exercising a feature.
 
-Start with the real Samsung HEIF [Motion Photo recipe](features/motion-photo.md) for a cheap conversion plus independent validation of both pair members. Read [inspect and validate](features/inspect-validate.md), [batch and categorize](features/batch-categorize.md), or [HDR and Apple editing](features/hdr-apple.md) when the change reaches those paths. Run the smallest complete evidence set, not every recipe for every change.
+On macOS, read the feature's host requirements. Before relying on the adapter, run `bash scripts/apple/check_apple_adapter_handshake.sh`. Record `sw_vers`, architecture, SDK/Xcode, and helper identity. A successful generic handshake does not establish that every private feature API is available.
 
-## Evidence
+## Exercise the affected feature
 
-Capture the action and resulting files/state, not just a final success line. Retain fixture identity, source preservation, output hashes, validation results, command statuses, and build-binding limits. The Motion Photo recipe writes its proof directory outside its disposable output directory and prints that proof path.
+Start with the real Samsung HEIF [Motion Photo recipe](features/motion-photo.md). It provides a cheap conversion and independent validation of both pair members.
 
-A parser, a portable codec, a helper mock, a native framework, and a device UI prove different things. Media/file/helper/native/final-byte values remain validation boundaries. Missing required resources, capability, or validation must fail before publication. For changed error or publication behavior, also run the owning negative regression and observe that existing bytes or both pair members remain safe.
+If the change affects another path, read its recipe: [inspect and validate](features/inspect-validate.md), [batch and categorize](features/batch-categorize.md), or [HDR and Apple editing](features/hdr-apple.md). Run the smallest complete evidence set. Do not run every recipe for every change.
 
-When committed-HEAD evidence is required, use `scripts/ci/agent_completion_gate.py run --base <actual-base> --plan <reviewed-plan>` and its `verify` command as documented in the runbook. The plan must reflect the actual changed paths and every required check. A dirty tree or later source change prevents a final exact-HEAD claim. This skill does not authorize commits, pushes, workflow dispatch, or external publication.
+## Retain evidence
 
-## Cleanup
+Capture the action and the resulting files or state. A final success line alone is insufficient. Retain fixture identity, source preservation, output hashes, validation results, command statuses, and build-binding limits. The Motion Photo recipe stores proof outside its disposable output directory. It prints the retained proof path.
 
-Remove only the output directories and processes this run created. Never kill by process name. Retain proof logs and manifests outside scratch state and confirm they still exist after cleanup. The Motion Photo recipe handles its own cleanup even after failure. Other native scripts may retain fixture outputs as evidence; inspect their cleanup contract before removing anything.
+Parsers, portable codecs, helper mocks, native frameworks, and device interfaces establish different evidence. Media, files, helper results, native facts, and final bytes remain validation boundaries. If required resources, capability, or validation are missing, fail before publication.
 
-## Helpers and maintenance
+If error or publication behavior changes, run the owning negative regression. Observe that existing bytes or both pair members remain safe.
 
-This skill ships no executable helper. Use the existing repository commands named in the feature map. Keep the map as navigation to current owners, not a copied acceptance definition. When a command or interface changes, update its recipe after exercising that path. Record a missing native/device environment as a gap rather than weakening a journey. Do not schedule future upkeep unless requested.
+If committed-HEAD evidence is required, follow the runbook. Use `scripts/ci/agent_completion_gate.py run --base <actual-base> --plan <reviewed-plan>` and its `verify` command. The plan must cover the actual changed paths and all required checks. A dirty tree or later source change prevents a final exact-HEAD claim. This skill does not authorize commits, pushes, workflow dispatch, or external publication.
+
+## Clean up owned state
+
+Remove only output directories and processes created by this run. Never kill processes by name.
+
+Keep proof logs and manifests outside the disposable scratch state. After cleanup, confirm that they still exist. The Motion Photo recipe cleans its output directory even after failure. Other native scripts can retain fixture outputs as evidence. Before removing those outputs, read the script's cleanup contract.
+
+## Maintain the feature map
+
+This skill contains no executable helper. Use the existing repository commands named in the feature map. Keep the map as navigation to current owners. Do not copy their acceptance definitions into a second owner.
+
+If a command or interface changes, exercise the affected path before updating its recipe. Record an unavailable native or device environment as a verification gap. Do not weaken the required journey to remove that gap. Do not schedule future upkeep unless requested.
 
 Adapted using pstack `create-verification-skill` at `a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4`. See [sources.json](sources.json) and [LICENSE](LICENSE).

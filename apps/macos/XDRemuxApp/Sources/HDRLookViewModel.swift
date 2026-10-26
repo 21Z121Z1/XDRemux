@@ -1,25 +1,6 @@
 import Foundation
 import Observation
 
-struct HDRLookItem: Decodable, Identifiable, Sendable {
-    let input: String
-    let output: String
-    let status: String
-    let error: String?
-    var id: String { input }
-}
-
-struct HDRLookReceipt: Decodable, Sendable {
-    let outputDirectory: String
-    let results: [HDRLookItem]
-    let failures: Int
-
-    enum CodingKeys: String, CodingKey {
-        case outputDirectory = "output_dir"
-        case results, failures
-    }
-}
-
 @Observable
 @MainActor
 final class HDRLookViewModel {

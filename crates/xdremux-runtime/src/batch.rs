@@ -62,15 +62,22 @@ impl Default for BatchExecutionOptions {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum CinematicFocalLength {
+    Automatic,
+    Assumed(f32),
+    CameraEstimate(PathBuf),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct CinematicEnvelopeOptions {
-    pub focal_length_35mm: f32,
+    pub focal_length: CinematicFocalLength,
     pub aperture: f32,
 }
 impl Default for CinematicEnvelopeOptions {
     fn default() -> Self {
         Self {
-            focal_length_35mm: 24.0,
+            focal_length: CinematicFocalLength::Automatic,
             aperture: 2.8,
         }
     }
@@ -420,7 +427,6 @@ enum OrderedBatchOutcome {
     Failure(BatchFailure),
 }
 
-#[derive(Clone, Copy)]
 struct BatchAppleOptions {
     portrait_profile: ApplePortraitSemanticProfile,
     cinematic: CinematicEnvelopeOptions,
@@ -433,10 +439,10 @@ fn process_batch_item_with_options(
     checkpoint: &MotionPhotoCheckpoint,
     reuse_existing: bool,
     apple_adapter_executable: Option<&Path>,
-    apple_options: BatchAppleOptions,
+    apple_options: &BatchAppleOptions,
 ) -> BatchWorkResult {
     #[cfg(not(target_os = "macos"))]
-    let _ = (apple_options.portrait_profile, apple_options.cinematic);
+    let _ = (apple_options.portrait_profile, &apple_options.cinematic);
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
         if item.input == item.output {
@@ -469,8 +475,7 @@ fn process_batch_item_with_options(
                     adapter,
                     &item.input,
                     &item.output,
-                    apple_options.cinematic.focal_length_35mm,
-                    apple_options.cinematic.aperture,
+                    &apple_options.cinematic,
                 )?;
                 return Ok(BatchSuccess {
                     input: item.input.clone(),
@@ -821,7 +826,7 @@ impl PortableRuntime {
                     &checkpoint,
                     options.reuse_existing,
                     options.apple_adapter_executable.as_deref(),
-                    apple_options,
+                    &apple_options,
                 );
                 outcomes[index] = Some(finalize_work_result(
                     work,
@@ -842,6 +847,7 @@ impl PortableRuntime {
                 let items = &items;
                 let checkpoint = &checkpoint;
                 let next = &next;
+                let apple_options = &apple_options;
                 let apple_adapter_executable = apple_adapter_executable.clone();
                 scope.spawn(move || {
                     let runtime = PortableRuntime::new();

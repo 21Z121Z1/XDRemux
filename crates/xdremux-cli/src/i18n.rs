@@ -142,7 +142,8 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         }
         (_, "apple_styles") => "生成 Photographic Styles 和推导的 Texture Styles（macOS 27）。",
         (_, "apple_cinematic") => "为普通视频推导待处理的 Cinematic 编辑元数据（macOS 27）。",
-        (_, "focal_length_35mm") => "为缺少相机几何的视频假定 35mm 等效焦距。",
+        (_, "cinematic_camera_estimate") => "使用绑定源视频的固定视角相机估计；显式焦距优先。",
+        (_, "focal_length_35mm") => "覆盖 Cinematic 已记录或自动估计的 35mm 等效焦距。",
         (_, "aperture") => "为 Cinematic 渲染元数据假定拍摄光圈。",
         (_, "output") => "输出 HEIC 或 MOV；Cinematic 默认生成新的 .xdremux.mov 文件。",
         (_, "recursive") => "递归查找输入目录；不跟随符号链接。",

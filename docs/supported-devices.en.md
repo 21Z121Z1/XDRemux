@@ -1,12 +1,23 @@
-# Supported Devices
+# Device and file compatibility
 
 English | [简体中文](supported-devices.md)
 
-This document lists device models that are known to capture ProXDR HEIC.
+XDRemux selects a conversion path from the input file's structure and metadata. A phone model is not an input allow-list. One successful file does not establish support for every firmware version, camera mode, or file from that model.
 
-A listed model is not a guarantee for every firmware version, camera mode, or individual file. XDRemux validates the file structure and metadata that the selected conversion path requires.
+## Coverage backed by repository fixtures
 
-## Known ProXDR capture models
+The versioned corpus provides concrete inputs for repeatable checks:
+
+| Asset | Included sources | What the fixtures establish |
+| --- | --- | --- |
+| ProXDR | OPPO Find X6 Pro LHDR v1; Find X7 Ultra LHDR v2, including XPAN; Find X9 Ultra UHDR, including high-resolution, Master, and Portrait captures. | The format and product-policy cases exercised by the associated tests. |
+| Motion Photo | Samsung, Xiaomi, OPPO, and vivo JPEG and HEIC/HEIF inputs. | The parser, conversion, and validation cases exercised by the associated tests. |
+
+The [fixture guide](../fixtures/README.en.md) describes the corpus. [SHA256SUMS](../fixtures/SHA256SUMS) identifies the exact files. These checks do not establish every camera mode or acceptance by the original Gallery or Apple Photos.
+
+## Recorded ProXDR capture models
+
+The following catalogue preserves the models reported in the project's device documentation. The repository does not provide a separate fixture or verification record for every entry. Treat this table as capture-format context, not a verified support matrix.
 
 | Brand or series | Models |
 | --- | --- |
@@ -18,42 +29,31 @@ A listed model is not a guarantee for every firmware version, camera mode, or in
 | realme Neo series | realme GT Neo6 SE, realme GT Neo6, realme Neo7, realme Neo7 SE, realme Neo7x, realme Neo8 |
 | realme number series | realme 12 Pro, realme 12 Pro+, realme 13 Pro+, realme 13 Pro Supreme Edition, realme 13 Pro, realme 14 Pro+, realme 14 Pro, realme 14, realme 15, realme 15 Pro |
 
-This list records known capture support. It is not a code allow-list.
-
 ## Gain Map differences
 
-Known files can contain different Gain Map layouts.
+ProXDR files can contain different Gain Map layouts. Earlier project reports describe YCbCr 4:4:4 HDR Gain Maps from OPPO Find X8 Ultra, the Find X9 series, and realme GT8 Pro in Ricoh mode. Other files can use 4:2:0 or monochrome Gain Maps. These reports do not replace inspection of the actual input.
 
-OPPO Find X8 Ultra, the Find X9 series, and realme GT8 Pro in Ricoh mode can use YCbCr 4:4:4 HDR Gain Maps in known implementations.
+The standard path preserves source Gain Map characteristics where the selected output supports them. `--oppo-compatible` can convert the map to a compatibility representation. The phone name alone does not determine the Gain Map layout.
 
-Other files can use 4:2:0 or monochrome Gain Maps.
+## Motion Photo requirements
 
-The standard conversion path preserves source Gain Map characteristics when the selected output path supports them. `--oppo-compatible` can reduce the representation to a compatibility form.
+Motion Photo support depends on detectable resources and tested format behavior. The ProXDR model catalogue does not control it.
 
-Do not infer the Gain Map layout from the phone name alone.
+An input needs a still resource, a motion-video resource that the parser can resolve, and the timing and container information required by the conversion. See the [LibLivePhoto integration contract](liblivephoto-integration.en.md) for exact-time handling and omitted resources.
 
-## Motion Photo support
+## Apple Portrait requirements
 
-Motion Photo support is capability-based and fixture-tested. It is not controlled by the ProXDR model table above.
+Apple Portrait conversion needs compatible portrait resources in the individual source photo. A ProXDR capture model does not imply that every photo contains depth, focus, semantic masks, or restore-original data.
 
-A Motion Photo input must contain a still resource, a motion-video resource that the parser can resolve, and the required timing/container information.
+The complete and OPPO source-native profiles have different resource requirements. See the [Apple feature guide](apple-features.en.md) before selecting a profile.
 
-The current public fixture set contains multiple Android Motion Photo layouts. See the [fixture guide](../fixtures/README.en.md).
+## Report an unsupported file
 
-## Apple Portrait support
-
-Apple Portrait conversion requires compatible portrait resources in the individual source photo.
-
-A supported ProXDR model does not imply that every photo contains depth, focus, semantic, or restore-original data.
-
-## Reporting a new file
-
-If a new device or firmware produces a file that XDRemux cannot convert:
+Keep personal photo content private unless publication is intentional. Redacted container diagnostics can be sufficient to investigate a problem.
 
 1. Keep the original file.
 2. Record the device model, OS version, and camera mode.
-3. Include the exact XDRemux error.
-4. Include redacted container diagnostics when they are sufficient.
-5. Do not publish personal photo content unless you intend to make it public.
+3. Record the exact XDRemux error.
+4. Provide redacted diagnostics or an authorized reproducible sample.
 
-A new compatibility claim should have a reproducible file or test. The device model alone is not sufficient evidence.
+A new compatibility statement requires a reproducible file or test. The model name alone is insufficient.

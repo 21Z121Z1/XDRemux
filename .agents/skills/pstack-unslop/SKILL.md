@@ -5,16 +5,32 @@ description: Edit authored XDRemux prose to remove vague claims, AI phrasing, un
 
 # Plain, evidence-backed prose
 
-State the outcome early. Use familiar words, active verbs, and connected sentences. Preserve the intended meaning, source attribution, evidence limits, and the reader's level of technical detail. Respect the current repository's English-canonical and matching-Chinese documentation policy.
+State the outcome early. Use familiar words, active verbs, and connected sentences. Preserve the intended meaning, source attribution, evidence limits, and the reader's required technical detail. Follow the repository policy for canonical English documentation and matching Chinese documentation.
 
-Cut filler, generic praise, chatbot closers, decorative emoji, vague attribution, and inflated claims. Name the source or remove an attribution such as "experts believe". Replace abstract claims with the mechanism, observed behavior, or measured number that supports them. Do not turn an inference into a fact while shortening it.
+## Replace vague claims
 
-Prefer "use", "help", "is", and "has" to elaborate synonyms. Avoid forced groups of three, synonym cycling, false ranges, "not just X but Y" framing, mannered metaphors, and stock conclusions. Keep one main idea per sentence and enough articles and verbs to read naturally. Do not compress an explanation into symbols that the reader must decode.
+Remove filler, generic praise, chatbot closers, decorative emoji, vague attribution, and inflated claims. For an attribution such as "experts believe", name the source or remove the attribution. Support abstract claims with a mechanism, observed behavior, or measured value. When shortening text, keep an inference distinct from an established fact.
 
-Avoid decorative emphasis, title-case headings, inline labels that repeat the next words, and punctuation used in place of a sentence. Use sentence case, periods, and commas. A colon before a real list or example is useful. Use straight quotation marks in newly authored prose when format permits. Follow an established document's technical formatting when it carries meaning.
+## Use direct sentences
 
-Keep technical terms when they are accurate and useful. Do not rewrite code, commands, CLI option spelling, machine JSON, schemas, citations, source quotations, filenames, fixture hashes, copyright notices, or license text for style. Keep precise native/media terms when a plainer substitute changes the claim. Avoid a broad search-and-replace pass over product outputs.
+Prefer "use", "help", "is", and "has" to elaborate synonyms. Avoid forced groups of three, changing synonyms for the same concept, false ranges, and "not just X but Y" framing. Remove elaborate metaphors and stock conclusions.
 
-After editing, check that the text still tells the reader what changed, why it matters, what was tested, and what remains unverified. Delete a sentence that adds no project-specific fact, useful action, or necessary context. Retain a material caveat even when the shorter paragraph looks cleaner without it.
+Keep one main idea in each sentence. Retain the articles and verbs needed for natural grammar. Do not compress an explanation into symbols that the reader must decode.
+
+## Keep formatting functional
+
+Use sentence case for headings. Remove decorative emphasis and inline labels that repeat the next words. Use periods and commas to separate ideas. Do not use punctuation as a substitute for a sentence. Use a colon before a list or example when it clarifies the structure.
+
+Use straight quotation marks in new prose when the format permits. Preserve established technical formatting when it carries meaning.
+
+## Preserve technical and source content
+
+Keep accurate technical terms that help the reader. Preserve precise native and media terms when a plainer substitute would change the claim.
+
+Do not change code, commands, CLI option spelling, machine JSON, or schemas for style. Preserve citations, source quotations, filenames, fixture hashes, copyright notices, and license text. Do not apply broad search-and-replace changes to product outputs.
+
+## Check the edited text
+
+Confirm that the text states what changed, why it matters, what was tested, and what remains unverified. Remove sentences that add no project-specific fact, useful action, or necessary context. Retain every material caveat, even if removing it would shorten the paragraph.
 
 Adapted from pstack at `a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4`, `pstack/skills/unslop/SKILL.md`. See [source hashes](sources.json) and [LICENSE](LICENSE).

@@ -1,107 +1,100 @@
-# 技术实现索引
+# 产品架构与媒体契约
 
 [English](architecture.en.md) | 简体中文
 
-本文档索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift 只保留明确受限的 Apple primitive adapter。
+Rust 工作区负责 XDRemux 的产品行为。Apple 适配器执行 Rust 请求的框架操作。Python 用于研究和训练。
 
-普通使用见[项目 README](../README.md)，命令行为见 [CLI 参考](cli.md)。
+本文说明组件职责和输出安全规则。命令用法见 [CLI 参考](cli.md)，首次转换见[项目 README](../README.md)。
 
-## 当前架构
+## 组件职责
 
-### Rust workspace
+| 组件 | 职责 |
+| --- | --- |
+| `crates/xdremux-cli/` | 解析公开命令，并选择需要执行的操作。 |
+| `crates/xdremux-engine/` | 描述源文件事实、用户意图、可用能力和转换策略。 |
+| `crates/xdremux-runtime/` | 执行转换计划、验证结果并发布输出文件。 |
+| Rust 媒体 crate | 解析元数据、处理 HDR、编码图像，以及读写容器。 |
+| LibLivePhoto | 提供可移植的 Motion Photo 和 Live Photo 文件格式实现。 |
+| `Sources/XDRemuxAppleAdapter/` | 调用 Apple 框架，通过 Rust 定义的协议返回观测结果。 |
+| `Sources/XDTextureNative/` 和 `Sources/XDCinematicNative/` | 为适配器实现原生纹理风格和电影效果操作。 |
+| `apps/macos/XDRemuxApp/` | 提供 Mac 界面并调用产品操作。 |
+| `xdremux_py/` | 提供独立于产品运行时的研究和训练工具。 |
 
-Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换、分类、批处理、Motion Photo 路由、验证和发布。
+### Rust 产品栈
 
-当前职责包括：
+Rust 负责 ProXDR 元数据解析、ISO/TS 21496-1 Gain Map 转换、HEIF 组装、分类、批处理、验证和发布。Apple 人像与摄影风格的资源模型和事务策略也由 Rust 定义。
 
-- ProXDR metadata 解析；
-- ISO/TS 21496-1 Gain Map 转换；
-- HEIF 和 ISO-BMFF 解析与写入；
-- 通过独立 LibLivePhoto facade 完成 Motion Photo 路由和资源提取；
-- 源 metadata 和分类；
-- 核心转换链路共享的输出验证；
-- Apple Portrait / Photographic Styles 的跨平台 policy、manifest 和 transaction orchestration。
+LibLivePhoto 提供源文件检查、资源选择、精确呈现时间和配对验证。XDRemux 保留 HDR 处理、编解码器选择、时间推断、几何处理和文件发布策略。详见 [LibLivePhoto 接入契约](liblivephoto-integration.md)。
 
-LibLivePhoto 提供可移植的 Motion/Live Photo 格式实现。XDRemux 保留 HDR、codec
-选择、推断时间、几何和文件发布策略。见 [接入契约](liblivephoto-integration.md)。
+CLI 在进入普通 HDR 处理前自动识别受支持的 Motion Photo。两类转换采用不同的输出安全规则，具体见 [CLI 参考](cli.md)。
 
-### Apple capability boundary
+### Apple 框架操作
 
-完整 Apple 产品仅分发 arm64/macOS 27 或更新版本；App 与原生包使用同一构建目标，adapter 在报告 capability 前拒绝不支持的 host。跨平台 Rust 核心测试独立保留，原生 framework 与设备验收仍须对应真实环境。
+完整 Apple 产品要求 Apple silicon（`arm64`）和 macOS 27 或更新版本。App 与原生安装包采用相同的部署目标。适配器在报告能力前拒绝不受支持的运行环境。
 
-`Sources/XDRemuxAppleAdapter/` 是 Rust runtime 调用的最小 Apple framework primitive adapter。
+适配器调用 ImageIO、Vision、Core Image、VideoToolbox 等所需的 Apple 框架。它返回框架观测结果，或写入 Rust 请求的资源，不决定产品兼容策略。
 
-当前职责包括：
+Swift 包只发布 `xdremux-apple-adapter` 可执行文件。原生纹理风格和电影效果目标为该适配器提供支持，不构成另一套公开转换 CLI。详见 [Package.swift](../Package.swift) 和 [Apple 功能文档](apple-features.md)。
 
-- 调用 ImageIO、Vision、CoreImage、VideoToolbox 等 Apple framework；
-- 返回 Rust 定义协议中的 framework facts；
-- 写入或探测 Rust 已规划的 Apple-specific resource。
+可移植的 Rust 测试仍覆盖 Linux、Windows 和 macOS。这些测试不能证明原生框架在各平台可用，也不能证明设备上的实际表现。
 
-原来的 Swift product target 已删除。Swift 侧只剩 `Sources/XDRemuxAppleAdapter/`，不得承载 product policy。
+### 研究工具
 
-### CLI 层
+`xdremux_py/` 不参与 Rust 运行时，也不定义公开转换方式。研究结果可以为产品修改提供依据，但不能替代产品测试或原生验收。
 
-`crates/xdremux-cli/` 负责唯一用户命令解析和路由。
+### 模型原语
 
-CLI 会在普通 HDR 命令链路前自动路由支持的 Motion Photo 输入。
+`model_adapters/geocalib/` 是独立的本地推理组件。Rust runtime 通过 ExifTool 读取已记录的等效焦距，只有缺失时才调用模型。Python helper 返回绑定源视频的像素内参和不确定度。来源优先级、固定相机准入、等效焦距换算、原生生成和发布均由 Rust 持有。helper 不构成第二套转换器或用户 CLI。固定版本环境与权重需要单独安装，不上传媒体。
 
-Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](cli.md)。
 
-### Python 实现
-
-`xdremux_py/` 只包含研究/训练工具。
-
-它不参与 Rust runtime，不定义正式 conversion path，也不作为 CI canonical correctness source。
-
-## 稳定媒体契约
+## 媒体契约
 
 ### 标准 HDR
 
-标准链路把厂商 HDR metadata 转换为 ISO/TS 21496-1 表示。
-
-所选链路允许时，实现会尽量保留源压缩图像数据。
+标准转换把厂商 HDR 元数据转换为 ISO/TS 21496-1 表示。在所选处理方式允许时，转换保留源文件的压缩图像数据。这不代表每项源资源都能保持不变。
 
 ### Live Photo
 
-默认 Live Photo 链路发布共享 asset identifier 的 HEIC/HEIF 照片和 MOV。强类型 `LivePhotoOutput` 可将同一已验证 pair 包装为真实 PVT 目录，不再次跨越 codec/remux 边界。Rust 负责有界包结构、验证及发布，App 只转交选择并展示计划容器。
+默认输出由一张 HEIC/HEIF 照片和一个 MOV 组成，两者共享资产标识符。转换器把解析出的源封面时间映射为 Apple `still-image-time`。
 
-转换器把解析得到的源封面时间映射为 Apple `still-image-time`。
+MOV 写入器直接复制压缩的视频和音频样本，不进行解码和重新编码。运行时在发布前比较源视频和输出视频的媒体载荷。源文件包含 Gain Map 且输出方式支持时，照片写入器会保留该 Gain Map。
 
-正常 MOV writer 使用压缩视频/音频样本透传。链路要求时，validator 会比较源文件和输出的压缩样本。
-
-源文件存在 Gain Map 且输出链路支持时，still writer 会保留 Gain Map。
+`LivePhotoOutput` 可以把同一组已验证文件放入真实的 PVT 目录。封装过程不再次编码或重封装媒体。Rust 负责包结构、验证和发布，App 传递输出类型并展示计划生成的容器。
 
 ### 发布
 
-默认 pair 输出只有在两个最终成员都发布后才算转换成功。转换先在自己独占的 staging 目录写入并同步已验证的完整 pair，再通过原子的 no-clobber 硬链接先占用 MOV 名称、后发布静态照片。已有最终路径及无关文件、目录不会被替换或删除。协作 writer 共享 MOV 占用，同 stem 的 `.heic` 与 `.heif` 也不例外。
+Live Photo 配对输出只有在两个最终文件均已发布，并通过字节回读检查后，才算转换成功。运行时先在私有暂存目录写入并同步已验证的完整配对文件，再用不会替换已有目录项的原子硬链接占用 MOV 名称，最后发布照片。
 
-两个文件名不是系统原子事务。第二个链接失败时，转换返回带 partial MOV 路径的错误，并保留 staging 供显式恢复。publisher 从已校验的 buffer 写入独立的 `recovery.heic` 和 `recovery.mov`，验证成功后才声明完整恢复副本已保留。恢复写入或读回失败时报告 `recovery-unverified`；原 `capture.*` 文件可能与受损的最终文件共享 inode。可对报告的独立 `recovery.heic` 执行 `xdremux validate`，移动资源前先检查两个最终路径。reconcile 只检查目标，未知 partial 或无效 pair 均保留并拒绝；名称像旧临时文件并不能证明删除所有权。
+已有输出项及无关文件、目录保持不变。遵循同一协议的写入者竞争同一个 MOV 名称。同名但后缀分别为 `.heic` 和 `.heif` 的输出也遵循此规则。
 
-发布要求同一文件系统支持硬链接。不支持时保留原始 I/O 错误并拒绝，不宣称 FAT/exFAT 支持。此协议无法阻止外部 writer 主动替换最终路径。staging 文件已同步不等于断电后目录项具有持久性保证。
+两个文件名不构成一个整体原子事务。第二个硬链接失败时，命令报告已发布的 MOV 路径，并保留暂存目录。最终文件的字节回读失败时，也保留暂存目录并记录已观察到的最终目录项。
 
-PVT 在 operation-owned 私有目录写入已验证媒体和固定 XML 版本 plist，然后用平台排他
-目录 rename 占用单一最终包路径，即使已有空目录也不替换。移动前解除旧 staging 路径的
-删除所有权，不会清理后来出现在旧路径的条目；发布失败保留完整包并报告恢复路径。
-macOS/Linux 后端缺少排他 rename 时拒绝；其他核心平台可读取/验证支持的包结构，
-不使用覆盖式发布回退。不据此宣称目录断电持久性、Photos 或墙纸通过。
+运行时尝试从已校验的缓冲区写入独立的 `recovery.heic` 和 `recovery.mov`。它同步这两个文件，并将文件字节与缓冲区比较。只有这些操作成功后，错误信息才确认完整的独立恢复文件对已保留。否则，错误信息报告 `recovery-unverified`。原来的 `capture.*` 文件可能与受损的最终文件共享 inode。
 
-batch 复用要求 source provenance 和容器身份一致。来源未知的有效 pair 或包不能被
-接受为无关输入的输出。App 没有包来源的持久 checkpoint，因此不会自动接管已有 PVT。
+错误信息确认独立恢复文件对已通过检查时，对报告路径中的 `recovery.heic` 执行 `xdremux validate`。移动任一成员前，先检查两个最终路径。已有输出检查会保留并拒绝来源未知的不完整配对或无效配对。名称看似临时文件，并不能证明当前操作有权删除它。
 
-## 当前技术文档
+配对发布要求同一文件系统支持硬链接。文件系统不支持时，发布失败并保留原始 I/O 错误；不宣称支持 FAT/exFAT。该协议无法阻止外部写入者在回读后替换文件。暂存文件已经同步，也不保证断电后目录项仍然持久保存。
 
-- [Apple 功能文档](apple-features.md)
-- [开发文档](development.md)
-- [测试政策](quality/testing.md)
-- [验证 runbook](validation/README.md)
-- [Fixture 说明](../fixtures/README.md)
+PVT 采用另一种文件系统操作。运行时在本次操作拥有的私有目录内写入已验证媒体和固定 XML 版本 plist，再通过排他目录重命名占用最终包路径。已有目录即使为空，也不会被替换。
+
+重命名前，运行时解除旧暂存路径的自动删除责任，避免删除后来出现在旧路径的新目录项。发布失败时，完整包保留在错误报告中的恢复路径。
+
+macOS 和 Linux 缺少排他重命名能力时，发布会失败。其他核心平台可以读取和验证受支持的包结构，但不会改用能够覆盖已有包的重命名操作。PVT 结构有效不能证明断电持久性、Photos 导入或墙纸支持。
+
+批处理复用已有输出时，要求源文件来源记录和容器身份一致。来源未知的有效配对或包，不能作为另一份输入的转换结果。App 没有持久保存包来源的检查点，因此不会自动接管已有 PVT。
+
+实现见 [pair_publication.rs](../crates/xdremux-runtime/src/live_photo/pair_publication.rs) 和 [live_photo_package.rs](../crates/xdremux-runtime/src/live_photo_package.rs)。
+
+## 延伸阅读
+
+- [Apple 功能文档](apple-features.md)说明平台要求与证据边界。
+- [开发文档](development.md)说明构建和组件职责。
+- [测试政策](quality/testing.md)规定修改需要的验证证据。
+- [验证操作指南](validation/README.md)说明如何将检查绑定到已提交的版本。
+- [测试样本说明](../fixtures/README.md)规定源媒体的身份和来源要求。
 
 ## 历史审计
 
-[ISO 一致性审计，2026-05-11](history/iso-conformance-audit-20260511.md) 是历史记录。
+[2026 年 5 月 11 日的 ISO 一致性审计](history/iso-conformance-audit-20260511.md)记录当时的实现。其中的旧路径不能作为当前架构参考。
 
-它包含当时的路径和实现细节。不要把其中的旧路径当作当前架构参考。
-
-保留历史审计中的测量结果。新的 conformance 研究取代旧结论时，应增加新的带日期审计。
-
-当前技术文档遵循[技术写作规范](style-guide.md)。
+保留历史审计中的测量结果。新的规范符合性研究取代旧结论时，增加新的带日期记录。当前文档遵循[技术写作规范](style-guide.md)。

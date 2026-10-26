@@ -1,3 +1,5 @@
+> **Historical validation record — 2026-10-14.** The results below apply to the named artifacts, sample set, and macOS build. References to the “current” product refer to this experiment's development context. The measurements have not been rerun for this documentation revision. See [Apple features](../apple-features.en.md) for current behavior and [validation](README.en.md) for new evidence requirements.
+
 # HDR Log thumbnail: 15-photo native comparison
 
 English | [简体中文](20261014-hdr-log-multisample.md)

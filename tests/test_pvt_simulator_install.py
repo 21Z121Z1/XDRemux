@@ -16,8 +16,9 @@ class SimulatorInstallModel:
     udid = '12345678-ABCD-1234-ABCD-123456789ABC'
     bundle = 'org.xdremux.audit.PVTReadback.u' + 'a' * 32
 
-    def __init__(self, root, behavior='success', ready=True):
+    def __init__(self, root, behavior='success', ready=True, inventory_delay=0):
         self.root, self.behavior, self.ready = root, behavior, ready
+        self.inventory_delay = inventory_delay
         self.work = root / 'proof'; self.work.mkdir()
         self.staged = root / 'PVTReadback.app'; self.staged.mkdir()
         (self.staged / 'Info.plist').write_bytes(plistlib.dumps(probe.reader_info(self.bundle)))
@@ -37,10 +38,12 @@ class SimulatorInstallModel:
             self.report['commands'].append({'name': name, 'argv': list(map(str, argv)), 'exit_code': 0})
             return subprocess.CompletedProcess(argv, 0, b'', b'')
         argv = list(map(str, argv)); action = argv[2]
-        record = {'name': name, 'argv': argv}; self.report['commands'].append(record)
+        record = {'name': name, 'argv': argv, 'timeout_seconds': kwargs.get('timeout')}
+        self.report['commands'].append(record)
         self._result = subprocess.CompletedProcess(argv, 0, b'', b'')
         if action == 'listapps':
-            if not self.ready:
+            delay = self.inventory_delay if not self.app.exists() else 0
+            if not self.ready or delay > kwargs['timeout']:
                 record['outcome'] = 'uncertain-after-timeout'
                 raise probe.Blocked('inventory service timeout')
             apps = {self.bundle: {'CFBundleIdentifier': self.bundle}} if self.app.exists() else {}
@@ -112,6 +115,30 @@ class SimulatorInstallTests(unittest.TestCase):
             with self.assertRaises(probe.Blocked): model.install()
             self.assertEqual(model.installs, 0)
             self.assertEqual(sum(c['argv'][2] == 'listapps' for c in model.report['commands']), 3)
+
+    def test_slow_startup_inventory_can_finish_before_installation(self):
+        for delay in (30, 78.5):
+            with self.subTest(delay=delay), tempfile.TemporaryDirectory() as raw:
+                model = SimulatorInstallModel(Path(raw), inventory_delay=delay)
+                facts = model.install()
+                self.assertEqual(facts['status'], 'installed-verified')
+                self.assertEqual(model.installs, 1)
+                startup = [o for o in facts['observations'] if o['phase'] == 'inventory']
+                self.assertEqual(len(startup), 1)
+                self.assertEqual(startup[0]['state'], 'service-answered')
+                self.assertEqual(facts['installed_binary_sha256'], probe.sha(model.staged / 'PVTReadback'))
+
+    def test_startup_inventory_deadline_still_blocks_installation(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw), inventory_delay=121)
+            with self.assertRaisesRegex(probe.Blocked, 'app-inventory service'):
+                model.install()
+            self.assertEqual(model.installs, 0)
+            self.assertEqual(model.report['reader_installation']['status'], 'installation-service-not-ready')
+            inventory = [c for c in model.report['commands'] if c['argv'][2] == 'listapps']
+            self.assertEqual(len(inventory), 3)
+            self.assertTrue(all(0 < c['timeout_seconds'] <= 120 for c in inventory))
+            self.assertTrue(all(c['outcome'] == 'uncertain-after-timeout' for c in inventory))
 
     def test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service(self):
         with tempfile.TemporaryDirectory() as raw:

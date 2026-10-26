@@ -1,126 +1,119 @@
-# Testing Policy
+# Testing policy
 
 English | [简体中文](testing.md)
 
-A change is complete only when its evidence matches the behavior that changed.
+A change is complete only when the evidence covers the behavior that changed. Select checks from the layers below. Commands are in the [test guide](../../tests/README.en.md). Receipt procedures are in the [validation runbook](../validation/README.en.md).
 
-For commands, see [tests/README.en.md](../../tests/README.en.md). For completion-gate plans, see the [validation runbook](../validation/README.en.md).
+## Match the evidence to the claim
 
-## Evidence layers
-
-| Layer | Typical command or source | What it proves |
+| Evidence | Command or source | Scope of the result |
 | --- | --- | --- |
-| Unit and contract | `cargo test --workspace --locked` | Rust product, parser, format, Apple-feature policy, and transaction contracts. |
-| Repository policy | `python3 -m unittest discover -s tests -t . -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
-| Real fixture | `fixtures/` and `scripts/validation/` | Behavior on versioned or supplied real media. |
-| Native framework | macOS validation jobs | ImageIO, PhotoKit, or other tested Apple framework behavior. |
-| Device | manual or recorded real-device validation | Behavior that depends on a specific gallery, Photos version, display, or device. |
-| Completion receipt | `scripts/ci/agent_completion_gate.py` | The selected checks passed for the exact commit. |
+| Unit and contract tests | `cargo test --workspace --locked` | Rust product, parser, format, Apple-feature policy, and transaction behavior. |
+| Repository policy tests | `python3 -m unittest discover -s tests -t . -v` | Cross-file rules, Python behavior, documentation, and architecture contracts. |
+| Real media tests | `fixtures/` and `scripts/validation/` | Behavior on the versioned or supplied media. |
+| Native framework tests | macOS validation jobs | The ImageIO, PhotoKit, or other Apple framework behavior exercised by the test. |
+| Device tests | Recorded or manual device validation | Behavior on the tested gallery, Photos version, display, and device. |
+| Completion receipt | `scripts/ci/agent_completion_gate.py` | The declared checks passed for the specified commit. |
 
-A static policy test is not functional conversion evidence.
+Source-inspection tests establish static contracts. They do not establish conversion behavior. A parser pass does not establish device behavior or correct gallery rendering.
 
-A parser test is not a device test.
+## Select the minimum complete checks
 
-A container parser pass is not proof that a gallery renders the result correctly.
+The complete product gate targets arm64/macOS 27. It includes the app, adapter, relocated package, source preservation, HDR, Styles, and performance checks. Rust core tests remain enabled on Linux, Windows, and macOS. Intel product packages are outside the supported distribution scope.
 
-## Minimum evidence
+An unavailable native environment, a failed operation, or an untested device behavior remains a gap. The platform scope does not make those checks pass.
 
-The complete product gate targets arm64/macOS 27: App, adapter, relocated package, media preservation, HDR/Styles and performance checks remain required. Linux, Windows and macOS Rust core tests remain enabled. Intel product-package checks are outside the supported delivery scope. This scope does not turn missing native data, failed operations or untested device behavior into a pass.
+| Change | Minimum evidence |
+| --- | --- |
+| Documentation only | Documentation policy and link checks. |
+| CLI parser or messages | Tests for the affected parser and output behavior. |
+| HDR or containers | Unit tests and a real conversion or an equivalent functional fixture. |
+| Motion Photo | Parser and writer tests, plus the applicable real-fixture checks. |
+| Apple features | Structural tests and the applicable native framework or device checks. |
+| App behavior | App build and the affected model or UI tests. |
+| Verification framework | Completion-gate self-tests and a real gate run. |
 
-The macOS 27 performance reference preserves its original measurements. The
-`apple-styles` case allows twice the historical median and p95 wall times to
-accommodate full-resolution HDR reconstruction before Linear Thumbnail reduction.
-Its RSS and helper-launch limits remain unchanged. Other workloads retain the
-shared wall-time tolerance. See the [versioned budget](../../benchmarks/macos27-arm64-product-baseline.json).
+When practical, add a regression assertion that fails for the original source defect. Use the smallest set of checks that covers the changed behavior.
 
-Use the smallest complete evidence set.
+### Preserve performance reference values
 
-- Documentation-only change: documentation policy and link checks.
-- CLI parser or message change: targeted parser/output regression.
-- HDR or container change: unit tests plus a real conversion or equivalent functional fixture.
-- Motion Photo change: parser/writer tests plus the applicable real Motion Photo fixture gates.
-- Apple feature change: structural tests plus the applicable native-framework or device evidence.
-- App change: app build and the affected model/UI test.
-- Verification-framework change: completion-gate self-tests and a real gate run.
+The [macOS 27 budget](../../benchmarks/macos27-arm64-product-baseline.json) retains its original measurements. The `apple-styles` case permits twice the historical median and p95 wall times. This allowance covers full-resolution HDR reconstruction before Linear Thumbnail reduction.
 
-Every source bug fix should add a regression assertion that would fail for the original defect when that is practical.
+The RSS and helper-launch limits remain unchanged. Other workloads use the shared wall-time tolerance. The [measurement guide](evals.en.md) defines current reports and the limits of performance conclusions.
 
-## Public Motion Photo fixtures
+## Preserve fixtures and restrict uploaded media
 
-The repository contains versioned real Motion Photo fixtures under `fixtures/`.
+The `fixtures/` directory contains versioned real Motion Photo files. Their exact bytes are part of the test contract. `fixtures/SHA256SUMS` records their identities. Strict Rust CI checks use these files across JPEG and HEIC/HEIF layouts.
 
-Their exact bytes are part of the test contract. `fixtures/SHA256SUMS` is the identity manifest.
+Some older ProXDR, Apple-feature, and device-only samples can remain private or outside the repository. Do not describe every real sample as private.
 
-Strict Rust CI gates use these fixtures to test multiple JPEG and HEIC/HEIF Motion Photo layouts.
+Native checks can create media and pixel buffers on the runner. Automatic Actions uploads must contain only the named diagnostic reports, hashes, and logs. Do not upload source photos, converted portraits, rendered comparisons, or pixel dictionaries.
 
-Do not describe all real samples as private. Some older ProXDR, device-only, and Apple-feature samples can still be external or private.
+Keep media generation, native readback, and failure assertions in the tests. Restrict uploads without skipping those checks. For device validation, produce Photos import files locally.
 
-Native checks may create media and pixel buffers on their runner. Automatic
-Actions uploads contain named diagnostic reports, hashes and logs, not source
-photos, converted portraits, rendered comparisons or pixel dictionaries. Keep
-media generation, native readback and failure assertions in the test; restrict
-the upload boundary rather than skipping those checks. Produce Photos import
-files locally when device validation is required.
+## Report device limits
 
-## Device-dependent claims
+Claims about Photos editing, OPPO Gallery display, or another device UI need evidence from that environment. If the environment is unavailable, report only the behavior actually tested. Do not mark untested device behavior as passed.
 
-A claim about Apple Photos editing, OPPO Gallery display, or another device UI requires evidence from that environment.
+## Keep documentation consistent with code
 
-If the environment is unavailable, narrow the claim to the behavior that was actually tested.
+Command names, options, defaults, output-safety rules, and support limits are product contracts. When code changes a contract, update both language versions in the same change. Follow the [technical writing guide](../style-guide.en.md).
 
-Do not mark an untested device-dependent claim as passed.
+## Keep research evidence separate
 
-## Documentation is testable behavior
+The reusable [`research.yml`](../../.github/workflows/research.yml) workflow contains portable research tests, native carrier readback, and the pinned Photographic Styles tone sweep. It also contains the provisional system HEIF HDR measurement and PVT admission probe.
 
-User-visible command names, options, defaults, output-safety rules, and support boundaries are product contracts.
+Jobs use the exact PR or `main` SHA with read-only permissions. Manual replay accepts no alternate source or secrets. Native tone and system HEIF jobs use `xcode-27` and retain measurement artifacts for one day.
 
-When code changes one of these contracts, update the English and Chinese documentation in the same change.
+Research results do not supply the `exact-head` product gate. They do not establish Photos editing, slider response, save/reopen behavior, or gallery acceptance.
 
-Current technical documentation follows the [technical writing guide](../style-guide.en.md).
+### Interpret the PVT probe
 
-## Research regression evidence
+The readiness control and product probe use one clean checkout. CI requires the installed iOS 27.0 runtime and iPhone 11 device type. A missing or incompatible pair stops the control before simulator creation. Direct runs that omit both pin options retain catalog-based selection.
 
-A single reusable `research.yml` workflow owns portable research tests, native
-carrier readback, the pinned Photographic Styles tone sweep, and the provisional
-system HEIF HDR measurement and PVT admission probe. Its jobs use the exact pull-request or main SHA
-with read-only permissions. A manual replay accepts no alternate source or secrets.
-The native tone and system HEIF jobs use the standard `xcode-27` runner and retain
-measurement artifacts for one day. Their results do not supply `exact-head` or
-establish Photos editing, slider response, save/reopen, or Gallery acceptance.
+Before simulator creation, the job checks that the selected runtime supports the chosen iPhone type. It also checks the device type's runtime version bounds and independently verifies membership in the supported list.
 
-The PVT job uses one clean checkout for its readiness control and product probe.
-CI explicitly requires the installed iOS 27.0 / iPhone 11 pair, so a newer
-runtime or specialized device cannot silently change this baseline. If either
-is missing or incompatible, the control blocks without creating a simulator.
-Direct runs without both pin options retain catalog-based selection.
-It selects an iPhone that the chosen runtime explicitly supports and that meets
-the device type's runtime version bounds. An independent membership check runs
-before simulator creation. The product probe runs at most once, after the owned
-control simulator has passed and its deletion is verified. Its receipt must bind
-the same source SHA, runtime and device type. The control passes its exact pair
-as `--required-runtime` and `--required-device-type`; the product validates it
-against fresh catalogs without selecting a replacement. It checks the same pair
-again immediately before creation, after build and preparation work. A changed
-or incompatible pair blocks creation. A passing control does not prove
-PVT admission. Admission requires whole-package identity and independent PhotoKit
-readback. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
+The product probe runs at most once. It starts only after the control simulator passes and the job verifies deletion of that simulator. The control passes its exact pair through `--required-runtime` and `--required-device-type`. The product checks that pair against fresh catalogs without selecting a replacement. After build and preparation, it checks the same pair again immediately before simulator creation. A changed or incompatible pair blocks creation.
 
-The control and product boot monitors require an owned-device `Finished` terminal
-record as well as a zero process exit. Migration failure, an already-booted
-shortcut, and unknown output block inventory or installation. This check does
-not replace inventory, Photos Save, or independent PhotoKit readback.
+The control submits one application-inventory query with a 120-second deadline.
+A timeout keeps readiness blocked and collects bounded host diagnostics for the
+owned simulator before cleanup. These diagnostics do not establish readiness or
+Photos admission.
 
-PVT stage observations bind the source and session and retain monotonic times
-within each named process clock. Unstarted or timed-out stages leave admission
-unobserved. Cleanup command outcomes and independently observed resource absence
-are separate facts; later absence does not rewrite a failed or uncertain original
-receipt. The control wrapper keeps overall acceptance in `status` and native
-facts in `product_observations`; a cleanup failure does not erase verified
-admission observations. Portable event and history replays establish harness reporting only.
-An owned run of the changed native runner is required for a runner-working claim;
-Photos admission still requires the complete save and independent readback path.
+The product probe permits at most three startup inventory queries, each with a
+120-second deadline. A real inventory reply is required before its single reader
+installation. The registration query after that command has a 20-second deadline;
+matching installed bytes and both owned containers must still be verified.
 
-Keep experiment commands and promotion criteria beside their code rather than
-creating a workflow per hypothesis. Product orientation readback runs inside
-`ci.yml` against the same exact SHA as the Rust product tests. It reads the
-synthetic oriented HEIF and its expected geometry with ImageIO.
+The file promise uses the package interchange type declared readable by
+`PHLivePhoto`, rather than assuming the filesystem's content-type alias is a
+Photos reader type. Before sharing, a separate provider must load the exact
+whole directory through that native reader, with positive dimensions and
+unchanged member hashes. UIKit receives that native decoder result, with its
+object class and the opaque whole-package origin bound to the input receipt.
+Receipts distinguish native decoding from the later system save callback and
+independent library readback; decoding alone is not admission. They retain both
+the filesystem/provider facts and the consumer type, native decode and hashes.
+Neither a Live Photo object type label nor assembly from extracted resources can
+substitute for whole-package decoding, system save and independent readback.
+
+All system share sheets use the invoking button as their popover source view
+and its bounds as the source rectangle. The image availability control and both
+whole-package routes use the same presentation path, including regular-width
+windows.
+
+When the UI test fails, the probe collects a bounded native log for its reader
+inside the owned simulator before deletion. A failed diagnostic query preserves
+the original test failure and does not prevent cleanup.
+
+The product receipt must identify the same source SHA, runtime, and device type. A passing control does not prove PVT admission. Admission requires whole-package identity and independent PhotoKit readback.
+
+The control and product boot monitors require a zero process exit and an owned-device `Finished` terminal record. Migration failure, an already-booted shortcut, or unknown output blocks inventory or installation. This check does not replace inventory, Photos Save, or independent PhotoKit readback.
+
+Stage observations identify the source and session. Each stage retains monotonic times within its named process clock. An unstarted or timed-out stage leaves admission unobserved.
+
+Cleanup command results and independent observations that resources are absent are separate facts. Later absence does not change a failed or uncertain original receipt. The control wrapper stores overall acceptance in `status` and native facts in `product_observations`. A cleanup failure does not erase verified admission observations.
+
+Portable event and history replays test the probe's reporting behavior only. To claim that a changed native runner works, execute it with a simulator created for that run. Photos admission still requires the complete save and independent readback sequence. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
+
+Keep experiment commands and promotion criteria beside their code. Do not create a workflow for each hypothesis. Product orientation readback runs in `ci.yml` at the same SHA as Rust product tests. ImageIO reads the synthetic oriented HEIF and checks its expected geometry.
