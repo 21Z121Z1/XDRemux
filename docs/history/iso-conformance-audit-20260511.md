@@ -1,3 +1,7 @@
+> **Historical record — 2026-05-11.** The audit below describes the former Python and Swift implementations. Its labels, measurements, commands, and source paths are preserved as recorded; they do not certify the current Rust product. Read the [English summary](iso-conformance-audit-20260511.summary.en.md) and [current architecture](../architecture.en.md) for context.
+>
+> **历史记录——2026-05-11。** 下文描述早期 Python 和 Swift 实现。原有结论标签、测量值、命令和源码路径均按记录保留，不能用于认证当前 Rust 产品。阅读[中文摘要](iso-conformance-audit-20260511.summary.md)和[当前架构](../architecture.md)了解适用范围。
+
 # XDRemux ISO Conformance Audit Report
 
 **Date**: 2026-05-11

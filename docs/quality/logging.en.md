@@ -1,62 +1,46 @@
-# CLI Output Policy
+# CLI output policy
 
 English | [简体中文](logging.md)
 
-This document defines the current command-output contract.
+The Rust CLI owns terminal output and exit status. This policy applies to its human-readable text, JSON results, and diagnostics. Command options are in the [CLI reference](../cli.en.md).
 
-For command options, see the [CLI reference](../cli.en.md).
+## Keep output streams separate
 
-## Human-readable output
+In human-readable mode, normal product commands write progress and results to stdout. They write errors to stderr. Do not add another general logging protocol unless the CLI contract requires one.
 
-The Rust CLI prints human-readable progress for normal product commands.
-
-Use stdout for normal progress and result lines.
-
-Use stderr for errors.
-
-Do not add a second general logging protocol unless the CLI contract explicitly adds it.
-
-## Machine-readable commands
-
-The Rust commands below write JSON to stdout:
+These command forms write JSON to stdout:
 
 - `inspect --json`
 - `batch --json`
 - `categorize --json`
 - `validate --json`
 
-Do not mix unrelated progress text into the JSON stdout stream of these commands.
+When a command reports failures in JSON, keep them in the structured stdout result. Parser and diagnostic errors can still use stderr. Keep unrelated progress text out of the JSON stream. Diagnostics and structured results serve different consumers.
 
-## Error text
+## Write actionable errors
 
-An error message must first identify the user-visible problem.
+State the user-visible problem first. Include an internal metadata key or container term only when it helps diagnose that problem.
 
-Add an internal metadata key or container term only when it helps the reader diagnose the problem.
+If the batch UI consumes one line per failure, preserve that format. When a higher layer adds context, retain the original error. Do not replace an error with an unstructured `print` and continue as though the operation succeeded.
 
-Keep one batch failure on one line when the batch UI depends on line-oriented output.
+## Preserve exit status
 
-Preserve the original error when a higher layer adds context.
+| Status | Meaning |
+| --- | --- |
+| `0` | Success, help, or version output. |
+| `1` | Runtime conversion, validation, or output failure. |
+| `2` | Syntax, usage, input discovery, or planning error. |
 
-Do not replace a critical thrown error with an unstructured `print` and then continue as if the operation succeeded.
+The adapter and research tools must not define a second product exit-code contract.
 
-## Exit status
+## Retain useful diagnostics
 
-The Rust CLI uses `0` for success/help/version, `1` for runtime conversion or validation failures, and `2` for command-line syntax or usage errors. Do not invent a second product exit-code contract in the adapter or research tooling.
+Some conversion paths report source facts or product outcomes as diagnostic lines. Before changing a diagnostic string, search for tests that assert its exact text.
 
-## Diagnostics
+The public CLI does not expose `--debug-dir`. Use the documented validation or diagnostic script for the affected feature. An Apple capability failure can retain evidence or helper output when the platform operation requires it.
 
-Some conversion paths print diagnostic lines that identify selected source facts or product outcomes.
+## Keep formatting out of libraries
 
-Tests can depend on exact diagnostic text. Search for assertions before changing a diagnostic string.
+The runtime and other Rust crates expose structured results, warnings, and errors. They should not depend on terminal formatting. The CLI and app presentation layers own formatting and localization.
 
-`--debug-dir` can retain diagnostic artifacts for supported conversion paths.
-
-Apple capability failures can also retain evidence or helper output when the platform operation requires it.
-
-## Library boundary
-
-The Rust runtime and crates are libraries. They should expose structured results, warnings, and errors instead of depending on terminal formatting.
-
-Terminal formatting and localization belong at the CLI or app presentation layer.
-
-Current technical writing and user-visible error guidance follow the [technical writing guide](../style-guide.en.md).
+Follow the [technical writing guide](../style-guide.en.md) for documentation and user-visible errors.

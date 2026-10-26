@@ -2,71 +2,57 @@
 
 [English](README.en.md) | 简体中文
 
-本目录包含 Rust 产品 policy test、Python 仓库 policy test 和可复用 validation harness。
+本目录包含 Python 回归、产品与仓库规则检查、验证框架自测和小型合成样本。Rust 测试与所属 crate 放在一起。以下命令从仓库根目录运行。
 
-## Rust 测试
-
-在仓库根目录运行 canonical 产品 test：
+## 运行 Rust 产品测试
 
 ```bash
 cargo test --workspace --locked
 ```
 
-Swift package 只包含 Apple primitive adapter。运行 macOS consumer check 时构建它：
+Rust workspace 测试 CLI 解析、转换、批处理、Motion Photo、分类、Portrait、Styles、验证和输出安全。
+
+执行 macOS 消费者检查时，构建 Apple 框架适配器：
 
 ```bash
 swift build --product xdremux-apple-adapter
 ```
 
-公开 CLI 的解析、转换、batch、Motion Photo、分类、Portrait、Styles、验证和输出安全测试位于 Rust workspace。
+Swift package 对外提供适配器可执行产品，包内包含所需的原生支持目标。它不提供另一套转换产品。
 
-## Python 仓库测试
-
-运行：
+## 运行 Python 仓库测试
 
 ```bash
 python3 -m unittest discover -s tests -t . -v
 ```
 
-这些测试覆盖仓库 policy、文档、App 架构以及可选的研究/训练 package；它们不是产品转换实现。
+这些测试覆盖仓库规则、文档、App 架构和可选研究训练代码，不实现产品转换。检查源码文本的测试提供静态证据，不能替代实际转换测试。
 
-源码检查类 policy test 属于 static evidence，不能替代 functional conversion test。
+## 选择验证脚本
 
-## Validation harness
+可复用的可移植检查位于 `scripts/validation/`。App 模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
 
-可复用的可移植 harness 位于 `scripts/validation/`；macOS App 的模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
+| 脚本 | 用途 |
+| --- | --- |
+| `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | 转换并验证真实 Motion Photo 样本集。 |
+| `scripts/validation/verify_error_messages.sh` | 检查部分 CLI 帮助和错误结果。 |
+| `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复执行分类批处理的行为。 |
+| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 构建并运行 macOS App 模型测试。 |
 
-`tests/validation/` 只放验证框架、工作流配置和目录布局的 Python 自测，不放 shell 启动器。
+`tests/validation/` 保存完成门禁、工作流配置和仓库结构的 Python 自测，不放 shell 启动器。检查选择见[回归与真实媒体指南](../docs/quality/evals.md)。
 
-例如：
+## 选择正确的样本位置
 
-- `scripts/validation/check_rust_motion_photo_real_fixtures.sh`
-- `scripts/validation/verify_error_messages.sh`
-- `scripts/validation/verify_batch_categorize_idempotence.sh`
-- `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh`
+真实 Motion Photo 样本集位于 `fixtures/`，`fixtures/SHA256SUMS` 记录文件的准确身份。
 
-如何选择 harness 见[回归和真实样本验证](../docs/quality/evals.md)。
+`tests/fixtures/` 用于可重新生成的小型合成输入或仅含元数据的输入。不要将真实媒体移入该目录。
 
-## 真实 Motion Photo fixture
+## 验证完成门禁
 
-strict Motion Photo corpus 位于 `fixtures/`，不在 `tests/fixtures/`。
+`tests/validation/test_agent_completion_gate.py` 检查必需证据的处理和回执失效行为。[验证操作指南](../docs/validation/README.md)说明如何对已提交修改运行门禁。
 
-`fixtures/SHA256SUMS` 定义真实媒体文件的准确身份。
+## 检查文档
 
-`tests/fixtures/` 用于可以作为测试数据重新生成的小型 synthetic 或 metadata-only fixture。
+`tests/test_public_documentation.py` 检查双语发布规则和必需文档引用。`tests/validation/test_repository_layout.py` 检查本地链接及路径大小写。
 
-## Completion gate 测试
-
-`tests/validation/test_agent_completion_gate.py` 测试仓库 completion gate 实现。
-
-该测试检查必需证据处理和 receipt 失效行为。
-
-正式验收流程见 [docs/validation/README.md](../docs/validation/README.md)。
-
-## 文档测试
-
-`tests/test_public_documentation.py` 检查当前公开文档链接和双语发布规则。
-
-增加新的规范性技术文档时，如果它属于公开双语集合，就把它加入文档 policy。
-
-当前文档遵循[技术写作规范](../docs/style-guide.md)。
+新的规范性文档加入公开双语集合时，将其纳入文档规则检查。写作遵循[技术写作规范](../docs/style-guide.md)。

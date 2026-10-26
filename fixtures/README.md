@@ -1,47 +1,52 @@
-# 真实媒体 Fixture
+# 真实媒体测试样本
 
 [English](README.en.md) | 简体中文
 
-本目录保存用于验证 XDRemux 可移植 Rust 实现及迁移期 oracle 的真实设备原始媒体输入。所有样张都应保持原始字节不变。
+本目录保存设备原始媒体，用于验证可移植 Rust 实现及 Apple 框架消费者。这些文件是不可修改的测试输入。某个设备样本存在，不代表该设备的全部拍摄模式均受支持。
 
-## 目录结构
+## 查找样本
 
-- `motion-photo/<vendor>/...`：Android Motion Photo 样张，覆盖 JPEG 与 HEIC/HEIF 布局。
-- `proxdr/<vendor>/<device>/...`：厂商原始 ProXDR HEIC，用于验证 HDR 提取、family 判定、Gain Map 重建、HEIF 组装和 CLI 转换。
+| 路径 | 测试用途 |
+| --- | --- |
+| `motion-photo/<vendor>/...` | JPEG 和 HEIC/HEIF 布局的 Android Motion Photo。 |
+| `proxdr/<vendor>/<device>/...` | 原始 ProXDR HEIC，用于验证 HDR 提取、格式家族识别、Gain Map 重建、HEIF 组装和 CLI 转换。 |
 
-路径属于 fixture 契约的一部分。命名优先描述稳定的能力或布局，而不是拍摄时间。厂商/设备目录只记录测试输入来源，不是产品支持白名单。
+路径属于测试契约。命名优先描述稳定的能力或布局，不使用拍摄时间。厂商和设备目录记录样本来源，不是产品支持白名单。
 
-## 文件身份契约
+## 保持文件身份
 
-媒体文件按原始字节提交。`SHA256SUMS` 是本目录所有版本化真实媒体 fixture 的统一 canonical identity manifest。
+媒体文件必须保持原始字节。[`SHA256SUMS`](SHA256SUMS) 是本目录所有版本化真实媒体文件的权威身份清单。
 
-严格 real-fixture gate 必须拒绝字节与记录 digest 不一致的文件。如果 metadata、方向、容器布局、厂商尾数据或内嵌资源属于被测行为，不要为了“规范化”而改写源 fixture。
+文件摘要与清单不一致时，严格样本检查必须失败。源元数据、方向、容器布局、厂商尾数据或内嵌资源的字节决定被测行为时，不得对这些内容进行规范化改写。
 
-## Fixture 保留的数据
+## 发布前检查数据
 
-真实 fixture 可能包含 EXIF、拍摄时间、厂商 metadata、内嵌 Motion Video、HDR Gain Map、人像数据、方向数据、Local HDR metadata，以及 parser/validator 所需的其他原始 payload。这些都属于测试输入的一部分。
+真实样本可能保留 Exif、拍摄时间、厂商元数据、内嵌视频、Gain Map、人像资源、方向和局部 HDR 元数据。解析器和验证器可能依赖这些原始载荷。
 
-不要因为文件位于 `fixtures/` 下，就假定真实照片已经去敏。
+不得因为照片位于 `fixtures/`，就假定它已经去敏。添加新样本前，必须确认文件可以公开。
 
 ## 当前覆盖范围
 
-Motion Photo corpus 当前包含 Samsung、Xiaomi、OPPO、vivo 样张，并覆盖 JPEG 与 HEIC/HEIF 容器。
+Motion Photo 样本包含 Samsung、Xiaomi、OPPO 和 vivo 文件，覆盖 JPEG 与 HEIC/HEIF 容器。
 
-ProXDR corpus 当前包含 OPPO Find X6 Pro 的 LHDR v1、Find X7 Ultra 的 LHDR v2（含 XPAN），以及 Find X9 Ultra 的 UHDR 样张（含高分辨率、Master 和 Portrait）。这些 fixture 用于暴露格式与产品策略差异，并不意味着每台设备的所有拍摄模式都已经得到覆盖。
+ProXDR 样本包含以下 OPPO 输入：
 
-## 生成输出
+- Find X6 Pro 的 LHDR v1。
+- Find X7 Ultra 的 LHDR v2，含 XPAN。
+- Find X9 Ultra 的 UHDR，含高分辨率、Master 和 Portrait 拍摄。
 
-生成的 ISO HDR HEIC 和 Live Photo HEIC/MOV 都是临时测试或 workflow artifact。除非未来测试明确把某个输出定义为版本化 golden artifact，否则不要把转换结果提交到这里。
+这些输入用于检验格式和产品策略差异，不覆盖每台设备的全部固件或拍摄模式。
 
-## 增加 fixture
+## 单独保存生成媒体
 
-增加真实 fixture 时：
+生成的 ISO HDR HEIC 和 Live Photo 文件对属于临时测试或工作流产物。只有测试明确将输出定义为版本化基准文件时，才可提交到本目录。
 
-1. 确认文件可以公开提交。
-2. 不修改字节，提交原始文件。
-3. 放入对应的能力/厂商/设备层级。
-4. 在 `SHA256SUMS` 中加入 SHA-256 digest。
-5. 增加或更新测试，明确这个 fixture 能证明什么。
-6. 不要根据一个 fixture 推断无关的设备支持。
+## 添加样本
 
-仓库测试政策见 [docs/quality/testing.md](../docs/quality/testing.md)。
+1. 确认文件可以在本仓库公开。
+2. 选择对应的能力、厂商和设备路径。
+3. 提交原始文件，不修改字节。
+4. 将 SHA-256 摘要加入 `SHA256SUMS`。
+5. 添加或更新测试，明确样本能够证明的行为。
+
+不得根据一个样本推断无关的设备支持。[测试政策](../docs/quality/testing.md)规定证据与上传限制。

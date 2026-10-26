@@ -1,3 +1,5 @@
+> **Historical audit — 2026-07-18.** The tables and selected settings below describe the encoders and samples tested at that time. They are not universal quality recommendations or evidence of current device behavior. The original body is preserved. Read the [English summary](encoding-quality-pareto-20260718.summary.en.md) or [中文摘要](encoding-quality-pareto-20260718.summary.md) before applying the results to current code.
+
 # Active encoding quality and size audit (2026-07-18)
 
 ## Scope and reference hierarchy

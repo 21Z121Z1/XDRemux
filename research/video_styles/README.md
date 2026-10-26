@@ -1,41 +1,27 @@
-# Video Smart Style carrier hypothesis
+# Video Smart Style carrier experiment
 
 English | [简体中文](README.zh-CN.md)
 
-**Research only.** This tests four candidate MOV representations, not a supported
-XDRemux conversion and not evidence of reversible Apple Photos video editing.
-Rust remains the sole product policy/orchestration stack. The Swift executable
-here owns only public AVFoundation operations for this isolated experiment.
+This experiment compares four candidate MOV representations for video Smart Style metadata. **It is research only.** It does not establish a supported XDRemux conversion or reversible video editing in Apple Photos.
 
-## Retained question and observations
+Rust owns product policy and orchestration. The isolated Swift executable in this directory performs public AVFoundation operations for the experiment.
 
-The historical experiment tried six static `com.apple.quicktime.smartstyle.*`
-fields and three binary-plist spelling variants in a boxed timed metadata track:
-`lower`, `compact`, `upper`. `static` is the no-timed-track control. The constants
-(rendering version/cast 1, intensity 1, tone/color 0, bypass false, reversible true)
-are **synthetic hypotheses**, not recovered scene facts or a validated schema.
-The spelling alternatives live in one constructor, not competing backends.
+## Candidate definitions
 
-Historical jobs encountered source download/LFS and Swift bridging/concurrency
-failures. The old validator read only the first video sample. It did not prove
-full audio/video preservation, metadata payload readback, Photos admission, or
-edit/save/reopen. The old writer also deleted an existing output before checking
-its source and guessed 30 fps for missing durations. Those approaches are retired.
+All four candidates write six static `com.apple.quicktime.smartstyle.*` fields. Three candidates also write a boxed timed metadata track with binary-plist payloads.
 
-The removed firmware-analysis workflow requested iOS 27 build `24A437` and probed
-`PESupport.assetCanRenderStyles:`, `PESupport.canPerformEditOnAsset:`,
-`PISemanticStyleAutoCalculator.canRenderStylesOnComposition:`,
-`PISemanticStyleAutoCalculator.isStylableFromImageProperties:error:`,
-`PHAssetPhotosSmartStyleExtendedProperties.isCurrentlySmartStyleable`, and
-`PHAsset._setupSmartStyleFromFetchDictionary:`. These are **probe targets**, not
-successful observations: its disassembly output was not committed and failures
-were allowed to exit successfully. Two build-specific CameraUI addresses
-(`0x1bdd478fc`, `0x1bdf25490`) are not portable entry points. No firmware downloader,
-private binary, or one-off firmware Actions workflow is revived here.
+| Variant | Timed metadata |
+| --- | --- |
+| `static` | None; this is the control without a timed track. |
+| `lower` | Lower-case initial letters in the longer field names. |
+| `compact` | Short field names. |
+| `upper` | Upper-case initial letters in the longer field names. |
 
-## Reproducible carrier experiment
+[`CarrierProbe.swift`](CarrierProbe.swift) defines all variants in one constructor. The constants are rendering version/cast 1, intensity 1, tone/color 0, bypass false, and reversible true where applicable. These are synthetic hypotheses. They are not recovered scene facts or a validated native schema.
 
-On macOS, with Xcode command-line tools and `ffprobe` installed, from repository root:
+## Run the experiment
+
+Use macOS with Xcode command-line tools and `ffprobe`. The synthetic smoke test also requires `ffmpeg`. Run these commands from the repository root:
 
 ```sh
 swiftc -swift-version 5 -parse-as-library research/video_styles/CarrierProbe.swift -o /tmp/CarrierProbe
@@ -43,80 +29,97 @@ python -m research.video_styles.probe input.mov candidate.mov --helper /tmp/Carr
 python -m research.video_styles.smoke --helper /tmp/CarrierProbe
 ```
 
-Use only media you may process. The wrapper never uploads media. CI generates
-its own H.264/HEVC 10-bit clips with audio and a rotation matrix; these are not
-native Smart Style positive samples. The input limit is 2 GiB; subprocesses have
-120-second deadlines; the timestamp reader accepts at most 100,000 video samples.
-These bounds keep a diagnostic run finite, not define product performance goals.
+Use the Python wrapper to publish a validated candidate. The Swift constructor alone writes to a private output path and does not perform the complete publication checks.
 
-`probe.py` requires an absent destination and an existing parent directory. It
-constructs inside a private same-directory temporary folder. Before atomically
-linking the finished candidate into place it requires native static/timed payload
-readback and complete encoded-packet SHA-256, per-track order/count, exact rational
-PTS/DTS/duration, codec configuration, bit depth/chroma/color and display-matrix
-parity. It checks source tags reported by ffprobe except container-brand/encoder
-and stream handler/vendor/encoder bookkeeping; it does not claim preservation of
-uninterpreted MOV atoms. The original input hash must remain unchanged. A racing
-writer wins its own destination; this process refuses to replace it. Atomic name
-publication is not a promise of survival after a filesystem/power failure.
+The destination must not exist, and its parent directory must exist. Use only media that you have permission to process. The wrapper does not upload media.
 
-Only one video plus optional audio tracks are currently supported. Chapters,
-other source tracks, missing/overlapping timing, changing codec descriptions,
-pre-existing Smart Style keys, parity failures and unsupported filesystems fail
-explicitly. There is no re-encoding, silent fallback, invented frame duration, or
-input replacement. Call the Python wrapper rather than the private-output Swift
-constructor for validated publication. Native errors and subprocess timeouts are
-reported, not converted into success.
+| Limit | Value |
+| --- | --- |
+| Input file size | At most 2 GiB |
+| Subprocess deadline | 120 seconds |
+| Swift reader/writer loop deadline | 100 seconds |
+| Video samples accepted by the timestamp reader | At most 100,000 |
 
-## Native timing regression
+These limits bound diagnostic work. They are not product performance targets.
 
-On macOS 26.6.2 (25G83), compressed `AVAssetReader` emits zero-length
-`EmptyMedia` control buffers at the track presentation end. Forwarding those
-markers to `AVAssetWriter` changed the last H.264 B-frame packet duration from
-1/12 to 1/4 second, despite identical payloads and track presentation duration.
-Explicit `endSession` did not fix it. Consuming only the terminal empty markers
-preserved all packets and timing for the H.264 and HEVC10/audio/rotation matrix.
-Other control buffers and actual samples, including audio trim attachments,
-remain unchanged. Interior empty edits fail explicitly; they are not silently
-removed. The full-packet validator remains the publication gate.
+## Checks before publication
 
-The synthetic smoke gate asserts that this control-buffer path is exercised.
-It is evidence about the tested public framework behavior, not iOS 27 Photos.
+[`probe.py`](probe.py) constructs the candidate in a private temporary folder in the destination directory. It requires all of the following checks before publication:
 
-## Failure evidence
+- Native readback of the static and timed metadata payloads.
+- SHA-256 equality for every encoded audio/video packet, with matching per-track packet order and counts.
+- Exact rational equality for PTS, DTS, and durations.
+- Matching codec configuration, bit depth, chroma, color information, and display matrix.
+- Matching source tags reported by `ffprobe`, except the documented container and stream bookkeeping fields.
+- An unchanged source file hash.
 
-The probe emits a JSON receipt and returns a nonzero status on failure. Timing
-mismatches retain media kind, source/candidate track IDs and stream indices,
-packet index (null for stream timing), raw ticks/time bases and exact rational
-values. The temporary candidate is hashed before cleanup, never published after
-failed parity, and not retained as an artifact. Source hash/readback distinguishes
-unchanged input from unavailable or changed input; unavailable evidence is null.
+The tag comparison excludes container brand/encoder fields and stream handler/vendor/encoder fields. These checks do not establish preservation of uninterpreted MOV atoms.
 
-The synthetic gate records every H.264/HEVC10 × static/lower/compact/upper case,
-even after an earlier failure. All eight cases, terminal empty-marker coverage,
-no-clobber/source-immutability controls and malformed-input rejection are mandatory.
-A missing prerequisite cannot pass the malformed-input control. CI uploads the
-JSON diagnostic on failure as well as success; uploading evidence does not waive
-the failing exit status. A successful carrier trial followed by a failed smoke
-control remains an unsuccessful test and reports its earlier publication honestly.
+The wrapper publishes the completed candidate through an atomic hard link. If another writer creates the destination first, this process refuses to replace it. Atomic name publication does not guarantee survival after a filesystem or power failure.
 
-## Promotion gate
+The experiment accepts one video track and optional audio tracks. It rejects chapters, other track types, missing or overlapping timing, changing codec descriptions, and pre-existing Smart Style keys. Parity failures and unsupported filesystems also fail explicitly.
 
-A structurally readable file is insufficient. Promotion additionally requires a
-legally shareable native positive/control corpus with OS/device provenance;
-correct metadata semantics per sample rather than static repeated guesses;
-full-duration, audio, color/HDR and orientation preservation; Photos import and
-actual independent parameter edit, save, reopen and reversal on supported devices.
-Reject a hypothesis when the control/negative matrix disproves it. Preserve raw
-consumer observations and failures with source/output hashes. Until those gates
-pass, `photosEditingValidated` remains false regardless of CI results.
+The tool passes through encoded media. It does not re-encode media, invent frame durations, replace the input, or convert native errors and timeouts into success.
 
-## Design references
+## Native timing observation
 
-- [AVFoundation export guide](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/AVFoundationPG/Articles/05_Export.html): nil output settings request compressed passthrough; reader/writer completion and errors must be checked.
-- [Metadata adaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor): append timed metadata groups with an explicit boxed format description; the installed SDK and native readback are the executable contract.
-- [ffprobe](https://ffmpeg.org/ffprobe.html): `-show_packets -show_streams -show_data_hash sha256` supplies complete packet and codec-extradata checksums. Rational timestamps avoid rounding-based false equivalence.
+The following result belongs to the recorded macOS 26.6.2 (25G83) experiment. It is not a new run or evidence about iOS 27 Photos.
 
-Portable regressions: `python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v`.
-Native structural gate: `.github/workflows/research.yml`, separate from product
-acceptance. A passing research gate never changes the support status above.
+Compressed `AVAssetReader` emitted zero-length `EmptyMedia` control buffers at the track presentation end. Forwarding those markers to `AVAssetWriter` changed the last H.264 B-frame packet duration from 1/12 to 1/4 second. Packet payloads and track presentation duration remained equal. An explicit `endSession` call did not correct the change.
+
+Consuming only the terminal empty markers preserved all packets and timing in the tested H.264 and HEVC10/audio/rotation matrix. Other control buffers and real samples, including audio trim attachments, remain unchanged. Interior empty edits fail explicitly. The full-packet comparison remains a publication requirement.
+
+The synthetic smoke test requires the terminal-marker path to run. This check covers the tested public-framework behavior only.
+
+## Failure reports and regression tests
+
+The probe writes a JSON report and returns a nonzero exit status on failure. A timing mismatch records:
+
+- Media type, source/candidate track IDs, and stream indices.
+- Packet index, or null for a stream-level timing mismatch.
+- Raw timestamp ticks, time bases, and exact rational values.
+
+The tool hashes a temporary candidate before cleanup. It does not publish a candidate after a parity failure or retain that failed candidate as an artifact. Source readback distinguishes unchanged, changed, and unavailable input. Unavailable evidence is null.
+
+The synthetic gate covers H.264/HEVC10 × `static`/`lower`/`compact`/`upper`: eight cases in total. It records every case even if an earlier case fails. All eight cases must pass, and the terminal empty-marker path must run. The gate also requires no-clobber, source-immutability, and malformed-input controls.
+
+A missing prerequisite cannot satisfy the malformed-input control. CI uploads JSON diagnostics after success and failure, but upload success does not override a failing test. If a carrier trial publishes successfully and a later control fails, the overall test fails. The report still records the earlier publication.
+
+Run the portable regressions with:
+
+```sh
+python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v
+```
+
+The native structural gate is in [the research workflow](../../.github/workflows/research.yml). It generates H.264 and HEVC 10-bit clips with audio and rotation. These synthetic clips are not native Smart Style positive samples. Passing research CI does not change product support.
+
+## Historical experiments and rejected methods
+
+Earlier jobs failed during source download/LFS handling and Swift bridging or concurrency checks. Their validator read only the first video sample. It could not establish complete media preservation, metadata readback, Photos admission, or edit/save/reopen behavior.
+
+The earlier writer deleted an existing destination before validating its input. It also assumed 30 fps when duration information was missing. Both methods are retired.
+
+A removed firmware-analysis workflow requested iOS 27 build `24A437`. Its targets were:
+
+- `PESupport.assetCanRenderStyles:`
+- `PESupport.canPerformEditOnAsset:`
+- `PISemanticStyleAutoCalculator.canRenderStylesOnComposition:`
+- `PISemanticStyleAutoCalculator.isStylableFromImageProperties:error:`
+- `PHAssetPhotosSmartStyleExtendedProperties.isCurrentlySmartStyleable`
+- `PHAsset._setupSmartStyleFromFetchDictionary:`
+
+These names identify probe targets, not successful observations. The disassembly output was not committed, and the workflow allowed some failures to exit successfully. CameraUI addresses `0x1bdd478fc` and `0x1bdf25490` applied to a specific build; they are not portable entry points. This directory does not restore the firmware downloader, private binaries, or one-shot firmware workflows.
+
+## Requirements before product use
+
+Product use requires a legally shareable native positive/control corpus with recorded OS and device provenance. Each sample needs correct metadata semantics. Repeated static values do not establish those semantics.
+
+Validation must cover complete duration, audio, color/HDR, and orientation preservation. On applicable devices, it must also cover Photos import, independent parameter editing, saving, reopening, and reversal. Reject a candidate when a control or negative test disproves it.
+
+Preserve raw consumer observations and failures with source/output hashes. Until these requirements pass, `photosEditingValidated` remains false regardless of CI status.
+
+## Primary references
+
+- [AVFoundation export guide](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/AVFoundationPG/Articles/05_Export.html): nil output settings request compressed passthrough. Check reader/writer completion and errors.
+- [Metadata adaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor): timed groups need an explicit boxed format description. Check behavior against the installed SDK and native readback.
+- [ffprobe](https://ffmpeg.org/ffprobe.html): `-show_packets -show_streams -show_data_hash sha256` provides packet and codec-extradata checksums. Rational timestamps avoid comparisons based on rounded values.

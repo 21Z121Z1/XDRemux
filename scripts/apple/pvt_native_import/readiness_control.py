@@ -15,10 +15,12 @@ import time
 import uuid
 
 if __package__:
+    from .boot_status import observe_boot_status
     from .check_native_import import capture_host_simulator_diagnostics
     from .observations import PVTStages
     from .owned_cleanup import cleanup_owned_simulator
 else:
+    from boot_status import observe_boot_status
     from check_native_import import capture_host_simulator_diagnostics
     from observations import PVTStages
     from owned_cleanup import cleanup_owned_simulator
@@ -30,9 +32,9 @@ class ReadinessBlocked(RuntimeError):
     pass
 
 
-def run_control(run, choose_device, report, name, device_root):
+def run_control(run, choose_device, report, name, device_root, *, capture_diagnostics=None):
     stages = PVTStages(report.get('expected_head'), name, ('readiness',))
-    facts = {'name': name, 'status': 'pending', 'listapps_attempts': 0,
+    facts = {'name': name, 'source_head': report.get('expected_head'), 'status': 'pending', 'listapps_attempts': 0,
              'cleanup_status': 'not-created', 'stage_observations': stages.facts}
     report['control'] = facts
     owned = None
@@ -58,8 +60,12 @@ def run_control(run, choose_device, report, name, device_root):
         owned = parsed
         facts['owned_udid'] = owned
         stages.record('readiness', 'observed', 'owned_uuid_received', owned_udid=owned)
-        run('control-boot', ['xcrun', 'simctl', 'boot', owned])
-        run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
+        # Let the monitor initiate startup; a preceding boot can leave it
+        # observing an already-Booted device instead of the startup sequence.
+        boot = run('control-bootstatus', ['xcrun', 'simctl', 'bootstatus', owned, '-b'], timeout=180)
+        facts['boot_observation'] = observe_boot_status(boot.stdout, owned)
+        if facts['boot_observation']['state'] != 'completed':
+            raise ReadinessBlocked(facts['boot_observation']['reason'])
         stages.record('readiness', 'observed', 'bootstatus_completed')
         facts['listapps_attempts'] = 1
         stages.record('readiness', 'observed', 'inventory_submitted')
@@ -98,6 +104,12 @@ def run_control(run, choose_device, report, name, device_root):
     finally:
         stages.stop_active(timed_out=any(row.get('outcome') == 'uncertain-after-timeout' for row in report.get('commands', [])))
         if owned:
+            if not ready and capture_diagnostics is not None:
+                try:
+                    capture_diagnostics(run, owned, facts, include_host_processes=False)
+                except Exception as error:
+                    # Optional observations must not replace the failure or skip cleanup.
+                    facts['host_diagnostic_error'] = str(error)
             cleanup = cleanup_owned_simulator(run, owned,
                 {'owned_udid': owned, 'source_head': report.get('expected_head'), 'session_id': name},
                 device_root, prefix='control', command_records=report.get('commands', []))
@@ -111,16 +123,17 @@ def run_control(run, choose_device, report, name, device_root):
     return facts
 
 
-def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head):
+def run_control_and_probe(run, choose_device, invoke_probe, report, control_name, device_root, *, expected_head, capture_diagnostics=None):
     report.update(control_prewarms_core_simulator=True, product_probe_invocations=0,
                   experimental_condition='control may warm CoreSimulator/runtime; not a cold-start fix or fresh-VM claim')
-    control = run_control(run, choose_device, report, control_name, device_root)
+    control = run_control(run, choose_device, report, control_name, device_root,
+                          capture_diagnostics=capture_diagnostics)
     if control['status'] != 'passed-cleaned':
         report.update(status='control-environment-blocked', reason=control.get('reason', 'control cleanup is not confirmed'))
         return
     report.update(product_probe_invocations=1, status='product-probe-running')
     try:
-        code, native = invoke_probe()
+        code, native = invoke_probe(control['selected_runtime'], control['selected_device_type'])
         report['product_probe_exit_code'] = code
         report['product_result'] = native
         if not isinstance(native, dict):
@@ -167,7 +180,11 @@ def main():
     parser.add_argument('--output-root', type=Path, required=True)
     parser.add_argument('--product-output-root', type=Path, required=True)
     parser.add_argument('--execute-owned-simulator', action='store_true')
+    parser.add_argument('--required-runtime')
+    parser.add_argument('--required-device-type')
     args = parser.parse_args()
+    if (args.required_runtime is None) != (args.required_device_type is None):
+        parser.error('required runtime and device type must be provided together')
     args.repo = args.repo.resolve()
     args.output_root = args.output_root.resolve()
     args.product_output_root = args.product_output_root.resolve()
@@ -217,12 +234,13 @@ def main():
             return subprocess.CompletedProcess(argv, record['exit_code'],
                 (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
 
-        def invoke_probe():
+        def invoke_probe(runtime, device):
             save_report()
             args.product_output_root.mkdir(parents=True, exist_ok=False)
             command = [sys.executable, str(probe_path), '--repo', str(args.repo), '--cli',
                        str(args.repo / 'target/debug/xdremux'), '--expected-head', args.expected_head,
-                       '--output-root', str(args.product_output_root), '--execute-owned-simulator']
+                       '--output-root', str(args.product_output_root), '--execute-owned-simulator',
+                       '--required-runtime', runtime, '--required-device-type', device]
             report['product_command'] = command
             started = time.monotonic()
             with (work / 'product-probe.stdout').open('wb') as stdout, (work / 'product-probe.stderr').open('wb') as stderr:
@@ -235,10 +253,14 @@ def main():
             report['product_receipt'] = str(receipts[0])
             return result.returncode, json.loads(receipts[0].read_text())
 
-        run_control_and_probe(run, probe.select_device, invoke_probe, report,
+        choose_device = probe.select_device
+        if args.required_runtime is not None:
+            def choose_device(runtimes, types):
+                return probe.validate_required_device(runtimes, types, args.required_runtime, args.required_device_type)
+        run_control_and_probe(run, choose_device, invoke_probe, report,
                               'pvt-readiness-control-' + uuid.uuid4().hex,
                               Path.home() / 'Library/Developer/CoreSimulator/Devices',
-                              expected_head=args.expected_head)
+                              expected_head=args.expected_head, capture_diagnostics=probe.capture_host_simulator_diagnostics)
     except (ReadinessBlocked, OSError, ValueError, RuntimeError) as error:
         report.update(status='experiment-blocked', reason=str(error))
     except Exception as error:

@@ -5,28 +5,36 @@ description: Coordinate a scoped XDRemux investigation, bug fix, feature, or ref
 
 # XDRemux engineering workflow
 
-Read [AGENTS.md](../../../AGENTS.md), the relevant owner, and nearby consumer tests before choosing a change. Treat this skill as a project workflow. It grants no additional authority to send messages, update tickets, publish, open or merge a PR, commit, push, delete branches, install tools, or change billing or protection settings. Follow the user's current scope and the active session's permission rules.
+Read [AGENTS.md](../../../AGENTS.md), the responsible implementation, and nearby consumer tests before choosing a change. Use this skill to organize work within the user's current scope and the active session's permissions.
 
-## Choose the work
+This skill grants no additional authority for external or repository actions. These include messages, ticket updates, publication, PR creation or merge, commits, pushes, and branch deletion. Tool installation, billing changes, and protection settings also require authority from the task or session.
 
-1. State the user-visible result, current behavior, affected producer and consumer, and the evidence that will distinguish success from failure.
-2. Read the matching [playbook](references/playbooks.md). Keep investigations read-only. Keep refactors behavior-preserving. Name any intended behavior change explicitly.
-3. Name the data shape, canonical owner, and boundary before changing a cross-function contract. Compare a small number of alternatives when the tradeoff matters. Do not create an abstraction for a single mechanical edit.
+## Define the work
+
+1. State the requested result and current behavior. Identify the producer, consumer, and evidence needed to distinguish success from failure.
+2. Read the matching [playbook](references/playbooks.md). Keep an investigation read-only. Preserve behavior in a refactor. Identify any intended behavior change.
+3. Before changing a contract between functions, name its data shape, responsible module, and boundary. Compare alternatives when the tradeoff matters. Do not add an abstraction for one mechanical edit.
 4. Read [engineering principles](../pstack-engineering-principles/SKILL.md). For a bug with a cheap executable reproduction, read [TDD](../pstack-tdd/SKILL.md).
-5. For multi-step work, keep a short plan with the blocking evidence, independent work, shared files or state, and smallest useful check for each unit. A single owner is sufficient when splitting work adds coordination without improving coverage.
+5. For multi-step work, keep a short plan. Include blocking evidence, independent tasks, shared files or state, and the smallest useful check for each unit. Use one owner when delegation adds coordination without improving coverage.
 
 ## Implement and inspect
 
-Make the smallest coherent change supported by the evidence. Preserve existing caller contracts, public fixture bytes and provenance, source facts, and failure-safe publication. Re-ground after another worker changes shared files. Inspect the actual diff and its consumers before accepting delegated work.
+Make the smallest complete change supported by evidence. Preserve caller contracts, public fixture bytes and provenance, source facts, and safe publication on failure. After another worker changes shared files, read the new state. Inspect the actual diff and its consumers before accepting delegated work.
 
-Use the session's available tools. Delegate only when the task or applicable instructions authorize it and the work has a useful independent scope. Give each worker its target files, intended behavior, known constraints, and required evidence. Serialize shared writes. Inherit the active session's model and settings unless that session explicitly specifies otherwise. Do not select a new model, reasoning budget, or service tier from this skill.
+Use the tools available in the session. Delegate only when the task or applicable instructions authorize delegation and the work has an independent scope. Give each worker the target files, intended behavior, constraints, and required evidence. Serialize writes to shared files.
+
+Inherit the active session's model and settings unless the session explicitly selects different settings. Do not use this skill to select a model, reasoning budget, or service tier.
 
 ## Verify and review
 
-Follow the [verification checklist](references/verification.md) and [XDRemux feature recipes](../xdremux-verify/SKILL.md). Run the affected user entry point or real artifact and the smallest complete repository checks. A compile, structural parse, native framework readback, and real-device edit are different claims. An unavailable host or failed check remains unavailable or failed.
+Follow the [verification checklist](references/verification.md) and [feature recipes](../xdremux-verify/SKILL.md). Exercise the affected public entry point or inspect the actual artifact. Run the smallest complete set of repository checks.
 
-Use [review](../pstack-review/SKILL.md) for a completed meaningful diff or contested design. Review findings are evidence to assess, not instructions to apply automatically. After a fix, rerun the affected checks and re-review the changed contract. Do not repeat unrelated expensive suites when no new change or unresolved concern justifies them.
+Compilation, structural parsing, native framework readback, and a real-device edit establish different claims. Report an unavailable host as unavailable. Report a failed check as failed.
 
-Apply [unslop](../pstack-unslop/SKILL.md) to authored explanations. Report the resulting behavior, the reason for the change, commands and outcomes, and material native/device gaps. Refer only to evidence actually read or produced. Use the repository's existing completion gate when an exact-HEAD receipt is required. Do not add a parallel verification ledger or workflow.
+For a completed meaningful diff or contested design, use [review](../pstack-review/SKILL.md). Assess findings before applying them. After a fix, rerun affected checks and review the changed contract again. Repeat an expensive suite only when a new change or unresolved concern requires it.
+
+Apply [unslop](../pstack-unslop/SKILL.md) to explanations. Report the resulting behavior, reason for the change, executed commands, results, and material native or device gaps. Cite only evidence read or produced during the task.
+
+When an exact-HEAD receipt is required, use the existing completion gate. Do not add another verification ledger or workflow.
 
 Adapted from pstack at `a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4`. Original paths and hashes are in [sources.json](sources.json). See [LICENSE](LICENSE).

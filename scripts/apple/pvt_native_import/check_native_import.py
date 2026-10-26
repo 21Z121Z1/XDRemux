@@ -19,9 +19,11 @@ import time
 import uuid
 
 if __package__:
+    from .boot_status import observe_boot_status
     from .observations import PVTStages, parse_share_observations, check_reader_observation
     from .owned_cleanup import cleanup_owned_simulator
 else:
+    from boot_status import observe_boot_status
     from observations import PVTStages, parse_share_observations, check_reader_observation
     from owned_cleanup import cleanup_owned_simulator
 
@@ -128,7 +130,7 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout, source_head
     return facts
 
 
-def capture_host_simulator_diagnostics(run, owned_udid, report):
+def capture_host_simulator_diagnostics(run, owned_udid, report, *, include_host_processes=True):
     """Observe an unresponsive owned device without its simctl spawn service.
 
     These host facts never establish installation or Photos readiness.
@@ -138,6 +140,9 @@ def capture_host_simulator_diagnostics(run, owned_udid, report):
     facts = {'owned_udid': owned_udid, 'processes': [],
              'process_scope': 'selected host service names; per-process device ownership is not inferred',
              'scope': 'read-only host observations; device/service readiness remains unproven'}
+    if not include_host_processes:
+        facts.update(source_head=report.get('source_head'), session_id=report.get('name'),
+                     process_scope='host process query disabled')
     report['host_simulator_diagnostics'] = facts
     home = Path.home().resolve(strict=True)
     try:
@@ -181,24 +186,25 @@ def capture_host_simulator_diagnostics(run, owned_udid, report):
         facts['system_log'] = {**metadata, 'text': data.decode(errors='replace')}
     except (OSError, ValueError, AttributeError) as error:
         facts['system_log'] = {'error': str(error)}
-    try:
-        observed = subprocess.run(['/bin/ps', '-ww', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,rss=,comm='],
-                                  capture_output=True, timeout=5)
-        facts['process_query_exit_code'] = observed.returncode
-        relevant = {'CoreSimulatorService', 'com.apple.CoreSimulator.CoreSimulatorService',
-                    'SimulatorTrampoline', 'launchd_sim', 'simdiskimaged',
-                    'SpringBoard', 'backboardd', 'installd', 'installcoordinationd'}
-        for line in observed.stdout.decode(errors='replace').splitlines():
-            fields = line.split(None, 8)
-            if len(fields) == 9 and Path(fields[-1]).name in relevant:
-                facts['processes'].append(dict(zip(
-                    ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'rss_kib', 'command'),
-                    [*map(int, fields[:3]), *fields[3:7], int(fields[7]), Path(fields[-1]).name])))
-                if len(facts['processes']) == 64:
-                    facts['process_list_truncated'] = True
-                    break
-    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-        facts['process_error'] = str(error)
+    if include_host_processes:
+        try:
+            observed = subprocess.run(['/bin/ps', '-ww', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,rss=,comm='],
+                                      capture_output=True, timeout=5)
+            facts['process_query_exit_code'] = observed.returncode
+            relevant = {'CoreSimulatorService', 'com.apple.CoreSimulator.CoreSimulatorService',
+                        'SimulatorTrampoline', 'launchd_sim', 'simdiskimaged',
+                        'SpringBoard', 'backboardd', 'installd', 'installcoordinationd'}
+            for line in observed.stdout.decode(errors='replace').splitlines():
+                fields = line.split(None, 8)
+                if len(fields) == 9 and Path(fields[-1]).name in relevant:
+                    facts['processes'].append(dict(zip(
+                        ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'rss_kib', 'command'),
+                        [*map(int, fields[:3]), *fields[3:7], int(fields[7]), Path(fields[-1]).name])))
+                    if len(facts['processes']) == 64:
+                        facts['process_list_truncated'] = True
+                        break
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            facts['process_error'] = str(error)
     try:
         memory = subprocess.run(['/usr/bin/vm_stat'], capture_output=True, timeout=5)
         text = memory.stdout.decode(errors='replace')
@@ -442,6 +448,35 @@ def select_device(runtimes, types):
     raise Blocked('no installed available iOS runtime explicitly supports a compatible catalogued iPhone; no runtime installation attempted')
 
 
+def validate_required_device(runtimes, types, runtime, device):
+    """Validate this exact pair against fresh facts; never select a substitute."""
+    runtime_rows = [item for item in runtimes['runtimes'] if item.get('identifier') == runtime]
+    device_rows = [item for item in types['devicetypes'] if item.get('identifier') == device]
+    if len(runtime_rows) != 1 or len(device_rows) != 1:
+        raise Blocked('required runtime/device pair is absent or ambiguous in the current catalog')
+    row, phone = runtime_rows[0], device_rows[0]
+    try:
+        parts = [int(value) for value in row['version'].split('.')]
+        if not 1 <= len(parts) <= 3 or any(value < 0 for value in parts):
+            raise ValueError('invalid runtime version')
+        encoded = parts[0] * 65536 + (parts[1] if len(parts) > 1 else 0) * 256 + (parts[2] if len(parts) > 2 else 0)
+        supported = {item['identifier'] for item in row.get('supportedDeviceTypes', [])}
+        valid = (row.get('isAvailable') is True and '.iOS-' in runtime and parts[0] >= 17
+                 and phone.get('productFamily') == 'iPhone' and device in supported
+                 and phone.get('minRuntimeVersion', 0) <= encoded <= phone.get('maxRuntimeVersion', 2**32))
+    except (KeyError, TypeError, ValueError) as error:
+        raise Blocked('required runtime/device catalog facts are malformed') from error
+    if not valid:
+        raise Blocked('required runtime/device pair is no longer available and compatible; no substitute selected')
+    return runtime, device
+
+
+def read_required_device(run, runtime, device, *, prefix):
+    runtimes = json.loads(run(prefix + '-runtimes', ['xcrun', 'simctl', 'list', 'runtimes', '--json']).stdout)
+    types = json.loads(run(prefix + '-device-types', ['xcrun', 'simctl', 'list', 'devicetypes', '--json']).stdout)
+    return validate_required_device(runtimes, types, runtime, device)
+
+
 def check_readback(baseline, after, expected_id, expected_hashes, cover_seconds):
     if baseline.get('status') != 'baseline' or not isinstance(baseline.get('asset_identifiers'), list):
         raise Blocked('new owned simulator did not present an authorized asset-identifier baseline')
@@ -545,7 +580,11 @@ def main():
     parser.add_argument('--expected-head', required=True)
     parser.add_argument('--output-root', type=Path, required=True)
     parser.add_argument('--execute-owned-simulator', action='store_true')
+    parser.add_argument('--required-runtime')
+    parser.add_argument('--required-device-type')
     args = parser.parse_args()
+    if bool(args.required_runtime) != bool(args.required_device_type):
+        parser.error('--required-runtime and --required-device-type must be supplied together')
     args.repo = args.repo.resolve()
     args.cli = args.cli.resolve()
     args.output_root = args.output_root.resolve()
@@ -652,7 +691,8 @@ def main():
         report['official_owned_photos_grant_available'] = privacy_available
         runtime_data = json.loads(run('simctl-runtimes', ['xcrun', 'simctl', 'list', 'runtimes', '--json']).stdout)
         types_data = json.loads(run('simctl-device-types', ['xcrun', 'simctl', 'list', 'devicetypes', '--json']).stdout)
-        runtime, device = select_device(runtime_data, types_data)
+        runtime, device = (validate_required_device(runtime_data, types_data, args.required_runtime, args.required_device_type)
+                           if args.required_runtime else select_device(runtime_data, types_data))
         report['selected_runtime'] = runtime
         report['selected_device_type'] = device
         selected_runtime = next(item for item in runtime_data['runtimes'] if item.get('identifier') == runtime)
@@ -719,13 +759,19 @@ def main():
         report['reader_binary_sha256'] = sha(app / 'PVTReadback')
         report['reader_info_sha256'] = sha(app / 'Info.plist')
         stages.record('preparation', 'completed', 'reader_signed_and_package_validated')
+        # Builds may take minutes. Recheck the exact chosen pair immediately
+        # before creation, including direct runs without a readiness control.
+        read_required_device(run, runtime, device, prefix='precreate')
         stages.record('readiness', 'started', 'simulator_create_submitted')
         result = run('create-owned-simulator', ['xcrun', 'simctl', 'create', 'pvt-audit-' + token, device, runtime])
         owned_udid = str(uuid.UUID(result.stdout.decode().strip())).upper()
         report['owned_udid'] = owned_udid
         (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
-        run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
-        run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
+        # Start and monitor with one bounded command, as in the control.
+        boot = run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
+        report['boot_observation'] = observe_boot_status(boot.stdout, owned_udid)
+        if report['boot_observation']['state'] != 'completed':
+            raise Blocked(report['boot_observation']['reason'])
         install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])

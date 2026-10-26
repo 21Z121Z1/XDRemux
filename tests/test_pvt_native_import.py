@@ -20,6 +20,18 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_product_boot_monitor_starts_device_without_a_prior_unobserved_boot(self):
+        # External simctl lifecycle: the monitor owns startup, not a second
+        # command that can see an already-Booted device and short-circuit.
+        calls = []
+        for node in ast.walk(ast.parse(inspect.getsource(probe.main))):
+            if not isinstance(node, ast.Call) or len(node.args) < 2 or not isinstance(node.args[1], ast.List):
+                continue
+            argv = [item.value if isinstance(item, ast.Constant) else None for item in node.args[1].elts]
+            if argv[:2] == ['xcrun', 'simctl'] and argv[2] in ('boot', 'bootstatus'):
+                calls.append((argv, next((k.value.value for k in node.keywords if k.arg == 'timeout'), None)))
+        self.assertEqual(calls, [(['xcrun', 'simctl', 'bootstatus', None, '-b'], 180)])
+
     def test_installation_is_not_gated_on_redundant_cli_help_probes(self):
         # Native service replies are the readiness contract. Merely printing
         # usage must not block those requests (observed15s native help timeout).

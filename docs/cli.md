@@ -2,168 +2,170 @@
 
 [English](cli.en.md) | 简体中文
 
-XDRemux 的产品入口是 Rust `xdremux` CLI。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
+XDRemux 的产品入口是 Rust `xdremux` CLI。程序自动识别源类型、ProXDR 或 Motion Photo 转换方式及 HDR 结构。标准转换不需要选择设备代际、格式或编解码器。
 
-完整 Mac 产品交付面向 Apple silicon（`arm64`）和 macOS 27。底层 Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。核心构建或较旧的编译下限不证明 Styles SPI 或其他 Apple 原生功能可用。这些功能仍需文档规定的 macOS 27 SDK、运行时 API、硬件及独立原生验收检查。
+完整 Mac 产品交付面向 Apple silicon（`arm64`）和 macOS 27。Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。可移植构建不证明 Styles SPI 或其他 Apple 功能可用。这些功能需要文档规定的 SDK、运行时 API、硬件和原生检查。
 
-Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 只作为研究/训练工具。它们都不是第二套 XDRemux 实现，不再定义新的 CLI 产品语义或产品 policy。
+Swift 包提供 Apple 适配器，Python 工具用于研究和训练。两者不再定义新的 CLI 产品语义，也不另设产品策略。
 
 ## 命令
 
-| 命令 | 功能 |
+| 命令 | 输入和结果 |
 | --- | --- |
-| `convert` | 转换一张 ProXDR 照片；支持的 Motion Photo 会自动转换为 Live Photo。 |
-| `batch` | 批量发现并转换支持的照片资产。 |
-| `categorize` | 不转换，只按资产类型和主要拍摄模式分类。 |
-| `inspect` | 检查输入类型和关键结构。 |
-| `validate` | 验证 ISO HDR HEIF 或 Live Photo 输出。 |
-
-运行帮助：
+| `convert` | 转换一张支持的 ProXDR 静态照片或 Motion Photo。支持的 Motion Photo 自动转换为 Live Photo。`--apple-cinematic` 则选择普通视频。 |
+| `batch` | 接受多个文件或目录，为每个计划项报告结果。 |
+| `categorize` | 按资产类型和主要拍摄模式复制到分类目录，不转换媒体。 |
+| `inspect` | 报告解析到的源数据，不转换媒体。 |
+| `validate` | 检查支持的 ISO HDR HEIF、Live Photo 成员或 PVT 目录，不转换媒体。 |
 
 ```bash
 xdremux --help
 xdremux convert --help
 ```
 
+参数定义见 [CLI 源码](../crates/xdremux-cli/src/lib.rs)。分类和验证分别由 [categorize](../crates/xdremux-cli/src/categorize.rs) 与 [validate](../crates/xdremux-cli/src/validate.rs) 模块实现。
+
 ## 终端语言
 
-使用 `xdremux --lang en --help` 或 `xdremux --lang zh-CN --help` 选择英文或
-简体中文终端显示。全局选项也可放在子命令后。选择顺序为 `--lang`、
-`XDREMUX_LANG`、`LC_ALL`、`LC_MESSAGES`、`LANG`，最后默认英文。忽略空环境变量。
-`zh_CN.UTF-8` 等受支持的 `zh` locale 选择简体中文；`C` 和 `POSIX` 选择英文。
-不支持的环境 locale 回退英文；显式指定不支持的 `--lang` 则返回用法错误。
+`--lang en` 选择英文，`--lang zh-CN` 选择简体中文。这个全局选项可以放在子命令前，也可以放在子命令后。
 
-语言不改变 JSON 文档、命令/选项名称、枚举值、退出码或输入路径参数。
-翻译范围为人类可读帮助、标签和 CLI 持有的错误上下文。Clap 详细参数诊断和
-底层库/原生错误仍可能使用英文。
+语言按以下优先级选择首个适用值：
+
+1. `--lang`
+2. `XDREMUX_LANG`
+3. `LC_ALL`
+4. `LC_MESSAGES`
+5. `LANG`
+6. 英文
+
+空环境变量会被忽略。`zh_CN.UTF-8` 等受支持的 `zh` 区域设置选择简体中文，`C` 和 `POSIX` 选择英文。不支持的环境语言回退到英文；显式传入不支持的 `--lang` 值则返回用法错误。
+
+语言选项改变帮助、标签和 CLI 自身的错误上下文，不改变 JSON、命令名、选项名、枚举值、路径或退出码。Clap 参数诊断详情、底层库和原生错误仍可能使用英文。
 
 ## `convert`
 
-标准转换不需要模式参数：
+`--input INPUT` 必填。`--output OUTPUT` 可省略，但默认行为取决于源类型和所选功能。
+
+| 源类型或功能 | 省略 `--output` 时 | 输入保护 |
+| --- | --- | --- |
+| ProXDR 静态照片，包括摄影风格或人像 | 以输入路径为输出目标。 | 转换成功后，通过原子发布替换输入。 |
+| Motion Photo，默认文件对输出 | 在源文件旁选择新的 HEIC 文件名，并生成同名 MOV。 | 不替换源文件，名称不能与已有文件对成员冲突。 |
+| Motion Photo，PVT 输出 | 在源文件旁选择新的 `.pvt` 目录。 | 不替换源文件。 |
+| `--apple-cinematic` | 在源文件旁使用 `SOURCE.xdremux.mov`。 | 不替换源文件；目标已存在时拒绝写入。 |
+
+> [!CAUTION]
+> 需要保留 ProXDR 原图时，指定独立的 `--output` 路径。省略此选项会在转换成功后替换源文件。
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
-```
-
-对于普通 ProXDR，如果省略 `--output`，输出目标就是输入路径，并使用原子发布替换文件。
-
-对于支持的 Motion Photo：
-
-```bash
 xdremux convert --input IMG_001.jpg
 ```
 
-XDRemux 会自动识别 Motion Photo，并发布匹配的 HEIC + MOV Live Photo pair。Motion Photo 不做原位转换；未指定输出时会选择不会与现有 HEIC/MOV 冲突的新文件名。
+第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
 
-### 可选 PVT 封装
+### 产品选项
 
-`convert` 和 `batch` 的 `--live-photo-output pair|pvt` 选择实况照片容器，默认仍为
-HEIC/HEIF + MOV 文件对。包输出示例：
+以下选项适用于 `convert` 和 `batch`。
+
+| 选项 | 条件和效果 |
+| --- | --- |
+| `--live-photo-output pair\|pvt` | 默认为 `pair`。选择 Live Photo 文件对或 PVT 目录，其他资产保留原有格式。 |
+| `--oppo-compatible` | 为 ProXDR 静态照片请求 OPPO 相册兼容输出。Motion Photo 项拒绝此请求。 |
+| `--apple-portrait` | 请求完整 Apple 人像资源集，包括 Vision 语义资源。 |
+| `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
+| `--apple-styles` | 在 macOS 27 上生成摄影风格和推理得到的纹理风格，需要支持的 ProXDR 源数据。 |
+| `--apple-cinematic` | 在 macOS 27 上为普通视频生成待处理的电影效果元数据，属于实验性功能。 |
+| `--focal-length-35mm MM` | 需要 `--apple-cinematic`，以显式 35mm 等效焦距覆盖自动选择。 |
+| `--aperture F` | 需要 `--apple-cinematic`，默认为 `2.8`，提供假定拍摄光圈。 |
+
+`--oppo-compatible`、`--apple-portrait`、`--apple-portrait-oppo`、`--apple-styles` 和 `--apple-cinematic` 相互排斥。功能失败后不会静默切换模式。发布输出前，必须具备所需源数据和原生能力。
+
+### PVT 目录输出
 
 ```bash
 xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
 xdremux validate capture.pvt --json
 ```
 
-PVT 是真实目录，包含 `capture.heic`、`capture.mov` 和 `metadata.plist`；
-`PFVideoComplementMetadataVersionKey` 的值是字符串 `"1"`。封装保留已生成且已验证
-pair 的完整字节、配对标识和封面时间，不额外编码照片或重封装 MOV。原有媒体转换策略
-仍可能生成配对元数据或按需重编码照片；厂商资源遗漏继续报告，PVT 不等于无损转换。
+示例要求输入是支持的 Motion Photo。`capture.pvt` 包含 `capture.heic`、`capture.mov` 和 `metadata.plist`。plist 中 `PFVideoComplementMetadataVersionKey` 的值为字符串 `"1"`。
 
-显式包目标必须以 `.pvt` 结尾；已有文件、目录或 symlink 均保留并拒绝覆盖。
-支持的 macOS/Linux 文件系统使用一次原子排他目录 rename 发布；平台或文件系统不支持时
-报错，不回退到覆盖式 rename。发布失败可能保留完整 staging 包并报告路径供显式恢复，
-不承诺断电持久性。将 ZIP 改名为 `.pvt` 会被拒绝。
+封装保留已生成文件对的字节、标识和封面时间，不再次编码照片或重封装 MOV。此前的转换仍可能添加配对元数据，或按需要重新编码照片。厂商资源遗漏继续报告，因此 PVT 不等于无损转换。
 
-该选择只影响 Motion Photo。混合 batch 中普通 HDR 照片保持原有输出，不能把 HEIF
-伪装写到显式 `.pvt` 目标。batch JSON 将包目录列为一个输出；复用需要来源 checkpoint
-及容器一致，旧文件对或来源未知的有效包均不能替代当前 PVT 请求。
+显式包目标必须以 `.pvt` 结尾。已有文件、目录和符号链接均保留并拒绝覆盖。受支持的 macOS、Linux 文件系统通过一次原子排他目录重命名发布；不支持的平台或文件系统直接失败，不回退到覆盖式重命名。
 
-支持包输出和验证，`convert`、`batch` 和 `categorize` 不将已有 PVT 或其成员当作新源；目录扫描跳过整个包，
-输出和 checkpoint 写入也拒绝向已有包内部写入，包括通过别名访问的路径。
+发布失败可能保留完整暂存包，并报告恢复路径。这不构成断电持久性保证。将 ZIP 改名为 `.pvt` 会被拒绝。
 
-App 提供同一选择并交给 Rust 创建；仅结构有效不足以接管已有包，已有包保持不变。
-当前结构测试不证明 Photos 导入或动态墙纸可用。
+PVT 选项只影响 Motion Photo 项。混合批次中的静态照片保持原有 HDR 输出，不会把 HEIF 伪装写入显式 `.pvt` 目标。批处理 JSON 将包目录列为一个输出。
 
-### OPPO 相册兼容
+复用要求来源记录和请求容器匹配。已有文件对或来源无关的有效包不能满足 PVT 请求。`convert`、`batch` 和 `categorize` 不把已有 PVT 或包内成员视为输入资产。
 
-需要输出继续面向 OPPO Gallery 时，只使用一个产品级开关：
+目录扫描跳过 PVT 目录。输出和检查点写入拒绝包内目标，也拒绝通过路径别名写入。App 提供相同选项并交给 Rust 创建；仅结构有效不足以接管已有包。
+
+包生成和验证不证明 Photos 导入或动态墙纸可用，详见 [Live Photo 集成](liblivephoto-integration.md)。
+
+### OPPO 相册输出
 
 ```bash
-xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_oppo.heic \
-  --oppo-compatible
+xdremux convert --input IMG_001.heic --output IMG_001_oppo.heic --oppo-compatible
 ```
 
-`--oppo-compatible` 表示“生成 OPPO Gallery 兼容输出”。XDRemux 会根据输入和目标结果自动选择内部 Gain Map 编码、metadata routing 和平台能力。
+engine 根据源数据和输出目标选择增益图编码、元数据关系和平台操作。Motion Photo 转换遇到 `--oppo-compatible` 会失败。混合批次逐项报告这些 Motion Photo 失败。
 
-OPPO-compatible 目前只适用于 ProXDR 静态照片，不能和 Motion Photo → Live Photo 转换组合。遇到这种组合时 CLI 会明确失败，而不会静默忽略参数。
-
-### macOS 上的 Apple 人像
-
-不需要 Apple 私有分割能力时，使用源数据模式：
+### Apple 人像
 
 ```bash
 xdremux convert --input portrait.heic --output portrait_apple.heic --apple-portrait-oppo
 xdremux batch --input-dir portraits/ --output-dir converted/ --apple-portrait-oppo --jobs 2
 ```
 
-此模式将 OPPO 深度转换为 disparity，并保留焦点元数据、光圈、Rust 生成的 REND 和 ISO Gain Map。存在有效的 OPPO 人物、头发蒙版时才附加；空白或不可用蒙版保持缺失。不生成皮肤、牙齿、眼镜蒙版，不发送任何 Vision 请求。
+OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust 生成的 REND 和 ISO 增益图。存在有效 OPPO 人物、头发蒙版时才附加，空白或不可用蒙版保持缺失。
 
-**相比完整模式，人像效果会降级。** 人物和发丝边缘可能不够精细，语义光效及相关编辑可能受限。此模式仍使用 macOS 上公开的 ImageIO 和 Core Image API，不是 Linux/Windows 人像写入器。Photos 编辑行为仍取决于消费端和系统版本。
+此模式不生成皮肤、牙齿或眼镜蒙版，不发送 Vision 请求。与完整模式相比，人物和头发边缘可能不够准确，语义光效及相关编辑可能受限。
 
-需要现有完整资源集和 Vision 语义时，使用 `--apple-portrait`；摄影风格使用 `--apple-styles`。这些选项与 `--apple-portrait-oppo` 互斥，也不能与 `--oppo-compatible` 组合。输入缺少必要的 OPPO 深度或源图数据时，在发布输出前失败。CLI 不会在失败后悄悄切换模式。
+此模式仍需 macOS 上公开的 ImageIO 和 Core Image API，不能在 Linux 或 Windows 上写入人像资源。Photos 编辑行为取决于消费端和系统版本。
+
+`--apple-portrait` 请求含 Vision 语义的完整资源集，`--apple-styles` 请求摄影风格。这些照片功能需要支持的 ProXDR 静态照片及相应源资源。缺少必需的 OPPO 深度或源数据时，在发布前失败。
 
 ## `batch`
 
-可以重复提供文件或目录：
-
 ```bash
-xdremux batch \
-  --input-dir photo_dump/ \
-  --recursive \
-  --output-dir converted/
+xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
 ```
 
-也可以重复 `--input FILE`。目录默认不递归，使用 `--recursive` 才进入子目录。隐藏文件和 XDRemux 自己生成的 `.xdremux` 输出不会重新进入发现流程。
+至少提供一个 `--input` 或 `--input-dir`，两者都可以重复。目录默认不递归，使用 `--recursive` 才进入子目录。扫描忽略符号链接、隐藏项、PVT 目录及已生成的 `.xdremux` 输出。
 
-常用参数：
+普通目录扫描选择 HEIC、HEIF、JPG、JPEG 候选文件。`--apple-cinematic` 改为选择 MOV、MP4、M4V、AVI、MKV 候选。发现候选文件不代表文件能够解码。
 
-每个新转换的 Live Photo 批处理成功项在 JSON 中包含 `omitted_resource_count`，终端输出会报告非零遗漏。复用 checkpoint 不产生新转换报告，该字段为 `null`，不假定为零。规划后若其他写入者发布了相同输出，批处理发布会拒绝替换，保留已有文件。
-
-| 参数 | 作用 |
+| 选项 | 默认值和行为 |
 | --- | --- |
-| `--input FILE` | 添加一个输入文件，可重复。 |
-| `--input-dir DIR` | 添加一个输入目录，可重复。 |
-| `--recursive` | 递归扫描输入目录。 |
-| `--output-dir DIR` | 指定输出目录。 |
-| `--jobs N` | 最大并发转换数；必须大于 0。 |
-| `--checkpoint FILE` | 指定持久 checkpoint。 |
-| `--resume` | 依据 source provenance 恢复已完成工作。 |
-| `--skip-existing` | 只在 provenance 与输出身份都匹配时复用已有结果。 |
-| `--categorize` | 转换后直接按分类目录发布。 |
-| `--live-photo-output` | 选择默认实况照片文件对或真实 PVT 目录包。 |
-| `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
-| `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
-| `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
-| `--apple-styles` | 在 macOS 27 上一并推理生成摄影风格与纹理风格。 |
-| `--apple-cinematic` | 在 macOS 27 上为普通视频推理待处理的电影效果元数据。 |
-| `--json` | 输出稳定的机器可读 receipt。 |
+| `--input FILE` | 添加一个显式文件，可重复。 |
+| `--input-dir DIR` | 添加一个目录，可重复。 |
+| `--recursive` | 默认关闭，启用后进入输入子目录。 |
+| `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
+| `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |
+| `--checkpoint FILE` | 指定检查点基础路径，实际文件名追加 `.motion-photo`。 |
+| `--resume` | 来源及输出身份匹配时复用已完成 Live Photo，再重试剩余项。 |
+| `--skip-existing` | 复用已有 Live Photo 输出前执行相同的来源校验。 |
+| `--categorize` | 直接把转换结果发布到分类目录。 |
+| `--json` | 输出一份结构化回执，替代终端文本。 |
 
-batch 会在开始写文件前完成输出规划，避免源文件、HEIC 输出和 Live Photo MOV companion 之间发生路径碰撞。任务之间相互隔离；一个输入失败不会使已经成功发布的其他输入失去结果。
+[产品选项](#产品选项)同样适用。`--resume` 和 `--skip-existing` 要求同时指定 `--output-dir` 或 `--checkpoint`。未显式指定检查点时，文件位于输出目录中的 `.xdremux-motion-photo-checkpoint.jsonl`。
 
-如果混合 batch 使用 `--oppo-compatible`，ProXDR 静态照片按该产品意图转换；Motion Photo 项会作为明确的逐项失败记录下来，不会假装已经应用兼容策略。
+检查点复用只适用于 Live Photo，不保证跳过任意已有 HDR 或视频输出。`--apple-cinematic` 拒绝 `--resume`、`--skip-existing`、`--checkpoint` 和 `--categorize`。
+
+规划在写入前保留源路径和输出路径，包括每组 Live Photo 的 MOV 路径。其他写入者在规划后创建相同目标时，发布拒绝覆盖。各项分别报告成功或失败；后续失败不使此前成功输出失效。
+
+每个新转换的 Live Photo 成功项在 JSON 中报告 `omitted_resource_count`。终端文本报告非零遗漏数。复用不产生新的转换报告，因此该字段为 `null`，不会假定为零。
 
 ## `categorize`
 
 ```bash
-xdremux categorize \
-  --input photo_dump/ \
-  --output-dir categorized/
+xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run --json
 ```
 
-`--input` 可以重复，目录会递归扫描。`--dry-run` 只生成计划，`--json` 输出机器可读 receipt。Live Photo 的 HEIC 与 MOV 作为同一个资产处理。
+`--input PATH` 至少提供一次，可以重复。`--output-dir DIR` 必填。输入目录递归扫描，`--dry-run` 只报告计划，不发布文件，`--json` 输出结构化回执。
+
+命令按资产类型和主要拍摄模式复制文件。通过验证的 Live Photo 照片与 MOV 作为同一资产处理。显式符号链接输入会被拒绝，目录扫描跳过符号链接和 PVT 目录。
 
 ## `inspect`
 
@@ -172,59 +174,59 @@ xdremux inspect IMG_001.heic
 xdremux inspect IMG_001.heic --json
 ```
 
-`inspect` 用于观察从源文件自动解析出的事实，例如资产类型、HDR 模式、Gain Map 数据量、Motion Photo 视频范围和 presentation timestamp。它不是转换策略配置入口。
+位置参数 `INPUT` 必填，`--json` 选择结构化输出。可用信息包括资产类型、HDR 模式、增益图数据、Motion Photo 视频范围和显示时间戳。
+
+检查结果不改变转换策略，也不保证源文件可以转换。
 
 ## `validate`
 
 ```bash
 xdremux validate output.heic
-xdremux validate output.heic --json
+xdremux validate output.mov --json
+xdremux validate capture.pvt --json
 ```
 
-`validate` 自动识别并验证 ISO HDR HEIF、Live Photo pair 或支持的三成员 PVT 目录。包验证检查 XML 字符串版本 plist、无歧义的普通成员文件及现有配对标识、媒体和时间契约；缺失、嵌套、symlink、重复或损坏成员会被拒绝且保持原样。这是结构验证，不是 Photos 导入验收，适合脚本和 CI 的独立转换后检查。
+位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
 
-## 电影效果视频意图（macOS）
+PVT 验证还检查 XML plist 的字符串版本及无歧义的普通成员文件。成员缺失、嵌套、符号链接、重复或损坏时拒绝验证，且不改变文件。这是结构验证，不是 Photos 导入验证。
+
+`validate STYLES_OUTPUT --apple-styles` 额外要求在 macOS 27 上完成摄影风格与纹理风格原生回读。App 在跳过已有摄影风格输出前执行此检查。普通 HDR 文件不能通过这项功能检查。
+
+## macOS 电影效果视频
 
 ```bash
 xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jobs 2
 ```
 
-`--apple-cinematic` 与 `--apple-styles`、`--apple-portrait` 一样，在 `convert` 和 `batch` 中启用；它与照片功能及 OPPO 兼容开关互斥。输出必须使用 `.mov` 后缀且尚不存在。单文件未指定输出时，在源文件旁生成 `SOURCE.xdremux.mov`。
+命令根据解码后的视频帧生成新元数据，把压缩的视频和音频样本复制到新 MOV。目标必须使用 `.mov` 扩展名且尚不存在，源文件不会被替换。
 
-命令从解码后的视频帧生成新的 Cinematic 元数据，将压缩的视频和音频样本复制到新 MOV 中。输出文件必须尚不存在，输入文件不会被替换。
+发布前，公共 `CNAssetInfo` 必须报告 `needsPreprocessing`、资源状态 `ready` 及 `isPreprocessed == false`。MOV 不含已生成的栅格视差轨道。待处理状态是转换验收目标，不证明 Photos 编辑或渲染质量。
 
-发布前，Apple adapter 必须通过公共 `CNAssetInfo` 确认 `needsPreprocessing`、资源状态 `ready` 和 `isPreprocessed == false`。MOV 不包含已物化的栅格视差轨道。此状态是验收目标，不代表 Photos 编辑或渲染画质已经通过验证。
+适配器需要 macOS 27、使用 macOS 27 SDK 构建的程序、对应私有框架方法及受支持的推理和跟踪资源。SDK、系统、方法或资源缺失时失败。
 
-当前实现需要 macOS 27、使用 macOS 27 SDK 构建的 adapter、对应的 Apple 私有框架方法，以及受支持的推理和跟踪硬件/资源。必要的 SDK、系统、方法或资源不可用时，命令会失败。将待处理 MOV 导入 Photos 并开启电影效果，由 Photos 处理和渲染其资源。
+将待处理 MOV 导入 Photos，并启用电影效果以进行原生处理。实验性流程不保证所有已识别的待处理资产都能完成处理。在 macOS 27.0.1 上，独立 1080p H.264 样本完成处理和渲染；640×360 H.264 样本达到待处理状态后，被 Apple 预处理以不受支持为由拒绝。
 
-这是实验性命令。成功识别待处理状态，不保证原生处理支持每一种输入。在 macOS 27.0.1 上，独立 1080p H.264 输入能正常处理和渲染；640×360 H.264 输入能达到待处理状态，但 Apple 预处理会以不受支持为由拒绝。命令保留压缩媒体，不进行缩放或转码。已验证范围和消费者检查见 [Cinematic 元数据封装约定](cinematic.md)。
-
-此意图的批处理目录扫描选择 MOV、MP4、M4V、AVI、MKV 候选，媒体是否能解码由 AVFoundation 判断。不会重新发现已生成的 `.xdremux` 文件。规划器保留不冲突的 `.mov` 文件名，回执类型为 `cinematic`。Live Photo 检查点/恢复及照片分类选项不适用于此视频意图。
+命令保留压缩媒体，不缩放或转码。候选视频能否解码由 AVFoundation 判断。批处理结果使用 `cinematic` 类型，并预留不冲突的 MOV 名称。
 
 两个入口都自动选择焦距：显式 `--focal-length-35mm MM` 优先，然后是 ExifTool 读取的固定 35mm 等效焦距，字段缺失或未知时调用已安装的 GeoCalib helper。只有物理焦距还不够，不再默认代入 24 mm。依赖缺失、元数据冲突或模型观测被拒绝时，在发布输出前失败。`--aperture F` 仍是独立假设，默认为 2.8。显式传入任一参数都需要 `--apple-cinematic`。支持的标签、限制和原生验证见 [Cinematic 元数据封装约定](cinematic.md)。
 
-
 `convert --cinematic-camera-estimate camera.json` 保留为高于自动选择的显式观测输入，显式 `--focal-length-35mm` 优先。正常使用不需要 JSON 参数，`batch` 会逐个解析输入。[GeoCalib 模型适配器](../model_adapters/geocalib/README.md) 需要一次性本地安装，目前支持固定视角 SDR 视频。准入和焦距选择由 Rust 持有。它不能恢复拍摄光圈、对焦距离或未知 EIS 裁切；模型不确定度较低也不等于物理精度已验证。
 
-## 产品意图与实现细节
+## 退出码与 JSON
 
-普通 CLI 只暴露会改变用户所需结果的产品意图。源结构识别、重建算法、Gain Map layout、metadata routing、camera tail 和 codec/backend 选择由 engine/runtime 根据输入与平台能力决定，不要求最终用户配置。
+| 退出码 | 含义 |
+| --- | --- |
+| `0` | 成功、帮助或版本输出。 |
+| `1` | 运行时转换、验证或输出失败。部分项目成功的批次仍可能返回 `1`。 |
+| `2` | 语法、用法、输入发现或规划错误。 |
 
-需要排障时，应通过 `inspect`、结构化日志和开发测试观察自动决策，而不是把内部策略重新变成命令行参数。
+`inspect`、`batch`、`categorize` 和 `validate` 支持 `--json`，`convert` 不支持。默认输出终端文本，语言选项不改变结构化模式。
 
-`validate --apple-styles` 还会在 macOS 27 要求原生摄影风格与纹理风格读回通过。App 在跳过已有摄影风格输出前调用此检查；普通 HDR 文件不能通过该功能检查。
+## 产品策略与 Apple 适配器
 
-## 退出状态
+engine 和 runtime 根据输入选择源图重建、增益图布局、元数据关系、相机尾部数据处理和编解码器。通过 `inspect`、结构化结果和开发检查观察这些决策。
 
-成功、帮助和版本输出使用 `0`。运行时转换或验证失败使用 `1`。命令行语法或参数错误使用 `2`。
+Rust 负责功能策略、数据模型、元数据组装、验证和发布。`xdremux-apple-adapter` 调用 ImageIO、Vision、Core Image、Core ML、VideoToolbox 及其他必需 Apple API，返回操作结果和观察到的事实。
 
-## 机器可读输出
-
-`inspect --json`、`batch --json`、`categorize --json` 和 `validate --json` 提供稳定的结构化输出。默认输出仍以人类可读性为主。
-
-## Apple 功能所有权
-
-Photographic Styles 和 Portrait 通过 `convert` 与 `batch` 的 intent 请求。Rust 负责 policy、orchestration、数据模型、metadata、assembly、validation 和 publication。`xdremux-apple-adapter` 只调用 ImageIO、Vision、Core Image、Core ML、VideoToolbox 等平台 API，并返回事实 observation 或 primitive operation 结果。
-
-Rust 驱动的 macOS gate 会验证结构输出和已测试的 native consumer facts。视觉等价和 Photos 交互行为仍属于独立的真机结论，不能从 parser 或 adapter probe 成功推导出来。
+解析器或适配器检查成功，只能证明该检查实际覆盖的约定。视觉等价和 Photos 交互编辑仍需相应环境中的独立证据。
