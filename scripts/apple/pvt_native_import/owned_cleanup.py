@@ -59,10 +59,14 @@ def cleanup_owned_simulator(run, owned_udid, binding, device_root, *, prefix, co
     names = (('control-shutdown', 'control-delete', 'control-cleanup-verification') if prefix == 'control'
              else ('shutdown-owned', 'delete-owned', 'cleanup-owned-verification'))
     for name, verb in zip(names[:2], ('shutdown', 'delete')):
-        observed = {'state': 'started', 'elapsed_seconds': time.monotonic() - started}
+        # Shutdown includes the guest's service teardown, which can outlast the
+        # generic 60-second command window on a newly booted hosted simulator.
+        timeout = 180 if verb == 'shutdown' else 60
+        observed = {'state': 'started', 'elapsed_seconds': time.monotonic() - started,
+                    'timeout_seconds': timeout}
         facts['commands'][verb] = observed
         try:
-            result = run(name, ['xcrun', 'simctl', verb, owned_udid], required=False)
+            result = run(name, ['xcrun', 'simctl', verb, owned_udid], timeout=timeout, required=False)
             observed.update(state='completed', exit_code=result.returncode)
         except (RuntimeError, OSError, ValueError) as error:
             record = next((row for row in reversed(command_records) if row.get('name') == name), {})

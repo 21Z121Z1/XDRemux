@@ -114,6 +114,11 @@ Stage observations identify the source and session. Each stage retains monotonic
 
 Cleanup command results and independent observations that resources are absent are separate facts. Later absence does not change a failed or uncertain original receipt. The control wrapper stores overall acceptance in `status` and native facts in `product_observations`. A cleanup failure does not erase verified admission observations.
 
+Each owned simulator receives one shutdown command with a 180-second deadline,
+then one delete command with a 60-second deadline and an independent absence
+query with a 20-second deadline. Guest service teardown has its own window;
+timeouts remain failures even when later deletion confirms absence.
+
 Portable event and history replays test the probe's reporting behavior only. To claim that a changed native runner works, execute it with a simulator created for that run. Photos admission still requires the complete save and independent readback sequence. See the [Motion Photo verification recipe](../../.agents/skills/xdremux-verify/features/motion-photo.md).
 
 Keep experiment commands and promotion criteria beside their code. Do not create a workflow for each hypothesis. Product orientation readback runs in `ci.yml` at the same SHA as Rust product tests. ImageIO reads the synthetic oriented HEIF and checks its expected geometry.

@@ -215,6 +215,36 @@ class PVTOwnedCleanupTests(unittest.TestCase):
         result = cleanup_owned_simulator(run, self.owned, binding, root, prefix='product', command_records=records)
         return result, commands
 
+    def test_slow_shutdown_has_a_bounded_window_without_retry_or_absence_promotion(self):
+        for prefix in ('control', 'product'):
+            for shutdown_seconds, accepted in ((90, True), (181, False)):
+                with self.subTest(prefix=prefix, seconds=shutdown_seconds), tempfile.TemporaryDirectory() as raw:
+                    root = Path(raw)
+                    (root / self.owned).mkdir()
+                    (root / self.foreign).mkdir()
+                    records, verbs = [], []
+                    def run(name, argv, **kwargs):
+                        verb = argv[2]
+                        verbs.append(verb)
+                        if verb == 'shutdown':
+                            timeout = kwargs.get('timeout', 60)
+                            self.assertLessEqual(timeout, 180)
+                            if shutdown_seconds > timeout:
+                                records.append({'name': name, 'outcome': 'uncertain-after-timeout'})
+                                raise RuntimeError('shutdown timed out')
+                        if verb == 'delete':
+                            (root / self.owned).rmdir()
+                        data = json.dumps({'devices': {'runtime': [{'udid': self.foreign}]}}).encode()
+                        return subprocess.CompletedProcess(argv, 0, data)
+                    binding = {'source_head': HEAD, 'session_id': SESSION, 'owned_udid': self.owned}
+                    result = cleanup_owned_simulator(run, self.owned, binding, root,
+                        prefix=prefix, command_records=records)
+                    self.assertEqual(result['accepted'], accepted)
+                    self.assertEqual(result['all_commands_succeeded'], accepted)
+                    self.assertTrue(result['absence']['verified_absent'])
+                    self.assertTrue((root / self.foreign).is_dir())
+                    self.assertEqual(verbs, ['shutdown', 'delete', 'list'])
+
     def test_command_timeout_or_nonzero_and_observed_absence_remain_orthogonal(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
