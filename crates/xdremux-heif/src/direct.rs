@@ -101,6 +101,8 @@ pub struct DirectHevcGainMap<'a> {
     pub tile_height: u32,
     pub tiles: &'a [GainMapTile<'a>],
     /// HEVCDecoderConfigurationRecord payload, without the outer hvcC box.
+    /// RGB tiles supplied to the native assembler use BT.601 full-range
+    /// YCbCr, matching the portable encoder and the emitted gain-map nclx.
     pub hvcc: &'a [u8],
     pub profile: GainMapEncodeProfile,
 }
@@ -1400,6 +1402,7 @@ mod tests {
             let canonical = crate::assemble_iso_gain_map_heif(
                 &source,
                 &crate::IsoGainMapAssembly {
+                    alternate_icc: None,
                     gain_map: gain,
                     tmap_payload: &[0; 4],
                     xmp_payload: b"xmp",

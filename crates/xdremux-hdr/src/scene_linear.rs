@@ -1,6 +1,6 @@
 use crate::{HdrError, ResolvedScale, Result};
 
-/// Tightly packed scene-linear Display P3 RGB.
+/// Tightly packed scene-linear RGB in the caller's gain-map application primaries.
 ///
 /// Samples are relative luminance in the base image's linear encoding. This
 /// buffer does not carry a nit calibration or a transfer function.
@@ -36,7 +36,7 @@ pub struct IsoGainChannel {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IsoGainApplication {
     pub channels: [IsoGainChannel; 3],
-    /// ISO 21496-1 weight on the log2 gain. The full alternate image uses 1.
+    /// ISO 21496-1 weight on the log2 gain. The full alternate uses 1 or -1.
     pub weight: f64,
 }
 
@@ -44,8 +44,9 @@ pub struct IsoGainApplication {
 ///
 /// Headrooms are already log2 values, matching [`ResolvedScale`]. The full
 /// alternate image is the target whose headroom equals `alternate_headroom`,
-/// which produces weight 1. A target between the base and alternate headrooms
-/// scales the log2 gain and does not resample it.
+/// which produces weight 1 or -1 according to the headroom direction. A target
+/// between the base and alternate headrooms scales the log2 gain and does not
+/// resample it.
 pub fn iso21496_application_weight(
     base_headroom: f64,
     alternate_headroom: f64,
@@ -68,7 +69,7 @@ pub fn iso21496_application_weight(
             "base and alternate headroom are equal, so a different target has no weight",
         ));
     }
-    Ok(((target_headroom - base_headroom) / span).clamp(0.0, 1.0))
+    Ok(span.signum() * ((target_headroom - base_headroom) / span).clamp(0.0, 1.0))
 }
 
 /// Parameters that reconstruct the full alternate image described by `scale`.
@@ -144,10 +145,10 @@ pub fn apply_iso_gain_sample(
         ));
     }
     validate_channel(channel)?;
-    if !weight.is_finite() || !(0.0..=1.0).contains(&weight) {
+    if !weight.is_finite() || !(-1.0..=1.0).contains(&weight) {
         return Err(HdrError::invalid(
             "gain map application",
-            "application weight must be finite and within 0 through 1",
+            "application weight must be finite and within -1 through 1",
         ));
     }
     let code = gain_code.clamp(0.0, 1.0);
@@ -183,10 +184,10 @@ pub fn reconstruct_scene_linear_hdr(
     for channel in &application.channels {
         validate_channel(channel)?;
     }
-    if !application.weight.is_finite() || !(0.0..=1.0).contains(&application.weight) {
+    if !application.weight.is_finite() || !(-1.0..=1.0).contains(&application.weight) {
         return Err(HdrError::invalid(
             "gain map application",
-            "application weight must be finite and within 0 through 1",
+            "application weight must be finite and within -1 through 1",
         ));
     }
     let pixel_count = sdr
@@ -500,6 +501,37 @@ mod tests {
         assert_eq!(iso21496_application_weight(0.0, 0.0, 0.0).unwrap(), 1.0);
         assert!(iso21496_application_weight(0.0, 0.0, 1.0).is_err());
         assert!(iso21496_application_weight(f64::NAN, 1.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn hdr_baseline_uses_negative_weight_to_reconstruct_sdr() {
+        let weight = iso21496_application_weight(2.0, 0.0, 0.0).unwrap();
+        assert_eq!(weight, -1.0);
+        assert_eq!(iso21496_application_weight(2.0, 0.0, 1.0).unwrap(), -0.5);
+        let hdr = SceneLinearRgb {
+            width: 1,
+            height: 1,
+            samples: vec![4.0, 2.0, 1.0],
+        };
+        let output = reconstruct_scene_linear_hdr(
+            &hdr,
+            GainMapCodes {
+                width: 1,
+                height: 1,
+                bytes_per_row: 1,
+                channels: 1,
+                data: &[255],
+            },
+            &application(
+                IsoGainChannel {
+                    maximum_log2: 2.0,
+                    ..channel(1.0, 0.0, 0.0)
+                },
+                weight,
+            ),
+        )
+        .unwrap();
+        assert_eq!(output.samples, vec![1.0, 0.5, 0.25]);
     }
 
     #[test]

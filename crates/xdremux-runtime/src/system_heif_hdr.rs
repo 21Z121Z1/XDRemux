@@ -14,18 +14,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use xdremux_codec::{HeifRasterDecodeRequest, RasterPixelFormat};
 use xdremux_engine::{
     content_headroom_from_linear, encode_display_p3_rgba8, linear_difference, pack_linear_rgba_f16,
-    provisional_guided_filter, unpack_linear_rgb_f16, GainMapChannels, LinearDifference,
-    RasterDecoder, PROVISIONAL_GUIDED_EPSILON, PROVISIONAL_GUIDED_RADIUS,
-    PROVISIONAL_HDR_LOCAL_WEIGHT, PROVISIONAL_SDR_LOCAL_WEIGHT,
+    provisional_guided_filter, unpack_linear_rgb_f16, LinearDifference, PROVISIONAL_GUIDED_EPSILON,
+    PROVISIONAL_GUIDED_RADIUS, PROVISIONAL_HDR_LOCAL_WEIGHT, PROVISIONAL_SDR_LOCAL_WEIGHT,
 };
-use xdremux_hdr::ResolvedScale;
 
 use crate::apple_adapter::{AppleAdapterClient, SystemHeifAuxiliaryPlane, SystemHeifHdrFacts};
 use crate::apple_styles::{scene_linear_pair, SceneLinearPair};
-use crate::{AtomicFilePublisher, PortableRuntime, Result, RuntimeError};
+use crate::{AtomicFilePublisher, Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemHeifHdrReport {
@@ -94,39 +91,18 @@ pub(crate) fn requested() -> Result<bool> {
 }
 
 pub(crate) fn encode_system_base(
-    runtime: &PortableRuntime,
     executable: &Path,
     product_base: &[u8],
-    scale: &ResolvedScale,
-    channels: GainMapChannels,
     staging: &Path,
     output: &Path,
 ) -> Result<SystemHeifEncoded> {
-    let raster = runtime
-        .heif
-        .decode_raster(&HeifRasterDecodeRequest {
-            data: product_base.to_vec(),
-            format: RasterPixelFormat::Rgb8,
-        })
-        .map_err(|error| RuntimeError::external("system HEIF source raster", error))?;
-    let structure = xdremux_heif::validate_gain_map_structure(product_base)
+    xdremux_heif::validate_gain_map_structure(product_base)
         .map_err(|error| RuntimeError::external("system HEIF source Gain Map", error))?;
-    let gain_raster = runtime
-        .heif
-        .decode_item_raster(
-            product_base,
-            structure.gain_map_item_id,
-            match channels {
-                GainMapChannels::Mono => RasterPixelFormat::Mono8,
-                GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
-            },
-        )
-        .map_err(|error| RuntimeError::external("system HEIF source Gain Map", error))?;
-    let maximum_edge = match max_edge_override()? {
-        Some(edge) => edge,
-        None => raster.width.max(raster.height).max(2),
-    };
-    let scene = scene_linear_pair(&raster, &gain_raster, scale, maximum_edge)?;
+    let geometry = xdremux_heif::primary_coded_geometry(product_base)
+        .map_err(|error| RuntimeError::external("system HEIF source geometry", error))?;
+    let maximum_edge = max_edge_override()?.unwrap_or(geometry.width.max(geometry.height).max(2));
+    let client = AppleAdapterClient::new(executable.to_path_buf());
+    let scene = scene_linear_pair(&client, product_base, staging, maximum_edge)?;
     let width = u32::try_from(scene.width)
         .map_err(|_| RuntimeError::new("system HEIF gain map", "scene width exceeds u32"))?;
     let height = u32::try_from(scene.height)
@@ -136,7 +112,7 @@ pub(crate) fn encode_system_base(
         .tempdir_in(staging)
         .map_err(|error| RuntimeError::external("system HEIF staging", error))?;
     let measurement = encode_linear_pair(
-        &AppleAdapterClient::new(executable.to_path_buf()),
+        &client,
         &scene.sdr,
         &scene.hdr,
         width,

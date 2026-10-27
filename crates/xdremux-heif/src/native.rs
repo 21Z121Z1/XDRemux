@@ -37,6 +37,9 @@ pub struct IsoGainMapAssembly<'a> {
     pub gain_map: DirectHevcGainMap<'a>,
     pub tmap_payload: &'a [u8],
     pub xmp_payload: &'a [u8],
+    /// Source alternate-image ICC, when present. Otherwise the reconstructed
+    /// image uses BT.2020 PQ; gain application primaries remain in tmap.
+    pub alternate_icc: Option<&'a [u8]>,
 }
 
 fn invalid(message: impl Into<String>) -> HeifError {
@@ -377,6 +380,7 @@ fn build_iprp(
     meta: &ParsedMeta,
     gain: &DirectHevcGainMap<'_>,
     graph: AssemblyGraph<'_>,
+    alternate_icc: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
@@ -445,7 +449,10 @@ fn build_iprp(
     let gain_colr = append_property(
         &mut ipco_payload,
         &mut next_property_index,
-        &make_nclx_box(2, 2, 2)?,
+        // libheif's RGB tile encoder uses BT.601 YCbCr, full range. The
+        // first two fields describe no colorimetry for gain-map values;
+        // the matrix describes only their compression transform.
+        &make_nclx_box(2, 2, 6)?,
     )?;
     let gain_pixi = append_property(
         &mut ipco_payload,
@@ -462,11 +469,14 @@ fn build_iprp(
         &mut next_property_index,
         &make_box(HVCC, gain.hvcc)?,
     )?;
-    let tmap_colr = append_property(
-        &mut ipco_payload,
-        &mut next_property_index,
-        &make_nclx_box(9, 16, 9)?,
-    )?;
+    let alternate_colr = if let Some(icc) = alternate_icc {
+        let mut payload = b"prof".to_vec();
+        payload.extend_from_slice(icc);
+        make_box(COLR, &payload)?
+    } else {
+        make_nclx_box(9, 16, 9)?
+    };
+    let tmap_colr = append_property(&mut ipco_payload, &mut next_property_index, &alternate_colr)?;
     let tmap_pixi = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -1132,7 +1142,14 @@ pub fn assemble_iso_gain_map_heif(
         xmp_id,
         &removed_graph_ids,
     )?;
-    let iprp = build_iprp(source, iprp_header, &meta, gain, graph)?;
+    let iprp = build_iprp(
+        source,
+        iprp_header,
+        &meta,
+        gain,
+        graph,
+        assembly.alternate_icc,
+    )?;
     let iref = build_iref(
         &meta,
         &tile_ids,
@@ -1396,7 +1413,7 @@ mod tests {
             },
             removed: &BTreeSet::new(),
         };
-        let bytes = build_iprp(&source, iprp, &meta, &gain, graph).unwrap();
+        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, None).unwrap();
         let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
         let children = parse_boxes(&bytes, root.payload_range()).unwrap();
         let props = parse_ipco_properties(&bytes, &root).unwrap();
@@ -1469,6 +1486,7 @@ mod tests {
         assert!(assemble_iso_gain_map_heif(
             &[],
             &IsoGainMapAssembly {
+                alternate_icc: None,
                 gain_map: gain,
                 tmap_payload: &[],
                 xmp_payload: b"xmp",

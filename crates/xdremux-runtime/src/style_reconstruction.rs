@@ -267,6 +267,7 @@ fn hdr_gain_map(
     let bytes = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
+            alternate_icc: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: w as u32,
                 gain_map_height: h as u32,

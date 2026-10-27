@@ -262,9 +262,19 @@ fn assemble_jpeg_gain_map(
         .metadata
         .to_info_floats()
         .map_err(|error| RuntimeError::external("Ultra HDR metadata normalization", error))?;
-    let tmap_payload =
-        make_apple_tmap_payload_with_colour_space(&info, gain.metadata.use_base_color_space)
-            .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
+    let alternate_icc = if gain.metadata.uses_iso_colorimetry {
+        jpeg_icc_profile(gain.bytes)
+            .map_err(|error| RuntimeError::external("Ultra HDR alternate ICC", error))?
+    } else {
+        None
+    };
+    // ISO 21496-1 C.4.7: without an alternate ICC the application primaries
+    // are the base primaries, including when the source flag is zero. The
+    // HEIF writer may choose a new alternate encoding, but must not move the
+    // per-channel gain operation into that new space.
+    let use_base_colour_space = gain.metadata.use_base_color_space || alternate_icc.is_none();
+    let tmap_payload = make_apple_tmap_payload_with_colour_space(&info, use_base_colour_space)
+        .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
     let xmp_payload = make_hdrgm_xmp(&info)
         .map_err(|error| RuntimeError::external("Ultra HDR hdrgm XMP", error))?;
     let tiles = encoded
@@ -296,6 +306,7 @@ fn assemble_jpeg_gain_map(
     let output = assemble_iso_gain_map_heif(
         base_heif,
         &IsoGainMapAssembly {
+            alternate_icc: alternate_icc.as_deref(),
             gain_map: direct,
             tmap_payload: &tmap_payload,
             xmp_payload: &xmp_payload,
@@ -620,6 +631,105 @@ pub(crate) fn convert_motion_photo_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iso_gain_without_alternate_icc_keeps_the_base_application_primaries() {
+        use xdremux_format::isobmff::{parse_meta_box, scan_top_level_boxes, META};
+        let raster =
+            xdremux_codec::Raster8::new(16, 16, 48, RasterPixelFormat::Rgb8, vec![128; 16 * 48])
+                .unwrap();
+        let base = LibHeifProvider::new()
+            .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(raster, None))
+            .unwrap();
+        let mut jpeg = Vec::new();
+        jpeg_encoder::Encoder::new(&mut jpeg, 100)
+            .encode(&[128; 16 * 16], 16, 16, jpeg_encoder::ColorType::Luma)
+            .unwrap();
+        let fixture = fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"),
+        )
+        .unwrap();
+        let profile = jpeg_icc_profile(&fixture).unwrap().unwrap();
+        for (is_iso, alternate_icc) in [
+            (true, None),
+            (true, Some(profile.clone())),
+            (false, None),
+            (false, Some(profile)),
+        ] {
+            let mut gain_jpeg = jpeg[..2].to_vec();
+            if let Some(icc) = &alternate_icc {
+                let mut app2 = b"ICC_PROFILE\0\x01\x01".to_vec();
+                app2.extend_from_slice(icc);
+                gain_jpeg.extend_from_slice(&[0xff, 0xe2]);
+                gain_jpeg.extend_from_slice(&u16::try_from(app2.len() + 2).unwrap().to_be_bytes());
+                gain_jpeg.extend_from_slice(&app2);
+            }
+            gain_jpeg.extend_from_slice(&jpeg[2..]);
+            let gain = ValidatedGainJpeg {
+                bytes: &gain_jpeg,
+                metadata: UltraHdrGainMapMetadata {
+                    gain_map_min: [0.0; 3],
+                    gain_map_max: [2.0; 3],
+                    gamma: [1.0; 3],
+                    offset_sdr: [0.0; 3],
+                    offset_hdr: [0.0; 3],
+                    hdr_capacity_min: 0.0,
+                    hdr_capacity_max: 2.0,
+                    channel_count: 1,
+                    use_base_color_space: !is_iso,
+                    uses_iso_colorimetry: is_iso,
+                },
+            };
+            let output = assemble_jpeg_gain_map(
+                &ZuneJpegProvider::new(),
+                &LibHeifProvider::new(),
+                &base,
+                &gain,
+            )
+            .unwrap();
+            let structure = validate_gain_map_structure(&output).unwrap();
+            let top = scan_top_level_boxes(&output).unwrap();
+            let meta = parse_meta_box(&output, top.boxes.iter().find(|b| b.kind == META).unwrap())
+                .unwrap();
+            let location = meta
+                .iloc
+                .entries
+                .iter()
+                .find(|e| e.item_id == structure.tmap_item_id)
+                .unwrap();
+            let payload =
+                xdremux_format::exif::read_item_payload(&output, location, meta.idat.as_ref())
+                    .unwrap();
+            // ISO 21496-1 C.4.7: without an alternate ICC, both application
+            // spaces have the base primaries. A new BT.2020 output must not move
+            // the gain operation into BT.2020.
+            assert_eq!(payload[5] & 0x40 != 0, !is_iso || alternate_icc.is_none());
+            let entry = meta
+                .ipma
+                .entries
+                .iter()
+                .find(|e| e.item_id == structure.tmap_item_id)
+                .unwrap();
+            let colr = entry
+                .associations
+                .iter()
+                .find_map(|a| {
+                    meta.properties.iter().find(|p| {
+                        p.index == u32::from(a.property_index)
+                            && p.kind == xdremux_format::FourCC::new(*b"colr")
+                    })
+                })
+                .unwrap();
+            let color = &output[colr.box_range.start + 8..colr.box_range.end];
+            if let Some(icc) = alternate_icc.filter(|_| is_iso) {
+                assert_eq!(&color[..4], b"prof");
+                assert_eq!(&color[4..], icc);
+            } else {
+                assert_eq!(color, b"nclx\x00\x09\x00\x10\x00\x09\x80");
+            }
+        }
+    }
 
     #[test]
     fn generated_pair_identifier_is_uuid_v4() {

@@ -221,6 +221,11 @@ static NSDictionary *DecodeMatte(NSDictionary *request) {
 static NSDictionary *Readback(NSDictionary *request) {
     NSString *dir=request[@"output_path"],*path=request[@"input_path"];
     CGSize size=CGSizeMake([request[@"width"] doubleValue],[request[@"height"] doubleValue]);
+    BOOL oriented=[request[@"apply_orientation"] boolValue];
+    CIImage *base=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
+        options:@{kCIImageApplyOrientationProperty:@(oriented),kCIImageExpandToHDR:@NO}];
+    Require(base!=nil,@"Cannot decode the SDR representation");
+    if(oriented) Require(CGSizeEqualToSize(base.extent.size,size),@"SDR display geometry differs from the requested geometry");
     CGColorSpaceRef linear=CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearDisplayP3);
     CIContext *context=Context(linear);
     if(request[@"target_headroom"]) {
@@ -229,15 +234,17 @@ static NSDictionary *Readback(NSDictionary *request) {
         CIImage *gain=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
             options:@{kCIImageApplyOrientationProperty:@NO,kCIImageAuxiliaryHDRGainMap:@YES}];
         Require(gain!=nil,@"Cannot decode encoded HDR Gain Map");
-        CIImage *image=[Image(path) imageByApplyingGainMap:gain headroom:(float)headroom];
+        CIImage *image=[base imageByApplyingGainMap:gain headroom:(float)headroom];
         Require(image!=nil,@"Cannot apply encoded HDR Gain Map");
         NSDictionary *facts=Render(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"]);
         CGColorSpaceRelease(linear);
         return @{@"schema_version":@2,@"target":facts,@"requested_headroom":@(headroom),@"hdr_content_headroom":@(image.contentHeadroom)};
     }
-    NSDictionary *sdr=Render(Canvas(Image(path),size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"]);
+    NSDictionary *sdr=Render(Canvas(base,size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"]);
     CIImage *hdr=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
-        options:@{kCIImageApplyOrientationProperty:@NO,kCIImageExpandToHDR:@YES}];
+        options:@{kCIImageApplyOrientationProperty:@(oriented),kCIImageExpandToHDR:@YES}];
+    Require(hdr!=nil,@"Cannot decode the HDR representation");
+    if(oriented) Require(CGSizeEqualToSize(hdr.extent.size,size),@"HDR display geometry differs from the requested geometry");
     NSDictionary *expanded=Render(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"]);
     CGColorSpaceRelease(linear);
     return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(hdr.contentHeadroom)};

@@ -5,6 +5,10 @@ use libheif_rs::{
 
 use crate::{CodecError, LibHeifProvider, PrimaryHeifEncodeRequest, RasterPixelFormat, Result};
 
+// Little CMS generated IEC 61966-2-1 sRGB profile. Untagged JPEG RGB defaults
+// to sRGB (ISO 21496-1 C.4.4); tmap base items must carry a colr property.
+const SRGB_ICC: &[u8] = include_bytes!("srgb.icc");
+
 impl LibHeifProvider {
     /// Encode a complete RGB primary rendition as a standalone HEIC container.
     ///
@@ -57,12 +61,11 @@ impl LibHeifProvider {
             r.data, r.stride, g.data, g.stride, b.data, b.stride, request,
         )?;
 
-        if let Some(icc) = &request.icc_profile {
-            let profile = ColorProfileRaw::new(color_profile_types::PROF, icc.clone());
-            image
-                .set_color_profile_raw(&profile)
-                .map_err(CodecError::libheif)?;
-        }
+        let icc = request.icc_profile.as_deref().unwrap_or(SRGB_ICC);
+        let profile = ColorProfileRaw::new(color_profile_types::PROF, icc.to_vec());
+        image
+            .set_color_profile_raw(&profile)
+            .map_err(CodecError::libheif)?;
 
         let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
         let mut encoder = lib
@@ -178,6 +181,7 @@ mod tests {
             .unwrap();
         let context = HeifContext::read_from_bytes(&encoded).unwrap();
         let handle = context.primary_image_handle().unwrap();
+        assert_eq!(handle.color_profile_raw().unwrap().data, SRGB_ICC);
         assert_eq!(
             (handle.width(), handle.height()),
             (source.width, source.height)

@@ -217,16 +217,24 @@ pub fn make_strict_tmap_payload(payload: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-/// Serialize the current Swift `hdrgm` XMP document byte-for-byte.
+/// Serialize `hdrgm` XMP with the source's base/alternate direction and offsets.
 pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
     require_info_floats(info)?;
     let gain_min = [safe_log2(info[0]), safe_log2(info[1]), safe_log2(info[2])];
     let gain_max = [safe_log2(info[4]), safe_log2(info[5]), safe_log2(info[6])];
     let gamma = [info[7], info[8], info[9]];
-    let offset_sdr = [info[10], info[11], info[12]];
-    let offset_hdr = [info[13], info[14], info[15]];
-    let cap_min = swift_max(safe_log2(info[16]), 0.0);
-    let cap_max = safe_log2(info[17]);
+    let base_is_hdr = info[16] > info[17];
+    let base_offset = [info[10], info[11], info[12]];
+    let alternate_offset = [info[13], info[14], info[15]];
+    let (offset_sdr, offset_hdr) = if base_is_hdr {
+        (alternate_offset, base_offset)
+    } else {
+        (base_offset, alternate_offset)
+    };
+    let base_headroom = swift_max(safe_log2(info[16]), 0.0);
+    let alternate_headroom = swift_max(safe_log2(info[17]), 0.0);
+    let cap_min = base_headroom.min(alternate_headroom);
+    let cap_max = base_headroom.max(alternate_headroom);
 
     fn format_three(values: [f64; 3]) -> String {
         format!("{:.6} {:.6} {:.6}", values[0], values[1], values[2])
@@ -249,7 +257,7 @@ pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
             "         <hdrgm:OffsetHDR>{}</hdrgm:OffsetHDR>\n",
             "         <hdrgm:HDRCapacityMin>{:.6}</hdrgm:HDRCapacityMin>\n",
             "         <hdrgm:HDRCapacityMax>{:.6}</hdrgm:HDRCapacityMax>\n",
-            "         <hdrgm:BaseRenditionIsHDR>False</hdrgm:BaseRenditionIsHDR>\n",
+            "         <hdrgm:BaseRenditionIsHDR>{}</hdrgm:BaseRenditionIsHDR>\n",
             "      </rdf:Description>\n",
             "   </rdf:RDF>\n",
             "</x:xmpmeta>\n",
@@ -262,6 +270,7 @@ pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
         format_three(offset_hdr),
         cap_min,
         cap_max,
+        if base_is_hdr { "True" } else { "False" },
     );
     Ok(xml.into_bytes())
 }
@@ -309,6 +318,25 @@ mod tests {
         let multichannel = make_apple_tmap_payload(&info).unwrap();
         assert_eq!(multichannel.len(), 142);
         assert_eq!(multichannel[5], 0xc0);
+    }
+
+    #[test]
+    fn hdr_baseline_xmp_preserves_direction_capacity_and_offsets() {
+        let mut info = canonical_sample();
+        info[16] = 4.0;
+        info[17] = 1.0;
+        info[10..13].fill(0.02);
+        info[13..16].fill(0.01);
+        let xmp = String::from_utf8(make_hdrgm_xmp(&info).unwrap()).unwrap();
+        assert!(xmp.contains("<hdrgm:BaseRenditionIsHDR>True</hdrgm:BaseRenditionIsHDR>"));
+        assert!(xmp.contains("<hdrgm:HDRCapacityMin>0.000000</hdrgm:HDRCapacityMin>"));
+        assert!(xmp.contains("<hdrgm:HDRCapacityMax>2.000000</hdrgm:HDRCapacityMax>"));
+        assert!(xmp.contains("<hdrgm:OffsetSDR>0.010000 0.010000 0.010000</hdrgm:OffsetSDR>"));
+        assert!(xmp.contains("<hdrgm:OffsetHDR>0.020000 0.020000 0.020000</hdrgm:OffsetHDR>"));
+        let iso = make_apple_tmap_payload(&info).unwrap();
+        assert_eq!(iso[5], 0x40);
+        assert_eq!(i32::from_be_bytes(iso[6..10].try_into().unwrap()), 2);
+        assert_eq!(i32::from_be_bytes(iso[14..18].try_into().unwrap()), 0);
     }
 
     #[test]
