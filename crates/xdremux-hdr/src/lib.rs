@@ -17,9 +17,9 @@ pub use display_methods::{
 };
 pub use scene_guidance::{SceneGuidanceMetrics, SceneGuidancePolicy};
 pub use scene_reconstruction::{
-    decode_styles_thumbnail, display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene,
-    styles_thumbnail_to_linear, LinearPixel, LinearThumbnailEncoding, SceneGainMap,
-    SceneReconstruction,
+    decode_styles_thumbnail, display_p3_luminance, linear_display_p3_to_bt2020,
+    make_scene_gain_map, reconstruct_relative_scene, styles_thumbnail_to_linear, LinearPixel,
+    LinearThumbnailEncoding, SceneGainMap, SceneReconstruction,
 };
 mod scene_linear;
 

@@ -5,6 +5,7 @@
 #import <Metal/Metal.h>
 #import <objc/runtime.h>
 #import <dlfcn.h>
+#import <stdio.h>
 
 typedef struct { int64_t width, height; } XDNUSize;
 @interface NSObject (XDStylesSPI)
@@ -69,7 +70,7 @@ static CIImage *Canvas(CIImage *image, CGSize size) {
     image=[image imageByApplyingTransform:CGAffineTransformMakeTranslation(-r.origin.x,-r.origin.y)];
     return [image imageByApplyingTransform:CGAffineTransformMakeScale(size.width/r.size.width,size.height/r.size.height)];
 }
-static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path) {
+static NSDictionary *RenderRows(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path, size_t rowLimit) {
     NSDictionary *facts;
     // Each full-resolution float buffer must be released before the next
     // representation is rendered in the persistent adapter process.
@@ -78,32 +79,41 @@ static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef 
     size_t w=llround(r.size.width),h=llround(r.size.height);
     Require(w>0 && h>0 && w<=32768 && h<=32768 && w*h<=100000000,@"Image geometry exceeds the supported render limit");
     image=Canvas(image,CGSizeMake(w,h));
-    NSMutableData *data=[NSMutableData dataWithLength:w*h*16];
-    [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,0,w,h) format:kCIFormatRGBAf colorSpace:space];
-    const float *p=data.bytes;
+    size_t rows=MIN(h,rowLimit);
+    NSMutableData *data=[NSMutableData dataWithLength:w*rows*16];
     size_t nonzero=0,black=0;
-    for(size_t i=0;i<w*h;i++) {
-        BOOL zero=YES;
-        for(size_t c=0;c<4;c++) { Require(isfinite(p[i*4+c]),@"Apple render returned non-finite pixels"); if(c<3 && p[i*4+c]!=0) { nonzero++;zero=NO; } }
-        if(zero) black++;
+    NSString *temporary=[path stringByAppendingString:@".tmp"];
+    FILE *file=fopen(temporary.fileSystemRepresentation,"wb");
+    Require(file!=NULL,@"Cannot open rendered pixel output");
+    @try {
+        for(size_t y=0;y<h;y+=rows) {
+            @autoreleasepool {
+            size_t count=MIN(rows,h-y);
+            [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,y,w,count) format:kCIFormatRGBAf colorSpace:space];
+            const float *p=data.bytes;
+            for(size_t i=0;i<w*count;i++) {
+                BOOL zero=YES;
+                for(size_t c=0;c<4;c++) { Require(isfinite(p[i*4+c]),@"Apple render returned non-finite pixels"); if(c<3 && p[i*4+c]!=0) { nonzero++;zero=NO; } }
+                if(zero) black++;
+            }
+            Require(fwrite(data.bytes,1,w*count*16,file)==w*count*16,@"Cannot write rendered pixels");
+            }
+        }
+        Require(nonzero>0,@"Apple render returned an empty image");
+        int closed=fclose(file); file=NULL;
+        Require(closed==0,@"Cannot finish rendered pixel output");
+        Require(rename(temporary.fileSystemRepresentation,path.fileSystemRepresentation)==0,@"Cannot publish rendered pixels");
+    } @finally {
+        if(file) fclose(file);
+        remove(temporary.fileSystemRepresentation);
     }
-    Require(nonzero>0,@"Apple render returned an empty image");
-    NSError *error=nil;
-    Require([data writeToFile:path options:NSDataWritingAtomic error:&error],error.description ?: @"Cannot write rendered pixels");
     facts=@{@"width":@(w),@"height":@(h),@"black_fraction":@((double)black/(w*h))};
     }
     return facts;
 }
 
-static void WriteSceneColorProfile(NSString *dir) {
-    CGColorSpaceRef pq=CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3_PQ);
-    Require(pq!=NULL,@"Display P3 PQ is unavailable");
-    NSData *icc=CFBridgingRelease(CGColorSpaceCopyICCData(pq));
-    CGColorSpaceRelease(pq);
-    Require(icc.length>0,@"Cannot obtain the scene Gain Map color profile");
-    NSError *error=nil;
-    Require([icc writeToFile:[dir stringByAppendingPathComponent:@"scene-p3-pq.icc"] options:NSDataWritingAtomic error:&error],
-        error.description ?: @"Cannot write the scene Gain Map color profile");
+static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path) {
+    return RenderRows(image,context,space,path,SIZE_MAX);
 }
 
 static NSDictionary *Decode(NSDictionary *request) {
@@ -171,7 +181,6 @@ static NSDictionary *Decode(NSDictionary *request) {
     CIImage *lt=RawImage([dir stringByAppendingPathComponent:@"linear.heic"]);
     // Unmanaged rendering preserves the stored Log-like values despite its ICC tag.
     NSDictionary *l=Render(lt,unmanaged,NULL,[dir stringByAppendingPathComponent:@"thumbnail_codes.f32"]);
-    WriteSceneColorProfile(dir);
     CGColorSpaceRelease(linear);
     NSMutableDictionary *facts=[@{@"schema_version":@2,@"metadata_version":stored[@"0"] ?: @(-1),@"orientation":@(orientation),
         @"unstyled":u,@"original_hdr":b,@"thumbnail":l,@"coefficient_bytes":@(coeff.length),@"coefficient_float16":@(half),
@@ -257,11 +266,11 @@ static NSDictionary *Readback(NSDictionary *request) {
         Require(gain!=nil,@"Cannot decode encoded HDR Gain Map");
         CIImage *image=[base imageByApplyingGainMap:gain headroom:(float)headroom];
         Require(image!=nil,@"Cannot apply encoded HDR Gain Map");
-        NSDictionary *facts=Render(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"]);
+        NSDictionary *facts=RenderRows(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"],128);
         CGColorSpaceRelease(linear);
         return @{@"schema_version":@2,@"target":facts,@"requested_headroom":@(headroom),@"hdr_content_headroom":@(image.contentHeadroom)};
     }
-    sdr=Render(Canvas(base,size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"]);
+    sdr=RenderRows(Canvas(base,size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"],128);
     }
     [context clearCaches];
     @autoreleasepool {
@@ -269,12 +278,11 @@ static NSDictionary *Readback(NSDictionary *request) {
         options:@{kCIImageApplyOrientationProperty:@(oriented),kCIImageExpandToHDR:@YES}];
     Require(hdr!=nil,@"Cannot decode the HDR representation");
     if(oriented) Require(CGSizeEqualToSize(hdr.extent.size,size),@"HDR display geometry differs from the requested geometry");
-    expanded=Render(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"]);
+    expanded=RenderRows(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"],128);
     contentHeadroom=hdr.contentHeadroom;
     }
     [context clearCaches];
     CGColorSpaceRelease(linear);
-    WriteSceneColorProfile(dir);
     return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(contentHeadroom)};
 }
 

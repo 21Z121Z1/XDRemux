@@ -11,8 +11,9 @@ use xdremux_engine::{
 };
 use xdremux_format::ChromaSampling;
 use xdremux_hdr::{
-    display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, DisplayFamily,
-    DisplayFamilyPolicy, DisplayMethods, LinearPixel, LinearThumbnailEncoding, SceneGuidancePolicy,
+    display_p3_luminance, linear_display_p3_to_bt2020, make_scene_gain_map,
+    reconstruct_relative_scene, DisplayFamily, DisplayFamilyPolicy, DisplayMethods, LinearPixel,
+    LinearThumbnailEncoding, SceneGuidancePolicy,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, extract_style_display_mattes,
@@ -213,8 +214,20 @@ fn hdr_gain_map(
     display_headroom: Option<u32>,
 ) -> Result<Value> {
     let (w, h) = size;
-    let map = make_scene_gain_map(sdr, target, w, h)
-        .map_err(|e| RuntimeError::external("HDR-only scene Gain Map", e))?;
+    // The native scene fits use P3. Recompute gains from both images in the
+    // alternate BT.2020 primaries; per-channel P3 gains cannot be reused there.
+    let map = {
+        let base = sdr
+            .iter()
+            .map(linear_display_p3_to_bt2020)
+            .collect::<Vec<_>>();
+        let alternate = target
+            .iter()
+            .map(linear_display_p3_to_bt2020)
+            .collect::<Vec<_>>();
+        make_scene_gain_map(&base, &alternate, w, h)
+            .map_err(|e| RuntimeError::external("HDR-only scene Gain Map", e))?
+    };
     let raster = Raster8::new(
         w as u32,
         h as u32,
@@ -264,14 +277,10 @@ fn hdr_gain_map(
         make_scene_gain_map_metadata(map.min_ev as f64, map.max_ev as f64, map.offset as f64)
     };
     let (tmap, xmp) = metadata.map_err(|e| RuntimeError::external("scene Gain Map metadata", e))?;
-    let alternate_icc = fs::read(work.join("scene-p3-pq.icc"))
-        .map_err(|e| RuntimeError::external("native scene Gain Map color profile", e))?;
     let bytes = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
-            // Native readback and scene fitting both use linear Display P3.
-            // The preserved SDR primary may have different primaries.
-            alternate_icc: Some(&alternate_icc),
+            alternate_icc: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: w as u32,
                 gain_map_height: h as u32,
@@ -714,7 +723,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn native_p3_scene_gain_preserves_an_srgb_base_and_unequal_hdr_channels() {
+    fn native_scene_p3_gain_preserves_an_srgb_base_and_unequal_hdr_channels() {
         use xdremux_codec::PrimaryHeifEncodeRequest;
 
         let Some(adapter) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
@@ -768,6 +777,49 @@ mod tests {
             );
         }
         println!("Native P3 scene Gain Map: sRGB primary preserved; SDR unchanged; unequal HDR channels match linear P3 target");
+    }
+
+    #[test]
+    fn native_scene_readback_matches_full_frame_at_row_boundaries() {
+        let Some(adapter) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        let root = tempfile::tempdir().unwrap();
+        let pixels = (0..320)
+            .flat_map(|y| std::iter::repeat_n([y as f32 / 640., 0.25, -0.01, 1.], 16))
+            .collect::<Vec<_>>();
+        let input = root.path().join("source.f32");
+        let image = root.path().join("source.exr");
+        let reference = root.path().join("full-frame");
+        write_pixels(&input, &pixels).unwrap();
+        let client = AppleAdapterClient::new(adapter);
+        client
+            .styles_primitive(
+                &json!({"schema_version":2,"operation":"styles-encode-linear",
+            "input_path":input,"output_path":image,"width":16,"height":320,
+            "orientation":1,"readback_path":reference}),
+            )
+            .unwrap();
+        client
+            .styles_primitive(&json!({"schema_version":2,"operation":"styles-readback",
+            "input_path":image,"output_path":root.path(),"width":16,"height":320}))
+            .unwrap();
+        let expected = read_pixels(&root.path().join("full-frame.f32"), pixels.len()).unwrap();
+        let actual = read_pixels(&root.path().join("published_hdr.f32"), pixels.len()).unwrap();
+        let maximum = expected
+            .iter()
+            .zip(&actual)
+            .flat_map(|(a, b)| (0..4).map(move |c| (a[c] - b[c]).abs()))
+            .fold(0_f32, f32::max);
+        assert!(
+            maximum < 1e-6,
+            "bounded readback changed row order or float values: {maximum}"
+        );
+        assert!(
+            actual.iter().any(|p| p[2] < 0.),
+            "extended RGB must remain unclipped"
+        );
+        println!("Native bounded RGBA32F readback: 320 rows, including 128-row boundaries; max difference {maximum}");
     }
 
     #[test]

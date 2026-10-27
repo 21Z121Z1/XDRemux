@@ -96,6 +96,8 @@ Styles Linear Thumbnail 保存由 SDR 主图和 Gain Map 重建出的场景线�
 
 Apple 适配器通过 Core Image，在主图原始分辨率上读取 SDR 和展开后的 HDR 表示。框架解释源 ICC/nclx 和 `tmap` 色度，包括增益图应用基色、gamma、偏移及亮度余量，并以扩展线性 Display P3 RGBA32F 返回两幅图像。Rust 保留浮点 RGB 样本，将原生自下而上的行序转换为显示顺序。该路径不经过 RGB8 中转，也不再无条件执行 sRGB 传递函数解码。
 
+读回每次最多渲染 128 行，将浮点字节流式写入临时文件，再原子发布。读取下一幅表示前会释放当前表示的渲染资源，以限制中转内存，同时保留分辨率和精度。
+
 重建后，面积盒式滤波在线性光下将图像缩小到 1024 像素级缩略图。Rust 将每个通道除以 Styles plist key `4` 中的 `baseline_exposure`，再应用 Apple Log。
 
 Apple Log 传递函数、`[0, 1]` 码值范围和辅助色彩标记保持不变。编码器是 macOS 26A434 指数解码器 `_appleLogToLinear` / `sw_appleLogToLinear` 的逆变换。该解码器不使用二次暗部曲线，因此此编码器也不使用。相机端编码器的暗部曲线尚未核实。

@@ -32,6 +32,20 @@ pub struct SceneGainMap {
     pub clipped_negative_fraction: f32,
 }
 
+/// Convert linear Display P3 D65 to linear BT.2020 D65. The matrix is
+/// inverse(BT2020_to_XYZ) * P3_to_XYZ, using H.273 Table 2 primaries.
+/// Extended and HDR values are retained; alpha and the reference white scale
+/// are unchanged. This is not a transfer-function or tone-map operation.
+pub fn linear_display_p3_to_bt2020(p: &LinearPixel) -> LinearPixel {
+    let [r, g, b, a] = *p;
+    [
+        0.753_833_06 * r + 0.198_597_37 * g + 0.047_569_6 * b,
+        0.045_743_85 * r + 0.941_777_2 * g + 0.012_478_931 * b,
+        -0.001_210_340_3 * r + 0.017_601_717 * g + 0.983_608_6 * b,
+        a,
+    ]
+}
+
 /// RGB gain carries both the HDR-only style change and luminance restoration.
 /// A shared nonzero offset keeps gains finite at encoded black. The SDR base is
 /// never changed. Signed minimum gains permit HDR shadows darker than SDR.
@@ -43,17 +57,21 @@ pub fn make_scene_gain_map(
 ) -> Result<SceneGainMap> {
     checked_raster(sdr, width, height)?;
     checked_raster(scene, width, height)?;
-    let offset = 1. / 64.;
+    // A basis conversion can produce negative linear components. A positive
+    // common offset makes their logarithmic ratio representable without clipping.
+    let minimum = sdr
+        .iter()
+        .chain(scene)
+        .flat_map(|p| &p[..3])
+        .copied()
+        .fold(0_f32, f32::min);
+    let offset = 1. / 64. - minimum;
     let mut gains = Vec::with_capacity(sdr.len() * 3);
     let mut lo = 0f32;
     let mut hi = 0f32;
-    let mut negative = 0usize;
     for (base, target) in sdr.iter().zip(scene) {
         for c in 0..3 {
-            if target[c] < 0. {
-                negative += 1;
-            }
-            let ev = ((target[c].max(0.) + offset) / (base[c].max(0.) + offset)).log2();
+            let ev = ((target[c] + offset) / (base[c] + offset)).log2();
             lo = lo.min(ev);
             hi = hi.max(ev);
             gains.push(ev);
@@ -78,7 +96,7 @@ pub fn make_scene_gain_map(
         min_ev: lo,
         max_ev: hi,
         offset,
-        clipped_negative_fraction: negative as f32 / (sdr.len() * 3) as f32,
+        clipped_negative_fraction: 0.,
     })
 }
 
@@ -1088,6 +1106,42 @@ mod tests {
                 < 1e-6
         );
     }
+    #[test]
+    fn p3_to_bt2020_matches_independent_xy_reference_and_retains_extended_values() {
+        // Reference computed with exact rational xy chromaticities and D65:
+        // P3 R(.680,.320) G(.265,.690) B(.150,.060),
+        // BT2020 R(.708,.292) G(.170,.797) B(.131,.046), W(.3127,.3290).
+        let rgb = linear_display_p3_to_bt2020(&[1., 0.03, 0.01, 0.75]);
+        for (actual, expected) in rgb[..3]
+            .iter()
+            .zip([0.760_266_65, 0.074_121_95, 0.009_153_797])
+        {
+            assert!((actual - expected).abs() < 1e-7);
+        }
+        assert_eq!(rgb[3], 0.75);
+        let red = linear_display_p3_to_bt2020(&[4., 0., 0., 1.]);
+        assert!((red[0] - 3.015_332).abs() < 5e-7);
+        assert!((red[2] + 0.004_841_361).abs() < 1e-8);
+        let white = linear_display_p3_to_bt2020(&[2., 2., 2., 1.]);
+        assert!(white[..3].iter().all(|c| (*c - 2.).abs() < 3e-7));
+    }
+
+    #[test]
+    fn gain_map_preserves_negative_linear_components_with_a_positive_offset() {
+        let base = [[-0.02, 0.25, 0.5, 1.]];
+        let target = [[-0.04, 0.5, 1., 1.]];
+        let map = make_scene_gain_map(&base, &target, 1, 1).unwrap();
+        for c in 0..3 {
+            let ev = map.min_ev + f32::from(map.raster.data[c]) / 255. * (map.max_ev - map.min_ev);
+            let actual = (base[0][c] + map.offset) * ev.exp2() - map.offset;
+            assert!(
+                (actual - target[0][c]).abs() < 0.003,
+                "channel {c}: {actual}"
+            );
+        }
+        assert_eq!(map.clipped_negative_fraction, 0.);
+    }
+
     #[test]
     fn gain_map_can_darken_hdr_shadows_without_touching_sdr() {
         let base = vec![[0.3, 0.2, 0.1, 1.]; 32];

@@ -96,6 +96,8 @@ The Styles Linear Thumbnail stores Apple Log codes for scene-linear Display P3 H
 
 The Apple adapter reads the SDR and expanded HDR representations through Core Image at the base image's original resolution. The framework interprets the source ICC/nclx and `tmap` colorimetry, including the gain-map application primaries, gamma, offsets and headroom. It returns both images as extended-linear Display P3 RGBA32F. Rust preserves the float RGB samples and converts the bottom-up native rows to display order. This path has no RGB8 intermediate or unconditional sRGB transfer-function decode.
 
+Readback renders at most 128 rows per call and streams the float bytes to a temporary file before atomic publication. It releases each representation's rendering resources before reading the next. This bounds staging memory without reducing resolution or precision.
+
 After reconstruction, an area box filter reduces the image in linear light to the 1024-pixel-class thumbnail. Rust divides each channel by `baseline_exposure`, stored in Styles plist key `4`, then applies Apple Log.
 
 The Apple Log transfer, `[0, 1]` code range, and auxiliary color signaling remain unchanged. The encoder inverts the macOS 26A434 exponential decoder, `_appleLogToLinear` / `sw_appleLogToLinear`. That decoder does not use a quadratic toe, so this encoder does not use one. The camera-side encoder toe remains unverified.

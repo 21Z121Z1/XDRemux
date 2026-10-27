@@ -35,7 +35,7 @@ XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
 
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
   cargo test --locked -p xdremux-runtime --lib \
-  native_p3_scene_gain_preserves_an_srgb_base_and_unequal_hdr_channels -- --nocapture
+  style_reconstruction::tests::native_scene_ -- --nocapture
 
 # This is a real Rust product-path check. The fixture is a checked-in ProXDR
 # source; no Swift product writer or legacy Styles runner is used to produce

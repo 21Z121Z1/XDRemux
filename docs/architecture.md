@@ -57,7 +57,7 @@ ProXDR 转换保留主图 HEVC 数据及源 ICC/nclx。可移植 RGB Gain Map �
 
 tmap 默认色度为 BT.2020 PQ。它描述派生图像：解码器在 `use_base_colour_space` 指定的基色中应用增益，再按照 [ISO 21496-1](https://www.iso.org/standard/86775.html) 附录 B 转换为替代编码，不要求存储一幅 PQ 主图。采用 ISO APP2 元数据时，转换在源文件提供 alternate ICC 时保留它；Android hdrgm 由基础图像配置文件定义 HDR 基色，不把 Gain JPEG 的 ICC 当作 alternate 色度。ISO alternate ICC 缺失时，即使源标志为零，也保留基础图像的增益应用基色（C.4.7）。无 ICC 的 JPEG RGB 使用随附的标准 sRGB ICC，让编码后的基础图像具备明确色度（C.4.4）。
 
-Styles 重建和 HDR Look 从线性 Display P3 图像计算新的 RGB 增益。这些输出选择替代图像的基色（`use_base_colour_space=0`），并在 tmap 上附带系统 Display P3 PQ ICC。适配器在浮点读回时从 Core Graphics 获取此配置文件。即使原样保留的 SDR 主图使用 sRGB 或其他配置文件，增益仍在其计算所用的工作空间应用。此行为不改变 ProXDR 增益图的应用空间。
+Styles 重建和 HDR Look 在线性 Display P3 中拟合场景像素。生成新的 RGB Gain Map 时，Rust 先把 SDR 和 HDR 像素都转换到线性 BT.2020，再在该空间中计算新的通道增益。这些输出选择替代图像的基色（`use_base_colour_space=0`），并保留 tmap 的 BT.2020 PQ 声明。公共偏移覆盖负线性分量，避免在对数比值计算前裁剪它们。即使原样保留的 SDR 主图使用 sRGB 或其他配置文件，增益仍在其计算所用的工作空间应用。此行为不改变 ProXDR 增益图的应用空间。
 
 ISO JPEG 输入中，Exif `ColorSpace=1` 即使在存在 ICC 时也选择 sRGB（C.4.4）。其他 Exif 值在源文件提供 ICC 时保留它。Android hdrgm 输入沿用现有 ICC 选择行为。
 
