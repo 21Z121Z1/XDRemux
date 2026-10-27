@@ -971,19 +971,18 @@ fn scene_rgb_from_native(bytes: &[u8], width: usize, height: usize) -> Result<Sc
         ));
     }
     let mut samples = Vec::with_capacity(width * height * 3);
-    // Core Image bitmaps start at the bottom row; the runtime uses top-down RGB.
-    for row in bytes.chunks_exact(row_bytes).rev() {
-        for pixel in row.as_chunks::<16>().0 {
-            for component in pixel[..12].as_chunks::<4>().0 {
-                let value = f32::from_le_bytes(*component);
-                if !value.is_finite() {
-                    return Err(RuntimeError::new(
-                        "scene color management",
-                        "native scene contains non-finite RGB",
-                    ));
-                }
-                samples.push(value);
+    // CIContext bitmap rows already run top-down, independently of the
+    // lower-left coordinate origin used for render bounds.
+    for pixel in bytes.as_chunks::<16>().0 {
+        for component in pixel[..12].as_chunks::<4>().0 {
+            let value = f32::from_le_bytes(*component);
+            if !value.is_finite() {
+                return Err(RuntimeError::new(
+                    "scene color management",
+                    "native scene contains non-finite RGB",
+                ));
             }
+            samples.push(value);
         }
     }
     Ok(SceneLinearRgb {
@@ -1432,7 +1431,7 @@ mod tests {
         let scene = scene_rgb_from_native(&bytes, 1, 2).unwrap();
         assert_eq!(
             scene.samples,
-            vec![0.75, 0.5, 0.25, -0.125, 4.000_31, 0.000_123]
+            vec![-0.125, 4.000_31, 0.000_123, 0.75, 0.5, 0.25]
         );
         assert!(scene_rgb_from_native(&bytes[..bytes.len() - 1], 1, 2).is_err());
         let invalid = [f32::NAN, 0.0, 0.0, 1.0]
@@ -1440,6 +1439,47 @@ mod tests {
             .flat_map(|v| v.to_le_bytes())
             .collect::<Vec<_>>();
         assert!(scene_rgb_from_native(&invalid, 1, 1).is_err());
+    }
+
+    #[test]
+    fn native_scene_keeps_top_and_bottom_in_display_order() {
+        use xdremux_codec::PrimaryHeifEncodeRequest;
+        let Some(executable) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        // Encode a known top-down HEIF raster, independently of CIImage's raw
+        // bitmap initializer: red on top, blue on the bottom.
+        let data = (0..320)
+            .flat_map(|y| {
+                if y < 160 {
+                    [255, 0, 0].repeat(64)
+                } else {
+                    [0, 0, 255].repeat(64)
+                }
+            })
+            .collect();
+        let source = xdremux_codec::LibHeifProvider::new()
+            .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(
+                Raster8::new(64, 320, 192, RasterPixelFormat::Rgb8, data).unwrap(),
+                None,
+            ))
+            .unwrap();
+        let adapter = AppleAdapterClient::new(executable);
+        let work = tempfile::tempdir().unwrap();
+        let pair = scene_linear_pair(&adapter, &source, work.path(), 320).unwrap();
+        assert_eq!((pair.width, pair.height), (64, 320));
+        for representation in [&pair.sdr, &pair.hdr] {
+            let top = &representation[(32 * 64 + 32) * 3..][..3];
+            let bottom = &representation[(288 * 64 + 32) * 3..][..3];
+            assert!(top[0] > 0.75 && top[2] < 0.1, "top must stay red: {top:?}");
+            assert!(
+                bottom[2] > 0.8 && bottom[0] < 0.1,
+                "bottom must stay blue: {bottom:?}"
+            );
+        }
+        println!(
+            "Native scene display order: encoded top red / bottom blue preserved in SDR and HDR"
+        );
     }
 
     #[test]

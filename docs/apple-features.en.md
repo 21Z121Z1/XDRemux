@@ -94,7 +94,7 @@ Native readback does not establish Photos controls, Tone/Color response, or save
 
 The Styles Linear Thumbnail stores Apple Log codes for scene-linear Display P3 HDR reconstructed from the SDR base and Gain Map. It does not store a copy of the SDR image codes.
 
-The Apple adapter reads the SDR and expanded HDR representations through Core Image at the base image's original resolution. The framework interprets the source ICC/nclx and `tmap` colorimetry, including the gain-map application primaries, gamma, offsets and headroom. It returns both images as extended-linear Display P3 RGBA32F. Rust preserves the float RGB samples and converts the bottom-up native rows to display order. This path has no RGB8 intermediate or unconditional sRGB transfer-function decode.
+The Apple adapter reads the SDR and expanded HDR representations through Core Image at the base image's original resolution. The framework interprets the source ICC/nclx and `tmap` colorimetry, including the gain-map application primaries, gamma, offsets and headroom. It returns both images as extended-linear Display P3 RGBA32F. Rust preserves the float RGB samples and the bitmap's top-down row order. This path has no RGB8 intermediate or unconditional sRGB transfer-function decode.
 
 Readback renders at most 128 rows per call and streams the float bytes to a temporary file before atomic publication. It releases each representation's rendering resources before reading the next. This bounds staging memory without reducing resolution or precision.
 

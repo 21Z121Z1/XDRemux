@@ -94,7 +94,7 @@ Rust 定义必需的整数编辑字段，包括 Standard 纹理状态。ImageIO 
 
 Styles Linear Thumbnail 保存由 SDR 主图和 Gain Map 重建出的场景线性 Display P3 HDR，经 Apple Log 编码后的码值，不是 SDR 图像码值的副本。
 
-Apple 适配器通过 Core Image，在主图原始分辨率上读取 SDR 和展开后的 HDR 表示。框架解释源 ICC/nclx 和 `tmap` 色度，包括增益图应用基色、gamma、偏移及亮度余量，并以扩展线性 Display P3 RGBA32F 返回两幅图像。Rust 保留浮点 RGB 样本，将原生自下而上的行序转换为显示顺序。该路径不经过 RGB8 中转，也不再无条件执行 sRGB 传递函数解码。
+Apple 适配器通过 Core Image，在主图原始分辨率上读取 SDR 和展开后的 HDR 表示。框架解释源 ICC/nclx 和 `tmap` 色度，包括增益图应用基色、gamma、偏移及亮度余量，并以扩展线性 Display P3 RGBA32F 返回两幅图像。Rust 保留浮点 RGB 样本及位图自上而下的行序。该路径不经过 RGB8 中转，也不再无条件执行 sRGB 传递函数解码。
 
 读回每次最多渲染 128 行，将浮点字节流式写入临时文件，再原子发布。读取下一幅表示前会释放当前表示的渲染资源，以限制中转内存，同时保留分辨率和精度。
 

@@ -89,7 +89,9 @@ static NSDictionary *RenderRows(CIImage *image, CIContext *context, CGColorSpace
         for(size_t y=0;y<h;y+=rows) {
             @autoreleasepool {
             size_t count=MIN(rows,h-y);
-            [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,y,w,count) format:kCIFormatRGBAf colorSpace:space];
+            // Bitmap rows are top-down; Core Image bounds use a lower-left
+            // origin. Visit the top strip first to match full-frame readback.
+            [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,h-y-count,w,count) format:kCIFormatRGBAf colorSpace:space];
             const float *p=data.bytes;
             for(size_t i=0;i<w*count;i++) {
                 BOOL zero=YES;

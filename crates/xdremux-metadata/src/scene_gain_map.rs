@@ -56,7 +56,7 @@ mod tests {
         assert_eq!(
             bytes[5] & 0x40,
             0,
-            "P3 gains must not use the preserved base primaries"
+            "scene gains must use the alternate working primaries"
         );
     }
 

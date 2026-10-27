@@ -723,7 +723,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn native_scene_p3_gain_preserves_an_srgb_base_and_unequal_hdr_channels() {
+    fn native_scene_gain_preserves_srgb_base_and_p3_hdr_target() {
         use xdremux_codec::PrimaryHeifEncodeRequest;
 
         let Some(adapter) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
@@ -766,7 +766,7 @@ mod tests {
         .unwrap();
         let actual = read_pixels(&root.path().join("published_hdr.f32"), 64 * 64).unwrap();
         println!(
-            "Native P3 scene Gain Map: target={expected:?}; readback={:?}",
+            "Native scene Gain Map: P3 target={expected:?}; readback={:?}",
             actual[32 * 64 + 32]
         );
         for (c, value) in expected[..3].iter().enumerate() {
@@ -776,7 +776,7 @@ mod tests {
                 actual[32 * 64 + 32][c]
             );
         }
-        println!("Native P3 scene Gain Map: sRGB primary preserved; SDR unchanged; unequal HDR channels match linear P3 target");
+        println!("Native scene Gain Map: sRGB primary preserved; SDR unchanged; unequal HDR channels match linear P3 target");
     }
 
     #[test]
