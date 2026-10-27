@@ -401,8 +401,10 @@ pub fn apple_style_linear_metadata(
 /// Empty bins are filled from neighboring observed means. The monotone
 /// projection is pool-adjacent-violators on those means. There is no parametric
 /// family and no forced `(0, 0)` or `(1, 1)` endpoint. The 516-byte wire layout
-/// is unchanged: a 257 count, 256 inverse-sRGB nodes on the existing 65534
+/// is unchanged: a 257 count, 256 sRGB-encoded nodes on the existing 65534
 /// scale, and one repeated final node.
+/// Returned samples and fit error use the encoded nodes as decoded by the
+/// measured macOS consumer, so downstream statistics describe the written LUT.
 pub fn apple_style_monotonic_global_tone_curve(
     thumbnail_rgb: &[f32],
     primary_rgb: &[f32],
@@ -435,15 +437,6 @@ pub fn apple_style_monotonic_global_tone_curve(
     let values = interpolate_observed_bins(&sums, &counts);
     let fitted = isotonic_curve(&values, &counts)?;
 
-    let mut squared_error = 0.0_f64;
-    for (&input, &output) in thumbnail_rgb.iter().zip(primary_rgb) {
-        let predicted = f64::from(sample_gtc_linear(&fitted, input));
-        let expected = f64::from(output.clamp(0.0, 1.0));
-        let error = predicted - expected;
-        squared_error += error * error;
-    }
-    let finite_count = thumbnail_rgb.len();
-
     let mut data = Vec::with_capacity(516);
     data.extend_from_slice(&257_u16.to_le_bytes());
     for linear in &fitted {
@@ -451,10 +444,32 @@ pub fn apple_style_monotonic_global_tone_curve(
     }
     let last = *fitted.last().unwrap_or(&0.0);
     data.extend_from_slice(&encode_gtc_node(f64::from(last)).to_le_bytes());
+    // macOS reads 256 f32 nodes after inverse sRGB on a fixed 65535 scale.
+    // The iPhone firmware ratio/half stage has a different, unproven binding.
+    // Neither endpoint normalization nor the repeated final word belongs here.
+    let linear_samples = data[2..514]
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|word| {
+            let encoded = f64::from(u16::from_le_bytes(*word)) / 65_535.;
+            (if encoded <= 0.04045 {
+                encoded / 12.92
+            } else {
+                ((encoded + 0.055) / 1.055).powf(2.4)
+            }) as f32
+        })
+        .collect::<Vec<_>>();
+    let mut squared_error = 0.0_f64;
+    for (&input, &output) in thumbnail_rgb.iter().zip(primary_rgb) {
+        let predicted = f64::from(sample_gtc_linear(&linear_samples, input));
+        let expected = f64::from(output.clamp(0.0, 1.0));
+        squared_error += (predicted - expected).powi(2);
+    }
     Ok(AppleStyleGlobalToneCurve {
         data,
-        linear_samples: fitted,
-        fit_rmse: (squared_error / finite_count.max(1) as f64).sqrt(),
+        linear_samples,
+        fit_rmse: (squared_error / thumbnail_rgb.len() as f64).sqrt(),
         populated_bins,
     })
 }
@@ -2246,6 +2261,54 @@ mod tests {
         assert!((distribution.high_key - 2.85).abs() < 1e-12);
         assert_eq!(distribution.p50, 1.5);
         assert!((distribution.white_point - 2.985).abs() < 1e-12);
+    }
+
+    #[test]
+    fn generated_global_tone_curve_samples_and_fit_error_follow_the_wire_nodes() {
+        let thumbnail = (0..256)
+            .flat_map(|i| [i as f32 / 255.; 3])
+            .collect::<Vec<_>>();
+        // A sub-white endpoint distinguishes fixed-65535 Mac decoding from
+        // endpoint normalization. Include the sRGB toe and non-grid values.
+        let primary = thumbnail
+            .iter()
+            .map(|code| 0.0002 + 0.37123 * code * code)
+            .collect::<Vec<_>>();
+        let curve = apple_style_monotonic_global_tone_curve(&thumbnail, &primary).unwrap();
+        let decoded = curve.data[2..514]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|word| {
+                let encoded = f64::from(u16::from_le_bytes(*word)) / 65535.;
+                (if encoded <= 0.04045 {
+                    encoded / 12.92
+                } else {
+                    ((encoded + 0.055) / 1.055).powf(2.4)
+                }) as f32
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            curve.linear_samples, decoded,
+            "stats must use the encoded resource"
+        );
+        assert!(
+            decoded[255] < 0.4,
+            "do not normalize the final node to white"
+        );
+        let mapped = apple_style_apply_global_tone_curve(&thumbnail, &decoded).unwrap();
+        let expected_rmse = (mapped
+            .iter()
+            .zip(&primary)
+            .map(|(&actual, &target)| (f64::from(actual) - f64::from(target)).powi(2))
+            .sum::<f64>()
+            / mapped.len() as f64)
+            .sqrt();
+        assert!(
+            (curve.fit_rmse - expected_rmse).abs() < 1e-12,
+            "reported error must include wire quantization"
+        );
+        assert!(expected_rmse > 1e-7);
     }
 
     #[test]

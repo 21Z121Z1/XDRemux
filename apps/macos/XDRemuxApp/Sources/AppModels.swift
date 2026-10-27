@@ -1,5 +1,24 @@
 import Foundation
 
+struct HDRLookItem: Decodable, Identifiable, Sendable {
+    let input: String
+    let output: String
+    let status: String
+    let error: String?
+    var id: String { input }
+}
+
+struct HDRLookReceipt: Decodable, Sendable {
+    let outputDirectory: String
+    let results: [HDRLookItem]
+    let failures: Int
+
+    enum CodingKeys: String, CodingKey {
+        case outputDirectory = "output_dir"
+        case results, failures
+    }
+}
+
 struct ConversionConfig: Sendable, Equatable {
     var outputDirectory: URL?
     var fileNameSuffix = "_iso"

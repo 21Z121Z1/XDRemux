@@ -178,6 +178,25 @@ enum RustCLIClient {
         return try receipt.items.map(makeCategorizationItem(from:))
     }
 
+    static func hdrLook(inputs: [URL], outputDirectory: URL?, headroom: Int) throws -> HDRLookReceipt {
+        var arguments = ["hdr-look", "--recursive", "--headroom", String(headroom), "--json"]
+        if let outputDirectory {
+            arguments.append(contentsOf: ["--output-dir", outputDirectory.path])
+        }
+        arguments.append("--")
+        arguments.append(contentsOf: inputs.map(\.path))
+        let result = try run(arguments, allowNonZeroOutput: true)
+        do {
+            return try JSONDecoder().decode(HDRLookReceipt.self, from: Data(result.standardOutput.utf8))
+        } catch {
+            let detail = result.standardError.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw ClientError.commandFailed(
+                command: "hdr-look", status: result.status,
+                message: detail.isEmpty ? "无法读取 HDR 处理结果：\(error)" : detail
+            )
+        }
+    }
+
     static func productArgumentsForTesting(config: ConversionConfig) throws -> [String] {
         try productArguments(for: config)
     }

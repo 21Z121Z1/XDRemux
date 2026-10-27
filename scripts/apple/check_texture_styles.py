@@ -163,6 +163,7 @@ def main():
                 app_smoke=out/'app-texture-smoke'
                 app=ROOT/'apps/macos/XDRemuxApp'
                 run(['swiftc','-O','-parse-as-library',app/'Sources/AppModels.swift',
+                     app/'Sources/HDRLookViewModel.swift',
                      app/'Sources/RustCLIClient.swift',app/'Sources/RustAppConversionBridge.swift',
                      app/'Tests/XDRemuxAppTextureSmoke.swift','-o',app_smoke],case/'app-build.log')
                 app_output=case/'app-styles-texture.heic'

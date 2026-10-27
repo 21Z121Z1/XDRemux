@@ -1,9 +1,26 @@
 #![forbid(unsafe_code)]
 
+mod display_family;
+mod display_methods;
 mod edr;
 mod error;
 mod gainmap;
 mod info;
+mod scene_guidance;
+mod scene_reconstruction;
+pub use display_family::{
+    DisplayFamily, DisplayFamilyPolicy, DisplayFamilyTarget, DisplaySchedule,
+    DISPLAY_FAMILY_HEADROOM, DISPLAY_FAMILY_OFFSET,
+};
+pub use display_methods::{
+    render_display_pixel, render_styles_display, DisplayMethods, DisplayTarget,
+};
+pub use scene_guidance::{SceneGuidanceMetrics, SceneGuidancePolicy};
+pub use scene_reconstruction::{
+    decode_styles_thumbnail, display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene,
+    styles_thumbnail_to_linear, LinearPixel, LinearThumbnailEncoding, SceneGainMap,
+    SceneReconstruction,
+};
 mod scene_linear;
 
 pub use edr::{

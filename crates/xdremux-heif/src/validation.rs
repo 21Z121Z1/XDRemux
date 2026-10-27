@@ -212,7 +212,11 @@ fn item_extent_range(
     Ok(start..end)
 }
 
-fn item_payload(source: &[u8], idat: Option<&BoxHeader>, entry: &IlocEntry) -> Result<Vec<u8>> {
+pub(crate) fn item_payload(
+    source: &[u8],
+    idat: Option<&BoxHeader>,
+    entry: &IlocEntry,
+) -> Result<Vec<u8>> {
     let total = entry.extents.iter().try_fold(0usize, |total, extent| {
         let length = usize::try_from(extent.length).map_err(|_| {
             invalid(format!(

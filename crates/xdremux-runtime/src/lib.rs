@@ -11,13 +11,18 @@ mod batch_checkpoint;
 mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
+mod hdr_look;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
 mod oppo_tail;
 #[cfg(target_os = "macos")]
+mod style_reconstruction;
+#[cfg(target_os = "macos")]
 mod system_heif_hdr;
 mod validation;
+#[cfg(target_os = "macos")]
+pub use style_reconstruction::{reconstruct_styles_hdr, reconstruct_styles_hdr_with_display};
 
 #[cfg(target_os = "macos")]
 pub use apple_adapter::AppleStylePropertiesFacts;
@@ -41,6 +46,9 @@ pub fn validate_apple_styles_file(
     apple_texture::validate_existing(executable.as_ref(), input.as_ref())
 }
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
+#[cfg(target_os = "macos")]
+pub use hdr_look::render_hdr_look;
+pub use hdr_look::{plan_hdr_look, HdrLookItem, HdrLookPlan, HdrLookReceipt, HdrLookResult};
 pub use live_photo::LivePhotoFileReceipt;
 pub use live_photo_package::validate_still_output_path;
 pub use live_photo_package::LivePhotoPackagePublicationError;
