@@ -250,6 +250,7 @@ pub(crate) fn convert_file(
             RuntimeError::external("Photographic Styles source Gain Map structure", error),
         )
     })?;
+    profile_stage(&mut profile, "resource_prepare");
     let scene_rasters = if let Some(encoded) = system_encoded.as_mut() {
         let pair = encoded.submitted_scene.take().ok_or_else(|| {
             RuntimeError::new(
@@ -257,7 +258,6 @@ pub(crate) fn convert_file(
                 "submitted scene was already consumed",
             )
         })?;
-        profile_stage(&mut profile, "resource_decode");
         derive_style_scene_from_pair(
             pair,
             encoded.content_headroom.log2(),
@@ -270,7 +270,6 @@ pub(crate) fn convert_file(
             staging.path(),
             LINEAR_THUMBNAIL_MAX_SIZE,
         )?;
-        profile_stage(&mut profile, "resource_decode");
         let maximum_stops = prepared
             .scale
             .per_channel_gain_map_max
@@ -781,12 +780,10 @@ fn derive_style_scene_from_linear_images(
 ) -> Result<StyleSceneRasters> {
     // Thumbnail reduction happens only after the gain is applied at the base
     // resolution. Both images use the same linear-light area footprint.
-    let mut reduction_profile = profile_start();
     let base_image = area_resize_linear_rgb(full_sdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
     let hdr_image = area_resize_linear_rgb(full_hdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
-    profile_stage(&mut reduction_profile, "scene_linear_area_reduction");
     if base_image.width != hdr_image.width
         || base_image.height != hdr_image.height
         || base_image.samples.len() != hdr_image.samples.len()
@@ -911,6 +908,7 @@ pub(crate) fn scene_linear_pair(
     staging: &Path,
     maximum_edge: u32,
 ) -> Result<SceneLinearPair> {
+    let mut reconstruction_profile = profile_start();
     let geometry = xdremux_heif::primary_coded_geometry(source)
         .map_err(|error| RuntimeError::external("scene color management", error))?;
     let (width, height) = if geometry.quarter_turns_ccw & 1 == 1 {
@@ -943,6 +941,7 @@ pub(crate) fn scene_linear_pair(
             ));
         }
     }
+    profile_stage(&mut reconstruction_profile, "scene_hdr_reconstruction");
     let read = |name: &str| -> Result<SceneLinearRgb> {
         let bytes = fs::read(work.path().join(name))
             .map_err(|error| RuntimeError::external("scene color management pixels", error))?;
@@ -952,6 +951,7 @@ pub(crate) fn scene_linear_pair(
     };
     let sdr = read("published_sdr.f32")?;
     let hdr = read("published_hdr.f32")?;
+    profile_stage(&mut reconstruction_profile, "scene_linear_area_reduction");
     Ok(SceneLinearPair {
         width: sdr.width,
         height: sdr.height,
@@ -1509,7 +1509,7 @@ mod tests {
             let source = xdremux_heif::assemble_iso_gain_map_heif(
                 &base,
                 &IsoGainMapAssembly {
-                    alternate_icc: None,
+                    alternate_color_profile: xdremux_heif::IsoAlternateColorProfile::Bt2020Pq,
                     gain_map: DirectHevcGainMap {
                         gain_map_width: 64,
                         gain_map_height: 64,

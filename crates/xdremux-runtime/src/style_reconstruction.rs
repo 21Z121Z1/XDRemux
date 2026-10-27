@@ -267,7 +267,9 @@ fn hdr_gain_map(
     let bytes = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
-            alternate_icc: None,
+            // Native readback and scene fitting both use linear Display P3.
+            // The preserved SDR primary may have different primaries.
+            alternate_color_profile: xdremux_heif::IsoAlternateColorProfile::DisplayP3Pq,
             gain_map: DirectHevcGainMap {
                 gain_map_width: w as u32,
                 gain_map_height: h as u32,
@@ -708,6 +710,59 @@ pub fn reconstruct_styles_hdr_with_display(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_p3_scene_gain_preserves_an_srgb_base_and_unequal_hdr_channels() {
+        use xdremux_codec::PrimaryHeifEncodeRequest;
+
+        let Some(adapter) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        let root = tempfile::tempdir().unwrap();
+        let base = LibHeifProvider::new()
+            .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(
+                Raster8::new(64, 64, 192, RasterPixelFormat::Rgb8, vec![128; 64 * 64 * 3]).unwrap(),
+                None,
+            ))
+            .unwrap();
+        let input = root.path().join("srgb.heic");
+        fs::write(&input, &base).unwrap();
+        let client = AppleAdapterClient::new(adapter);
+        client
+            .styles_primitive(&json!({"schema_version":2,"operation":"styles-readback",
+            "input_path":input,"output_path":root.path(),"width":64,"height":64}))
+            .unwrap();
+        let sdr = read_pixels(&root.path().join("published_sdr.f32"), 64 * 64).unwrap();
+        // sRGB 128/255 decodes to 0.2158605. Neutral D65 remains neutral in P3.
+        assert!(sdr[32 * 64 + 32][..3]
+            .iter()
+            .all(|c| (*c - 0.215_860_5).abs() < 0.004));
+        // Independent absolute target values in linear P3. Applying their
+        // channel gains in sRGB before converting would move red by >0.2.
+        let expected = [1.5, 0.1, 0.7, 1.0];
+        let target = vec![expected; 64 * 64];
+        let output = root.path().join("hdr.heic");
+        hdr_gain_map(
+            &client,
+            &base,
+            &sdr,
+            &target,
+            &output,
+            root.path(),
+            (64, 64),
+            None,
+        )
+        .unwrap();
+        let actual = read_pixels(&root.path().join("published_hdr.f32"), 64 * 64).unwrap();
+        for (c, value) in expected[..3].iter().enumerate() {
+            assert!(
+                (actual[32 * 64 + 32][c] - value).abs() < 0.005 + value * 0.02,
+                "P3 channel {c}: {} instead of {value}",
+                actual[32 * 64 + 32][c]
+            );
+        }
+        println!("Native P3 scene Gain Map: sRGB primary preserved; SDR unchanged; unequal HDR channels match linear P3 target");
+    }
 
     #[test]
     fn native_thumbnail_encoding_requires_explicit_finite_fields() {

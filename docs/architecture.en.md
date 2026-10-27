@@ -57,6 +57,8 @@ ProXDR conversion preserves the primary HEVC data and its source ICC/nclx. The p
 
 The default tmap colorimetry is BT.2020 PQ. This describes a derived image: the decoder applies the gain in the primaries selected by `use_base_colour_space`, then converts to the alternate encoding as specified by [ISO 21496-1](https://www.iso.org/standard/86775.html), Annex B. No stored PQ primary is implied. When ISO APP2 metadata is selected, conversion preserves an alternate ICC when supplied; Android hdrgm defines HDR primaries from the base profile and does not use a Gain JPEG ICC as alternate colorimetry. Without one, the gain application retains the base primaries even if the source flag is zero (C.4.7). Untagged JPEG RGB uses a bundled standard sRGB ICC so the encoded base has explicit colorimetry (C.4.4).
 
+Styles reconstruction and HDR Look compute new RGB gains from linear Display P3 images. These outputs select the alternate primaries (`use_base_colour_space=0`) and declare Display P3 PQ RGB (`12,16,0`) on tmap. This preserves the gain operation's working space even when the unchanged SDR primary uses sRGB or another profile. It does not change the ProXDR gain-map application space.
+
 ### Live Photo
 
 The default output contains an HEIC/HEIF still and a MOV with the same asset identifier. The converter maps the resolved source cover time to Apple `still-image-time`.

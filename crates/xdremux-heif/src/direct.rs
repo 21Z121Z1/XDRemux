@@ -1402,7 +1402,7 @@ mod tests {
             let canonical = crate::assemble_iso_gain_map_heif(
                 &source,
                 &crate::IsoGainMapAssembly {
-                    alternate_icc: None,
+                    alternate_color_profile: crate::IsoAlternateColorProfile::Bt2020Pq,
                     gain_map: gain,
                     tmap_payload: &[0; 4],
                     xmp_payload: b"xmp",

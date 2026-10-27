@@ -20,7 +20,7 @@ pub use error::{HeifError, Result};
 // Canonical portable final-file assembly. It consumes an ordinary source HEIF
 // directly, replaces an existing canonical gain-map graph when present, and
 // does not depend on an externally generated intermediate graph.
-pub use native::IsoGainMapAssembly;
+pub use native::{IsoAlternateColorProfile, IsoGainMapAssembly};
 pub use orientation::{primary_coded_geometry, PrimaryCodedGeometry};
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use style_reconstruction::{

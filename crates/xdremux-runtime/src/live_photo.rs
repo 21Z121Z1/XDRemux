@@ -306,7 +306,10 @@ fn assemble_jpeg_gain_map(
     let output = assemble_iso_gain_map_heif(
         base_heif,
         &IsoGainMapAssembly {
-            alternate_icc: alternate_icc.as_deref(),
+            alternate_color_profile: alternate_icc.as_deref().map_or(
+                xdremux_heif::IsoAlternateColorProfile::Bt2020Pq,
+                xdremux_heif::IsoAlternateColorProfile::Icc,
+            ),
             gain_map: direct,
             tmap_payload: &tmap_payload,
             xmp_payload: &xmp_payload,

@@ -57,6 +57,8 @@ ProXDR 转换保留主图 HEVC 数据及源 ICC/nclx。可移植 RGB Gain Map �
 
 tmap 默认色度为 BT.2020 PQ。它描述派生图像：解码器在 `use_base_colour_space` 指定的基色中应用增益，再按照 [ISO 21496-1](https://www.iso.org/standard/86775.html) 附录 B 转换为替代编码，不要求存储一幅 PQ 主图。采用 ISO APP2 元数据时，转换在源文件提供 alternate ICC 时保留它；Android hdrgm 由基础图像配置文件定义 HDR 基色，不把 Gain JPEG 的 ICC 当作 alternate 色度。ISO alternate ICC 缺失时，即使源标志为零，也保留基础图像的增益应用基色（C.4.7）。无 ICC 的 JPEG RGB 使用随附的标准 sRGB ICC，让编码后的基础图像具备明确色度（C.4.4）。
 
+Styles 重建和 HDR Look 从线性 Display P3 图像计算新的 RGB 增益。这些输出选择替代图像的基色（`use_base_colour_space=0`），并在 tmap 上声明 Display P3 PQ RGB（`12,16,0`）。即使原样保留的 SDR 主图使用 sRGB 或其他配置文件，增益仍在其计算所用的工作空间应用。此行为不改变 ProXDR 增益图的应用空间。
+
 ### Live Photo
 
 默认输出由一张 HEIC/HEIF 照片和一个 MOV 组成，两者共享资产标识符。转换器把解析出的源封面时间映射为 Apple `still-image-time`。
