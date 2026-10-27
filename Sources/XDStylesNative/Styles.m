@@ -95,6 +95,17 @@ static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef 
     return facts;
 }
 
+static void WriteSceneColorProfile(NSString *dir) {
+    CGColorSpaceRef pq=CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3_PQ);
+    Require(pq!=NULL,@"Display P3 PQ is unavailable");
+    NSData *icc=CFBridgingRelease(CGColorSpaceCopyICCData(pq));
+    CGColorSpaceRelease(pq);
+    Require(icc.length>0,@"Cannot obtain the scene Gain Map color profile");
+    NSError *error=nil;
+    Require([icc writeToFile:[dir stringByAppendingPathComponent:@"scene-p3-pq.icc"] options:NSDataWritingAtomic error:&error],
+        error.description ?: @"Cannot write the scene Gain Map color profile");
+}
+
 static NSDictionary *Decode(NSDictionary *request) {
     NSString *inputPath=request[@"input_path"],*dir=request[@"output_path"];
     NSData *plist=[NSData dataWithContentsOfFile:[dir stringByAppendingPathComponent:@"styles.plist"]];
@@ -160,6 +171,7 @@ static NSDictionary *Decode(NSDictionary *request) {
     CIImage *lt=RawImage([dir stringByAppendingPathComponent:@"linear.heic"]);
     // Unmanaged rendering preserves the stored Log-like values despite its ICC tag.
     NSDictionary *l=Render(lt,unmanaged,NULL,[dir stringByAppendingPathComponent:@"thumbnail_codes.f32"]);
+    WriteSceneColorProfile(dir);
     CGColorSpaceRelease(linear);
     NSMutableDictionary *facts=[@{@"schema_version":@2,@"metadata_version":stored[@"0"] ?: @(-1),@"orientation":@(orientation),
         @"unstyled":u,@"original_hdr":b,@"thumbnail":l,@"coefficient_bytes":@(coeff.length),@"coefficient_float16":@(half),
@@ -262,6 +274,7 @@ static NSDictionary *Readback(NSDictionary *request) {
     }
     [context clearCaches];
     CGColorSpaceRelease(linear);
+    WriteSceneColorProfile(dir);
     return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(contentHeadroom)};
 }
 

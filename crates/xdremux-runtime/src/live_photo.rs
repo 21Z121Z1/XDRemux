@@ -306,10 +306,7 @@ fn assemble_jpeg_gain_map(
     let output = assemble_iso_gain_map_heif(
         base_heif,
         &IsoGainMapAssembly {
-            alternate_color_profile: alternate_icc.as_deref().map_or(
-                xdremux_heif::IsoAlternateColorProfile::Bt2020Pq,
-                xdremux_heif::IsoAlternateColorProfile::Icc,
-            ),
+            alternate_icc: alternate_icc.as_deref(),
             gain_map: direct,
             tmap_payload: &tmap_payload,
             xmp_payload: &xmp_payload,
@@ -319,6 +316,20 @@ fn assemble_jpeg_gain_map(
     validate_gain_map_structure(&output)
         .map_err(|error| RuntimeError::external("Ultra HDR HEIF validation", error))?;
     Ok(output)
+}
+
+fn primary_jpeg_icc(primary: &[u8], iso_colorimetry: bool) -> Result<Option<Vec<u8>>> {
+    // ISO 21496-1 C.4.4 gives Exif ColorSpace=1 precedence over an ICC.
+    // None selects the encoder's standard sRGB ICC without changing RGB codes.
+    if iso_colorimetry
+        && xdremux_format::jpeg::exif_color_space(primary)
+            .map_err(|error| RuntimeError::external("ISO JPEG base colorimetry", error))?
+            == Some(1)
+    {
+        return Ok(None);
+    }
+    jpeg_icc_profile(primary)
+        .map_err(|error| RuntimeError::external("Motion Photo primary JPEG ICC", error))
 }
 
 fn prepare_jpeg_still(
@@ -343,8 +354,11 @@ fn prepare_jpeg_still(
             format: RasterPixelFormat::Rgb8,
         })
         .map_err(|error| RuntimeError::external("Motion Photo primary JPEG decode", error))?;
-    let icc_profile = jpeg_icc_profile(primary)
-        .map_err(|error| RuntimeError::external("Motion Photo primary JPEG ICC", error))?;
+    let icc_profile = primary_jpeg_icc(
+        primary,
+        gain.as_ref()
+            .is_some_and(|g| g.metadata.uses_iso_colorimetry),
+    )?;
     let exif_tiff = build_live_photo_jpeg_exif(primary, content_identifier)
         .map_err(|error| RuntimeError::external("Live Photo JPEG EXIF transfer", error))?;
     let encoded_base = heif
@@ -634,6 +648,37 @@ pub(crate) fn convert_motion_photo_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iso_jpeg_exif_srgb_takes_precedence_over_conflicting_icc() {
+        let mut jpeg = vec![0xff, 0xd8];
+        // IFD0 points to an ExifIFD with the SHORT ColorSpace tag set to 1.
+        let tiff = b"MM\0*\0\0\0\x08\0\x01\x87\x69\0\x04\0\0\0\x01\0\0\0\x1a\0\0\0\0\0\x01\xa0\x01\0\x03\0\0\0\x01\0\x01\0\0\0\0\0\0";
+        let mut exif = b"Exif\0\0".to_vec();
+        exif.extend_from_slice(tiff);
+        let icc = b"source profile";
+        let mut app2 = b"ICC_PROFILE\0\x01\x01".to_vec();
+        app2.extend_from_slice(icc);
+        for (marker, payload) in [(0xe1, exif.as_slice()), (0xe2, app2.as_slice())] {
+            jpeg.extend([0xff, marker]);
+            jpeg.extend(u16::try_from(payload.len() + 2).unwrap().to_be_bytes());
+            jpeg.extend(payload);
+        }
+        jpeg.extend([0xff, 0xd9]);
+        // None selects the primary encoder's explicit standard sRGB profile.
+        assert_eq!(primary_jpeg_icc(&jpeg, true).unwrap(), None);
+        assert_eq!(
+            primary_jpeg_icc(&jpeg, false).unwrap().as_deref(),
+            Some(icc.as_slice())
+        );
+        // Exif uncalibrated leaves the source ICC in charge for ISO as well.
+        let color_value = 12 + 36;
+        jpeg[color_value..color_value + 2].copy_from_slice(&[0xff, 0xff]);
+        assert_eq!(
+            primary_jpeg_icc(&jpeg, true).unwrap().as_deref(),
+            Some(icc.as_slice())
+        );
+    }
 
     #[test]
     fn iso_gain_without_alternate_icc_keeps_the_base_application_primaries() {

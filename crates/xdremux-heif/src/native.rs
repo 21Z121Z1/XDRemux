@@ -28,15 +28,6 @@ const CDSC: FourCC = FourCC::new(*b"cdsc");
 
 const ISO_21496_AUX_TYPE: &[u8] = b"urn:iso:std:iso:ts:21496:-1\0";
 
-/// Color encoding of the fully reconstructed alternate image, separate from
-/// the gain image's compression matrix and its application primaries.
-#[derive(Debug, Clone, Copy)]
-pub enum IsoAlternateColorProfile<'a> {
-    Bt2020Pq,
-    DisplayP3Pq,
-    Icc(&'a [u8]),
-}
-
 /// Fully portable input to the native Rust HEIF assembler.
 ///
 /// The caller owns HDR metadata semantics and codec work. This layer only owns
@@ -46,7 +37,9 @@ pub struct IsoGainMapAssembly<'a> {
     pub gain_map: DirectHevcGainMap<'a>,
     pub tmap_payload: &'a [u8],
     pub xmp_payload: &'a [u8],
-    pub alternate_color_profile: IsoAlternateColorProfile<'a>,
+    /// Source alternate-image ICC, when present. Otherwise the reconstructed
+    /// image uses BT.2020 PQ; gain application primaries remain in tmap.
+    pub alternate_icc: Option<&'a [u8]>,
 }
 
 fn invalid(message: impl Into<String>) -> HeifError {
@@ -387,7 +380,7 @@ fn build_iprp(
     meta: &ParsedMeta,
     gain: &DirectHevcGainMap<'_>,
     graph: AssemblyGraph<'_>,
-    alternate_color_profile: IsoAlternateColorProfile<'_>,
+    alternate_icc: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
@@ -476,14 +469,12 @@ fn build_iprp(
         &mut next_property_index,
         &make_box(HVCC, gain.hvcc)?,
     )?;
-    let alternate_colr = match alternate_color_profile {
-        IsoAlternateColorProfile::Bt2020Pq => make_nclx_box(9, 16, 9)?,
-        IsoAlternateColorProfile::DisplayP3Pq => make_nclx_box(12, 16, 0)?,
-        IsoAlternateColorProfile::Icc(icc) => {
-            let mut payload = b"prof".to_vec();
-            payload.extend_from_slice(icc);
-            make_box(COLR, &payload)?
-        }
+    let alternate_colr = if let Some(icc) = alternate_icc {
+        let mut payload = b"prof".to_vec();
+        payload.extend_from_slice(icc);
+        make_box(COLR, &payload)?
+    } else {
+        make_nclx_box(9, 16, 9)?
     };
     let tmap_colr = append_property(&mut ipco_payload, &mut next_property_index, &alternate_colr)?;
     let tmap_pixi = append_property(
@@ -1157,7 +1148,7 @@ pub fn assemble_iso_gain_map_heif(
         &meta,
         gain,
         graph,
-        assembly.alternate_color_profile,
+        assembly.alternate_icc,
     )?;
     let iref = build_iref(
         &meta,
@@ -1422,15 +1413,7 @@ mod tests {
             },
             removed: &BTreeSet::new(),
         };
-        let bytes = build_iprp(
-            &source,
-            iprp,
-            &meta,
-            &gain,
-            graph,
-            IsoAlternateColorProfile::Bt2020Pq,
-        )
-        .unwrap();
+        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, None).unwrap();
         let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
         let children = parse_boxes(&bytes, root.payload_range()).unwrap();
         let props = parse_ipco_properties(&bytes, &root).unwrap();
@@ -1503,7 +1486,7 @@ mod tests {
         assert!(assemble_iso_gain_map_heif(
             &[],
             &IsoGainMapAssembly {
-                alternate_color_profile: IsoAlternateColorProfile::Bt2020Pq,
+                alternate_icc: None,
                 gain_map: gain,
                 tmap_payload: &[],
                 xmp_payload: b"xmp",

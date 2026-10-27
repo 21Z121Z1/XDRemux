@@ -114,7 +114,7 @@ fn assemble_and_validate(source: &[u8], encoded: &xdremux_codec::EncodedGainMapT
     let output = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
-            alternate_color_profile: xdremux_heif::IsoAlternateColorProfile::Bt2020Pq,
+            alternate_icc: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: encoded.gain_map_width,
                 gain_map_height: encoded.gain_map_height,

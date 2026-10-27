@@ -264,12 +264,14 @@ fn hdr_gain_map(
         make_scene_gain_map_metadata(map.min_ev as f64, map.max_ev as f64, map.offset as f64)
     };
     let (tmap, xmp) = metadata.map_err(|e| RuntimeError::external("scene Gain Map metadata", e))?;
+    let alternate_icc = fs::read(work.join("scene-p3-pq.icc"))
+        .map_err(|e| RuntimeError::external("native scene Gain Map color profile", e))?;
     let bytes = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
             // Native readback and scene fitting both use linear Display P3.
             // The preserved SDR primary may have different primaries.
-            alternate_color_profile: xdremux_heif::IsoAlternateColorProfile::DisplayP3Pq,
+            alternate_icc: Some(&alternate_icc),
             gain_map: DirectHevcGainMap {
                 gain_map_width: w as u32,
                 gain_map_height: h as u32,
@@ -754,6 +756,10 @@ mod tests {
         )
         .unwrap();
         let actual = read_pixels(&root.path().join("published_hdr.f32"), 64 * 64).unwrap();
+        println!(
+            "Native P3 scene Gain Map: target={expected:?}; readback={:?}",
+            actual[32 * 64 + 32]
+        );
         for (c, value) in expected[..3].iter().enumerate() {
             assert!(
                 (actual[32 * 64 + 32][c] - value).abs() < 0.005 + value * 0.02,

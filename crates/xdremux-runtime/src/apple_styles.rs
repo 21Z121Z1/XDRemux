@@ -1509,7 +1509,7 @@ mod tests {
             let source = xdremux_heif::assemble_iso_gain_map_heif(
                 &base,
                 &IsoGainMapAssembly {
-                    alternate_color_profile: xdremux_heif::IsoAlternateColorProfile::Bt2020Pq,
+                    alternate_icc: None,
                     gain_map: DirectHevcGainMap {
                         gain_map_width: 64,
                         gain_map_height: 64,
