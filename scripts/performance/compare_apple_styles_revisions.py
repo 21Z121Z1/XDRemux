@@ -32,7 +32,7 @@ ITERATIONS = 5
 CARGO_RELEASE_COMMAND = ["cargo", "build", "--locked", "--workspace", "--all-targets", "--release"]
 PROFILE_ENV = "XDREMUX_STYLES_PROFILE"
 PROFILE_STAGES = (
-    "source_analysis", "base_conversion", "semantic_production", "resource_decode",
+    "source_analysis", "base_conversion", "semantic_production", "resource_prepare",
     "scene_hdr_reconstruction", "scene_linear_area_reduction", "scene_derivation",
     "thumbnail_encode", "key1_fit", "style_metadata",
     "native_style_properties", "style_assembly", "texture_generation",

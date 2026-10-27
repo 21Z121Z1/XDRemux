@@ -117,6 +117,7 @@ fn assemble(
     assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
+            alternate_icc: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: width,
                 gain_map_height: height,

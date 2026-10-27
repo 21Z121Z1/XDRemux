@@ -94,18 +94,15 @@ Rust 定义必需的整数编辑字段，包括 Standard 纹理状态。ImageIO 
 
 Styles Linear Thumbnail 保存由 SDR 主图和 Gain Map 重建出的场景线性 Display P3 HDR，经 Apple Log 编码后的码值，不是 SDR 图像码值的副本。
 
-Rust 在主图原始分辨率上应用 Gain Map。它先对增益图码值进行双线性重采样，再重建 HDR。重建采用源文件的 ISO 21496-1 或 Apple `tmap` 参数：
+Apple 适配器通过 Core Image，在主图原始分辨率上读取 SDR 和展开后的 HDR 表示。框架解释源 ICC/nclx 和 `tmap` 色度，包括增益图应用基色、gamma、偏移及亮度余量，并以扩展线性 Display P3 RGBA32F 返回两幅图像。Rust 保留浮点 RGB 样本及位图自上而下的行序。该路径不经过 RGB8 中转，也不再无条件执行 sRGB 传递函数解码。
 
-- 最小和最大 log2 增益。
-- 26A434 `_flexMap` 解码器采用的 gamma 倒数指数。
-- 逐通道偏移。
-- 替代图像的亮度余量权重。
+读回每次最多渲染 128 行，将浮点字节流式写入临时文件，再原子发布。读取下一幅表示前会释放当前表示的渲染资源，以限制中转内存，同时保留分辨率和精度。
 
 重建后，面积盒式滤波在线性光下将图像缩小到 1024 像素级缩略图。Rust 将每个通道除以 Styles plist key `4` 中的 `baseline_exposure`，再应用 Apple Log。
 
 Apple Log 传递函数、`[0, 1]` 码值范围和辅助色彩标记保持不变。编码器是 macOS 26A434 指数解码器 `_appleLogToLinear` / `sw_appleLogToLinear` 的逆变换。该解码器不使用二次暗部曲线，因此此编码器也不使用。相机端编码器的暗部曲线尚未核实。
 
-变换保留 Display P3 原色，不把缩略图转换为 Apple Log 视频采用的 BT.2020，也不将缩略图改标为 sRGB、PQ、HLG 或线性。
+缩略图使用从源颜色空间转换得到的 Display P3 原色，不使用 Apple Log 视频采用的 BT.2020，也不将缩略图改标为 sRGB、PQ、HLG 或线性。
 
 系数使用解码后按显示方向排列的图像。RGB16 编码前，Rust 撤销主图完整的旋转和镜像序列。存储的 Linear Thumbnail 与 Style Delta Map 使用主图编码几何，并保留 `irot` 和 `imir` 的相对顺序。
 

@@ -94,18 +94,15 @@ Native readback does not establish Photos controls, Tone/Color response, or save
 
 The Styles Linear Thumbnail stores Apple Log codes for scene-linear Display P3 HDR reconstructed from the SDR base and Gain Map. It does not store a copy of the SDR image codes.
 
-Rust applies the Gain Map at the base image's original resolution. It resamples map codes bilinearly before HDR reconstruction. Reconstruction uses the source's ISO 21496-1 or Apple `tmap` parameters:
+The Apple adapter reads the SDR and expanded HDR representations through Core Image at the base image's original resolution. The framework interprets the source ICC/nclx and `tmap` colorimetry, including the gain-map application primaries, gamma, offsets and headroom. It returns both images as extended-linear Display P3 RGBA32F. Rust preserves the float RGB samples and the bitmap's top-down row order. This path has no RGB8 intermediate or unconditional sRGB transfer-function decode.
 
-- The minimum and maximum log2 gain.
-- Gamma as the reciprocal exponent used by the 26A434 `_flexMap` decoder.
-- Per-channel offsets.
-- The alternate-image headroom weight.
+Readback renders at most 128 rows per call and streams the float bytes to a temporary file before atomic publication. It releases each representation's rendering resources before reading the next. This bounds staging memory without reducing resolution or precision.
 
 After reconstruction, an area box filter reduces the image in linear light to the 1024-pixel-class thumbnail. Rust divides each channel by `baseline_exposure`, stored in Styles plist key `4`, then applies Apple Log.
 
 The Apple Log transfer, `[0, 1]` code range, and auxiliary color signaling remain unchanged. The encoder inverts the macOS 26A434 exponential decoder, `_appleLogToLinear` / `sw_appleLogToLinear`. That decoder does not use a quadratic toe, so this encoder does not use one. The camera-side encoder toe remains unverified.
 
-The transform keeps Display P3 primaries. It does not convert the thumbnail to the BT.2020 color space used by Apple Log video. It also does not relabel the thumbnail as sRGB, PQ, HLG, or linear.
+The thumbnail uses Display P3 primaries after color conversion from the source. It does not use the BT.2020 color space used by Apple Log video. It also does not relabel the thumbnail as sRGB, PQ, HLG, or linear.
 
 Coefficients use the decoded image in display orientation. Before RGB16 encoding, Rust reverses the primary item's complete rotation and mirror sequence. Stored Linear Thumbnail and Style Delta Map items use the primary coded geometry. They preserve the relative order of `irot` and `imir`.
 

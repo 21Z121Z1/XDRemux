@@ -54,7 +54,7 @@ class StylesRevisionComparisonTests(unittest.TestCase):
             self.assertEqual(saved["summary"], {"sentinel": 1})
 
     def test_profile_receipt_requires_complete_unique_finite_stages(self):
-        labels = ["source_analysis", "base_conversion", "semantic_production", "resource_decode",
+        labels = ["source_analysis", "base_conversion", "semantic_production", "resource_prepare",
                   "scene_hdr_reconstruction", "scene_linear_area_reduction", "scene_derivation",
                   "thumbnail_encode", "key1_fit", "style_metadata",
                   "native_style_properties", "style_assembly", "texture_generation",

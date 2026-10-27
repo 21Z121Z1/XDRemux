@@ -53,6 +53,14 @@ Portable Rust tests remain available on Linux, Windows, and macOS. Those tests d
 
 The standard path converts vendor HDR metadata to an ISO/TS 21496-1 representation. It preserves compressed source image data where the selected conversion path permits this. Conversion does not imply that every source resource can remain unchanged.
 
+ProXDR conversion preserves the primary HEVC data and its source ICC/nclx. The portable RGB Gain Map encoder uses BT.601 full-range YCbCr; the gain grid and tiles declare nclx `(2, 2, 6)`. The first two fields are unspecified as required by [HEIF tone-map derivation](https://www.iso.org/standard/89044.html). They do not describe the reconstructed HDR gamut. Standard RGB output uses 4:4:4; OPPO compatibility retains 4:2:0.
+
+The default tmap colorimetry is BT.2020 PQ. This describes a derived image: the decoder applies the gain in the primaries selected by `use_base_colour_space`, then converts to the alternate encoding as specified by [ISO 21496-1](https://www.iso.org/standard/86775.html), Annex B. No stored PQ primary is implied. When ISO APP2 metadata is selected, conversion preserves an alternate ICC when supplied; Android hdrgm defines HDR primaries from the base profile and does not use a Gain JPEG ICC as alternate colorimetry. Without one, the gain application retains the base primaries even if the source flag is zero (C.4.7). Untagged JPEG RGB uses a bundled standard sRGB ICC so the encoded base has explicit colorimetry (C.4.4).
+
+Styles reconstruction and HDR Look fit scene pixels in linear Display P3. When generating a new RGB Gain Map, Rust converts both SDR and HDR pixels to linear BT.2020, then computes new channel gains in that space. These outputs select the alternate primaries (`use_base_colour_space=0`) and keep BT.2020 PQ on tmap. A common offset covers negative linear components without clipping them before the logarithmic ratio. This preserves the gain operation's working space even when the unchanged SDR primary uses sRGB or another profile. It does not change the ProXDR gain-map application space.
+
+For ISO JPEG input, Exif `ColorSpace=1` selects sRGB even when an ICC is present (C.4.4). Other Exif values retain the source ICC when available. Android hdrgm input retains its existing ICC selection.
+
 ### Live Photo
 
 The default output contains an HEIC/HEIF still and a MOV with the same asset identifier. The converter maps the resolved source cover time to Apple `still-image-time`.

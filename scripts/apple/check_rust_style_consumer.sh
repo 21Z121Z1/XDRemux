@@ -29,6 +29,14 @@ XDREMUX_TEST_STYLES_REPORT="$test_root/thumbnail-report" \
   cargo test --locked -p xdremux-runtime --lib \
   real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
 
+XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+  cargo test --locked -p xdremux-runtime --lib \
+  apple_styles::tests::native_ -- --nocapture
+
+XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+  cargo test --locked -p xdremux-runtime --lib \
+  style_reconstruction::tests::native_scene_ -- --nocapture
+
 # This is a real Rust product-path check. The fixture is a checked-in ProXDR
 # source; no Swift product writer or legacy Styles runner is used to produce
 # the output under test.

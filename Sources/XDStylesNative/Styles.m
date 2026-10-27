@@ -5,6 +5,7 @@
 #import <Metal/Metal.h>
 #import <objc/runtime.h>
 #import <dlfcn.h>
+#import <stdio.h>
 
 typedef struct { int64_t width, height; } XDNUSize;
 @interface NSObject (XDStylesSPI)
@@ -69,24 +70,52 @@ static CIImage *Canvas(CIImage *image, CGSize size) {
     image=[image imageByApplyingTransform:CGAffineTransformMakeTranslation(-r.origin.x,-r.origin.y)];
     return [image imageByApplyingTransform:CGAffineTransformMakeScale(size.width/r.size.width,size.height/r.size.height)];
 }
-static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path) {
+static NSDictionary *RenderRows(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path, size_t rowLimit) {
+    NSDictionary *facts;
+    // Each full-resolution float buffer must be released before the next
+    // representation is rendered in the persistent adapter process.
+    @autoreleasepool {
     CGRect r=image.extent;
     size_t w=llround(r.size.width),h=llround(r.size.height);
     Require(w>0 && h>0 && w<=32768 && h<=32768 && w*h<=100000000,@"Image geometry exceeds the supported render limit");
     image=Canvas(image,CGSizeMake(w,h));
-    NSMutableData *data=[NSMutableData dataWithLength:w*h*16];
-    [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,0,w,h) format:kCIFormatRGBAf colorSpace:space];
-    const float *p=data.bytes;
+    size_t rows=MIN(h,rowLimit);
+    NSMutableData *data=[NSMutableData dataWithLength:w*rows*16];
     size_t nonzero=0,black=0;
-    for(size_t i=0;i<w*h;i++) {
-        BOOL zero=YES;
-        for(size_t c=0;c<4;c++) { Require(isfinite(p[i*4+c]),@"Apple render returned non-finite pixels"); if(c<3 && p[i*4+c]!=0) { nonzero++;zero=NO; } }
-        if(zero) black++;
+    NSString *temporary=[path stringByAppendingString:@".tmp"];
+    FILE *file=fopen(temporary.fileSystemRepresentation,"wb");
+    Require(file!=NULL,@"Cannot open rendered pixel output");
+    @try {
+        for(size_t y=0;y<h;y+=rows) {
+            @autoreleasepool {
+            size_t count=MIN(rows,h-y);
+            // Bitmap rows are top-down; Core Image bounds use a lower-left
+            // origin. Visit the top strip first to match full-frame readback.
+            [context render:image toBitmap:data.mutableBytes rowBytes:w*16 bounds:CGRectMake(0,h-y-count,w,count) format:kCIFormatRGBAf colorSpace:space];
+            const float *p=data.bytes;
+            for(size_t i=0;i<w*count;i++) {
+                BOOL zero=YES;
+                for(size_t c=0;c<4;c++) { Require(isfinite(p[i*4+c]),@"Apple render returned non-finite pixels"); if(c<3 && p[i*4+c]!=0) { nonzero++;zero=NO; } }
+                if(zero) black++;
+            }
+            Require(fwrite(data.bytes,1,w*count*16,file)==w*count*16,@"Cannot write rendered pixels");
+            }
+        }
+        Require(nonzero>0,@"Apple render returned an empty image");
+        int closed=fclose(file); file=NULL;
+        Require(closed==0,@"Cannot finish rendered pixel output");
+        Require(rename(temporary.fileSystemRepresentation,path.fileSystemRepresentation)==0,@"Cannot publish rendered pixels");
+    } @finally {
+        if(file) fclose(file);
+        remove(temporary.fileSystemRepresentation);
     }
-    Require(nonzero>0,@"Apple render returned an empty image");
-    NSError *error=nil;
-    Require([data writeToFile:path options:NSDataWritingAtomic error:&error],error.description ?: @"Cannot write rendered pixels");
-    return @{@"width":@(w),@"height":@(h),@"black_fraction":@((double)black/(w*h))};
+    facts=@{@"width":@(w),@"height":@(h),@"black_fraction":@((double)black/(w*h))};
+    }
+    return facts;
+}
+
+static NSDictionary *Render(CIImage *image, CIContext *context, CGColorSpaceRef space, NSString *path) {
+    return RenderRows(image,context,space,path,SIZE_MAX);
 }
 
 static NSDictionary *Decode(NSDictionary *request) {
@@ -221,26 +250,42 @@ static NSDictionary *DecodeMatte(NSDictionary *request) {
 static NSDictionary *Readback(NSDictionary *request) {
     NSString *dir=request[@"output_path"],*path=request[@"input_path"];
     CGSize size=CGSizeMake([request[@"width"] doubleValue],[request[@"height"] doubleValue]);
+    BOOL oriented=[request[@"apply_orientation"] boolValue];
     CGColorSpaceRef linear=CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearDisplayP3);
     CIContext *context=Context(linear);
+    NSDictionary *sdr,*expanded;
+    double contentHeadroom;
+    @autoreleasepool {
+    CIImage *base=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
+        options:@{kCIImageApplyOrientationProperty:@(oriented),kCIImageExpandToHDR:@NO}];
+    Require(base!=nil,@"Cannot decode the SDR representation");
+    if(oriented) Require(CGSizeEqualToSize(base.extent.size,size),@"SDR display geometry differs from the requested geometry");
     if(request[@"target_headroom"]) {
         double headroom=[request[@"target_headroom"]doubleValue];
         Require(isfinite(headroom)&&headroom>=1,@"Invalid requested readback headroom");
         CIImage *gain=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
             options:@{kCIImageApplyOrientationProperty:@NO,kCIImageAuxiliaryHDRGainMap:@YES}];
         Require(gain!=nil,@"Cannot decode encoded HDR Gain Map");
-        CIImage *image=[Image(path) imageByApplyingGainMap:gain headroom:(float)headroom];
+        CIImage *image=[base imageByApplyingGainMap:gain headroom:(float)headroom];
         Require(image!=nil,@"Cannot apply encoded HDR Gain Map");
-        NSDictionary *facts=Render(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"]);
+        NSDictionary *facts=RenderRows(Canvas(image,size),context,linear,[dir stringByAppendingPathComponent:@"published_target.f32"],128);
         CGColorSpaceRelease(linear);
         return @{@"schema_version":@2,@"target":facts,@"requested_headroom":@(headroom),@"hdr_content_headroom":@(image.contentHeadroom)};
     }
-    NSDictionary *sdr=Render(Canvas(Image(path),size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"]);
+    sdr=RenderRows(Canvas(base,size),context,linear,[dir stringByAppendingPathComponent:@"published_sdr.f32"],128);
+    }
+    [context clearCaches];
+    @autoreleasepool {
     CIImage *hdr=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path]
-        options:@{kCIImageApplyOrientationProperty:@NO,kCIImageExpandToHDR:@YES}];
-    NSDictionary *expanded=Render(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"]);
+        options:@{kCIImageApplyOrientationProperty:@(oriented),kCIImageExpandToHDR:@YES}];
+    Require(hdr!=nil,@"Cannot decode the HDR representation");
+    if(oriented) Require(CGSizeEqualToSize(hdr.extent.size,size),@"HDR display geometry differs from the requested geometry");
+    expanded=RenderRows(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"],128);
+    contentHeadroom=hdr.contentHeadroom;
+    }
+    [context clearCaches];
     CGColorSpaceRelease(linear);
-    return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(hdr.contentHeadroom)};
+    return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(contentHeadroom)};
 }
 
 NSDictionary *XDStylesPerform(NSDictionary *request, NSError **error) {

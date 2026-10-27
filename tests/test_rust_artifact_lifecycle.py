@@ -23,7 +23,7 @@ class RustArtifactLifecycleTests(unittest.TestCase):
         source = (RUNTIME / "apple_styles.rs").read_text(encoding="utf-8")
         # Native readback tests also validate their decoded outputs. Only the
         # production transaction determines publication ordering.
-        source = source.partition("\n#[cfg(test)]")[0]
+        source = source.partition("\n#[cfg(test)]\nmod tests {")[0]
         for marker in (
             "tempdir_in(parent)",
             "assemble_photographic_styles_heif",

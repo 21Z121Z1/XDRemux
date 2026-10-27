@@ -417,6 +417,11 @@ fn encode_tile_container(
         // The emitted hvcC is parsed and validated after encoding instead.
     }
 
+    // libheif's default RGB conversion is BT.601 YCbCr, full range. The
+    // final HEIF gain item declares (2, 2, 6), while the encoder's VUI may
+    // retain its default sRGB primaries/transfer. Those fields are not the
+    // gain application or alternate-image colorimetry. The final-file pixel
+    // regression checks both supported RGB chroma layouts against this contract.
     let mut context = HeifContext::new().map_err(CodecError::libheif)?;
     context
         .encode_image(&image, &mut encoder, None)

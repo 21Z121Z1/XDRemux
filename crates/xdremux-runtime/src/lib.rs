@@ -884,6 +884,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
         let mut output = assemble_iso_gain_map_heif(
             body,
             &IsoGainMapAssembly {
+                alternate_icc: None,
                 gain_map,
                 tmap_payload: &tmap_payload,
                 xmp_payload: &xmp_payload,

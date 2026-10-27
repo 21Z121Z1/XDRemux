@@ -1,5 +1,59 @@
 use crate::codec::ChromaSampling;
 use crate::error::{FormatError, Result};
+use crate::{jpeg_exif_tiff, Cursor, Endian};
+
+/// Read Exif ColorSpace through the active IFD0 -> ExifIFD pointer. This is a
+/// source fact; the caller decides the applicable ICC/Exif precedence.
+pub fn exif_color_space(jpeg: &[u8]) -> Result<Option<u16>> {
+    let Some(tiff) = jpeg_exif_tiff(jpeg)? else {
+        return Ok(None);
+    };
+    let context = "JPEG EXIF ColorSpace";
+    let endian = match tiff.get(..2) {
+        Some(b"II") => Endian::Little,
+        Some(b"MM") => Endian::Big,
+        _ => return Err(FormatError::invalid(context, "invalid TIFF byte order")),
+    };
+    let mut header = Cursor::new(&tiff, endian, context);
+    header.skip(2)?;
+    if header.read_u16()? != 42 {
+        return Err(FormatError::invalid(context, "invalid TIFF magic"));
+    }
+    let mut value = header.read_u32()?;
+    for (wanted_tag, wanted_type) in [(0x8769, 4), (0xa001, 3)] {
+        if value == 0 {
+            return Ok(None);
+        }
+        let offset = usize::try_from(value).map_err(|_| FormatError::overflow(context))?;
+        let mut ifd = Cursor::bounded(&tiff, offset..tiff.len(), endian, context)?;
+        let count = usize::from(ifd.read_u16()?);
+        let entries = ifd.take(count * 12)?;
+        ifd.read_u32()?; // Required next-IFD field; no other IFD is relevant.
+        let mut found = None;
+        for bytes in entries.as_chunks::<12>().0 {
+            let mut entry = Cursor::new(bytes, endian, context);
+            if entry.read_u16()? != wanted_tag {
+                continue;
+            }
+            if found.is_some() || entry.read_u16()? != wanted_type || entry.read_u32()? != 1 {
+                return Err(FormatError::invalid(
+                    context,
+                    "duplicate or invalid TIFF entry",
+                ));
+            }
+            found = Some(if wanted_type == 3 {
+                u32::from(entry.read_u16()?)
+            } else {
+                entry.read_u32()?
+            });
+        }
+        let Some(found) = found else {
+            return Ok(None);
+        };
+        value = found;
+    }
+    Ok(Some(value as u16)) // The final field was read as SHORT.
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JpegComponent {
@@ -226,6 +280,36 @@ pub fn probe_frame_profile(data: &[u8]) -> Result<JpegFrameProfile> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn jpeg_with_exif(tiff: &[u8]) -> Vec<u8> {
+        let mut jpeg = vec![0xff, 0xd8, 0xff, 0xe1];
+        jpeg.extend(u16::try_from(tiff.len() + 8).unwrap().to_be_bytes());
+        jpeg.extend(b"Exif\0\0");
+        jpeg.extend(tiff);
+        jpeg.extend([0xff, 0xd9]);
+        jpeg
+    }
+
+    #[test]
+    fn reads_exif_color_space_in_both_byte_orders() {
+        for tiff in [
+            b"MM\0*\0\0\0\x08\0\x01\x87\x69\0\x04\0\0\0\x01\0\0\0\x1a\0\0\0\0\0\x01\xa0\x01\0\x03\0\0\0\x01\0\x01\0\0\0\0\0\0".as_slice(),
+            b"II*\0\x08\0\0\0\x01\0\x69\x87\x04\0\x01\0\0\0\x1a\0\0\0\0\0\0\0\x01\0\x01\xa0\x03\0\x01\0\0\0\x01\0\0\0\0\0\0\0".as_slice(),
+        ] {
+            assert_eq!(exif_color_space(&jpeg_with_exif(tiff)).unwrap(), Some(1));
+        }
+    }
+
+    #[test]
+    fn exif_color_space_requires_an_active_bounded_ifd_pointer() {
+        let mut tiff = b"MM\0*\0\0\0\x08\0\x01\x87\x69\0\x04\0\0\0\x01\0\0\0\x1a\0\0\0\0\0\x01\xa0\x01\0\x03\0\0\0\x01\0\x01\0\0\0\0\0\0".to_vec();
+        tiff[10..12].copy_from_slice(&[0x87, 0x68]);
+        assert_eq!(exif_color_space(&jpeg_with_exif(&tiff)).unwrap(), None);
+        tiff[10..12].copy_from_slice(&[0x87, 0x69]);
+        tiff[18..22].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert!(exif_color_space(&jpeg_with_exif(&tiff)).is_err());
+        assert_eq!(exif_color_space(&[0xff, 0xd8, 0xff, 0xd9]).unwrap(), None);
+    }
 
     fn jpeg_with_sof(components: &[(u8, u8, u8, u8)], precision: u8) -> Vec<u8> {
         let mut output = vec![0xff, 0xd8];

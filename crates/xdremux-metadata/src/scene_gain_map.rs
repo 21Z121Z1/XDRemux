@@ -1,7 +1,8 @@
 use crate::{MetadataError, Result};
 
-/// ImageIO-compatible ISO metadata with signed gain bounds. Equal parameters
-/// apply independently to every channel of an RGB gain image.
+/// ImageIO-compatible ISO metadata with signed gain bounds, computed in the
+/// alternate image's linear RGB primaries. Equal parameters apply independently
+/// to every channel of an RGB gain image.
 pub fn make_scene_gain_map_metadata(
     min_ev: f64,
     max_ev: f64,
@@ -35,7 +36,7 @@ pub fn make_scene_gain_map_metadata_with_capacity(
         ));
     }
     let values = [0., capacity, min_ev, max_ev, 1., offset, offset];
-    let mut tmap = vec![0, 0, 0, 0, 0, 0x40];
+    let mut tmap = vec![0, 0, 0, 0, 0, 0];
     for value in values {
         tmap.extend(((value * 1_000_000.).round() as i32).to_be_bytes());
         tmap.extend(1_000_000u32.to_be_bytes());
@@ -49,6 +50,16 @@ pub fn make_scene_gain_map_metadata_with_capacity(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn scene_gain_uses_the_alternate_working_primaries() {
+        let (bytes, _) = make_scene_gain_map_metadata(-3., 6., 1. / 64.).unwrap();
+        assert_eq!(
+            bytes[5] & 0x40,
+            0,
+            "scene gains must use the alternate working primaries"
+        );
+    }
+
     #[test]
     fn serializes_negative_gain_minimum_without_clamping_shadows() {
         let (bytes, xmp) = make_scene_gain_map_metadata(-3., 6., 1. / 64.).unwrap();

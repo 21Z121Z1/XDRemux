@@ -3,8 +3,11 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
+use serde_json::json;
 use sha2::{Digest, Sha256};
-use xdremux_codec::{EncodedHevcResource, HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
+use xdremux_codec::EncodedHevcResource;
+#[cfg(test)]
+use xdremux_codec::{HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
 use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_distribution, apple_style_face_exposure_boost,
     apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
@@ -14,18 +17,19 @@ use xdremux_engine::{
     AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
     APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
-use xdremux_hdr::{
-    area_resize_linear_rgb, iso_gain_application_for_alternate, reconstruct_scene_linear_hdr,
-    GainMapCodes, SceneLinearRgb,
-};
+use xdremux_hdr::{area_resize_linear_rgb, SceneLinearRgb};
+#[cfg(test)]
+use xdremux_hdr::{iso_gain_application_for_alternate, reconstruct_scene_linear_hdr, GainMapCodes};
 
 use crate::apple_adapter::{AppleAdapterClient, AppleVideoToolboxMain10Encode};
 use crate::{
     publication_parent, AtomicFilePublisher, PhotographicStylesFileReceipt, PortableRuntime,
     Result, RuntimeError,
 };
+#[cfg(test)]
 use xdremux_engine::RasterDecoder;
 use xdremux_format::{parse_hvcc_profile, ChromaSampling};
+#[cfg(test)]
 use xdremux_hdr::ResolvedScale;
 
 const STYLE_DELTA_TILE_SIZE: u32 = 512;
@@ -142,11 +146,8 @@ pub(crate) fn convert_file(
         .bytes;
     let mut system_encoded = if crate::system_heif_hdr::requested()? {
         Some(crate::system_heif_hdr::encode_system_base(
-            runtime,
             executable.as_ref(),
             &product_base,
-            &prepared.scale,
-            prepared.analysis.gain_map.channels,
             staging.path(),
             output,
         )?)
@@ -243,12 +244,13 @@ pub(crate) fn convert_file(
     let geometry = xdremux_heif::primary_coded_geometry(&semantic_base).map_err(|error| {
         RuntimeError::external("Photographic Styles primary coded geometry", error)
     })?;
-    let structure = xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
+    xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
         note_system_carrier(
             carrier_report.as_deref(),
             RuntimeError::external("Photographic Styles source Gain Map structure", error),
         )
     })?;
+    profile_stage(&mut profile, "resource_prepare");
     let scene_rasters = if let Some(encoded) = system_encoded.as_mut() {
         let pair = encoded.submitted_scene.take().ok_or_else(|| {
             RuntimeError::new(
@@ -256,40 +258,26 @@ pub(crate) fn convert_file(
                 "submitted scene was already consumed",
             )
         })?;
-        profile_stage(&mut profile, "resource_decode");
         derive_style_scene_from_pair(
             pair,
             encoded.content_headroom.log2(),
             LINEAR_THUMBNAIL_MAX_SIZE,
         )?
     } else {
-        let raster = runtime
-            .heif
-            .decode_raster(&HeifRasterDecodeRequest {
-                data: semantic_base.clone(),
-                format: RasterPixelFormat::Rgb8,
-            })
-            .map_err(|error| RuntimeError::external("Photographic Styles source raster", error))?;
-        let gain_raster = runtime
-            .heif
-            .decode_item_raster(
-                &semantic_base,
-                structure.gain_map_item_id,
-                match prepared.analysis.gain_map.channels {
-                    xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
-                    xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
-                },
-            )
-            .map_err(|error| {
-                RuntimeError::external("Photographic Styles source Gain Map", error)
-            })?;
-        profile_stage(&mut profile, "resource_decode");
-        derive_style_scene(
-            &raster,
-            &gain_raster,
-            &prepared.scale,
+        let pair = scene_linear_pair(
+            &adapter,
+            &semantic_base,
+            staging.path(),
             LINEAR_THUMBNAIL_MAX_SIZE,
-        )?
+        )?;
+        let maximum_stops = prepared
+            .scale
+            .per_channel_gain_map_max
+            .iter()
+            .copied()
+            .chain(std::iter::once(prepared.scale.gain_map_max))
+            .fold(f64::NEG_INFINITY, f64::max);
+        derive_style_scene_from_pair(pair, maximum_stops as f32, LINEAR_THUMBNAIL_MAX_SIZE)?
     };
     profile_stage(&mut profile, "scene_derivation");
     let display_thumbnail = linear_thumbnail_raster(&scene_rasters)?;
@@ -634,6 +622,7 @@ struct StyleSceneRasters {
     renderer_linear_maximum: f32,
 }
 
+#[cfg(test)]
 fn derive_style_scene(
     raster: &Raster8,
     gain_map: &Raster8,
@@ -791,12 +780,10 @@ fn derive_style_scene_from_linear_images(
 ) -> Result<StyleSceneRasters> {
     // Thumbnail reduction happens only after the gain is applied at the base
     // resolution. Both images use the same linear-light area footprint.
-    let mut reduction_profile = profile_start();
     let base_image = area_resize_linear_rgb(full_sdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
     let hdr_image = area_resize_linear_rgb(full_hdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
-    profile_stage(&mut reduction_profile, "scene_linear_area_reduction");
     if base_image.width != hdr_image.width
         || base_image.height != hdr_image.height
         || base_image.samples.len() != hdr_image.samples.len()
@@ -916,17 +903,92 @@ pub(crate) struct SceneLinearPair {
 }
 
 pub(crate) fn scene_linear_pair(
-    raster: &Raster8,
-    gain_map: &Raster8,
-    scale: &ResolvedScale,
+    adapter: &AppleAdapterClient,
+    source: &[u8],
+    staging: &Path,
     maximum_edge: u32,
 ) -> Result<SceneLinearPair> {
-    let scene = derive_style_scene(raster, gain_map, scale, maximum_edge)?;
+    let mut reconstruction_profile = profile_start();
+    let geometry = xdremux_heif::primary_coded_geometry(source)
+        .map_err(|error| RuntimeError::external("scene color management", error))?;
+    let (width, height) = if geometry.quarter_turns_ccw & 1 == 1 {
+        (geometry.height, geometry.width)
+    } else {
+        (geometry.width, geometry.height)
+    };
+    let work = tempfile::Builder::new()
+        .prefix(".xdremux-linear-scene-")
+        .tempdir_in(staging)
+        .map_err(|error| RuntimeError::external("scene color management staging", error))?;
+    let input = work.path().join("source.heic");
+    fs::write(&input, source)
+        .map_err(|error| RuntimeError::external("scene color management source", error))?;
+    // ImageIO/Core Image honors the base ICC/nclx, the tmap alternate colorimetry
+    // and use_base_colour_space. It reconstructs before converting both images
+    // to extended-linear P3. Keep the full resolution and float precision here.
+    let facts = adapter.styles_primitive(&json!({
+        "schema_version": 2, "operation": "styles-readback",
+        "input_path": input, "output_path": work.path(),
+        "width": width, "height": height, "apply_orientation": true,
+    }))?;
+    for representation in ["sdr", "hdr"] {
+        if facts[representation]["width"].as_u64() != Some(u64::from(width))
+            || facts[representation]["height"].as_u64() != Some(u64::from(height))
+        {
+            return Err(RuntimeError::new(
+                "scene color management",
+                "native scene geometry differs from the source",
+            ));
+        }
+    }
+    profile_stage(&mut reconstruction_profile, "scene_hdr_reconstruction");
+    let read = |name: &str| -> Result<SceneLinearRgb> {
+        let bytes = fs::read(work.path().join(name))
+            .map_err(|error| RuntimeError::external("scene color management pixels", error))?;
+        let image = scene_rgb_from_native(&bytes, width as usize, height as usize)?;
+        area_resize_linear_rgb(&image, maximum_edge)
+            .map_err(|error| RuntimeError::external("scene linear reduction", error))
+    };
+    let sdr = read("published_sdr.f32")?;
+    let hdr = read("published_hdr.f32")?;
+    profile_stage(&mut reconstruction_profile, "scene_linear_area_reduction");
     Ok(SceneLinearPair {
-        width: scene.width,
-        height: scene.height,
-        sdr: scene.base_rgb,
-        hdr: scene.hdr_rgb,
+        width: sdr.width,
+        height: sdr.height,
+        sdr: sdr.samples,
+        hdr: hdr.samples,
+    })
+}
+
+fn scene_rgb_from_native(bytes: &[u8], width: usize, height: usize) -> Result<SceneLinearRgb> {
+    let row_bytes = width
+        .checked_mul(16)
+        .ok_or_else(|| RuntimeError::new("scene color management", "native row size overflows"))?;
+    if row_bytes == 0 || height == 0 || row_bytes.checked_mul(height) != Some(bytes.len()) {
+        return Err(RuntimeError::new(
+            "scene color management",
+            "native float pixels do not match their geometry",
+        ));
+    }
+    let mut samples = Vec::with_capacity(width * height * 3);
+    // CIContext bitmap rows already run top-down, independently of the
+    // lower-left coordinate origin used for render bounds.
+    for pixel in bytes.as_chunks::<16>().0 {
+        for component in pixel[..12].as_chunks::<4>().0 {
+            let value = f32::from_le_bytes(*component);
+            if !value.is_finite() {
+                return Err(RuntimeError::new(
+                    "scene color management",
+                    "native scene contains non-finite RGB",
+                ));
+            }
+            samples.push(value);
+        }
+    }
+    Ok(SceneLinearRgb {
+        width,
+        height,
+        samples,
     })
 }
 
@@ -990,6 +1052,7 @@ fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
     .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
 }
 
+#[cfg(test)]
 fn srgb_decode(value: f32) -> f32 {
     if value <= 0.040_45 {
         value / 12.92
@@ -1355,6 +1418,175 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_float_scene_keeps_precision_hdr_values_and_row_order() {
+        let pixels = [
+            [-0.125_f32, 4.000_31, 0.000_123, 1.0],
+            [0.75, 0.5, 0.25, 1.0],
+        ];
+        let bytes = pixels
+            .iter()
+            .flatten()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<_>>();
+        let scene = scene_rgb_from_native(&bytes, 1, 2).unwrap();
+        assert_eq!(
+            scene.samples,
+            vec![-0.125, 4.000_31, 0.000_123, 0.75, 0.5, 0.25]
+        );
+        assert!(scene_rgb_from_native(&bytes[..bytes.len() - 1], 1, 2).is_err());
+        let invalid = [f32::NAN, 0.0, 0.0, 1.0]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<_>>();
+        assert!(scene_rgb_from_native(&invalid, 1, 1).is_err());
+    }
+
+    #[test]
+    fn native_scene_keeps_top_and_bottom_in_display_order() {
+        use xdremux_codec::PrimaryHeifEncodeRequest;
+        let Some(executable) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        // Encode a known top-down HEIF raster, independently of CIImage's raw
+        // bitmap initializer: red on top, blue on the bottom.
+        let data = (0..320)
+            .flat_map(|y| {
+                if y < 160 {
+                    [255, 0, 0].repeat(64)
+                } else {
+                    [0, 0, 255].repeat(64)
+                }
+            })
+            .collect();
+        let source = xdremux_codec::LibHeifProvider::new()
+            .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(
+                Raster8::new(64, 320, 192, RasterPixelFormat::Rgb8, data).unwrap(),
+                None,
+            ))
+            .unwrap();
+        let adapter = AppleAdapterClient::new(executable);
+        let work = tempfile::tempdir().unwrap();
+        let pair = scene_linear_pair(&adapter, &source, work.path(), 320).unwrap();
+        assert_eq!((pair.width, pair.height), (64, 320));
+        for representation in [&pair.sdr, &pair.hdr] {
+            let top = &representation[(32 * 64 + 32) * 3..][..3];
+            let bottom = &representation[(288 * 64 + 32) * 3..][..3];
+            assert!(top[0] > 0.75 && top[2] < 0.1, "top must stay red: {top:?}");
+            assert!(
+                bottom[2] > 0.8 && bottom[0] < 0.1,
+                "bottom must stay blue: {bottom:?}"
+            );
+        }
+        println!(
+            "Native scene display order: encoded top red / bottom blue preserved in SDR and HDR"
+        );
+    }
+
+    #[test]
+    fn native_scene_applies_rgb_gain_before_converting_srgb_to_p3() {
+        use xdremux_codec::{GainMapTileEncodeRequest, PrimaryHeifEncodeRequest};
+        use xdremux_engine::{
+            GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile, GainMapTileEncoder,
+        };
+        use xdremux_heif::{DirectHevcGainMap, GainMapTile, IsoGainMapAssembly};
+
+        let Some(executable) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        let provider = xdremux_codec::LibHeifProvider::new();
+        let raster = |rgb: [u8; 3]| {
+            Raster8::new(64, 64, 64 * 3, RasterPixelFormat::Rgb8, rgb.repeat(64 * 64)).unwrap()
+        };
+        let profile = GainMapEncodeProfile {
+            width: 64,
+            height: 64,
+            channels: GainMapChannels::Rgb,
+            layout: GainMapCodecLayout {
+                chroma: ChromaSampling::Yuv444,
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
+        };
+        let encoded = provider
+            .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
+                raster([255, 128, 0]),
+                profile,
+            ))
+            .unwrap();
+        let tiles = encoded
+            .tiles
+            .iter()
+            .map(|t| GainMapTile {
+                payload: &t.payload,
+                width: t.width,
+                height: t.height,
+            })
+            .collect::<Vec<_>>();
+        let info = [
+            1.0, 1.0, 1.0, 1.0, 4.0, 4.0, 4.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            4.0, 4.0, 0.0,
+        ];
+        let tmap = xdremux_metadata::make_apple_tmap_payload(&info).unwrap();
+        let xmp = xdremux_metadata::make_hdrgm_xmp(&info).unwrap();
+        let jpeg = fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"),
+        )
+        .unwrap();
+        let p3_icc = xdremux_format::jpeg_icc_profile(&jpeg).unwrap().unwrap();
+        let adapter = AppleAdapterClient::new(executable);
+        // The second case is saturated Display P3 red, outside sRGB.
+        for (icc, expected_red) in [
+            (None, [0.822_461_97_f32, 0.033_194_2, 0.017_082_63]),
+            (Some(p3_icc), [1.0, 0.0, 0.0]),
+        ] {
+            let base = provider
+                .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(
+                    raster([255, 0, 0]),
+                    icc,
+                ))
+                .unwrap();
+            let source = xdremux_heif::assemble_iso_gain_map_heif(
+                &base,
+                &IsoGainMapAssembly {
+                    alternate_icc: None,
+                    gain_map: DirectHevcGainMap {
+                        gain_map_width: 64,
+                        gain_map_height: 64,
+                        tile_width: encoded.tile_width,
+                        tile_height: encoded.tile_height,
+                        tiles: &tiles,
+                        hvcc: &encoded.hvcc,
+                        profile: xdremux_heif::GainMapEncodeProfile {
+                            channels: xdremux_heif::GainMapChannels::Rgb,
+                            chroma: ChromaSampling::Yuv444,
+                            luma_bit_depth: 8,
+                            chroma_bit_depth: 8,
+                        },
+                    },
+                    tmap_payload: &tmap,
+                    xmp_payload: &xmp,
+                },
+            )
+            .unwrap();
+            let work = tempfile::tempdir().unwrap();
+            let pair = scene_linear_pair(&adapter, &source, work.path(), 64).unwrap();
+            let i = (32 * 64 + 32) * 3;
+            // Independently derived from the sRGB and Display P3 D65 xy primaries:
+            // P3 = inverse(P3_to_XYZ) * sRGB_to_XYZ * [1,0,0]. Gain is applied
+            // in sRGB first. Applying the unequal gains after conversion gives
+            // different green/blue values; treating the source as P3 gives zero.
+            for (component, coefficient) in expected_red.iter().enumerate() {
+                assert!((pair.sdr[i + component] - coefficient).abs() < 0.015);
+                assert!(
+                    (pair.hdr[i + component] - 4.0 * coefficient).abs()
+                        < 0.005 + 0.08 * coefficient
+                );
+            }
+        }
+    }
+
+    #[test]
     fn missing_or_changed_smartstyle_state_is_rejected_before_publication() {
         let expected = apple_style_maker_apple_dictionary();
         assert!(validate_maker_apple_properties(&expected, &BTreeMap::new()).is_err());
@@ -1395,7 +1627,7 @@ mod tests {
             let output_path = output_dir.join(path.file_name().unwrap());
             convert_file(&runtime, &adapter, &source, &output_path).unwrap();
             let output = fs::read(&output_path).unwrap();
-            let structure = xdremux_heif::validate_gain_map_structure(&output).unwrap();
+            xdremux_heif::validate_gain_map_structure(&output).unwrap();
             let top = scan_top_level_boxes(&output).unwrap();
             let meta_header = top.boxes.iter().find(|header| header.kind == META).unwrap();
             let meta = parse_meta_box(&output, meta_header).unwrap();
@@ -1431,19 +1663,22 @@ mod tests {
                 .unwrap();
             let sdr_preview = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
             let prepared = runtime.analyze_proxdr(&source).unwrap();
-            let gain = runtime
-                .heif
-                .decode_item_raster(
-                    &output,
-                    structure.gain_map_item_id,
-                    match prepared.analysis.gain_map.channels {
-                        xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
-                        xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
-                    },
-                )
-                .unwrap();
+            let pair = scene_linear_pair(
+                &AppleAdapterClient::new(adapter.clone()),
+                &output,
+                temporary.path(),
+                LINEAR_THUMBNAIL_MAX_SIZE,
+            )
+            .unwrap();
+            let maximum_stops = prepared
+                .scale
+                .per_channel_gain_map_max
+                .iter()
+                .copied()
+                .chain(std::iter::once(prepared.scale.gain_map_max))
+                .fold(f64::NEG_INFINITY, f64::max);
             let scene =
-                derive_style_scene(&base, &gain, &prepared.scale, LINEAR_THUMBNAIL_MAX_SIZE)
+                derive_style_scene_from_pair(pair, maximum_stops as f32, LINEAR_THUMBNAIL_MAX_SIZE)
                     .unwrap();
             let expected = linear_thumbnail_raster(&scene).unwrap();
             assert_eq!(

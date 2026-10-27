@@ -23,6 +23,9 @@ pub struct UltraHdrGainMapMetadata {
     pub hdr_capacity_max: f64,
     pub channel_count: u8,
     pub use_base_color_space: bool,
+    /// ISO APP2 metadata defines an alternate-image ICC binding. Android
+    /// hdrgm instead defines HDR colorimetry from the primary image profile.
+    pub uses_iso_colorimetry: bool,
 }
 
 impl UltraHdrGainMapMetadata {
@@ -276,6 +279,7 @@ fn parse_hdrgm_xmp(xmp: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
         hdr_capacity_max,
         channel_count,
         use_base_color_space: true,
+        uses_iso_colorimetry: false,
     };
     metadata.validate()?;
     Ok(Some(metadata))
@@ -437,6 +441,7 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
         hdr_capacity_max: alternate_headroom,
         channel_count,
         use_base_color_space,
+        uses_iso_colorimetry: true,
     };
     metadata.validate()?;
     Ok(metadata)
@@ -552,6 +557,7 @@ mod tests {
         assert_eq!(metadata.gain_map_max, [1.0, 1.1, 1.2]);
         assert_eq!(metadata.hdr_capacity_max, 2.0);
         assert!(metadata.use_base_color_space);
+        assert!(metadata.uses_iso_colorimetry);
         let info = metadata.to_info_floats().unwrap();
         assert_eq!(info[0], 1.0);
         assert!((info[4] - 2.0).abs() < 1e-12);
@@ -565,6 +571,7 @@ mod tests {
         assert_eq!(metadata.channel_count, 1);
         assert_eq!(metadata.gain_map_max, [2.0; 3]);
         assert_eq!(metadata.gamma, [1.0; 3]);
+        assert!(!metadata.uses_iso_colorimetry);
     }
 
     #[test]
