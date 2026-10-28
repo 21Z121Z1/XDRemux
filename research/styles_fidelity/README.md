@@ -99,6 +99,11 @@ the source as ProXDR or expand product CLI admission. The engine accepts explici
 baseline and gain scales plus a baseline maximum. Defaults preserve the existing
 product calibration. Each trial rebuilds the thumbnail, GTC, coefficients, light
 maps, statistics and metadata together; original resources are evaluator-only.
+For the research Apple HDR input, semantic resources are merged into the
+authoritative source graph. The source primary, Gain Map, transforms and color
+properties remain intact. A Gain Map identified by the ordered tmap graph may
+link to the primary alone or to both primary and tmap; semantic mattes still
+require both targets. Unrelated or duplicate Gain Map targets remain errors.
 
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity

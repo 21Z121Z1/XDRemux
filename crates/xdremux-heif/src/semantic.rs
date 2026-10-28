@@ -200,7 +200,7 @@ fn item_payload(data: &[u8], graph: &Graph, item_id: u32, context: &str) -> Resu
             method => {
                 return Err(invalid(format!(
                     "{context} item {item_id} uses unsupported construction_method {method}"
-                )))
+                )));
             }
         };
         payload.extend_from_slice(
@@ -339,17 +339,20 @@ fn semantic_items(
             if alpha.is_some_and(|alpha| alpha.root == reference.from_item_id) {
                 continue;
             }
-            if reference.to_item_ids.len() != 2
-                || !reference.to_item_ids.contains(&scaffold_primary)
-                || !reference.to_item_ids.contains(&scaffold_tmap)
-            {
-                return Err(invalid(
-                    "semantic scaffold has an unsupported auxiliary relationship",
-                ));
-            }
             // The tmap dimg graph identifies the Gain Map even when ImageIO
-            // encodes it as a direct hvc1 with the same auxl targets as mattes.
+            // encodes it as a direct hvc1. Native Apple HDR sources can link
+            // that image only to the primary; semantic mattes still name both.
             if reference.from_item_id == gain_image {
+                let targets = &reference.to_item_ids;
+                if targets.as_slice() != [scaffold_primary]
+                    && !(targets.len() == 2
+                        && targets.contains(&scaffold_primary)
+                        && targets.contains(&scaffold_tmap))
+                {
+                    return Err(invalid(
+                        "semantic scaffold has an unsupported Gain Map auxiliary relationship",
+                    ));
+                }
                 if seen_gain_auxiliary {
                     return Err(invalid(
                         "semantic scaffold has multiple Gain Map auxl references",
@@ -357,6 +360,14 @@ fn semantic_items(
                 }
                 seen_gain_auxiliary = true;
                 continue;
+            }
+            if reference.to_item_ids.len() != 2
+                || !reference.to_item_ids.contains(&scaffold_primary)
+                || !reference.to_item_ids.contains(&scaffold_tmap)
+            {
+                return Err(invalid(
+                    "semantic scaffold has an unsupported auxiliary relationship",
+                ));
             }
             if item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
                 != Some(HVC1)
@@ -521,7 +532,7 @@ fn primary_alpha_image(data: &[u8], graph: &Graph, context: &str) -> Result<Opti
             _ => {
                 return Err(invalid(format!(
                     "{context} auxiliary image has multiple auxC properties"
-                )))
+                )));
             }
         };
         let (uri, _) = auxiliary_type_bytes(data, property)?;
@@ -732,7 +743,7 @@ fn paired_alpha_images(
         _ => {
             return Err(invalid(
                 "source and scaffold must contain a matching alpha resource",
-            ))
+            ));
         }
     }
     Ok((source_alpha, scaffold_alpha))
@@ -1284,7 +1295,7 @@ fn remap_infe_item_id(
             return Err(invalid(format!(
                 "semantic scaffold item {} uses unsupported infe version {other}",
                 item.item_id
-            )))
+            )));
         }
     }
     Ok(output)
@@ -1941,7 +1952,7 @@ pub(crate) fn coded_image_items(
         _ => {
             return Err(invalid(format!(
                 "{context} image {image_id} is neither hvc1 nor grid"
-            )))
+            )));
         }
     };
     let mut seen = BTreeSet::new();
@@ -2053,7 +2064,7 @@ fn rebuild_meta_children(data: &[u8], graph: &Graph, iloc: &[u8], iprp: &[u8]) -
             ILOC => {
                 return Err(invalid(
                     "semantic scaffold meta contains multiple iloc boxes",
-                ))
+                ));
             }
             IPRP if !saw_iprp => {
                 saw_iprp = true;
@@ -2062,7 +2073,7 @@ fn rebuild_meta_children(data: &[u8], graph: &Graph, iloc: &[u8], iprp: &[u8]) -
             IPRP => {
                 return Err(invalid(
                     "semantic scaffold meta contains multiple iprp boxes",
-                ))
+                ));
             }
             _ => payload.extend_from_slice(raw_box(data, header, "semantic scaffold meta child")?),
         }
@@ -2839,6 +2850,58 @@ mod tests {
                 .find(|p| p.index == index)
                 .unwrap();
             assert_eq!(raw_property(&output, property).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_accepts_native_primary_only_gain_map_links() {
+        for grid in [false, true] {
+            let source = Fixture::new(grid, false, "source").bytes();
+            let mut scaffold = Fixture::new(grid, true, "framework");
+            scaffold
+                .references
+                .iter_mut()
+                .find(|reference| reference.kind == AUXL && reference.from_item_id == GAIN)
+                .unwrap()
+                .to_item_ids = vec![PRIMARY];
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                let output = assemble(&source, &scaffold.bytes(), 3).unwrap();
+                if grid {
+                    assert_payload(&output, PRIMARY_TILES[0], b"source-primary-tile-0");
+                    assert_payload(&output, GAIN_TILES[0], b"source-gain-tile-0");
+                } else {
+                    assert_payload(&output, PRIMARY, b"source-primary");
+                    assert_payload(&output, GAIN, b"source-gain");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_rejects_unrelated_or_duplicate_gain_map_links() {
+        let source = Fixture::new(false, false, "source").bytes();
+        for targets in [
+            vec![],
+            vec![TONE_MAP],
+            vec![PRIMARY, PRIMARY],
+            vec![PRIMARY, SEMANTICS[0]],
+        ] {
+            let mut scaffold = Fixture::new(false, true, "framework");
+            scaffold
+                .references
+                .iter_mut()
+                .find(|reference| reference.kind == AUXL && reference.from_item_id == GAIN)
+                .unwrap()
+                .to_item_ids = targets;
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                assert!(assemble(&source, &scaffold.bytes(), 3).is_err());
+            }
         }
     }
 

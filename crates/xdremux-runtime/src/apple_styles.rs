@@ -277,11 +277,21 @@ fn convert_file_impl(
     let semantic_scaffold = fs::read(&semantic_scaffold_path).map_err(|error| {
         RuntimeError::external("Photographic Styles semantic scaffold read", error)
     })?;
-    let semantic_base = xdremux_heif::transplant_apple_semantic_auxiliary_heif(
-        &base,
-        &semantic_scaffold,
-        APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
-    )
+    let semantic_base = if research.is_some() {
+        // The blind Apple HDR base is authoritative. Import only the newly
+        // inferred resources, preserving its coded primary and HDR graph.
+        xdremux_heif::merge_apple_semantic_auxiliary_heif(
+            &base,
+            &semantic_scaffold,
+            APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
+        )
+    } else {
+        xdremux_heif::transplant_apple_semantic_auxiliary_heif(
+            &base,
+            &semantic_scaffold,
+            APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
+        )
+    }
     .map_err(|error| {
         note_system_carrier(
             carrier_report.as_deref(),

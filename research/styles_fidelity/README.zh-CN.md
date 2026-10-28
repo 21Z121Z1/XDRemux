@@ -58,6 +58,8 @@ python3 -m research.styles_fidelity.native \
 
 `styles-research` Cargo 特性提供研究示例，对隔离后的 Apple HDR 基图调用共享 Rust Styles 生成器；它不把源文件伪装成 ProXDR，也不扩展产品 CLI 准入。引擎接受明确的 baseline、gain 缩放和 baseline 上限，默认值沿用现有产品标定。每次试验共同重建缩略图、GTC、系数、光照图、统计和元数据；原资源仅供评估。
 
+研究路径将新语义资源合入原始 Apple HDR 资源图，保留源主图、Gain Map、变换与颜色属性。由有序 tmap 图识别的 Gain Map 可以只关联主图，也可以同时关联主图与 tmap；语义蒙版仍须关联两者。无关或重复的 Gain Map 目标仍会被拒绝。
+
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
 python3 -m research.styles_fidelity.blind \
