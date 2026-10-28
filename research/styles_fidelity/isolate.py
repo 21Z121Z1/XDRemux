@@ -130,6 +130,7 @@ class Graph:
                     raise ValueError('invalid image alternate group members')
                 self.alternatives.append(members)
         locations = H.parse_iloc(data, by_kind['iloc'])
+        self.storage_methods = {item: location['construction_method'] for item, location in locations.items()}
         self.payloads = {}
         idat = by_kind.get('idat')
         for item in self.items:
@@ -238,10 +239,14 @@ def _hdr_xmp(payload: bytes) -> bytes | None:
     if not values:
         raise ValueError('HDR namespace has no admitted fields')
     xmp = ET.Element('{adobe:ns:meta/}xmpmeta')
+    for prefix, uri in [('x', 'adobe:ns:meta/'), ('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+                        ('HDRGainMap', HDR_NAMESPACE)]:
+        ET.register_namespace(prefix, uri)
     rdf = ET.SubElement(xmp, '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF')
     desc = ET.SubElement(rdf, '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description')
+    desc.set('{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about', '')
     for name, value in sorted(values.items()):
-        desc.set('{' + HDR_NAMESPACE + '}' + name, value)
+        ET.SubElement(desc, '{' + HDR_NAMESPACE + '}' + name).text = value
     return ET.tostring(xmp, encoding='utf-8')
 
 
@@ -300,10 +305,12 @@ def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple
             selected_refs.append({'type': 'cdsc', 'from': item,
                                   'to': [t for t in graph.targets(item, 'cdsc') if t in payloads and t != item]})
     mapping = {old: index + 1 for index, old in enumerate(order)}
+    wide = len(order) > 65535
+    item_code = 'I' if wide else 'H'
     alternatives = [members for members in graph.alternatives
                     if len(members) == 2 and graph.primary in members
                     and any(t in members for t in tmap)]
-    group_bytes = b''.join(_full('altr', 0, 0, struct.pack('>II', index + 1, len(members))
+    group_bytes = b''.join(_full('altr', 0, 0, struct.pack('>II', len(mapping) + index + 1, len(members))
                                 + b''.join(struct.pack('>I', mapping[i]) for i in members))
                            for index, members in enumerate(alternatives))
     properties, associations = [], {}
@@ -324,35 +331,47 @@ def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple
     for old in order:
         kind = graph.identities[old]['kind']
         tail = b'application/rdf+xml\0\0' if kind == 'mime' else b''
-        info = struct.pack('>IH4s', mapping[old], 0, kind.encode()) + b'image\0' + tail
+        info = struct.pack('>' + item_code + 'H4s', mapping[old], 0, kind.encode()) + b'image\0' + tail
         flags = 1 if old in redacted else graph.items[old]['flags']
         if flags & ~1:
             raise ValueError('unsupported image item flags')
-        infos.append(_full('infe', 3, flags, info))
+        infos.append(_full('infe', 3 if wide else 2, flags, info))
     ipma = struct.pack('>I', len(associations))
+    wide_properties = len(properties) > 127
     for item, values in associations.items():
         if len(values) > 255:
             raise ValueError('too many properties')
-        ipma += struct.pack('>IB', item, len(values))
-        ipma += b''.join(struct.pack('>H', i | (0x8000 if essential else 0)) for i, essential in values)
-    references = b''.join(_box(r['type'], struct.pack('>IH', mapping[r['from']], len(r['to']))
-                              + b''.join(struct.pack('>I', mapping[t]) for t in r['to'])) for r in selected_refs)
+        ipma += struct.pack('>' + item_code + 'B', item, len(values))
+        ipma += b''.join(struct.pack('>H' if wide_properties else '>B',
+                                    i | ((0x8000 if wide_properties else 0x80) if essential else 0))
+                         for i, essential in values)
+    references = b''.join(_box(r['type'], struct.pack('>' + item_code + 'H', mapping[r['from']], len(r['to']))
+                              + b''.join(struct.pack('>' + item_code, mapping[t]) for t in r['to'])) for r in selected_refs)
+    idat_payload = b''.join(payloads[i] for i in order if graph.storage_methods[i] == 1)
+    mdat_payload = b''.join(payloads[i] for i in order if graph.storage_methods[i] == 0)
     def metadata(start):
-        offsets, pos = [], start
+        offsets, positions = [], {0: start, 1: 0}
         for old in order:
             payload = payloads[old]
-            offsets.append(struct.pack('>IHHHQQ', mapping[old], 0, 0, 1, pos, len(payload)))
-            pos += len(payload)
-        iloc = _full('iloc', 2, 0, b'\x88\x00' + struct.pack('>I', len(order)) + b''.join(offsets))
+            method = graph.storage_methods[old]
+            offsets.append(struct.pack('>' + item_code + 'HHHQQ', mapping[old], method, 0, 1,
+                                       positions[method], len(payload)))
+            positions[method] += len(payload)
+        iloc = _full('iloc', 2 if wide else 1, 0, b'\x88\x00'
+                     + struct.pack('>' + item_code, len(order)) + b''.join(offsets))
         hdlr = _full('hdlr', 0, 0, b'\0' * 4 + b'pict' + b'\0' * 12 + b'\0')
-        return _full('meta', 0, 0, hdlr + _full('pitm', 1, 0, struct.pack('>I', mapping[graph.primary]))
-                     + _full('iinf', 1, 0, struct.pack('>I', len(infos)) + b''.join(infos)) + iloc
-                     + _full('iref', 1, 0, references)
-                     + _box('iprp', _box('ipco', b''.join(properties)) + _full('ipma', 1, 1, ipma))
-                     + (_box('grpl', group_bytes) if group_bytes else b''))
+        dinf = _box('dinf', _full('dref', 0, 0, struct.pack('>I', 1) + _full('url ', 0, 1, b'')))
+        return _full('meta', 0, 0, hdlr + dinf
+                     + _full('pitm', int(wide), 0, struct.pack('>' + item_code, mapping[graph.primary]))
+                     + _full('iinf', int(wide), 0, struct.pack('>' + item_code, len(infos)) + b''.join(infos)) + iloc
+                     + _full('iref', int(wide), 0, references)
+                     + _box('iprp', _box('ipco', b''.join(properties))
+                            + _full('ipma', int(wide), int(wide_properties), ipma))
+                     + (_box('grpl', group_bytes) if group_bytes else b'')
+                     + (_box('idat', idat_payload) if idat_payload else b''))
     prefix = _box('ftyp', graph.file_type)
     first = metadata(0)
-    output = prefix + metadata(len(prefix) + len(first) + 8) + _box('mdat', b''.join(payloads[i] for i in order))
+    output = prefix + metadata(len(prefix) + len(first) + 8) + _box('mdat', mdat_payload)
     actual = Graph(output)
     for old, new in mapping.items():
         if actual.payloads[new] != payloads[old]:

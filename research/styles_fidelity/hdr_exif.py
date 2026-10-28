@@ -62,4 +62,4 @@ def wrap_note(note: bytes) -> bytes:
     tiff += struct.pack('>HHII', 34665, 4, 1, 44) + b'\0' * 4 + b'Apple\0'
     tiff += struct.pack('>H', 1)
     tiff += struct.pack('>HHII', 37500, 7, len(note), 62) + b'\0' * 4 + note
-    return b'\0' * 4 + tiff
+    return struct.pack('>I', 6) + b'Exif\0\0' + tiff

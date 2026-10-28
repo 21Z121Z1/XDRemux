@@ -170,7 +170,7 @@ class StyleFidelityTests(unittest.TestCase):
         self.assertEqual(hdr_exif.redact(clean), clean)
         from PIL import Image
         exif = Image.Exif()
-        exif.load(b'Exif\0\0' + clean[4:])
+        exif.load(b'Exif\0\0' + clean[4 + int.from_bytes(clean[:4], 'big'):])
         self.assertEqual(set(exif.keys()), {271, 34665})
         self.assertEqual(set(exif.get_ifd(34665)), {37500})
         note = exif.get_ifd(34665)[37500]
@@ -205,6 +205,9 @@ class StyleFidelityTests(unittest.TestCase):
         self.assertEqual(after.items[tone_maps[0]]['flags'], 0)
         self.assertEqual(after.targets(tone_maps[0], 'dimg'), [1, 2])
         self.assertEqual(after.alternatives, [[tone_maps[0], after.primary]])
+        for i in tone_maps:
+            self.assertEqual(after.storage_methods[i], 1)
+        self.assertEqual(after.items[after.primary]['version'], 2)
 
     def test_hdr_exif_ablation_is_stricter_and_cannot_copy_reference_state(self):
         output, receipt = isolate.isolate_bytes(sample(), keep_numeric_hdr_exif=False)

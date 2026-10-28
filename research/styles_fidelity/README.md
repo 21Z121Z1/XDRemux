@@ -38,7 +38,8 @@ The allow-list projection retains the compressed primary, one associated Apple
 HDR Gain Map, their coded dependencies, verified pixel properties, a matching
 tone-map item when present, its ordered alternate-image group, admitted source
 HDR format brands, item visibility,
-and numeric HDR descriptors. It creates a new item
+numeric HDR descriptors, and source `idat`/`mdat` construction methods. Compact
+item IDs use the 16-bit HEIF layouts. It creates a new item
 graph and new media storage. Original Styles, Linear Thumbnail, Delta Map,
 semantic resources, SmartStyle MakerNotes, unrelated XMP and unused media bytes
 do not enter the producer file. EXIF is rebuilt from scratch with the literal
