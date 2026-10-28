@@ -376,7 +376,6 @@ pub fn apple_style_identity_global_tone_curve() -> Vec<u8> {
 /// documented by the producer contract. They describe a source-derived
 /// proxy for the unavailable camera-time LTMDigitalGain; they are not a donor
 /// image or a scene-independent identity fallback.
-#[allow(clippy::excessive_precision)]
 pub fn apple_style_linear_metadata(
     base_luminance: &[f32],
     hdr_luminance: &[f32],
@@ -390,6 +389,7 @@ pub fn apple_style_linear_metadata(
     )
 }
 
+#[allow(clippy::excessive_precision)]
 pub fn apple_style_linear_metadata_with_calibration(
     base_luminance: &[f32],
     hdr_luminance: &[f32],

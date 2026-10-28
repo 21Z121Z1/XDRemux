@@ -76,7 +76,7 @@ def prepare_renderer(research: Path, output: Path):
     owned = output / 'edit-response.m'
     owned.write_text(source)
     flags = ['xcrun', 'clang', '-O1', '-fobjc-arc']
-    for framework in ('Foundation', 'CoreImage', 'CoreMedia', 'ImageIO', 'Metal'):
+    for framework in ('Foundation', 'CoreGraphics', 'CoreImage', 'CoreMedia', 'ImageIO', 'Metal'):
         flags += ['-framework', framework]
     binary = output / 'edit-response'
     run([*flags, owned, '-o', binary])
@@ -244,9 +244,10 @@ def main(argv=None):
                     trial['error'] = str(error)
                 report['trials'].append(trial)
                 (output / 'report.json').write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
+                if index == 0 and not trial['passed']:
+                    raise ValueError('product default failed; alternative fits cannot waive that failure: '
+                                     + trial['error'])
             selected = choose_candidate(report['trials'])
-            if not report['trials'][0]['passed']:
-                raise ValueError('product default failed; alternative fits cannot waive that failure')
             report['selected'] = selected['calibration']
             report['training_default_rmse'] = report['trials'][0]['training_rmse']
             report['training_selected_rmse'] = selected['training_rmse']

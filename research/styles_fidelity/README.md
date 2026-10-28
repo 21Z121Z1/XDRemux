@@ -156,8 +156,12 @@ Differences across the two domains measure domain sensitivity;
 they are not an error against a Photos reference render. This is not full-size
 effect composition, multi-person blending or a device save/reopen test.
 
-The existing research tone job produces a portrait with the current product
-CLI, executes both experiments and exports only numeric reports. Images,
+The existing research tone job converts `uhdr-portrait-02.heic` with the current
+product CLI, executes both experiments and exports only numeric reports.
+This public fixture depicts shop mannequins, not human skin. Its native detected
+person context exercises resource replay but does not establish human portrait
+fidelity. `uhdr-portrait-01.heic` depicts a toy and has no native face context.
+Images,
 landmarks, input resources and render buffers remain in owned temporary storage.
 
 ## Remaining experiments

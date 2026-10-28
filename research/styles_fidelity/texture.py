@@ -105,6 +105,20 @@ def numeric_leaves(value, prefix=''):
     return result
 
 
+def compare_statistics(person: dict, facts: dict) -> dict:
+    group = facts['native_effect_name']
+    reference = numeric_leaves(person.get('imageStats', {}).get(group, {}))
+    replayed = numeric_leaves(facts.get('native_output_person_stats', {}))
+    common = reference.keys() & replayed.keys()
+    errors = [abs(reference[k] - replayed[k]) for k in common]
+    return {'statistics_group': group, 'statistics_compared_fields': len(errors),
+            'statistics_maximum_absolute_difference': max(errors) if errors else None,
+            'statistics_mean_absolute_difference': sum(errors) / len(errors) if errors else None,
+            'statistics_field_differences': {k: replayed[k] - reference[k] for k in sorted(common)},
+            'stored_only_statistics_fields': len(reference.keys() - replayed.keys()),
+            'replayed_only_statistics_fields': len(replayed.keys() - reference.keys())}
+
+
 def prepare_tools(research: Path, output: Path):
     revision = run(['git', '-C', research, 'rev-parse', 'HEAD']).stdout.decode().strip()
     root = research / 'research/texture-producer-20261020'
@@ -116,16 +130,22 @@ def prepare_tools(research: Path, output: Path):
     spec.loader.exec_module(module)
     source = (root / 'generate_stats.m').read_text()
     before = 'if (storedPerson) [nativeStats addEntriesFromDictionary:storedPerson[@"imageStats"][@"Mattify"]];'
-    after = ('BOOL recompute=[NSProcessInfo.processInfo.environment[@"TEXTURE_RECOMPUTE_FINAL_STATS"] boolValue];\n'
-             '            NSString *group = [effectKind isEqual:@"SkinSmoothStandalone"] ? @"SkinSmooth" : effectKind;\n'
-             '            NSDictionary *existing = storedPerson[@"imageStats"][group];\n'
-             '            if (existing && !recompute) [nativeStats addEntriesFromDictionary:existing];')
     condition = ('if ([effectKind isEqual:@"Mattify"] && [parameterSource isEqual:@"Studio"] '
                  '&& exposure == 0 && ![report[@"calculateStats"] intValue])')
     if source.count(before) != 1 or source.count(condition) != 1:
         raise ValueError('pinned Texture replay patch context changed')
-    source = source.replace(before, after).replace(condition,
+    source = source.replace(before, '').replace(condition,
         'if ([parameterSource isEqual:@"Studio"] && exposure == 0 && ![report[@"calculateStats"] intValue])')
+    tuning_anchor = 'report[@"native_effect_type"] = Call(effectDescriptor, @"type", @[]);'
+    if source.count(tuning_anchor) != 1:
+        raise ValueError('pinned effect identity context changed')
+    source = source.replace(tuning_anchor, tuning_anchor + '''
+                id statisticsGroup=Call(NSClassFromString(@"CMITextureStylesProcessor"),@"effectTypeToEffectName:",@[report[@"native_effect_type"]]);
+                report[@"native_effect_name"]=statisticsGroup;
+                NSDictionary *existing=storedPerson[@"imageStats"][statisticsGroup];
+                if(existing && ![NSProcessInfo.processInfo.environment[@"TEXTURE_RECOMPUTE_FINAL_STATS"] boolValue])
+                    [nativeStats addEntriesFromDictionary:existing];
+''')
     person_anchor = 'NSDictionary *personDictionary = storedPerson ?: selected[@"native_person_without_stats"];'
     if source.count(person_anchor) != 1:
         raise ValueError('pinned person input context changed')
@@ -177,7 +197,10 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
     admission = json.loads(admission_path.read_text())
     people = admission.get('native_person_data_readback', [])
     if not people or admission.get('texture_person_count') != len(people):
-        raise ValueError('portrait replay requires final-file native people')
+        raise ValueError('portrait replay requires final-file native people: ' + json.dumps({
+            'native_people': len(people), 'texture_person_count': admission.get('texture_person_count'),
+            'asset_loaded': admission.get('asset_loaded'),
+            'texture_properties_present': admission.get('texture_properties_present')}))
     primitive(adapter, 'texture-prepare', source, directory,
               texture={'max_dimension': 1024})
     prepared = json.loads((directory / 'input.json').read_text())
@@ -242,11 +265,6 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
                 and facts.get('provided_precomputed_image_stats_from_final_HEIC') == (mode == 'stored')
                 and facts.get('geometry_from_final_HEIC') is True
                 and facts.get('fresh_Vision_observations_used_as_replay_inputs') is False)
-            group = 'SkinSmooth' if effect == 'SkinSmoothStandalone' else effect
-            reference = numeric_leaves(person.get('imageStats', {}).get(group, {}))
-            replayed = numeric_leaves(facts.get('native_output_person_stats', {}))
-            common = reference.keys() & replayed.keys()
-            errors = [abs(reference[k] - replayed[k]) for k in common]
             pixels = np.fromfile(output.with_name(output.name + '.rgba16f'), dtype='<f2')
             if pixels.size != width * height * 4 or not np.isfinite(pixels).all():
                 raise ValueError('native effect output does not match its finite RGBA16F layout')
@@ -262,12 +280,7 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
                     'changed_rgb_components': int(np.count_nonzero(difference))})
             effects.append({'person': index, 'effect': effect, 'domain': domain, 'statistics_mode': mode, 'passed': passed,
                 'rendered_pixels': rendered, 'gpu_command_status': facts.get('render_command_status'),
-                'statistics_compared_fields': len(errors),
-                'statistics_maximum_absolute_difference': max(errors) if errors else None,
-                'statistics_mean_absolute_difference': sum(errors) / len(errors) if errors else None,
-                'statistics_field_differences': {k: replayed[k] - reference[k] for k in sorted(common)},
-                'stored_only_statistics_fields': len(reference.keys() - replayed.keys()),
-                'replayed_only_statistics_fields': len(replayed.keys() - reference.keys()),
+                **compare_statistics(person, facts),
                 'native_parameters': facts.get('native_parameters'),
                 'exception': facts.get('exception')})
     unchanged = sha(source.read_bytes()) == sha(original)

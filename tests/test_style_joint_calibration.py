@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 from research.styles_fidelity.blind import choose_candidate, score
-from research.styles_fidelity.texture import area_rgba, numeric_leaves, pixel_person
+from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person
 
 
 class JointCalibrationTests(unittest.TestCase):
@@ -55,6 +55,16 @@ class JointCalibrationTests(unittest.TestCase):
                          {'/a': 2, '/v/0': 1.5})
         with self.assertRaises(ValueError):
             numeric_leaves({'bad': float('inf')})
+
+    def test_statistics_use_native_effect_identity_instead_of_class_suffix(self):
+        person = {'imageStats': {'UnderEyeBrightening': {'mean': 0.25},
+                                 'SkinSmoothingStandalone': {'mean': 0.5}}}
+        for group, expected in [('UnderEyeBrightening', 0.5), ('SkinSmoothingStandalone', 0.25)]:
+            result = compare_statistics(person, {'native_effect_name': group,
+                'native_output_person_stats': {'mean': 0.75}})
+            self.assertEqual(result['statistics_compared_fields'], 1)
+            self.assertEqual(result['statistics_maximum_absolute_difference'], expected)
+            self.assertEqual(result['statistics_group'], group)
 
 
 if __name__ == '__main__':

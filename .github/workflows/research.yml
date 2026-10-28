@@ -245,7 +245,7 @@ jobs:
         run: |
           adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
           XDREMUX_APPLE_ADAPTER="$adapter" target/debug/xdremux convert \
-            --input fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic \
+            --input fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic \
             --output "$RUNNER_TEMP/styles-texture-final.heic" --apple-styles
           python3 -m research.styles_fidelity.texture \
             --adapter "$adapter" --research-root "$GITHUB_WORKSPACE/texture-research" \
