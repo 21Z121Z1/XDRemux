@@ -86,9 +86,9 @@ def readback(adapter: Path, source: Path, directory: Path, width: int, height: i
     return facts
 
 
-def check_case(adapter: Path, source: Path, directory: Path) -> dict:
+def check_case(adapter: Path, source: Path, directory: Path, *, keep_numeric_hdr_exif: bool = True) -> dict:
     original = source.read_bytes()
-    projection, projection_report = isolate.isolate_bytes(original)
+    projection, projection_report = isolate.isolate_bytes(original, keep_numeric_hdr_exif=keep_numeric_hdr_exif)
     width, height = display_geometry(isolate.Graph(original))
     if display_geometry(isolate.Graph(projection)) != (width, height):
         raise ValueError('projection changed display geometry')
@@ -122,6 +122,8 @@ def main(argv=None):
     parser.add_argument('--adapter', type=Path, required=True)
     parser.add_argument('--input', type=Path, action='append', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--ablate-hdr-exif', action='store_true',
+                        help='also measure a stricter projection without numeric HDR EXIF')
     args = parser.parse_args(argv)
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         parser.error('this measurement requires the supported arm64/macOS Apple adapter')
@@ -134,7 +136,11 @@ def main(argv=None):
     try:
         for source in args.input:
             try:
-                report['cases'].append(check_case(args.adapter.resolve(), source.resolve(), output))
+                case = check_case(args.adapter.resolve(), source.resolve(), output)
+                if args.ablate_hdr_exif:
+                    case['without_hdr_exif'] = check_case(args.adapter.resolve(), source.resolve(), output,
+                                                          keep_numeric_hdr_exif=False)
+                report['cases'].append(case)
             except (ValueError, OSError, subprocess.TimeoutExpired) as error:
                 report['cases'].append({'source_sha256': isolate.sha(source.read_bytes()) if source.is_file() else None,
                                         'passed': False, 'error': type(error).__name__ + ': ' + str(error)})

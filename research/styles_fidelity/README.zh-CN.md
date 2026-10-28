@@ -26,6 +26,8 @@ python3 -m research.styles_fidelity.isolate \
 
 按允许清单投影资源：保留压缩主图、一张关联的 Apple HDR Gain Map、编码依赖、已核对的像素属性、存在时的匹配色调映射项目及数值 HDR 描述符。投影重新建立项目图和媒体存储，原 Styles、Linear Thumbnail、Delta Map、语义资源、SmartStyle MakerNote、无关 XMP 和未使用的媒体字节不会进入生成器文件。EXIF 从零重建，仅写入在源文件中核实的 Apple 品牌名和 HDR MakerNote 数值字段 33／48，保留其有理数值；其他 EXIF 字段与 MakerNote 状态全部去除。删除 HDR 字段可能在 SDR 像素不变的同时禁用 Apple HDR 展开，因此必须进行原生检查。写出后再次核对像素载荷、颜色和几何。属性不支持或关联存在歧义时失败。
 
+同时保留经允许清单核对的源 HDR 格式声明和项目可见性；匹配的 tone-map 项目不能被改成隐藏状态。
+
 拟合前先审阅场景分组。分组 JSON 须含 `scene_groups_reviewed: true` 及按候选 SHA 索引的 `samples` 字典；每条提供 `scene_group` 和 `split`（`calibration` 或 `holdout`）。
 
 ```sh
@@ -47,6 +49,8 @@ python3 -m research.styles_fidelity.native \
 ```
 
 检查比较原件与隔离文件完整、按显示方向排列的 RGBA32F 线性 Display P3 SDR／HDR 回读。要求源文件不变、headroom 不变、像素有限，最大绝对误差不超过 `1e-6`，且参考文件确实展开 HDR。比较后删除临时像素缓冲；报告只有数值、尺寸和哈希。已有输出不会复用。目前明确拒绝 clean aperture 几何。
+
+加上 `--ablate-hdr-exif` 可额外对照不含数值 HDR EXIF 的更严格投影，记录该文件的 HDR 表示是否依赖这些字段。这个对照不会豁免默认投影的失败。
 
 现有 `research.yml` 的 Tone 任务对固定版本的公开 Apple 样本运行此检查，仅上传报告。用户提供的私人照片保留在 Git 和公开产物之外。便携解析或解码不能证明 Apple HDR 等价、重建后的滑块响应或 Photos 编辑／保存／重开。
 

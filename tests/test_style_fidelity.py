@@ -29,7 +29,7 @@ def full(kind, version, flags, payload):
     return box(kind, bytes([version]) + flags.to_bytes(3, 'big') + payload)
 
 
-def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_reference=False, shared_exif=False):
+def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_reference=False, shared_exif=False, tmap=False):
     """Synthetic container, with recognizable withheld bytes, never a photo."""
     payloads = {
         1: b'compressed-primary', 2: b'compressed-gain',
@@ -41,6 +41,9 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
         7: b'WITHHELD-PERSON-MATTE',
     }
     kinds = {1: 'hvc1', 2: 'hvc1', 3: 'uri ', 4: 'hvc1', 5: 'uri ', 6: 'Exif', 7: 'hvc1'}
+    if tmap:
+        kinds[8] = 'tmap'
+        payloads[8] = b'tone-map-transfer-parameters'
     uris = {3: isolate.STYLES_URI, 5: isolate.TEXTURE_URI}
     props = [full('ispe', 0, 0, struct.pack('>II', 64, 48)),
              box('hvcC', b'\x01' * 23),
@@ -52,11 +55,14 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
     infos = []
     for item, kind in kinds.items():
         tail = uris.get(item, '').encode() + b'\0' if item in uris else b''
-        infos.append(full('infe', 3, 0, struct.pack('>IH4s', item, 0, kind.encode()) + b'name\0' + tail))
+        infos.append(full('infe', 3, 0 if item in (1, 8) else 1,
+                          struct.pack('>IH4s', item, 0, kind.encode()) + b'name\0' + tail))
     refs = [('auxl', 2, [1]), ('cdsc', 3, [1]), ('auxl', 4, [1]),
             ('cdsc', 5, [1]), ('cdsc', 6, [1, 2] if shared_exif else [1]), ('auxl', 7, [1])]
     if broken_reference:
         refs.append(('dimg', 1, [999]))
+    if tmap:
+        refs.append(('dimg', 8, [1, 2]))
     idat = b''.join(payloads.values())
     offset = 0
     entries = []
@@ -74,7 +80,7 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
     children += full('iref', 1, 0, b''.join(box(kind, struct.pack('>IH', source, len(targets)) + b''.join(struct.pack('>I', t) for t in targets)) for kind, source, targets in refs))
     children += box('iprp', box('ipco', b''.join(props)) + full('ipma', 1, 1, ipma))
     children += box('idat', idat)
-    return box('ftyp', b'heic\0\0\0\0mif1heic') + full('meta', 0, 0, children)
+    return box('ftyp', b'heic\0\0\0\0mif1heic' + (b'MiHBtmap' if tmap else b'')) + full('meta', 0, 0, children)
 
 
 class StyleFidelityTests(unittest.TestCase):
@@ -186,6 +192,22 @@ class StyleFidelityTests(unittest.TestCase):
         self.assertEqual(len(exif_items), 1)
         self.assertEqual(set(graph.targets(exif_items[0], 'cdsc')), {1, 2})
         self.assertTrue(receipt['rebuilt_numeric_hdr_exif'])
+
+    def test_projection_preserves_hdr_brands_and_visible_tone_map(self):
+        original = sample(tmap=True)
+        output, _ = isolate.isolate_bytes(original)
+        before, after = isolate.Graph(original), isolate.Graph(output)
+        self.assertEqual(before.file_type, after.file_type)
+        tone_maps = [i for i, v in after.identities.items() if v['kind'] == 'tmap']
+        self.assertEqual(len(tone_maps), 1)
+        self.assertEqual(after.items[tone_maps[0]]['flags'], 0)
+        self.assertEqual(after.targets(tone_maps[0], 'dimg'), [1, 2])
+
+    def test_hdr_exif_ablation_is_stricter_and_cannot_copy_reference_state(self):
+        output, receipt = isolate.isolate_bytes(sample(), keep_numeric_hdr_exif=False)
+        self.assertFalse(receipt['rebuilt_numeric_hdr_exif'])
+        self.assertFalse(any(v['kind'] == 'Exif' for v in isolate.Graph(output).identities.values()))
+        self.assertNotIn(b'WITHHELD', output)
 
     def test_broken_dependency_cannot_be_silently_removed(self):
         with self.assertRaisesRegex(ValueError, 'missing|dependency'):

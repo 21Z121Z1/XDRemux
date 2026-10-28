@@ -215,6 +215,7 @@ jobs:
         run: |
           adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
           python3 -m research.styles_fidelity.native \
+            --ablate-hdr-exif \
             --adapter "$adapter" \
             --input consumer-research/Apple_Native_Samples/IMG_0032.HEIC \
             --input consumer-research/Apple_Native_Samples/IMG_0033.HEIC \

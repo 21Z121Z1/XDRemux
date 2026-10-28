@@ -36,7 +36,8 @@ python3 -m research.styles_fidelity.isolate \
 
 The allow-list projection retains the compressed primary, one associated Apple
 HDR Gain Map, their coded dependencies, verified pixel properties, a matching
-tone-map item when present, and numeric HDR descriptors. It creates a new item
+tone-map item when present, admitted source HDR format brands, item visibility,
+and numeric HDR descriptors. It creates a new item
 graph and new media storage. Original Styles, Linear Thumbnail, Delta Map,
 semantic resources, SmartStyle MakerNotes, unrelated XMP and unused media bytes
 do not enter the producer file. EXIF is rebuilt from scratch with the literal
@@ -77,6 +78,10 @@ headroom, finite pixels and maximum absolute error at most `1e-6`. The reference
 must actually expand HDR. Temporary pixel buffers are deleted after comparison.
 Only numeric facts, dimensions and hashes enter the report. Existing outputs are
 never reused. Clean-aperture geometry is currently rejected.
+
+Use `--ablate-hdr-exif` to also compare a stricter projection without numeric HDR
+EXIF. That comparison records whether EXIF is needed by the tested file's HDR
+representation; it does not waive a failure in the default projection.
 
 The existing `research.yml` tone job runs this check on its pinned public Apple
 samples. Uploads contain only the report. Supplied private photos stay outside Git

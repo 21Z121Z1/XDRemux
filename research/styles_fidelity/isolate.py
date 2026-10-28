@@ -25,6 +25,7 @@ HDR_AUX = 'urn:com:apple:photo:2020:aux:hdrgainmap'
 HDR_NAMESPACE = 'http://ns.apple.com/HDRGainMap/1.0/'
 HDR_FIELDS = {'HDRGainMapVersion', 'HDRGainMapHeadroom'}
 PIXEL_PROPERTIES = {'hvcC', 'ispe', 'pixi', 'colr', 'irot', 'imir', 'clap', 'auxC', 'clli', 'mdcv'}
+PIXEL_BRANDS = {b'heic', b'heix', b'mif1', b'miaf', b'MiHB', b'MiHA', b'MiHE', b'MiPr', b'tmap'}
 MAX_FILE_BYTES = 256 * 1024 * 1024
 
 
@@ -57,6 +58,12 @@ class Graph:
             raise ValueError('empty or oversized research HEIF')
         self.data = data
         top = list(H.boxes(data, 0, len(data)))
+        ftyp = [b for b in top if b['type'] == 'ftyp']
+        if len(ftyp) != 1:
+            raise ValueError('one file type declaration is required')
+        self.file_type = data[ftyp[0]['payload_start']:ftyp[0]['end']]
+        if len(self.file_type) < 8 or len(self.file_type) % 4:
+            raise ValueError('invalid file type declaration')
         metadata = [b for b in top if b['type'] == 'meta']
         if len(metadata) != 1:
             raise ValueError('one HEIF meta box is required')
@@ -222,8 +229,11 @@ def _hdr_xmp(payload: bytes) -> bytes | None:
     return ET.tostring(xmp, encoding='utf-8')
 
 
-def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
+def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple[bytes, dict]:
     graph = Graph(source)
+    if any(brand not in PIXEL_BRANDS for brand in [graph.file_type[:4],
+            *(graph.file_type[i:i + 4] for i in range(8, len(graph.file_type), 4))]):
+        raise ValueError('unverified pixel format brand')
     gain = [i for i in graph.items if graph.aux(i) == [HDR_AUX]
             and graph.targets(i, 'auxl') == [graph.primary]]
     if len(gain) != 1:
@@ -252,7 +262,7 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
                      and r['type'] in {'dimg', 'auxl'} and all(t in order for t in r['to'])]
     redacted, exif_items = [], []
     for item, identity in graph.identities.items():
-        if identity['kind'] == 'Exif' and graph.primary in graph.targets(item, 'cdsc'):
+        if keep_numeric_hdr_exif and identity['kind'] == 'Exif' and graph.primary in graph.targets(item, 'cdsc'):
             exif_items.append(item)
             if len(exif_items) > 1:
                 raise ValueError('ambiguous primary EXIF')
@@ -293,7 +303,10 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
         kind = graph.identities[old]['kind']
         tail = b'application/rdf+xml\0\0' if kind == 'mime' else b''
         info = struct.pack('>IH4s', mapping[old], 0, kind.encode()) + b'image\0' + tail
-        infos.append(_full('infe', 3, 0 if old == graph.primary else 1, info))
+        flags = 1 if old in redacted else graph.items[old]['flags']
+        if flags & ~1:
+            raise ValueError('unsupported image item flags')
+        infos.append(_full('infe', 3, flags, info))
     ipma = struct.pack('>I', len(associations))
     for item, values in associations.items():
         if len(values) > 255:
@@ -314,7 +327,7 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
                      + _full('iinf', 1, 0, struct.pack('>I', len(infos)) + b''.join(infos)) + iloc
                      + _full('iref', 1, 0, references)
                      + _box('iprp', _box('ipco', b''.join(properties)) + _full('ipma', 1, 1, ipma)))
-    prefix = _box('ftyp', b'heic\0\0\0\0mif1heic')
+    prefix = _box('ftyp', graph.file_type)
     first = metadata(0)
     output = prefix + metadata(len(prefix) + len(first) + 8) + _box('mdat', b''.join(payloads[i] for i in order))
     actual = Graph(output)
