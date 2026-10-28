@@ -774,6 +774,62 @@ mod tests {
     }
 
     #[test]
+    fn gain_ramp_quantization_and_hevc_error_stay_within_the_measured_budget() {
+        // This measures the gain branch, including 8-bit quantization and the
+        // actual quality-90 codec. It is not a native HDR-rendering assertion.
+        let (w, h) = (93_u32, 71_u32);
+        let mut ideal = Vec::new();
+        for y in 0..h {
+            for x in 0..w {
+                ideal.extend([
+                    f64::from(x) / f64::from(w - 1),
+                    f64::from(y) / f64::from(h - 1),
+                    f64::from(x + y) / f64::from(w + h - 2),
+                ]);
+            }
+        }
+        for (chroma, max_budget, p99_budget) in [
+            (ChromaSampling::Yuv444, 4., 3.),
+            (ChromaSampling::Yuv420, 6., 4.),
+        ] {
+            let raster = Raster8::new(
+                w,
+                h,
+                w as usize * 3,
+                RasterPixelFormat::Rgb8,
+                ideal.iter().map(|v| (v * 255.).round() as u8).collect(),
+            )
+            .unwrap();
+            let request =
+                GainMapTileEncodeRequest::reference_compatible(raster, target(w, h, chroma));
+            let decoded = LibHeifProvider::new()
+                .decode_raster(&HeifRasterDecodeRequest {
+                    data: encode_tile_container(&request, 0, 0).unwrap(),
+                    format: RasterPixelFormat::Rgb8,
+                })
+                .unwrap();
+            let mut errors = Vec::new();
+            for y in 0..h as usize {
+                for x in 0..w as usize {
+                    for c in 0..3 {
+                        let got = f64::from(decoded.data[y * decoded.bytes_per_row + x * 3 + c]);
+                        errors.push((got - ideal[(y * w as usize + x) * 3 + c] * 255.).abs());
+                    }
+                }
+            }
+            errors.sort_by(f64::total_cmp);
+            let maximum = errors[errors.len() - 1];
+            let p99 = errors[(errors.len() * 99).div_ceil(100) - 1];
+            println!("gain-ramp {chroma:?}: max={maximum:.6} codes p99={p99:.6} codes; at 24 EV max={:.6} EV p99={:.6} EV", maximum * 24. / 255., p99 * 24. / 255.);
+            assert!(
+                maximum <= max_budget,
+                "{chroma:?}: maximum code error {maximum}"
+            );
+            assert!(p99 <= p99_budget, "{chroma:?}: p99 code error {p99}");
+        }
+    }
+
+    #[test]
     fn libheif_rgb444_tile_roundtrips_through_raster_decoder() {
         let raster = rgb_raster(93, 71);
         let request = GainMapTileEncodeRequest::reference_compatible(

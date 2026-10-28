@@ -26,11 +26,67 @@ pub struct UltraHdrGainMapMetadata {
     /// ISO APP2 metadata defines an alternate-image ICC binding. Android
     /// hdrgm instead defines HDR colorimetry from the primary image profile.
     pub uses_iso_colorimetry: bool,
+    // Required ISO bytes retain the exact signed/unsigned rational fields.
+    // Optional future tails are ignored, as permitted by Annex C.2.1.
+    iso_payload: Option<Vec<u8>>,
 }
 
 impl UltraHdrGainMapMetadata {
-    /// Translate public Ultra HDR log-domain metadata into XDRemux's canonical
-    /// 20-float linear ratio representation consumed by the ISO HEIF writer.
+    /// Remux ISO rationals directly. Only the application-space flag may be
+    /// resolved by the caller (C.4.7); XMP uses the checked float writer.
+    pub fn to_tmap_payload(&self, use_base_colour_space: bool) -> Result<Vec<u8>> {
+        self.validate()?;
+        if let Some(source) = &self.iso_payload {
+            let mut payload = vec![0]; // HEIF ToneMapImage version
+            payload.extend_from_slice(source);
+            payload[5] = (payload[5] & !0x40) | if use_base_colour_space { 0x40 } else { 0 };
+            decode_iso_payload(&payload[1..])?;
+            return Ok(payload);
+        }
+        crate::iso21496::make_tmap_from_log_metadata(self, use_base_colour_space)
+    }
+
+    /// XMP is a floating-point compatibility projection; the ISO rationals
+    /// remain authoritative. Avoid exp2/log2 overflow and decimal truncation.
+    pub fn to_hdrgm_xmp(&self) -> Result<Vec<u8>> {
+        self.validate()?;
+        if let Some(source) = &self.iso_payload {
+            let pair = |offset| {
+                (
+                    u32::from_be_bytes(
+                        source[offset..offset + 4]
+                            .try_into()
+                            .expect("validated headroom"),
+                    ),
+                    u32::from_be_bytes(
+                        source[offset + 4..offset + 8]
+                            .try_into()
+                            .expect("validated headroom"),
+                    ),
+                )
+            };
+            let (base, alternate) = (pair(5), pair(13));
+            return Ok(crate::iso21496::write_hdrgm_xmp_with_headrooms(
+                self.gain_map_min,
+                self.gain_map_max,
+                self.gamma,
+                [self.offset_sdr, self.offset_hdr],
+                [decimal_headroom(base), decimal_headroom(alternate)],
+                u64::from(base.0) * u64::from(alternate.1)
+                    > u64::from(alternate.0) * u64::from(base.1),
+            ));
+        }
+        Ok(crate::iso21496::write_hdrgm_xmp(
+            self.gain_map_min,
+            self.gain_map_max,
+            self.gamma,
+            [self.offset_sdr, self.offset_hdr],
+            [self.hdr_capacity_min, self.hdr_capacity_max],
+        ))
+    }
+
+    /// Float compatibility view for calculations and diagnostics. ISO remux
+    /// must use to_tmap_payload to retain source rational values and ordering.
     pub fn to_info_floats(&self) -> Result<[f64; 20]> {
         self.validate()?;
         let mut info = [0.0_f64; 20];
@@ -46,21 +102,44 @@ impl UltraHdrGainMapMetadata {
         info[17] = 2.0_f64.powf(self.hdr_capacity_max);
         info[18] = info[17];
         info[19] = 0.0;
-        if info.iter().any(|value| !value.is_finite()) {
+        if info.iter().any(|value| !value.is_finite())
+            || info[..3]
+                .iter()
+                .chain(&info[4..7])
+                .any(|value| *value <= 0.0)
+            || info[16] == info[17]
+        {
             return Err(MetadataError::invalid(
                 ISO_CONTEXT,
-                "metadata overflows the canonical linear representation",
+                "metadata cannot retain its constraints in the float compatibility representation",
             ));
         }
         Ok(info)
     }
 
     fn validate(&self) -> Result<()> {
-        let context = if self.uses_iso_colorimetry {
-            ISO_CONTEXT
-        } else {
-            XMP_CONTEXT
-        };
+        if let Some(source) = &self.iso_payload {
+            // Public float observations must not be edited independently of
+            // the exact source facts that will be serialized.
+            let mut expected = decode_iso_payload(source)?;
+            expected.iso_payload = None;
+            let mut observed = self.clone();
+            observed.iso_payload = None;
+            if observed != expected {
+                return Err(MetadataError::invalid(
+                    ISO_CONTEXT,
+                    "ISO observations differ from source rational values",
+                ));
+            }
+            return Ok(());
+        }
+        if self.uses_iso_colorimetry {
+            return Err(MetadataError::invalid(
+                ISO_CONTEXT,
+                "ISO metadata lacks source rational values",
+            ));
+        }
+        let context = XMP_CONTEXT;
         if !matches!(self.channel_count, 1 | 3) {
             return Err(MetadataError::invalid(
                 context,
@@ -96,15 +175,7 @@ impl UltraHdrGainMapMetadata {
                 ));
             }
         }
-        if self.uses_iso_colorimetry {
-            // ISO headrooms describe baseline and alternate, not a sorted range.
-            if self.hdr_capacity_min == self.hdr_capacity_max {
-                return Err(MetadataError::invalid(
-                    context,
-                    "baseline and alternate HDR headrooms must differ",
-                ));
-            }
-        } else if self.hdr_capacity_min < 0.0 || self.hdr_capacity_max <= self.hdr_capacity_min {
+        if self.hdr_capacity_min < 0.0 || self.hdr_capacity_max <= self.hdr_capacity_min {
             return Err(MetadataError::invalid(
                 context,
                 "HDRCapacityMin must be nonnegative and HDRCapacityMax must exceed HDRCapacityMin",
@@ -112,6 +183,27 @@ impl UltraHdrGainMapMetadata {
         }
         Ok(())
     }
+}
+
+// Two distinct u32/u32 values differ by at least 1/(u32::MAX^2).
+// Forty decimal places preserve that ordering in XMP text even when f64 cannot.
+fn decimal_headroom((numerator, denominator): (u32, u32)) -> String {
+    let mut value = (numerator / denominator).to_string();
+    let mut remainder = u64::from(numerator % denominator);
+    if remainder != 0 {
+        value.push('.');
+    }
+    for _ in 0..40 {
+        if remainder == 0 {
+            break;
+        }
+        remainder *= 10;
+        value.push(char::from(
+            b'0' + (remainder / u64::from(denominator)) as u8,
+        ));
+        remainder %= u64::from(denominator);
+    }
+    value
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8], start: usize) -> Option<usize> {
@@ -307,6 +399,7 @@ fn parse_hdrgm_xmp(xmp: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
         channel_count,
         use_base_color_space: true,
         uses_iso_colorimetry: false,
+        iso_payload: None,
     };
     metadata.validate()?;
     Ok(Some(metadata))
@@ -414,30 +507,51 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
 
     // Each rational carries its own denominator; the 2025 layout has
     // no optional common-denominator or reverse-direction fields.
-    let base_headroom = fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
-    let alternate_headroom =
-        fraction_unsigned(cursor.u32()?, cursor.u32()?, "alternateHdrHeadroom")?;
+    let base = (cursor.u32()?, cursor.u32()?);
+    let alternate = (cursor.u32()?, cursor.u32()?);
+    let base_headroom = fraction_unsigned(base.0, base.1, "baseHdrHeadroom")?;
+    let alternate_headroom = fraction_unsigned(alternate.0, alternate.1, "alternateHdrHeadroom")?;
+    if u64::from(base.0) * u64::from(alternate.1) == u64::from(alternate.0) * u64::from(base.1) {
+        return Err(MetadataError::invalid(
+            ISO_CONTEXT,
+            "baseline and alternate HDR headrooms must differ",
+        ));
+    }
     let mut gain_min = Vec::with_capacity(usize::from(channel_count));
     let mut gain_max = Vec::with_capacity(usize::from(channel_count));
     let mut gamma = Vec::with_capacity(usize::from(channel_count));
     let mut base_offset = Vec::with_capacity(usize::from(channel_count));
     let mut alt_offset = Vec::with_capacity(usize::from(channel_count));
     for channel in 0..channel_count {
+        let minimum = (cursor.i32()?, cursor.u32()?);
+        let maximum = (cursor.i32()?, cursor.u32()?);
         gain_min.push(fraction_signed(
-            cursor.i32()?,
-            cursor.u32()?,
+            minimum.0,
+            minimum.1,
             &format!("gainMapMin[{channel}]"),
         )?);
         gain_max.push(fraction_signed(
-            cursor.i32()?,
-            cursor.u32()?,
+            maximum.0,
+            maximum.1,
             &format!("gainMapMax[{channel}]"),
         )?);
-        gamma.push(fraction_unsigned(
-            cursor.u32()?,
-            cursor.u32()?,
-            &format!("gamma[{channel}]"),
-        )?);
+        // i32 * u32 fits i64, including i32::MIN and u32::MAX.
+        if i64::from(minimum.0) * i64::from(maximum.1) > i64::from(maximum.0) * i64::from(minimum.1)
+        {
+            return Err(MetadataError::invalid(
+                ISO_CONTEXT,
+                format!("gainMapMin[{channel}] exceeds gainMapMax[{channel}]"),
+            ));
+        }
+        let gamma_value =
+            fraction_unsigned(cursor.u32()?, cursor.u32()?, &format!("gamma[{channel}]"))?;
+        if gamma_value <= 0.0 {
+            return Err(MetadataError::invalid(
+                ISO_CONTEXT,
+                "gain-map gamma must be positive",
+            ));
+        }
+        gamma.push(gamma_value);
         base_offset.push(fraction_signed(
             cursor.i32()?,
             cursor.u32()?,
@@ -458,7 +572,7 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
         }
     }
 
-    let metadata = UltraHdrGainMapMetadata {
+    Ok(UltraHdrGainMapMetadata {
         gain_map_min: three(&gain_min),
         gain_map_max: three(&gain_max),
         gamma: three(&gamma),
@@ -469,9 +583,19 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
         channel_count,
         use_base_color_space,
         uses_iso_colorimetry: true,
-    };
-    metadata.validate()?;
-    Ok(metadata)
+        iso_payload: Some(payload[..cursor.position].to_vec()),
+    })
+}
+
+/// Check the actual HEIF metadata bytes after a writer has changed representation.
+pub(crate) fn validate_tmap_payload(payload: &[u8]) -> Result<()> {
+    if payload.first() != Some(&0) {
+        return Err(MetadataError::invalid(
+            ISO_CONTEXT,
+            "unsupported HEIF tone-map version",
+        ));
+    }
+    decode_iso_payload(&payload[1..]).map(|_| ())
 }
 
 fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
@@ -711,6 +835,70 @@ mod tests {
         assert_eq!(expected.offset_sdr, [-0.25; 3]);
         payload.extend_from_slice(&[0xff, 0xff, 1, 2, 3]);
         assert_eq!(decode_iso_payload(&payload).unwrap(), expected);
+    }
+
+    #[test]
+    fn exact_iso_ordering_and_headrooms_are_not_decided_by_f64() {
+        let mut payload = iso_payload(0);
+        for (offset, value) in [
+            (21, 2_147_483_646_u32),
+            (25, 2_147_483_647),
+            (29, 2_147_483_645),
+            (33, 2_147_483_646),
+        ] {
+            payload[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        assert!(decode_iso_payload(&payload)
+            .unwrap_err()
+            .to_string()
+            .contains("gainMapMin"));
+        // The reverse ordering is valid and must retain all rational bytes.
+        payload[21..25].copy_from_slice(&2_147_483_645_u32.to_be_bytes());
+        payload[25..29].copy_from_slice(&2_147_483_646_u32.to_be_bytes());
+        payload[29..33].copy_from_slice(&2_147_483_646_u32.to_be_bytes());
+        payload[33..37].copy_from_slice(&2_147_483_647_u32.to_be_bytes());
+        for (offset, value) in [
+            (5, 2_147_483_645_u32),
+            (9, 2_147_483_646),
+            (13, 2_147_483_646),
+            (17, 2_147_483_647),
+        ] {
+            payload[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        let metadata = decode_iso_payload(&payload).unwrap();
+        assert_eq!(metadata.hdr_capacity_min, metadata.hdr_capacity_max);
+        assert!(metadata.to_info_floats().is_err());
+        assert_eq!(&metadata.to_tmap_payload(false).unwrap()[1..], payload);
+        let xmp = String::from_utf8(metadata.to_hdrgm_xmp().unwrap()).unwrap();
+        assert!(xmp.contains("<hdrgm:HDRCapacityMin>0.9999999995343387122585798727"));
+        assert!(xmp.contains("<hdrgm:HDRCapacityMax>0.9999999995343387124754203075"));
+        let mut reverse = payload.clone();
+        reverse[5..13].copy_from_slice(&payload[13..21]);
+        reverse[13..21].copy_from_slice(&payload[5..13]);
+        let xmp = String::from_utf8(
+            decode_iso_payload(&reverse)
+                .unwrap()
+                .to_hdrgm_xmp()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(xmp.contains("<hdrgm:BaseRenditionIsHDR>True</hdrgm:BaseRenditionIsHDR>"));
+        let mut edited = metadata.clone();
+        edited.gamma[0] = 2.;
+        assert!(edited.to_tmap_payload(false).is_err());
+        // Equal values expressed with different denominators are still invalid.
+        payload[5..9].copy_from_slice(&1_u32.to_be_bytes());
+        payload[9..13].copy_from_slice(&2_u32.to_be_bytes());
+        payload[13..17].copy_from_slice(&2_u32.to_be_bytes());
+        payload[17..21].copy_from_slice(&4_u32.to_be_bytes());
+        assert!(decode_iso_payload(&payload).is_err());
+        // No canonical exp2 normalization may destroy otherwise valid ISO data.
+        payload[13..17].copy_from_slice(&u32::MAX.to_be_bytes());
+        payload[17..21].copy_from_slice(&1_u32.to_be_bytes());
+        payload[37..41].copy_from_slice(&u32::MAX.to_be_bytes());
+        let metadata = decode_iso_payload(&payload).unwrap();
+        assert_eq!(&metadata.to_tmap_payload(false).unwrap()[1..], payload);
+        assert!(metadata.to_hdrgm_xmp().is_ok());
     }
 
     #[test]

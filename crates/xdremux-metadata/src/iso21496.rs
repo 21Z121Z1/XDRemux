@@ -1,9 +1,5 @@
 use crate::{MetadataError, Result};
 
-const IMAGEIO_DENOMINATOR: i32 = 1 << 22;
-const IMAGEIO_DECIMAL_DENOMINATOR: f64 = 100_000.0;
-const NATIVE_RATIONAL_DENOMINATOR: i64 = 100_000;
-
 fn require_info_floats(values: &[f64]) -> Result<()> {
     if values.len() < 18 {
         return Err(MetadataError::invalid(
@@ -12,22 +8,6 @@ fn require_info_floats(values: &[f64]) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn swift_max(left: f64, right: f64) -> f64 {
-    if left < right {
-        right
-    } else {
-        left
-    }
-}
-
-fn safe_log2(value: f64) -> f64 {
-    if value > 0.0 {
-        value.log2()
-    } else {
-        0.0
-    }
 }
 
 fn push_i32_be(value: i32, output: &mut Vec<u8>) {
@@ -42,55 +22,142 @@ fn push_u32_be(value: u32, output: &mut Vec<u8>) {
     output.extend_from_slice(&value.to_be_bytes());
 }
 
-fn append_imageio_rational(value: f64, output: &mut Vec<u8>) {
-    if !value.is_finite() {
-        push_i32_be(0, output);
-        push_i32_be(1, output);
-        return;
+// Bounded continued fractions. Source ISO never goes through this projection.
+// Generated/XMP values must meet both wire bounds and the documented error
+// budget; a value that cannot be represented is an error, never a clamp.
+fn rational(value: f64, signed: bool) -> Result<(i64, u32)> {
+    let limit = if signed {
+        if value.is_sign_negative() {
+            1u64 << 31
+        } else {
+            i32::MAX as u64
+        }
+    } else {
+        u32::MAX as u64
+    };
+    if !value.is_finite() || (!signed && value < 0.0) || value.abs() > limit as f64 {
+        return Err(MetadataError::invalid(
+            "ISO 21496 tmap",
+            format!("rational value {value} is out of range"),
+        ));
     }
-
-    let rounded = value.round();
-    if (value - rounded).abs() < 1e-12
-        && rounded >= f64::from(i32::MIN)
-        && rounded <= f64::from(i32::MAX)
+    let x = value.abs();
+    let (mut p0, mut q0, mut p1, mut q1) = (0u64, 1u64, 1u64, 0u64);
+    let mut remainder = x;
+    loop {
+        let a = remainder.floor();
+        let k = (limit - p0).checked_div(p1).unwrap_or(u64::MAX).min(
+            (u64::from(u32::MAX) - q0)
+                .checked_div(q1)
+                .unwrap_or(u64::MAX),
+        );
+        if a > k as f64 {
+            let candidate = (p0 + k * p1, q0 + k * q1);
+            if candidate.1 != 0
+                && (q1 == 0
+                    || (candidate.0 as f64 / candidate.1 as f64 - x).abs()
+                        < (p1 as f64 / q1 as f64 - x).abs())
+            {
+                (p1, q1) = candidate;
+            }
+            break;
+        }
+        let a = a as u64;
+        let (p, q) = (p0 + a * p1, q0 + a * q1);
+        (p0, q0, p1, q1) = (p1, q1, p, q);
+        let fraction = remainder - a as f64;
+        if fraction == 0.0 || (p as f64 / q as f64 - x).abs() <= x * f64::EPSILON {
+            break;
+        }
+        remainder = 1.0 / fraction;
+    }
+    if q1 == 0
+        || (p1 as f64 / q1 as f64 - x).abs() > 1e-12_f64.max(x * 1e-9)
+        || (x > 0.0 && p1 == 0)
     {
-        push_i32_be(rounded as i32, output);
-        push_i32_be(1, output);
-        return;
-    }
-
-    let imageio_value = (value * IMAGEIO_DECIMAL_DENOMINATOR).round() / IMAGEIO_DECIMAL_DENOMINATOR;
-    let numerator = (imageio_value * f64::from(IMAGEIO_DENOMINATOR)).round();
-    let clamped = numerator.clamp(f64::from(i32::MIN), f64::from(i32::MAX));
-    push_i32_be(clamped as i32, output);
-    push_i32_be(IMAGEIO_DENOMINATOR, output);
-}
-
-fn append_native_unsigned_rational(value: f64, output: &mut Vec<u8>) -> Result<()> {
-    let rounded = (value * NATIVE_RATIONAL_DENOMINATOR as f64).round();
-    let non_negative = swift_max(0.0, rounded);
-    if !non_negative.is_finite() || non_negative > f64::from(u32::MAX) {
         return Err(MetadataError::invalid(
-            "ImageIO native tmap",
-            format!("unsigned rational value {value} is out of range"),
+            "ISO 21496 tmap",
+            format!("rational value {value} cannot meet the serialization error budget"),
         ));
     }
-    push_u32_be(non_negative as u32, output);
-    push_u32_be(NATIVE_RATIONAL_DENOMINATOR as u32, output);
+    Ok((
+        if value.is_sign_negative() {
+            -(p1 as i64)
+        } else {
+            p1 as i64
+        },
+        q1 as u32,
+    ))
+}
+
+fn append_rational(value: f64, signed: bool, output: &mut Vec<u8>) -> Result<()> {
+    let (numerator, denominator) = rational(value, signed)?;
+    if signed {
+        push_i32_be(numerator as i32, output);
+    } else {
+        push_u32_be(numerator as u32, output);
+    }
+    push_u32_be(denominator, output);
     Ok(())
 }
 
-fn append_native_signed_rational(value: f64, output: &mut Vec<u8>) -> Result<()> {
-    let rounded = (value * NATIVE_RATIONAL_DENOMINATOR as f64).round();
-    if !rounded.is_finite() || rounded < f64::from(i32::MIN) || rounded > f64::from(i32::MAX) {
+/// Serialize log-domain fields directly, without an exp2/log2 round trip.
+pub(crate) fn make_tmap_from_log_metadata(
+    metadata: &crate::UltraHdrGainMapMetadata,
+    use_base_colour_space: bool,
+) -> Result<Vec<u8>> {
+    make_log_tmap(
+        [metadata.hdr_capacity_min, metadata.hdr_capacity_max],
+        std::array::from_fn(|c| {
+            [
+                metadata.gain_map_min[c],
+                metadata.gain_map_max[c],
+                metadata.gamma[c],
+                metadata.offset_sdr[c],
+                metadata.offset_hdr[c],
+            ]
+        }),
+        use_base_colour_space,
+        metadata.channel_count,
+    )
+}
+
+pub(crate) fn make_log_tmap(
+    headrooms: [f64; 2],
+    channels: [[f64; 5]; 3],
+    use_base_colour_space: bool,
+    channel_count: u8,
+) -> Result<Vec<u8>> {
+    if !matches!(channel_count, 1 | 3)
+        || (channel_count == 1 && (channels[1] != channels[0] || channels[2] != channels[0]))
+    {
         return Err(MetadataError::invalid(
-            "ImageIO native tmap",
-            format!("signed rational value {value} is out of range"),
+            "ISO 21496 tmap",
+            "metadata channel count does not match its parameters",
         ));
     }
-    push_i32_be(rounded as i32, output);
-    push_u32_be(NATIVE_RATIONAL_DENOMINATOR as u32, output);
-    Ok(())
+    let flags =
+        if channel_count == 3 { 0x80 } else { 0 } | if use_base_colour_space { 0x40 } else { 0 };
+    let mut output = vec![0];
+    push_u16_be(0, &mut output);
+    push_u16_be(0, &mut output);
+    output.push(flags);
+    for headroom in headrooms {
+        append_rational(headroom, false, &mut output)?;
+    }
+    for channel in channels.into_iter().take(usize::from(channel_count)) {
+        if channel[0] > channel[1] || channel[2] <= 0.0 {
+            return Err(MetadataError::invalid(
+                "ISO 21496 tmap",
+                "invalid gain interval or gamma",
+            ));
+        }
+        for (i, value) in channel.into_iter().enumerate() {
+            append_rational(value, i != 2, &mut output)?;
+        }
+    }
+    crate::ultrahdr_jpeg::validate_tmap_payload(&output)?;
+    Ok(output)
 }
 
 fn canonical_channel_values(info: &[f64], channel: usize) -> Result<[f64; 5]> {
@@ -124,17 +191,24 @@ fn canonical_channel_values(info: &[f64], channel: usize) -> Result<[f64; 5]> {
     ])
 }
 
-fn canonical_first_channel_values(info: &[f64]) -> Result<[f64; 7]> {
-    let [gain_min, gain_max, gamma, base_offset, alt_offset] = canonical_channel_values(info, 0)?;
-    Ok([
-        swift_max(swift_max(info[16], 1.0).log2(), 0.0),
-        swift_max(info[17], 1.0).log2(),
-        gain_min,
-        gain_max,
-        gamma,
-        base_offset,
-        alt_offset,
-    ])
+fn canonical_headrooms(info: &[f64]) -> Result<[f64; 2]> {
+    require_info_floats(info)?;
+    if [info[16], info[17]]
+        .iter()
+        .any(|v| !v.is_finite() || *v < 1.0)
+    {
+        return Err(MetadataError::invalid(
+            "ISO 21496 tmap",
+            "headroom ratios must be finite and at least one",
+        ));
+    }
+    if info[16] == info[17] {
+        return Err(MetadataError::invalid(
+            "ISO 21496 tmap",
+            "baseline and alternate HDR headrooms must differ",
+        ));
+    }
+    Ok([info[16].log2(), info[17].log2()])
 }
 
 /// Generate an ISO 21496-1:2025 GainMapMetadata payload inside HEIF tmap.
@@ -170,60 +244,19 @@ pub fn make_apple_tmap_payload_with_channel_count(
     use_base_colour_space: bool,
     channel_count: u8,
 ) -> Result<Vec<u8>> {
-    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
+    let headrooms = canonical_headrooms(info)?;
     let channels = [
         canonical_channel_values(info, 0)?,
         canonical_channel_values(info, 1)?,
         canonical_channel_values(info, 2)?,
     ];
-    if !matches!(channel_count, 1 | 3)
-        || (channel_count == 1 && (channels[1] != channels[0] || channels[2] != channels[0]))
-    {
-        return Err(MetadataError::invalid(
-            "ISO 21496 tmap",
-            "metadata channel count does not match its parameters",
-        ));
-    }
-    let multichannel = channel_count == 3;
-    let flags = if multichannel { 0x80 } else { 0 } | if use_base_colour_space { 0x40 } else { 0 };
-    let mut output = vec![0, 0, 0, 0, 0, flags];
-    append_imageio_rational(cap_min, &mut output);
-    append_imageio_rational(cap_max, &mut output);
-    for [gain_min, gain_max, gamma, base_offset, alt_offset] in
-        channels.into_iter().take(if multichannel { 3 } else { 1 })
-    {
-        for value in [gain_min, gain_max, gamma, base_offset, alt_offset] {
-            append_imageio_rational(value, &mut output);
-        }
-    }
-    debug_assert_eq!(output.len(), if multichannel { 142 } else { 62 });
-    Ok(output)
+    make_log_tmap(headrooms, channels, use_base_colour_space, channel_count)
 }
 
-/// Generate a 142-byte three-channel ImageIO-native compatibility payload.
-/// Unlike the historical writer, preserve each channel's actual parameters.
+/// Generate three metadata component records for ImageIO consumers.
+/// Uses the same checked signed/unsigned rational writer as the standard path.
 pub fn make_imageio_native_tmap_payload(info: &[f64]) -> Result<Vec<u8>> {
-    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
-
-    let mut output = Vec::with_capacity(142);
-    output.push(0);
-    push_u16_be(0, &mut output);
-    push_u16_be(0, &mut output);
-    output.push(0xC0);
-    append_native_unsigned_rational(cap_min, &mut output)?;
-    append_native_unsigned_rational(cap_max, &mut output)?;
-
-    for channel in 0..3 {
-        let [gain_min, gain_max, gamma, base_offset, alt_offset] =
-            canonical_channel_values(info, channel)?;
-        append_native_signed_rational(gain_min, &mut output)?;
-        append_native_signed_rational(gain_max, &mut output)?;
-        append_native_unsigned_rational(gamma, &mut output)?;
-        append_native_signed_rational(base_offset, &mut output)?;
-        append_native_signed_rational(alt_offset, &mut output)?;
-    }
-    debug_assert_eq!(output.len(), 142);
-    Ok(output)
+    make_apple_tmap_payload_with_channel_count(info, true, 3)
 }
 
 /// Legacy padded metadata helper retained for compatibility with older diagnostics.
@@ -247,25 +280,63 @@ pub fn make_strict_tmap_payload(payload: &[u8]) -> Result<Vec<u8>> {
 
 /// Serialize `hdrgm` XMP with the source's base/alternate direction and offsets.
 pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
-    require_info_floats(info)?;
-    let gain_min = [safe_log2(info[0]), safe_log2(info[1]), safe_log2(info[2])];
-    let gain_max = [safe_log2(info[4]), safe_log2(info[5]), safe_log2(info[6])];
-    let gamma = [info[7], info[8], info[9]];
-    let base_is_hdr = info[16] > info[17];
-    let base_offset = [info[10], info[11], info[12]];
-    let alternate_offset = [info[13], info[14], info[15]];
+    let headrooms = canonical_headrooms(info)?;
+    let c = [
+        canonical_channel_values(info, 0)?,
+        canonical_channel_values(info, 1)?,
+        canonical_channel_values(info, 2)?,
+    ];
+    Ok(write_hdrgm_xmp(
+        std::array::from_fn(|i| c[i][0]),
+        std::array::from_fn(|i| c[i][1]),
+        std::array::from_fn(|i| c[i][2]),
+        [
+            std::array::from_fn(|i| c[i][3]),
+            std::array::from_fn(|i| c[i][4]),
+        ],
+        headrooms,
+    ))
+}
+
+pub(crate) fn write_hdrgm_xmp(
+    gain_min: [f64; 3],
+    gain_max: [f64; 3],
+    gamma: [f64; 3],
+    offsets: [[f64; 3]; 2],
+    headrooms: [f64; 2],
+) -> Vec<u8> {
+    let base_is_hdr = headrooms[0] > headrooms[1];
+    write_hdrgm_xmp_with_headrooms(
+        gain_min,
+        gain_max,
+        gamma,
+        offsets,
+        headrooms.map(|v| v.to_string()),
+        base_is_hdr,
+    )
+}
+
+pub(crate) fn write_hdrgm_xmp_with_headrooms(
+    gain_min: [f64; 3],
+    gain_max: [f64; 3],
+    gamma: [f64; 3],
+    offsets: [[f64; 3]; 2],
+    headrooms: [String; 2],
+    base_is_hdr: bool,
+) -> Vec<u8> {
     let (offset_sdr, offset_hdr) = if base_is_hdr {
-        (alternate_offset, base_offset)
+        (offsets[1], offsets[0])
     } else {
-        (base_offset, alternate_offset)
+        (offsets[0], offsets[1])
     };
-    let base_headroom = swift_max(safe_log2(info[16]), 0.0);
-    let alternate_headroom = swift_max(safe_log2(info[17]), 0.0);
-    let cap_min = base_headroom.min(alternate_headroom);
-    let cap_max = base_headroom.max(alternate_headroom);
+    let (cap_min, cap_max) = if base_is_hdr {
+        (&headrooms[1], &headrooms[0])
+    } else {
+        (&headrooms[0], &headrooms[1])
+    };
 
     fn format_three(values: [f64; 3]) -> String {
-        format!("{:.6} {:.6} {:.6}", values[0], values[1], values[2])
+        format!("{} {} {}", values[0], values[1], values[2])
     }
 
     let xml = format!(
@@ -283,8 +354,8 @@ pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
             "         <hdrgm:Gamma>{}</hdrgm:Gamma>\n",
             "         <hdrgm:OffsetSDR>{}</hdrgm:OffsetSDR>\n",
             "         <hdrgm:OffsetHDR>{}</hdrgm:OffsetHDR>\n",
-            "         <hdrgm:HDRCapacityMin>{:.6}</hdrgm:HDRCapacityMin>\n",
-            "         <hdrgm:HDRCapacityMax>{:.6}</hdrgm:HDRCapacityMax>\n",
+            "         <hdrgm:HDRCapacityMin>{}</hdrgm:HDRCapacityMin>\n",
+            "         <hdrgm:HDRCapacityMax>{}</hdrgm:HDRCapacityMax>\n",
             "         <hdrgm:BaseRenditionIsHDR>{}</hdrgm:BaseRenditionIsHDR>\n",
             "      </rdf:Description>\n",
             "   </rdf:RDF>\n",
@@ -300,7 +371,7 @@ pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
         cap_max,
         if base_is_hdr { "True" } else { "False" },
     );
-    Ok(xml.into_bytes())
+    xml.into_bytes()
 }
 
 #[cfg(test)]
@@ -315,14 +386,56 @@ mod tests {
         ]
     }
 
+    fn read_rational(bytes: &[u8], offset: usize, signed: bool) -> f64 {
+        let raw: [u8; 4] = bytes[offset..offset + 4].try_into().unwrap();
+        let n = if signed {
+            f64::from(i32::from_be_bytes(raw))
+        } else {
+            f64::from(u32::from_be_bytes(raw))
+        };
+        n / f64::from(u32::from_be_bytes(
+            bytes[offset + 4..offset + 8].try_into().unwrap(),
+        ))
+    }
+
     #[test]
-    fn apple_tmap_matches_current_swift_golden_bytes() {
-        let bytes = make_apple_tmap_payload(&canonical_sample()).unwrap();
-        let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    fn generated_tmap_preserves_values_with_a_bounded_rational_error() {
+        let mut info = canonical_sample();
+        info[17] = 2_f64.powf(1e-6);
+        info[7..10].fill(600.1);
+        info[10..13].fill(1. / 64.);
+        let bytes = make_apple_tmap_payload(&info).unwrap();
+        assert!((read_rational(&bytes, 14, false) - 1e-6).abs() < 1e-12);
+        assert_eq!(read_rational(&bytes, 38, false), 600.1);
+        assert_eq!(read_rational(&bytes, 46, true), 1. / 64.);
+        let sample = make_apple_tmap_payload(&canonical_sample()).unwrap();
+        assert!((read_rational(&sample, 30, true) - canonical_sample()[4].log2()).abs() < 1e-9);
+        for value in [
+            f64::NAN,
+            f64::INFINITY,
+            -1.,
+            1e-20,
+            f64::from(u32::MAX) + 1.,
+        ] {
+            info[7..10].fill(value);
+            assert!(make_apple_tmap_payload(&info).is_err(), "gamma {value}");
+            assert!(
+                make_imageio_native_tmap_payload(&info).is_err(),
+                "gamma {value}"
+            );
+        }
+        info[7..10].fill(3_000_000_000.);
         assert_eq!(
-            hex,
-            "000000000040000000000000000100933a9300400000000000000000000100933a9300400000000000010000000100000000000000010000000000000001"
+            read_rational(&make_apple_tmap_payload(&info).unwrap(), 38, false),
+            3_000_000_000.
         );
+        info[17] = 1.;
+        assert!(
+            make_apple_tmap_payload(&info).is_err(),
+            "equal emitted headrooms must fail"
+        );
+        info[17] = f64::NAN;
+        assert!(make_apple_tmap_payload(&info).is_err());
     }
 
     #[test]
@@ -341,8 +454,8 @@ mod tests {
             1.5, 6.5, 2.0, 0.0,
         ];
         let xmp = String::from_utf8(make_hdrgm_xmp(&info).unwrap()).unwrap();
-        assert!(xmp.contains("0.321928 0.584963 0.807355"));
-        assert!(xmp.contains("2.000000 2.321928 2.584963"));
+        assert!(xmp.contains("0.32192809488736235 0.5849625007211562 0.8073549220576041"));
+        assert!(xmp.contains("2 2.321928094887362 2.584962500721156"));
         let multichannel = make_apple_tmap_payload(&info).unwrap();
         assert_eq!(multichannel.len(), 142);
         assert_eq!(multichannel[5], 0xc0);
@@ -357,10 +470,10 @@ mod tests {
         info[13..16].fill(0.01);
         let xmp = String::from_utf8(make_hdrgm_xmp(&info).unwrap()).unwrap();
         assert!(xmp.contains("<hdrgm:BaseRenditionIsHDR>True</hdrgm:BaseRenditionIsHDR>"));
-        assert!(xmp.contains("<hdrgm:HDRCapacityMin>0.000000</hdrgm:HDRCapacityMin>"));
-        assert!(xmp.contains("<hdrgm:HDRCapacityMax>2.000000</hdrgm:HDRCapacityMax>"));
-        assert!(xmp.contains("<hdrgm:OffsetSDR>0.010000 0.010000 0.010000</hdrgm:OffsetSDR>"));
-        assert!(xmp.contains("<hdrgm:OffsetHDR>0.020000 0.020000 0.020000</hdrgm:OffsetHDR>"));
+        assert!(xmp.contains("<hdrgm:HDRCapacityMin>0</hdrgm:HDRCapacityMin>"));
+        assert!(xmp.contains("<hdrgm:HDRCapacityMax>2</hdrgm:HDRCapacityMax>"));
+        assert!(xmp.contains("<hdrgm:OffsetSDR>0.01 0.01 0.01</hdrgm:OffsetSDR>"));
+        assert!(xmp.contains("<hdrgm:OffsetHDR>0.02 0.02 0.02</hdrgm:OffsetHDR>"));
         let iso = make_apple_tmap_payload(&info).unwrap();
         assert_eq!(iso[5], 0x40);
         assert_eq!(i32::from_be_bytes(iso[6..10].try_into().unwrap()), 2);

@@ -18,8 +18,7 @@ use xdremux_heif::{
     GainMapTile, IsoGainMapAssembly,
 };
 use xdremux_metadata::{
-    make_apple_tmap_payload_with_channel_count, make_hdrgm_xmp, parse_ultrahdr_gain_map_metadata,
-    validate_iso_alternate_icc, UltraHdrGainMapMetadata,
+    parse_ultrahdr_gain_map_metadata, validate_iso_alternate_icc, UltraHdrGainMapMetadata,
 };
 use xdremux_motion_photo::{
     apple, build_live_photo_jpeg_exif, companion_video_path, parse_first_lpex_object,
@@ -268,22 +267,18 @@ fn assemble_jpeg_gain_map(
         ))
         .map_err(|error| RuntimeError::external("Ultra HDR HEVC Gain Map encode", error))?;
 
-    let info = gain
-        .metadata
-        .to_info_floats()
-        .map_err(|error| RuntimeError::external("Ultra HDR metadata normalization", error))?;
     // ISO 21496-1 C.4.7: without an alternate ICC the application primaries
     // are the base primaries, including when the source flag is zero. The
     // HEIF writer may choose a new alternate encoding, but must not move the
     // per-channel gain operation into that new space.
     let use_base_colour_space = gain.metadata.use_base_color_space || alternate_icc.is_none();
-    let tmap_payload = make_apple_tmap_payload_with_channel_count(
-        &info,
-        use_base_colour_space,
-        gain.metadata.channel_count,
-    )
-    .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
-    let xmp_payload = make_hdrgm_xmp(&info)
+    let tmap_payload = gain
+        .metadata
+        .to_tmap_payload(use_base_colour_space)
+        .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
+    let xmp_payload = gain
+        .metadata
+        .to_hdrgm_xmp()
         .map_err(|error| RuntimeError::external("Ultra HDR hdrgm XMP", error))?;
     let tiles = encoded
         .tiles
@@ -721,31 +716,49 @@ mod tests {
                 gain_jpeg.extend_from_slice(&u16::try_from(app2.len() + 2).unwrap().to_be_bytes());
                 gain_jpeg.extend_from_slice(&app2);
             }
+            let mut info = [0.; 20];
+            info[..3].fill(1.);
+            info[4..7].fill(4.);
+            info[7..10].fill(1.);
+            // A real SDR alternate exercises the decreasing-headroom case.
+            info[16] = if is_iso && alternate_icc.is_some() {
+                4.
+            } else {
+                1.
+            };
+            info[17] = if is_iso && alternate_icc.is_some() {
+                1.
+            } else {
+                4.
+            };
+            let (marker, mut app2) = if is_iso {
+                let tmap =
+                    xdremux_metadata::make_apple_tmap_payload_with_colour_space(&info, false)
+                        .unwrap();
+                (
+                    0xe2,
+                    [b"urn:iso:std:iso:ts:21496:-1\0".as_slice(), &tmap[1..]].concat(),
+                )
+            } else {
+                (
+                    0xe1,
+                    [
+                        b"http://ns.adobe.com/xap/1.0/\0".as_slice(),
+                        &xdremux_metadata::make_hdrgm_xmp(&info).unwrap(),
+                    ]
+                    .concat(),
+                )
+            };
+            gain_jpeg.extend_from_slice(&[0xff, marker]);
+            gain_jpeg.extend_from_slice(&u16::try_from(app2.len() + 2).unwrap().to_be_bytes());
+            gain_jpeg.append(&mut app2);
             gain_jpeg.extend_from_slice(&jpeg[2..]);
+            let metadata = parse_ultrahdr_gain_map_metadata(&gain_jpeg)
+                .unwrap()
+                .unwrap();
             let gain = ValidatedGainJpeg {
                 bytes: &gain_jpeg,
-                metadata: UltraHdrGainMapMetadata {
-                    gain_map_min: [0.0; 3],
-                    gain_map_max: [2.0; 3],
-                    gamma: [1.0; 3],
-                    offset_sdr: [0.0; 3],
-                    offset_hdr: [0.0; 3],
-                    // This real ICC describes an SDR alternate, so the ISO
-                    // HDR -> SDR case does not require a CICP tag on it.
-                    hdr_capacity_min: if is_iso && alternate_icc.is_some() {
-                        2.0
-                    } else {
-                        0.0
-                    },
-                    hdr_capacity_max: if is_iso && alternate_icc.is_some() {
-                        0.0
-                    } else {
-                        2.0
-                    },
-                    channel_count: 1,
-                    use_base_color_space: !is_iso,
-                    uses_iso_colorimetry: is_iso,
-                },
+                metadata,
             };
             let output = assemble_jpeg_gain_map(
                 &ZuneJpegProvider::new(),

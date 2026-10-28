@@ -219,12 +219,24 @@ fn invalid_iso_with_valid_xmp_fails_before_publication_even_without_a_gain_map_m
     inverted[21..25].copy_from_slice(&2_i32.to_be_bytes());
     let mut equal_headrooms = valid.clone();
     equal_headrooms[13..17].fill(0);
+    // These unequal fractions collapse to the same f64. Validate the source
+    // ordering before any floating-point conversion.
+    let mut rounded_inversion = valid.clone();
+    for (offset, value) in [
+        (21, 2_147_483_646_u32),
+        (25, 2_147_483_647),
+        (29, 2_147_483_645),
+        (33, 2_147_483_646),
+    ] {
+        rounded_inversion[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
     for payload in [
         &valid[..4],
         &unknown,
         &reserved,
         &inverted,
         &equal_headrooms,
+        &rounded_inversion,
     ] {
         for mapped in [true, false] {
             let source = motion_source(&gain_jpeg(Some(payload), XMP, None), mapped);
@@ -254,6 +266,49 @@ fn invalid_iso_with_valid_xmp_fails_before_publication_even_without_a_gain_map_m
 }
 
 #[test]
+fn iso_rationals_survive_public_conversion_without_rounding_or_clamping() {
+    let mut iso = iso_payload();
+    // Tiny but distinct headroom, an unsigned gamma beyond the old fixed
+    // denominator's range, and an exactly representable binary offset.
+    for (offset, value) in [(13, 1_u32), (17, 1_000_000)] {
+        iso[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    for channel in 0..3 {
+        for (offset, value) in [(37, 6001_u32), (41, 10), (45, 1), (49, 64)] {
+            let start = offset + channel * 40;
+            iso[start..start + 4].copy_from_slice(&value.to_be_bytes());
+        }
+    }
+    let source = motion_source(&gain_jpeg(Some(&iso), XMP, None), true);
+    let work = tempfile::tempdir().unwrap();
+    let input = work.path().join("source.jpg");
+    fs::write(&input, &source).unwrap();
+    let receipt = PortableRuntime::new()
+        .convert_motion_photo_file(&source, &input, work.path().join("capture.heic"))
+        .unwrap();
+    let output = fs::read(receipt.image).unwrap();
+    let graph = validate_gain_map_structure(&output).unwrap();
+    let top = scan_top_level_boxes(&output).unwrap();
+    let meta = parse_meta_box(&output, top.boxes.iter().find(|b| b.kind == META).unwrap()).unwrap();
+    let location = meta
+        .iloc
+        .entries
+        .iter()
+        .find(|e| e.item_id == graph.tmap_item_id)
+        .unwrap();
+    let tmap = read_item_payload(&output, location, meta.idat.as_ref()).unwrap();
+    // C.4.7 changes only the application-space flag when alternate ICC is absent.
+    let mut expected = vec![0];
+    expected.extend_from_slice(&iso);
+    expected[5] |= 0x40;
+    assert_eq!(
+        tmap, expected,
+        "source rational pairs must be preserved exactly"
+    );
+    assert_eq!(fs::read(input).unwrap(), source);
+}
+
+#[test]
 fn samsung_dual_metadata_fixtures_select_iso_on_the_located_gain_jpeg() {
     for number in ["01", "02"] {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
@@ -278,8 +333,20 @@ fn samsung_dual_metadata_fixtures_select_iso_on_the_located_gain_jpeg() {
 #[test]
 fn damaged_iso_alternate_icc_cannot_be_published_as_a_profile_or_replaced_with_a_guessed_gamut() {
     let iso = iso_payload();
+    let mut incomplete = vec![0; 156];
+    incomplete[..4].copy_from_slice(&156_u32.to_be_bytes());
+    incomplete[8..10].copy_from_slice(&[4, 0x40]);
+    incomplete[12..24].copy_from_slice(b"mntrRGB XYZ ");
+    incomplete[36..40].copy_from_slice(b"acsp");
+    incomplete[128..144].copy_from_slice(&[
+        0, 0, 0, 1, b'c', b'i', b'c', b'p', 0, 0, 0, 144, 0, 0, 0, 12,
+    ]);
+    incomplete[144..].copy_from_slice(b"cicp\0\0\0\0\x09\x10\0\x01");
+    let conflicting = srgb_with_cicp([9, 16, 0, 1]);
     for icc in [
         b"broken ICC".as_slice(),
+        &incomplete,
+        &conflicting,
         &jpeg_icc_profile(&fixture()).unwrap().unwrap(),
     ] {
         let source = motion_source(&gain_jpeg(Some(&iso), XMP, Some(icc)), true);
@@ -297,19 +364,32 @@ fn damaged_iso_alternate_icc_cannot_be_published_as_a_profile_or_replaced_with_a
     }
 }
 
+fn srgb_with_cicp(codes: [u8; 4]) -> Vec<u8> {
+    let srgb = include_bytes!("../../xdremux-codec/src/portable/srgb.icc");
+    let count = u32::from_be_bytes(srgb[128..132].try_into().unwrap()) as usize;
+    let table_end = 132 + 12 * count;
+    let mut bytes = srgb[..table_end].to_vec();
+    bytes.extend_from_slice(b"cicp");
+    bytes.extend_from_slice(&u32::try_from(srgb.len() + 12).unwrap().to_be_bytes());
+    bytes.extend_from_slice(&12_u32.to_be_bytes());
+    bytes.extend_from_slice(&srgb[table_end..]);
+    for i in 0..count {
+        let at = 136 + i * 12;
+        let offset = u32::from_be_bytes(bytes[at..at + 4].try_into().unwrap());
+        bytes[at..at + 4].copy_from_slice(&(offset + 12).to_be_bytes());
+    }
+    bytes.extend_from_slice(b"cicp\0\0\0\0");
+    bytes.extend_from_slice(&codes);
+    let size = u32::try_from(bytes.len()).unwrap();
+    bytes[..4].copy_from_slice(&size.to_be_bytes());
+    bytes[128..132].copy_from_slice(&u32::try_from(count + 1).unwrap().to_be_bytes());
+    bytes
+}
+
 #[test]
-fn iso_cicp_admission_profile_reaches_tmap_without_changing_gain_compression() {
-    // A serialized admission-test header with a single CICP tag. It has no
-    // transform tables and establishes byte routing, not native ICC validity.
-    let mut profile = vec![0; 156];
-    profile[..4].copy_from_slice(&156_u32.to_be_bytes());
-    profile[8..10].copy_from_slice(&[4, 0x40]);
-    profile[12..24].copy_from_slice(b"mntrRGB XYZ ");
-    profile[36..40].copy_from_slice(b"acsp");
-    profile[128..144].copy_from_slice(&[
-        0, 0, 0, 1, b'c', b'i', b'c', b'p', 0, 0, 0, 144, 0, 0, 0, 12,
-    ]);
-    profile[144..].copy_from_slice(b"cicp\0\0\0\0\x09\x10\0\x01");
+fn consistent_icc_reaches_tmap_without_changing_gain_compression() {
+    // Complete sRGB transform with matching CICP, rather than a CICP-only header.
+    let profile = srgb_with_cicp([1, 13, 0, 1]);
     let source = motion_source(&gain_jpeg(Some(&iso_payload()), XMP, Some(&profile)), true);
     let work = tempfile::tempdir().unwrap();
     let input = work.path().join("source.jpg");
