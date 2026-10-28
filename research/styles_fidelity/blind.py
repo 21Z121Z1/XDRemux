@@ -15,7 +15,7 @@ import numpy as np
 
 from scripts.apple.check_style_tone_response import prepare_consumer_compatibility, PINNED_RESEARCH_REVISION
 from . import corpus, isolate, native
-from .texture import primitive, run
+from .texture import measurement_host, primitive, run
 
 TONES = (-0.5, 0.0, 0.5)
 DEFAULT = {'baseline_scale': 1.0, 'gain_scale': 1.0, 'baseline_maximum': 10.4}
@@ -92,10 +92,13 @@ def extract(compatibility: Path, photo: Path, output: Path):
 
 
 def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, root: Path,
-              *, color_supported=None):
+              *, color_supported=None, observations=None):
     resources = root / 'resources'
     extract(compatibility, source, resources)
     outputs, control_facts = {}, []
+    if observations is None:
+        observations = {}
+    observations.update({'controls': control_facts, 'remove_style_executed': False})
     controls = [(tone, 0.0) for tone in TONES]
     # Probe real input keys; an unavailable Color axis is reported, never synthesized.
     index = 0
@@ -112,6 +115,7 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
                 and t.get('output', {}).get('nonfinite') == 0 for t in facts.get('trials', [])):
             raise ValueError('native renderer failed: ' + str(facts.get('exception', facts.get('trials'))))
         available = facts.get('color_bias_supported') is True
+        observations['color_supported'] = available
         if color_supported is not None and available != color_supported:
             raise ValueError('native Color capability changed between reference and rebuilt file')
         if index == 0:
@@ -123,6 +127,8 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
         control_facts.append({'tone': tone, 'color': color, 'native_color_control': available,
                               'thumbnail_mode': facts['thumbnail_mode']})
         index += 1
+    neutral = outputs['tone=0,color=0']
+    observations['response_from_neutral'] = {key: score(neutral, value) for key, value in outputs.items()}
     facts = primitive(adapter, 'styles-decode-reverse', source, resources,
                       max_edge=512, supported_metadata_versions=[8, 9, 15, 16])
     width, height = facts['unstyled']['width'], facts['unstyled']['height']
@@ -130,8 +136,8 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
     if raw.size != width * height * 4 or not np.isfinite(raw).all():
         raise ValueError('invalid native remove-style result')
     outputs['remove-style'] = raw.reshape(height, width, 4)[..., :3].copy()
-    return outputs, {'controls': control_facts, 'color_supported': color_supported,
-                     'remove_style_executed': True}
+    observations['remove_style_executed'] = True
+    return outputs, observations
 
 
 def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headroom: float, calibration: dict,
@@ -185,6 +191,8 @@ def main(argv=None):
               'samples': [], 'selected': None,
               'scope': 'same-photo native edit equivalence; public semantic-Standard controls; no Photos device claim'}
     try:
+        report['host'] = measurement_host(adapter)
+        report['experiment_sha256'] = isolate.sha(Path(__file__).read_bytes())
         with tempfile.TemporaryDirectory(prefix='blind-fit-', dir=output) as temporary:
             work = Path(temporary)
             renderer, compatibility, report['renderer'] = prepare_renderer(args.research_root.resolve(), work)
@@ -220,8 +228,9 @@ def main(argv=None):
                 if case['sample']['split'] == 'calibration':
                     refs = case['root'] / 'reference'
                     refs.mkdir()
+                    case['sample']['edit_controls'] = {}
                     case['reference'], case['sample']['edit_controls'] = responses(adapter, renderer,
-                        compatibility, case['source'], refs)
+                        compatibility, case['source'], refs, observations=case['sample']['edit_controls'])
             calibrations = [DEFAULT, *({'baseline_scale': b, 'gain_scale': g, 'baseline_maximum': 64.0}
                 for b, g in itertools.product((.75, 1.0, 1.25), repeat=2))]
             for index, calibration in enumerate(calibrations):

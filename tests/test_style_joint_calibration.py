@@ -1,10 +1,14 @@
 import copy
+import json
+from pathlib import Path
+import sys
+import tempfile
 import unittest
 
 import numpy as np
 
 from research.styles_fidelity.blind import choose_candidate, score
-from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person
+from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person, run
 
 
 class JointCalibrationTests(unittest.TestCase):
@@ -65,6 +69,19 @@ class JointCalibrationTests(unittest.TestCase):
             self.assertEqual(result['statistics_compared_fields'], 1)
             self.assertEqual(result['statistics_maximum_absolute_difference'], expected)
             self.assertEqual(result['statistics_group'], group)
+
+    def test_native_failure_retains_report_reason_without_exporting_person_geometry(self):
+        with tempfile.TemporaryDirectory() as root:
+            report = Path(root) / 'native.json'
+            report.write_text(json.dumps({'stage': 'setup',
+                'exception': {'name': 'NativeInput', 'reason': 'missing required effect input'},
+                'person_before_stats': {'faceLandmarks': ['private geometry']}}))
+            with self.assertRaises(RuntimeError) as failure:
+                run([sys.executable, '-c', 'raise SystemExit(1)'], diagnostic=report)
+            self.assertIn('exited 1', str(failure.exception))
+            self.assertIn('missing required effect input', str(failure.exception))
+            self.assertNotIn('faceLandmarks', str(failure.exception))
+            self.assertNotIn('private geometry', str(failure.exception))
 
 
 if __name__ == '__main__':

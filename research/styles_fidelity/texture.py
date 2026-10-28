@@ -9,6 +9,7 @@ import json
 import math
 import os
 from pathlib import Path
+import platform
 import subprocess
 import sys
 import tempfile
@@ -54,11 +55,23 @@ def area_rgba(source, width, height):
     return result
 
 
-def run(command, *, env=None, timeout=300):
+def run(command, *, env=None, timeout=300, diagnostic=None):
     result = subprocess.run([str(v) for v in command], capture_output=True, timeout=timeout, env=env)
     if result.returncode:
+        details = {}
+        if diagnostic is not None and diagnostic.is_file():
+            try:
+                report = json.loads(diagnostic.read_text())
+                keys = ('stage', 'exception', 'producer_effect', 'person_index', 'native_effect_name',
+                        'setup', 'prewarm', 'prepareToProcess:', 'calculateStats', 'process',
+                        'finishProcessing', 'native_call_order', 'image_pixels', 'native_GPU_execution')
+                details = {key: report[key] for key in keys if key in report}
+            except (ValueError, OSError) as error:
+                details = {'report_read_error': str(error)}
         raise RuntimeError(f'{Path(command[0]).name} exited {result.returncode}: '
-                           + result.stderr.decode(errors='replace')[-1600:])
+                           + result.stderr.decode(errors='replace')[-1600:]
+                           + '; stdout: ' + result.stdout.decode(errors='replace')[-1600:]
+                           + '; native report: ' + json.dumps(details, allow_nan=False))
     return result
 
 
@@ -68,8 +81,19 @@ def primitive(adapter: Path, operation: str, source: Path, output: Path, **confi
     result = subprocess.run([str(adapter)], input=(json.dumps(request) + '\n').encode(),
                             capture_output=True, timeout=300)
     if result.returncode:
-        raise RuntimeError(operation + ': ' + result.stderr.decode(errors='replace')[-1200:])
+        raise RuntimeError(f'{operation} exited {result.returncode}: '
+                           + result.stderr.decode(errors='replace')[-3000:]
+                           + '; stdout: ' + result.stdout.decode(errors='replace')[-1600:])
     return json.loads(result.stdout)
+
+
+def measurement_host(adapter: Path):
+    facts = {'system': platform.system(), 'release': platform.release(),
+             'architecture': platform.machine(), 'adapter_sha256': sha(adapter.read_bytes())}
+    if facts['system'] == 'Darwin':
+        facts['os_build'] = run(['sw_vers', '-buildVersion']).stdout.decode().strip()
+        facts['sdk_version'] = run(['xcrun', '--show-sdk-version']).stdout.decode().strip()
+    return facts
 
 
 def pixel_person(person: dict, width: int, height: int) -> dict:
@@ -145,6 +169,14 @@ def prepare_tools(research: Path, output: Path):
                 NSDictionary *existing=storedPerson[@"imageStats"][statisticsGroup];
                 if(existing && ![NSProcessInfo.processInfo.environment[@"TEXTURE_RECOMPUTE_FINAL_STATS"] boolValue])
                     [nativeStats addEntriesFromDictionary:existing];
+''')
+    render_control = 'Call(effect, @"setSkipRendering:", @[@NO]);'
+    if source.count(render_control) != 1:
+        raise ValueError('pinned render control context changed')
+    source = source.replace(render_control, '''
+                    BOOL hasSkipControl=[effect respondsToSelector:NSSelectorFromString(@"setSkipRendering:")];
+                    report[@"render_skip_control_present"]=@(hasSkipControl);
+                    if(hasSkipControl) Call(effect,@"setSkipRendering:",@[@NO]);
 ''')
     person_anchor = 'NSDictionary *personDictionary = storedPerson ?: selected[@"native_person_without_stats"];'
     if source.count(person_anchor) != 1:
@@ -252,7 +284,7 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
             else:
                 environment.pop('TEXTURE_FINAL_LINEAR_RGBA16F', None)
             run([tools / 'replay', directory / 'working.png', output, '1', 'Studio', '0'],
-                env=environment)
+                env=environment, diagnostic=output)
             facts = json.loads(output.read_text())
             rendered = facts.get('rendered_pixels', {})
             passed = (facts.get('native_statistics_operations_completed') is True
@@ -305,6 +337,8 @@ def main(argv=None):
     output.mkdir(parents=True, exist_ok=False)
     report = {'schema': 'final-hdr-texture-replay-v1', 'cases': [], 'passed': False}
     try:
+        report['host'] = measurement_host(args.adapter.resolve())
+        report['experiment_sha256'] = sha(Path(__file__).read_bytes())
         with tempfile.TemporaryDirectory(prefix='texture-replay-', dir=output) as temporary:
             tools = Path(temporary)
             projector, report['producer'] = prepare_tools(args.research_root.resolve(), tools)
