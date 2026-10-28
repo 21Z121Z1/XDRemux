@@ -113,17 +113,23 @@ python3 -m research.styles_fidelity.blind \
 
 Every case must pass full native SDR/HDR input equivalence. Scene assignments are
 fixed before response evaluation. A default trial and a 3-by-3 exposure/gain grid
-are selected only by calibration-set native edit RMSE. The holdout is evaluated
-after selection. Reports include nonzero Tone, remove-style, and Color responses
-only when the native filter actually exposes a Color control. Missing Color
-support stays explicit. Numeric comparisons include shadow, midtone and highlight
-regions. A failed default cannot be waived by an alternative fit.
+are ranked only by calibration-set native forward Tone/Color RMSE. The holdout is
+evaluated after selection. Color runs only when the native filter exposes its
+control. Numeric comparisons include shadow, midtone and highlight regions.
+A failed default generation or forward render blocks selection.
+Native remove-style remains a separate required validation on the source and
+rebuilt files. Its failure does not discard independently completed forward
+measurements. Schema v2 distinguishes `forward_calibration_completed` from
+`native_reverse_validation_passed`; overall `passed` and the process exit remain
+failed when reversal fails. A forward-only candidate cannot establish complete
+reconstruction fidelity or be promoted to product defaults.
 The renderer uses the pinned `native-stage-mirror` path: native Apple Log decode,
 stored thumbnail gain and original-range limits precede the filter input.
 The probe's stored-code control path is excluded from calibration.
 The reverse probe compiles the current product's native primitive unchanged.
 Its owned caller converts a native assertion abort into a reported exception for
-diagnosis; the assertion still fails the case and cannot select a candidate.
+diagnosis; the assertion still fails native reverse validation and overall
+acceptance. The probe does not override the resource-cache implementation.
 
 The CI controls are the three published semantic-Standard `IMG_2600/2604/2608`
 files. Their Studio Texture metadata has no people, so it cannot activate a

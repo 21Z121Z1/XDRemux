@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from research.styles_fidelity.blind import choose_candidate, score
+from research.styles_fidelity.blind import choose_candidate, compare_reverse, score
 from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person, run, validate_working_input
 
 
@@ -23,6 +23,14 @@ class JointCalibrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             choose_candidate([{'passed': False, 'training_rmse': 0},
                               {'passed': True, 'training_rmse': float('nan')}])
+
+    def test_missing_native_reverse_is_failure_even_when_forward_values_are_available(self):
+        image = np.full((2, 2, 3), .5, dtype='f4')
+        self.assertFalse(compare_reverse(None, image)['passed'])
+        self.assertFalse(compare_reverse(image, None)['passed'])
+        self.assertNotIn('metrics', compare_reverse(None, image))
+        self.assertEqual(score(image, image)['rmse'], 0)
+        self.assertTrue(compare_reverse(image, image)['passed'])
 
     def test_native_error_metrics_measure_actual_values_and_reject_geometry_drift(self):
         reference = np.zeros((2, 2, 3), dtype='f4')

@@ -139,15 +139,19 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
         index += 1
     neutral = outputs['tone=0,color=0']
     observations['response_from_neutral'] = {key: score(neutral, value) for key, value in outputs.items()}
-    facts = primitive(adapter, 'styles-decode-reverse', source, resources,
-                      max_edge=512, supported_metadata_versions=[8, 9, 15, 16])
-    width, height = facts['unstyled']['width'], facts['unstyled']['height']
-    raw = np.fromfile(resources / 'unstyled.f32', dtype='<f4')
-    if raw.size != width * height * 4 or not np.isfinite(raw).all():
-        raise ValueError('invalid native remove-style result')
-    outputs['remove-style'] = raw.reshape(height, width, 4)[..., :3].copy()
-    observations['remove_style_executed'] = True
-    return outputs, observations
+    reverse = None
+    try:
+        facts = primitive(adapter, 'styles-decode-reverse', source, resources,
+                          max_edge=512, supported_metadata_versions=[8, 9, 15, 16])
+        width, height = facts['unstyled']['width'], facts['unstyled']['height']
+        raw = np.fromfile(resources / 'unstyled.f32', dtype='<f4')
+        if raw.size != width * height * 4 or not np.isfinite(raw).all():
+            raise ValueError('invalid native remove-style result')
+        reverse = raw.reshape(height, width, 4)[..., :3].copy()
+        observations['remove_style_executed'] = True
+    except (ValueError, RuntimeError, OSError, KeyError, subprocess.TimeoutExpired) as error:
+        observations['remove_style_error'] = str(error)
+    return outputs, reverse, observations
 
 
 def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headroom: float, calibration: dict,
@@ -161,8 +165,7 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
     if receipt.get('source_preserved') is not True or receipt.get('input_sha256') != isolate.sha(source.read_bytes()):
         raise ValueError('resource producer did not preserve its blind input')
     before, after = isolate.Graph(source.read_bytes()), isolate.Graph(output.read_bytes())
-    if before.image_fingerprint(before.primary) != after.image_fingerprint(after.primary):
-        raise ValueError('resource regeneration altered the coded primary')
+    coded_preserved = before.image_fingerprint(before.primary) == after.image_fingerprint(after.primary)
     preservation = None
     if verify_pixels:
         width, height = native.display_geometry(before)
@@ -173,8 +176,15 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
             comparisons = {kind: native.compare_buffers(work / 'input' / f'published_{kind}.f32',
                 work / 'rebuilt' / f'published_{kind}.f32', width, height) for kind in ('sdr', 'hdr')}
             if left['hdr_content_headroom'] != right['hdr_content_headroom'] or not all(c['passed'] for c in comparisons.values()):
-                raise ValueError('resource assembly changed native SDR/HDR base pixels: ' + json.dumps(comparisons))
+                raise ValueError('resource assembly changed native SDR/HDR base pixels: ' + json.dumps({
+                    'input_headroom': left['hdr_content_headroom'], 'rebuilt_headroom': right['hdr_content_headroom'],
+                    'comparisons': comparisons}))
             preservation = {'headroom': right['hdr_content_headroom'], 'comparisons': comparisons}
+    if not coded_preserved:
+        raise ValueError('resource regeneration altered the coded primary: ' + json.dumps({
+            'input_properties': [(p['kind'], isolate.sha(p['raw'])) for p in before.props(before.primary)],
+            'rebuilt_properties': [(p['kind'], isolate.sha(p['raw'])) for p in after.props(after.primary)],
+            'native_base_preservation': preservation}))
     return {'style': corpus.inspect_bytes(output.read_bytes())['style'],
             'native_base_preservation': preservation}
 
@@ -183,6 +193,18 @@ def compare_responses(reference, actual):
     if reference.keys() != actual.keys():
         raise ValueError('reference and regenerated files did not exercise identical native edits')
     return {key: score(reference[key], actual[key]) for key in reference}
+
+
+def compare_reverse(reference, actual):
+    result = {'passed': False, 'reference_available': reference is not None,
+              'rebuilt_available': actual is not None}
+    if reference is not None and actual is not None:
+        try:
+            result['metrics'] = score(reference, actual)
+            result['passed'] = True
+        except ValueError as error:
+            result['error'] = str(error)
+    return result
 
 
 def main(argv=None):
@@ -197,8 +219,12 @@ def main(argv=None):
     adapter, generator = args.adapter.resolve(), args.generator.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    report = {'schema': 'styles-blind-joint-calibration-v1', 'passed': False, 'trials': [],
+    report = {'schema': 'styles-blind-joint-calibration-v2', 'passed': False, 'trials': [],
               'samples': [], 'selected': None,
+              'forward_calibration_completed': False, 'native_reverse_validation_passed': False,
+              'calibration_objective': 'mean native forward Tone/Color RMSE; native reversal is separate required validation',
+              'selection_scope': 'forward-only research candidate; no product promotion',
+              'product_defaults_changed': False,
               'scope': 'same-photo native edit equivalence; public semantic-Standard controls; no Photos device claim'}
     try:
         report['host'] = measurement_host(adapter)
@@ -239,12 +265,13 @@ def main(argv=None):
                     refs = case['root'] / 'reference'
                     refs.mkdir()
                     case['sample']['edit_controls'] = {}
-                    case['reference'], case['sample']['edit_controls'] = responses(reverse, renderer,
+                    case['reference'], case['reverse_reference'], case['sample']['edit_controls'] = responses(reverse, renderer,
                         compatibility, case['source'], refs, observations=case['sample']['edit_controls'])
             calibrations = [DEFAULT, *({'baseline_scale': b, 'gain_scale': g, 'baseline_maximum': 64.0}
                 for b, g in itertools.product((.75, 1.0, 1.25), repeat=2))]
             for index, calibration in enumerate(calibrations):
-                trial = {'index': index, 'calibration': calibration, 'passed': False, 'samples': []}
+                trial = {'index': index, 'calibration': calibration, 'passed': False, 'samples': [],
+                         'verification_scope': 'resource generation and native forward Tone/Color; reversal reported separately'}
                 try:
                     for case in cases:
                         if case['sample']['split'] != 'calibration':
@@ -256,11 +283,12 @@ def main(argv=None):
                                                   verify_pixels=index == 0)
                             render = directory / 'response'
                             render.mkdir()
-                            actual, controls = responses(reverse, renderer, compatibility, rebuilt, render,
+                            actual, reversed_pixels, controls = responses(reverse, renderer, compatibility, rebuilt, render,
                                 color_supported=case['sample']['edit_controls']['color_supported'])
                             metrics = compare_responses(case['reference'], actual)
                             trial['samples'].append({'sample_id': case['sample']['sample_id'],
-                                'metrics': metrics, 'generated_metadata': metadata, 'controls': controls})
+                                'metrics': metrics, 'generated_metadata': metadata, 'controls': controls,
+                                'reverse_validation': compare_reverse(case['reverse_reference'], reversed_pixels)})
                     trial['training_rmse'] = float(np.mean([m['rmse'] for c in trial['samples'] for m in c['metrics'].values()]))
                     trial['passed'] = True
                 except (ValueError, RuntimeError, OSError, KeyError, subprocess.TimeoutExpired) as error:
@@ -280,7 +308,7 @@ def main(argv=None):
                     continue
                 refs = case['root'] / 'reference'
                 refs.mkdir()
-                reference, controls = responses(reverse, renderer, compatibility, case['source'], refs)
+                reference, reversed_reference, controls = responses(reverse, renderer, compatibility, case['source'], refs)
                 item = {'sample_id': case['sample']['sample_id'], 'controls': controls}
                 for label, calibration in [('default', DEFAULT), ('selected', selected['calibration'])]:
                     directory = case['root'] / label
@@ -290,13 +318,22 @@ def main(argv=None):
                                           verify_pixels=True)
                     render = directory / 'response'
                     render.mkdir()
-                    actual, _ = responses(reverse, renderer, compatibility, rebuilt, render,
+                    actual, reversed_pixels, actual_controls = responses(reverse, renderer, compatibility, rebuilt, render,
                                           color_supported=controls['color_supported'])
-                    item[label] = {'metrics': compare_responses(reference, actual), 'generated_metadata': metadata}
+                    item[label] = {'metrics': compare_responses(reference, actual), 'generated_metadata': metadata,
+                                   'controls': actual_controls,
+                                   'reverse_validation': compare_reverse(reversed_reference, reversed_pixels)}
                 holdout.append(item)
             report['holdout'] = holdout
-            report['passed'] = bool(holdout) and len([t for t in report['trials'] if t['passed']]) >= 2
-            report['product_defaults_changed'] = False
+            report['forward_calibration_completed'] = bool(holdout) and len([t for t in report['trials'] if t['passed']]) >= 2
+            reverse_checks = [s['reverse_validation']['passed'] for trial in (report['trials'][0], selected)
+                              for s in trial['samples']]
+            reverse_checks += [item[label]['reverse_validation']['passed'] for item in holdout
+                               for label in ('default', 'selected')]
+            report['native_reverse_validation_passed'] = bool(reverse_checks) and all(reverse_checks)
+            report['passed'] = report['forward_calibration_completed'] and report['native_reverse_validation_passed']
+            if not report['native_reverse_validation_passed']:
+                report['error'] = 'native reverse validation failed; forward calibration metrics do not waive this failure'
     except (ValueError, OSError, RuntimeError, KeyError, subprocess.TimeoutExpired) as error:
         report['error'] = str(error)
     finally:
