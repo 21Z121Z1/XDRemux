@@ -252,6 +252,15 @@ jobs:
             --input "$RUNNER_TEMP/styles-texture-final.heic" \
             --output "$RUNNER_TEMP/texture-final-replay"
 
+      - name: Upload final HDR Texture measurements without media
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-final-replay-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/texture-final-replay/report.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Regenerate blind resources and jointly calibrate native edit responses
         if: ${{ !cancelled() }}
         shell: bash
@@ -266,14 +275,12 @@ jobs:
             --holdout consumer-research/research/vm-native/samples/IMG_2608.HEIC \
             --output "$RUNNER_TEMP/styles-joint-fit"
 
-      - name: Upload fidelity measurements without media
+      - name: Upload blind calibration measurements without media
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: styles-fidelity-measurements-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            ${{ runner.temp }}/texture-final-replay/report.json
-            ${{ runner.temp }}/styles-joint-fit/report.json
+          name: styles-joint-fit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/styles-joint-fit/report.json
           if-no-files-found: warn
           retention-days: 7
 

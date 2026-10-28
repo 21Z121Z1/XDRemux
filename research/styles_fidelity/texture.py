@@ -143,6 +143,19 @@ def compare_statistics(person: dict, facts: dict) -> dict:
             'replayed_only_statistics_fields': len(replayed.keys() - reference.keys())}
 
 
+def validate_working_input(facts: dict, expected_sha: str | None, hdr: bool) -> dict:
+    pixels = facts['image_pixels']
+    maximum = pixels['maximum']
+    if (pixels.get('nonfinite') != 0 or not isinstance(pixels.get('sha256'), str)
+            or len(pixels['sha256']) != 64 or not isinstance(maximum, (int, float))
+            or not math.isfinite(maximum) or (hdr and maximum <= 1)):
+        raise ValueError('native effect did not receive finite working pixels in the requested domain')
+    if expected_sha is not None and pixels['sha256'] != expected_sha:
+        raise ValueError('native effect working pixels differ from the submitted domain: '
+                         + json.dumps({'expected_sha256': expected_sha, 'actual': pixels}))
+    return pixels
+
+
 def prepare_tools(research: Path, output: Path):
     revision = run(['git', '-C', research, 'rev-parse', 'HEAD']).stdout.decode().strip()
     root = research / 'research/texture-producer-20261020'
@@ -189,17 +202,18 @@ def prepare_tools(research: Path, output: Path):
             }
             report[@"geometry_from_final_HEIC"]=@YES;
 ''')
-    upload = '[command commit]; [command waitUntilCompleted];'
+    upload = '[context render:ciImage toMTLTexture:inputTexture commandBuffer:command bounds:full colorSpace:working];'
     if source.count(upload) != 1:
         raise ValueError('pinned working image upload context changed')
-    source = source.replace(upload, upload + '''
+    source = source.replace(upload, '''
             NSString *linearPath=NSProcessInfo.processInfo.environment[@"TEXTURE_FINAL_LINEAR_RGBA16F"];
             if(linearPath) {
                 NSData *pixels=[NSData dataWithContentsOfFile:linearPath];
                 if(pixels.length!=width*height*8) @throw [NSException exceptionWithName:@"LinearInput" reason:@"geometry mismatch" userInfo:nil];
                 [inputTexture replaceRegion:MTLRegionMake2D(0,0,width,height) mipmapLevel:0 withBytes:pixels.bytes bytesPerRow:width*8];
-                [outputTexture replaceRegion:MTLRegionMake2D(0,0,width,height) mipmapLevel:0 withBytes:pixels.bytes bytesPerRow:width*8];
                 report[@"color_domain"]=@"native final-file linear Display P3 HDR, area reduced, RGBA16F";
+            } else {
+                [context render:ciImage toMTLTexture:inputTexture commandBuffer:command bounds:full colorSpace:working];
             }
 ''')
     anchor = 'const __fp16 *renderedValues = renderedPixels.bytes;'
@@ -273,6 +287,7 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
     hdr_pixels.write_bytes(hdr_working.astype('<f2').tobytes())
     del hdr_working
     effects, comparisons, captured = [], [], {}
+    expected_inputs = {'sdr-analysis': None, 'hdr-linear': sha(hdr_pixels.read_bytes())}
     for index, person in enumerate(people):
         for effect, domain, mode in itertools.product(EFFECTS, ('sdr-analysis', 'hdr-linear'), ('stored', 'recomputed')):
             output = directory / f'person-{index}-{effect}-{domain}-{mode}.json'
@@ -286,6 +301,8 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
             run([tools / 'replay', directory / 'working.png', output, '1', 'Studio', '0'],
                 env=environment, diagnostic=output)
             facts = json.loads(output.read_text())
+            input_pixels = validate_working_input(facts, expected_inputs[domain], domain == 'hdr-linear')
+            expected_inputs[domain] = input_pixels['sha256']
             rendered = facts.get('rendered_pixels', {})
             passed = (facts.get('native_statistics_operations_completed') is True
                 and facts.get('render_command_status') == 4
@@ -312,6 +329,9 @@ def replay_case(adapter: Path, source: Path, tools: Path, projector, directory: 
                     'changed_rgb_components': int(np.count_nonzero(difference))})
             effects.append({'person': index, 'effect': effect, 'domain': domain, 'statistics_mode': mode, 'passed': passed,
                 'rendered_pixels': rendered, 'gpu_command_status': facts.get('render_command_status'),
+                'working_input': input_pixels, 'native_color_domain': facts.get('color_domain'),
+                'output_maximum': float(pixels.max()),
+                'render_skip_control_present': facts.get('render_skip_control_present'),
                 **compare_statistics(person, facts),
                 'native_parameters': facts.get('native_parameters'),
                 'exception': facts.get('exception')})

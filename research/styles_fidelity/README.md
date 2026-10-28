@@ -121,6 +121,9 @@ regions. A failed default cannot be waived by an alternative fit.
 The renderer uses the pinned `native-stage-mirror` path: native Apple Log decode,
 stored thumbnail gain and original-range limits precede the filter input.
 The probe's stored-code control path is excluded from calibration.
+The reverse probe compiles the current product's native primitive unchanged.
+Its owned caller converts a native assertion abort into a reported exception for
+diagnosis; the assertion still fails the case and cannot select a candidate.
 
 The CI controls are the three published semantic-Standard `IMG_2600/2604/2608`
 files. Their Studio Texture metadata has no people, so it cannot activate a
@@ -149,7 +152,9 @@ must match the product's 1024-edge working domain without a mask resize fallback
 Mattify, UnderEyeBrighten and SkinSmoothStandalone are rendered independently
 per person in two controlled domains: the product's SDR-derived linear P3
 analysis image and area-reduced native linear P3 HDR. The latter bypasses the
-8-bit SDR intermediate and retains values above one. Reports retain GPU status,
+8-bit SDR upload and retains values above one. Each effect must read back the
+exact submitted HDR pixel hash; all effects in a domain must receive identical
+working pixels. Reports retain these input facts, output maxima, GPU status,
 finite-pixel checks, output changes and stored-versus-recomputed statistic
 differences. Each domain renders once with stored statistics and once after
 clearing statistics while retaining the exact final-file person geometry.

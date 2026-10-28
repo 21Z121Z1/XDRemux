@@ -80,10 +80,19 @@ def prepare_renderer(research: Path, output: Path):
         flags += ['-framework', framework]
     binary = output / 'edit-response'
     run([*flags, owned, '-o', binary])
+    product = Path(__file__).resolve().parents[2]
+    reverse_source = product / 'Sources/XDStylesNative/Styles.m'
+    reverse_probe = Path(__file__).with_name('reverse_probe.m')
+    reverse = output / 'reverse-response'
+    run([*flags, '-fblocks', '-I', product / 'Sources/XDStylesNative/include',
+         reverse_source, reverse_probe, '-o', reverse])
     compatibility, parser_facts = prepare_consumer_compatibility(research, output)
-    return binary, compatibility, {'research_revision': revision,
+    return binary, reverse, compatibility, {'research_revision': revision,
         'upstream_probe_sha256': isolate.sha(original.read_bytes()),
         'owned_probe_sha256': isolate.sha(owned.read_bytes()), 'parser': parser_facts,
+        'reverse_source_sha256': isolate.sha(reverse_source.read_bytes()),
+        'reverse_probe_sha256': isolate.sha(reverse_probe.read_bytes()),
+        'reverse_assertion_policy': 'diagnostic exception containment; any native assertion remains failure',
         'scope': 'native PISemanticStyleFilter output; no reconstructed Metal consumer model'}
 
 
@@ -115,6 +124,7 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
                 and t.get('output', {}).get('nonfinite') == 0 for t in facts.get('trials', [])):
             raise ValueError('native renderer failed: ' + str(facts.get('exception', facts.get('trials'))))
         available = facts.get('color_bias_supported') is True
+        observations['native_input_keys'] = sorted(facts.get('defaults', {}))
         observations['color_supported'] = available
         if color_supported is not None and available != color_supported:
             raise ValueError('native Color capability changed between reference and rebuilt file')
@@ -195,7 +205,7 @@ def main(argv=None):
         report['experiment_sha256'] = isolate.sha(Path(__file__).read_bytes())
         with tempfile.TemporaryDirectory(prefix='blind-fit-', dir=output) as temporary:
             work = Path(temporary)
-            renderer, compatibility, report['renderer'] = prepare_renderer(args.research_root.resolve(), work)
+            renderer, reverse, compatibility, report['renderer'] = prepare_renderer(args.research_root.resolve(), work)
             cases, identities = [], set()
             # This scene assignment is fixed before any native response is evaluated.
             for split, paths in [('calibration', args.calibration), ('holdout', args.holdout)]:
@@ -229,7 +239,7 @@ def main(argv=None):
                     refs = case['root'] / 'reference'
                     refs.mkdir()
                     case['sample']['edit_controls'] = {}
-                    case['reference'], case['sample']['edit_controls'] = responses(adapter, renderer,
+                    case['reference'], case['sample']['edit_controls'] = responses(reverse, renderer,
                         compatibility, case['source'], refs, observations=case['sample']['edit_controls'])
             calibrations = [DEFAULT, *({'baseline_scale': b, 'gain_scale': g, 'baseline_maximum': 64.0}
                 for b, g in itertools.product((.75, 1.0, 1.25), repeat=2))]
@@ -246,7 +256,7 @@ def main(argv=None):
                                                   verify_pixels=index == 0)
                             render = directory / 'response'
                             render.mkdir()
-                            actual, controls = responses(adapter, renderer, compatibility, rebuilt, render,
+                            actual, controls = responses(reverse, renderer, compatibility, rebuilt, render,
                                 color_supported=case['sample']['edit_controls']['color_supported'])
                             metrics = compare_responses(case['reference'], actual)
                             trial['samples'].append({'sample_id': case['sample']['sample_id'],
@@ -270,7 +280,7 @@ def main(argv=None):
                     continue
                 refs = case['root'] / 'reference'
                 refs.mkdir()
-                reference, controls = responses(adapter, renderer, compatibility, case['source'], refs)
+                reference, controls = responses(reverse, renderer, compatibility, case['source'], refs)
                 item = {'sample_id': case['sample']['sample_id'], 'controls': controls}
                 for label, calibration in [('default', DEFAULT), ('selected', selected['calibration'])]:
                     directory = case['root'] / label
@@ -280,7 +290,7 @@ def main(argv=None):
                                           verify_pixels=True)
                     render = directory / 'response'
                     render.mkdir()
-                    actual, _ = responses(adapter, renderer, compatibility, rebuilt, render,
+                    actual, _ = responses(reverse, renderer, compatibility, rebuilt, render,
                                           color_supported=controls['color_supported'])
                     item[label] = {'metrics': compare_responses(reference, actual), 'generated_metadata': metadata}
                 holdout.append(item)

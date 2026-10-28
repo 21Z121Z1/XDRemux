@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from research.styles_fidelity.blind import choose_candidate, score
-from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person, run
+from research.styles_fidelity.texture import area_rgba, compare_statistics, numeric_leaves, pixel_person, run, validate_working_input
 
 
 class JointCalibrationTests(unittest.TestCase):
@@ -82,6 +82,15 @@ class JointCalibrationTests(unittest.TestCase):
             self.assertIn('missing required effect input', str(failure.exception))
             self.assertNotIn('faceLandmarks', str(failure.exception))
             self.assertNotIn('private geometry', str(failure.exception))
+
+    def test_each_hdr_effect_must_receive_the_actual_submitted_hdr_pixels(self):
+        expected = 'a' * 64
+        pixels = {'sha256': expected, 'nonfinite': 0, 'maximum': 2.5}
+        self.assertEqual(validate_working_input({'image_pixels': pixels}, expected, True), pixels)
+        with self.assertRaises(ValueError):
+            validate_working_input({'image_pixels': {**pixels, 'sha256': 'b' * 64}}, expected, True)
+        with self.assertRaises(ValueError):
+            validate_working_input({'image_pixels': {**pixels, 'maximum': .9}}, expected, True)
 
 
 if __name__ == '__main__':
