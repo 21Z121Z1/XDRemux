@@ -79,6 +79,8 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
     children += locations
     children += full('iref', 1, 0, b''.join(box(kind, struct.pack('>IH', source, len(targets)) + b''.join(struct.pack('>I', t) for t in targets)) for kind, source, targets in refs))
     children += box('iprp', box('ipco', b''.join(props)) + full('ipma', 1, 1, ipma))
+    if tmap:
+        children += box('grpl', full('altr', 0, 0, struct.pack('>IIII', 99, 2, 8, 1)))
     children += box('idat', idat)
     return box('ftyp', b'heic\0\0\0\0mif1heic' + (b'MiHBtmap' if tmap else b'')) + full('meta', 0, 0, children)
 
@@ -202,6 +204,7 @@ class StyleFidelityTests(unittest.TestCase):
         self.assertEqual(len(tone_maps), 1)
         self.assertEqual(after.items[tone_maps[0]]['flags'], 0)
         self.assertEqual(after.targets(tone_maps[0], 'dimg'), [1, 2])
+        self.assertEqual(after.alternatives, [[tone_maps[0], after.primary]])
 
     def test_hdr_exif_ablation_is_stricter_and_cannot_copy_reference_state(self):
         output, receipt = isolate.isolate_bytes(sample(), keep_numeric_hdr_exif=False)

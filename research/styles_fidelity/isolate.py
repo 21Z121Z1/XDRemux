@@ -113,6 +113,22 @@ class Graph:
         for ref in self.refs:
             if ref['from'] not in self.items or any(t not in self.items for t in ref['to']):
                 raise ValueError('missing item reference dependency')
+        self.alternatives = []
+        if 'grpl' in by_kind:
+            group_box = by_kind['grpl']
+            for group in H.boxes(data, group_box['payload_start'], group_box['end']):
+                if group['type'] != 'altr':
+                    raise ValueError('unverified image entity group')
+                gv, gf, pos = H.fullbox(data, group)
+                if gv != 0 or gf != 0 or pos + 8 > group['end']:
+                    raise ValueError('unsupported image alternate group')
+                count = int.from_bytes(data[pos + 4:pos + 8], 'big')
+                if pos + 8 + count * 4 != group['end']:
+                    raise ValueError('truncated image alternate group')
+                members = [int.from_bytes(data[pos + 8 + j * 4:pos + 12 + j * 4], 'big') for j in range(count)]
+                if len(set(members)) != count or any(i not in self.items for i in members):
+                    raise ValueError('invalid image alternate group members')
+                self.alternatives.append(members)
         locations = H.parse_iloc(data, by_kind['iloc'])
         self.payloads = {}
         idat = by_kind.get('idat')
@@ -284,6 +300,12 @@ def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple
             selected_refs.append({'type': 'cdsc', 'from': item,
                                   'to': [t for t in graph.targets(item, 'cdsc') if t in payloads and t != item]})
     mapping = {old: index + 1 for index, old in enumerate(order)}
+    alternatives = [members for members in graph.alternatives
+                    if len(members) == 2 and graph.primary in members
+                    and any(t in members for t in tmap)]
+    group_bytes = b''.join(_full('altr', 0, 0, struct.pack('>II', index + 1, len(members))
+                                + b''.join(struct.pack('>I', mapping[i]) for i in members))
+                           for index, members in enumerate(alternatives))
     properties, associations = [], {}
     for old in order:
         values = []
@@ -326,7 +348,8 @@ def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple
         return _full('meta', 0, 0, hdlr + _full('pitm', 1, 0, struct.pack('>I', mapping[graph.primary]))
                      + _full('iinf', 1, 0, struct.pack('>I', len(infos)) + b''.join(infos)) + iloc
                      + _full('iref', 1, 0, references)
-                     + _box('iprp', _box('ipco', b''.join(properties)) + _full('ipma', 1, 1, ipma)))
+                     + _box('iprp', _box('ipco', b''.join(properties)) + _full('ipma', 1, 1, ipma))
+                     + (_box('grpl', group_bytes) if group_bytes else b''))
     prefix = _box('ftyp', graph.file_type)
     first = metadata(0)
     output = prefix + metadata(len(prefix) + len(first) + 8) + _box('mdat', b''.join(payloads[i] for i in order))
@@ -344,6 +367,7 @@ def isolate_bytes(source: bytes, *, keep_numeric_hdr_exif: bool = True) -> tuple
                     'producer_input_sha256': sha(output), 'source_items': len(graph.items),
                     'retained_items': len(order), 'retained_image_payloads': len(order) - len(redacted),
                     'redacted_hdr_descriptors': len(redacted), 'coded_primary_preserved': True,
+                    'hdr_alternate_groups': len(alternatives),
                     'coded_hdr_gain_preserved': True, 'original_styles_available_to_producer': False,
                     'original_mattes_available_to_producer': False,
                     'original_exif_available_to_producer': False,

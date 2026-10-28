@@ -36,7 +36,8 @@ python3 -m research.styles_fidelity.isolate \
 
 The allow-list projection retains the compressed primary, one associated Apple
 HDR Gain Map, their coded dependencies, verified pixel properties, a matching
-tone-map item when present, admitted source HDR format brands, item visibility,
+tone-map item when present, its ordered alternate-image group, admitted source
+HDR format brands, item visibility,
 and numeric HDR descriptors. It creates a new item
 graph and new media storage. Original Styles, Linear Thumbnail, Delta Map,
 semantic resources, SmartStyle MakerNotes, unrelated XMP and unused media bytes
