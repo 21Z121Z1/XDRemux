@@ -40,6 +40,8 @@ def redact(payload: bytes) -> bytes | None:
         values[tag] = numerator, denominator
     if not values:
         return None
+    if exif.get(271) != 'Apple':
+        raise ValueError('numeric Apple HDR fields require the source Apple make')
     # Offsets inside an Apple MakerNote are relative to that note, not the TIFF.
     start = 16 + 12 * len(values) + 4
     entries, rationals = [], []

@@ -24,7 +24,7 @@ python3 -m research.styles_fidelity.isolate \
   --input /absolute/path/original.heic --output /absolute/path/new-case
 ```
 
-按允许清单投影资源：保留压缩主图、一张关联的 Apple HDR Gain Map、编码依赖、已核对的像素属性、存在时的匹配色调映射项目及数值 HDR 描述符。投影重新建立项目图和媒体存储，原 Styles、Linear Thumbnail、Delta Map、语义资源、SmartStyle MakerNote、无关 XMP 和未使用的媒体字节不会进入生成器文件。EXIF 从零重建，仅写入固定的 Apple 品牌名和 HDR MakerNote 数值字段 33／48，保留其有理数值；其他 EXIF 字段与 MakerNote 状态全部去除。删除 HDR 字段可能在 SDR 像素不变的同时禁用 Apple HDR 展开，因此必须进行原生检查。写出后再次核对像素载荷、颜色和几何。属性不支持或关联存在歧义时失败。
+按允许清单投影资源：保留压缩主图、一张关联的 Apple HDR Gain Map、编码依赖、已核对的像素属性、存在时的匹配色调映射项目及数值 HDR 描述符。投影重新建立项目图和媒体存储，原 Styles、Linear Thumbnail、Delta Map、语义资源、SmartStyle MakerNote、无关 XMP 和未使用的媒体字节不会进入生成器文件。EXIF 从零重建，仅写入在源文件中核实的 Apple 品牌名和 HDR MakerNote 数值字段 33／48，保留其有理数值；其他 EXIF 字段与 MakerNote 状态全部去除。删除 HDR 字段可能在 SDR 像素不变的同时禁用 Apple HDR 展开，因此必须进行原生检查。写出后再次核对像素载荷、颜色和几何。属性不支持或关联存在歧义时失败。
 
 拟合前先审阅场景分组。分组 JSON 须含 `scene_groups_reviewed: true` 及按候选 SHA 索引的 `samples` 字典；每条提供 `scene_group` 和 `split`（`calibration` 或 `holdout`）。
 

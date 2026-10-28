@@ -174,6 +174,11 @@ class StyleFidelityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'rational'):
             hdr_exif.redact(hdr_exif.wrap_note(note))
 
+    def test_hdr_redaction_cannot_invent_an_apple_make(self):
+        payload = hdr_exif.wrap_note(hdr_note()).replace(b'Apple\0', b'Other\0')
+        with self.assertRaisesRegex(ValueError, 'source Apple make'):
+            hdr_exif.redact(payload)
+
     def test_broken_dependency_cannot_be_silently_removed(self):
         with self.assertRaisesRegex(ValueError, 'missing|dependency'):
             isolate.isolate_bytes(sample(broken_reference=True))

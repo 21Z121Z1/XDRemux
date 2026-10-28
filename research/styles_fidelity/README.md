@@ -40,7 +40,7 @@ tone-map item when present, and numeric HDR descriptors. It creates a new item
 graph and new media storage. Original Styles, Linear Thumbnail, Delta Map,
 semantic resources, SmartStyle MakerNotes, unrelated XMP and unused media bytes
 do not enter the producer file. EXIF is rebuilt from scratch with the literal
-Apple make and only numeric HDR MakerNote tags 33/48, preserving their rational
+Apple make verified in the source and only numeric HDR MakerNote tags 33/48, preserving their rational
 values. All other EXIF fields and MakerNote state are omitted. Removing the HDR
 fields can preserve SDR pixels while disabling Apple's HDR expansion, so the
 native check is essential. Pixel payloads, color and geometry are checked again.
