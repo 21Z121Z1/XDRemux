@@ -210,6 +210,25 @@ jobs:
           test -x target/debug/xdremux
           test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
 
+      - name: Verify blind source isolation against native SDR and HDR
+        shell: bash
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          python3 -m research.styles_fidelity.native \
+            --adapter "$adapter" \
+            --input consumer-research/Apple_Native_Samples/IMG_0032.HEIC \
+            --input consumer-research/Apple_Native_Samples/IMG_0033.HEIC \
+            --output "$RUNNER_TEMP/styles-blind-native"
+
+      - name: Upload blind isolation measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: styles-blind-native-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/styles-blind-native/report.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Render tone sweeps
         shell: bash
         env:
