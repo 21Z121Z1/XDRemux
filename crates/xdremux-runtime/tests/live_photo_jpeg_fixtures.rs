@@ -109,9 +109,15 @@ fn samsung_ultrahdr_jpeg_becomes_valid_hdr_live_photo() {
 fn real_jpeg_motion_photo_vendor_matrix() {
     for (relative, expect_gain_map) in [
         ("vivo/android-v1-sdr-01.jpg", false),
+        ("vivo/android-v1-sdr-02.jpg", false),
+        ("samsung/jpeg-ultrahdr-01.jpg", true),
+        ("samsung/jpeg-ultrahdr-02.jpg", true),
         ("xiaomi/android-v1-ultrahdr-01.jpg", true),
         ("oppo/coloros15-ultrahdr-01.jpg", true),
+        ("oppo/coloros15-ultrahdr-02.jpg", true),
+        ("oppo/coloros15-ultrahdr-03.jpg", true),
         ("oppo/coloros16-dualstream-ultrahdr-01.jpg", true),
+        ("oppo/coloros16-dualstream-ultrahdr-02.jpg", true),
     ] {
         exercise(relative, expect_gain_map);
     }

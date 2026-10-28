@@ -82,8 +82,10 @@ Photos admission.
 
 The product probe permits at most three startup inventory queries, each with a
 120-second deadline. A real inventory reply is required before its single reader
-installation. The registration query after that command has a 20-second deadline;
-matching installed bytes and both owned containers must still be verified.
+installation. The registration query after that command and each owned app/data container
+readback use the same 120-second query deadline. The reader may be installed
+only once; matching installed bytes and both owned containers are required
+before the native probe continues. A timeout does not establish admission.
 
 The file promise uses the package interchange type declared readable by
 `PHLivePhoto`, rather than assuming the filesystem's content-type alias is a

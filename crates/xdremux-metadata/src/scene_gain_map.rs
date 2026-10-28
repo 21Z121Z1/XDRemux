@@ -35,21 +35,33 @@ pub fn make_scene_gain_map_metadata_with_capacity(
             "invalid signed gain range or offset",
         ));
     }
-    let values = [0., capacity, min_ev, max_ev, 1., offset, offset];
-    let mut tmap = vec![0, 0, 0, 0, 0, 0];
-    for value in values {
-        tmap.extend(((value * 1_000_000.).round() as i32).to_be_bytes());
-        tmap.extend(1_000_000u32.to_be_bytes());
-    }
-    let xmp = format!(
-        r#"<?xpacket begin=""?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/" hdrgm:Version="1.0" hdrgm:BaseRenditionIsHDR="False" hdrgm:GainMapMin="{min_ev:.8}" hdrgm:GainMapMax="{max_ev:.8}" hdrgm:Gamma="1" hdrgm:OffsetSDR="{offset:.8}" hdrgm:OffsetHDR="{offset:.8}" hdrgm:HDRCapacityMin="0" hdrgm:HDRCapacityMax="{capacity:.8}"/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>"#
+    let tmap = crate::iso21496::make_log_tmap(
+        [0., capacity],
+        [[min_ev, max_ev, 1., offset, offset]; 3],
+        false,
+        1,
+    )?;
+    let xmp = crate::iso21496::write_hdrgm_xmp(
+        [min_ev; 3],
+        [max_ev; 3],
+        [1.; 3],
+        [[offset; 3]; 2],
+        [0., capacity],
     );
-    Ok((tmap, xmp.into_bytes()))
+    Ok((tmap, xmp))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rational(bytes: &[u8], offset: usize) -> f64 {
+        f64::from(i32::from_be_bytes(
+            bytes[offset..offset + 4].try_into().unwrap(),
+        )) / f64::from(u32::from_be_bytes(
+            bytes[offset + 4..offset + 8].try_into().unwrap(),
+        ))
+    }
     #[test]
     fn scene_gain_uses_the_alternate_working_primaries() {
         let (bytes, _) = make_scene_gain_map_metadata(-3., 6., 1. / 64.).unwrap();
@@ -64,26 +76,21 @@ mod tests {
     fn serializes_negative_gain_minimum_without_clamping_shadows() {
         let (bytes, xmp) = make_scene_gain_map_metadata(-3., 6., 1. / 64.).unwrap();
         assert_eq!(bytes.len(), 62);
-        assert_eq!(
-            i32::from_be_bytes(bytes[22..26].try_into().unwrap()),
-            -3_000_000
-        );
+        assert_eq!(rational(&bytes, 22), -3.);
+        assert_eq!(rational(&bytes, 46), 1. / 64.);
         assert!(String::from_utf8(xmp)
             .unwrap()
-            .contains("GainMapMin=\"-3.00000000\""));
+            .contains("<hdrgm:GainMapMin>-3 -3 -3</hdrgm:GainMapMin>"));
         assert!(make_scene_gain_map_metadata(1., 6., 0.).is_err());
     }
     #[test]
     fn display_capacity_is_not_the_largest_local_gain() {
         let (bytes, xmp) =
             make_scene_gain_map_metadata_with_capacity(-4., 7., 1. / 64., 3.).unwrap();
-        assert_eq!(
-            i32::from_be_bytes(bytes[14..18].try_into().unwrap()),
-            3_000_000
-        );
+        assert_eq!(rational(&bytes, 14), 3.);
         assert!(String::from_utf8(xmp)
             .unwrap()
-            .contains("HDRCapacityMax=\"3.00000000\""));
+            .contains("<hdrgm:HDRCapacityMax>3</hdrgm:HDRCapacityMax>"));
         assert!(make_scene_gain_map_metadata_with_capacity(-4., 7., 1. / 64., f64::NAN).is_err());
     }
 }
