@@ -252,7 +252,7 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
                      and r['type'] in {'dimg', 'auxl'} and all(t in order for t in r['to'])]
     redacted, exif_items = [], []
     for item, identity in graph.identities.items():
-        if identity['kind'] == 'Exif' and graph.targets(item, 'cdsc') == [graph.primary]:
+        if identity['kind'] == 'Exif' and graph.primary in graph.targets(item, 'cdsc'):
             exif_items.append(item)
             if len(exif_items) > 1:
                 raise ValueError('ambiguous primary EXIF')
@@ -261,7 +261,8 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
                 order.append(item)
                 payloads[item] = hdr
                 redacted.append(item)
-                selected_refs.append({'type': 'cdsc', 'from': item, 'to': [graph.primary]})
+                selected_refs.append({'type': 'cdsc', 'from': item,
+                                      'to': [t for t in graph.targets(item, 'cdsc') if t in payloads and t != item]})
             continue
         if identity['kind'] != 'mime' or not set(graph.targets(item, 'cdsc')) & set((graph.primary, gain[0], *tmap)):
             continue

@@ -29,7 +29,7 @@ def full(kind, version, flags, payload):
     return box(kind, bytes([version]) + flags.to_bytes(3, 'big') + payload)
 
 
-def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_reference=False):
+def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_reference=False, shared_exif=False):
     """Synthetic container, with recognizable withheld bytes, never a photo."""
     payloads = {
         1: b'compressed-primary', 2: b'compressed-gain',
@@ -54,7 +54,7 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
         tail = uris.get(item, '').encode() + b'\0' if item in uris else b''
         infos.append(full('infe', 3, 0, struct.pack('>IH4s', item, 0, kind.encode()) + b'name\0' + tail))
     refs = [('auxl', 2, [1]), ('cdsc', 3, [1]), ('auxl', 4, [1]),
-            ('cdsc', 5, [1]), ('cdsc', 6, [1]), ('auxl', 7, [1])]
+            ('cdsc', 5, [1]), ('cdsc', 6, [1, 2] if shared_exif else [1]), ('auxl', 7, [1])]
     if broken_reference:
         refs.append(('dimg', 1, [999]))
     idat = b''.join(payloads.values())
@@ -178,6 +178,14 @@ class StyleFidelityTests(unittest.TestCase):
         payload = hdr_exif.wrap_note(hdr_note()).replace(b'Apple\0', b'Other\0')
         with self.assertRaisesRegex(ValueError, 'source Apple make'):
             hdr_exif.redact(payload)
+
+    def test_hdr_exif_associated_with_multiple_admitted_images_is_retained(self):
+        output, receipt = isolate.isolate_bytes(sample(shared_exif=True))
+        graph = isolate.Graph(output)
+        exif_items = [i for i, v in graph.identities.items() if v['kind'] == 'Exif']
+        self.assertEqual(len(exif_items), 1)
+        self.assertEqual(set(graph.targets(exif_items[0], 'cdsc')), {1, 2})
+        self.assertTrue(receipt['rebuilt_numeric_hdr_exif'])
 
     def test_broken_dependency_cannot_be_silently_removed(self):
         with self.assertRaisesRegex(ValueError, 'missing|dependency'):
