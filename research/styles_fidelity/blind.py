@@ -103,8 +103,11 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
         tone, color = controls[index]
         directory = root / f'edit-{index}'
         run([renderer, source, resources, directory], env={**os.environ,
-            'XD_TONE_BIAS': str(tone), 'XD_COLOR_BIAS': str(color), 'XD_TONE_MAX_EDGE': '512'})
+            'XD_TONE_BIAS': str(tone), 'XD_COLOR_BIAS': str(color), 'XD_TONE_MAX_EDGE': '512',
+            'XD_TONE_THUMB_MODE': 'native-stage-mirror'})
         facts = json.loads((directory / 'facts.json').read_text())
+        if facts.get('thumbnail_mode') != 'native-stage-mirror':
+            raise ValueError('native response did not decode Apple Log and thumbnail gain')
         if facts.get('exception') or not any(t.get('use_style_engine') is False
                 and t.get('output', {}).get('nonfinite') == 0 for t in facts.get('trials', [])):
             raise ValueError('native renderer failed: ' + str(facts.get('exception', facts.get('trials'))))
@@ -117,7 +120,8 @@ def responses(adapter: Path, renderer: Path, compatibility: Path, source: Path, 
                 controls.extend([(0.0, -0.5), (0.0, 0.5)])
         key = f'tone={tone:g},color={color:g}'
         outputs[key] = native_rgb(directory / 'renderer.f32')
-        control_facts.append({'tone': tone, 'color': color, 'native_color_control': available})
+        control_facts.append({'tone': tone, 'color': color, 'native_color_control': available,
+                              'thumbnail_mode': facts['thumbnail_mode']})
         index += 1
     facts = primitive(adapter, 'styles-decode-reverse', source, resources,
                       max_edge=512, supported_metadata_versions=[8, 9, 15, 16])
@@ -200,14 +204,14 @@ def main(argv=None):
                     root = work / identity
                     root.mkdir()
                     equivalence = native.check_case(adapter, source, root)
-                    if not equivalence['passed']:
-                        raise ValueError('blind input failed full native SDR/HDR equivalence')
-                    isolate.write_case(source, root / 'producer')
                     sample = {'sample_id': identity, 'name': source.name, 'split': split,
                               'semantic_standard': True, 'texture_reference': texture,
                               'native_equivalence': equivalence,
                               'prior_research_exposure': 'published controls; not a new unseen dataset'}
                     report['samples'].append(sample)
+                    if not equivalence['passed']:
+                        raise ValueError(source.name + ': blind input failed full native SDR/HDR equivalence')
+                    isolate.write_case(source, root / 'producer')
                     cases.append({'root': root, 'source': source, 'input': root / 'producer/input.heic',
                                   'sample': sample, 'headroom': equivalence['reference_headroom']})
             report['split_frozen'] = True

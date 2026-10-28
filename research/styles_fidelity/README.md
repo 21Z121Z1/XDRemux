@@ -118,6 +118,9 @@ after selection. Reports include nonzero Tone, remove-style, and Color responses
 only when the native filter actually exposes a Color control. Missing Color
 support stays explicit. Numeric comparisons include shadow, midtone and highlight
 regions. A failed default cannot be waived by an alternative fit.
+The renderer uses the pinned `native-stage-mirror` path: native Apple Log decode,
+stored thumbnail gain and original-range limits precede the filter input.
+The probe's stored-code control path is excluded from calibration.
 
 The CI controls are the three published semantic-Standard `IMG_2600/2604/2608`
 files. Their Studio Texture metadata has no people, so it cannot activate a
