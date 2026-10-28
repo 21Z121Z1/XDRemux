@@ -2,6 +2,7 @@
 
 mod apple_portrait;
 mod error;
+mod icc;
 mod scene_gain_map;
 pub use scene_gain_map::{
     make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity,
@@ -13,9 +14,11 @@ pub mod ultrahdr_jpeg;
 
 pub use apple_portrait::make_apple_portrait_focus_xmp;
 pub use error::{MetadataError, Result};
+pub use icc::validate_iso_alternate_icc;
 pub use iso21496::{
-    make_apple_tmap_payload, make_apple_tmap_payload_with_colour_space, make_hdrgm_xmp,
-    make_imageio_native_tmap_payload, make_strict_tmap_payload,
+    make_apple_tmap_payload, make_apple_tmap_payload_with_channel_count,
+    make_apple_tmap_payload_with_colour_space, make_hdrgm_xmp, make_imageio_native_tmap_payload,
+    make_strict_tmap_payload,
 };
 pub use oppo::{
     adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment,

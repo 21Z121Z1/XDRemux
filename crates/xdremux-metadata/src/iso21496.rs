@@ -150,13 +150,41 @@ pub fn make_apple_tmap_payload_with_colour_space(
     info: &[f64],
     use_base_colour_space: bool,
 ) -> Result<Vec<u8>> {
-    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
     let channels = [
         canonical_channel_values(info, 0)?,
         canonical_channel_values(info, 1)?,
         canonical_channel_values(info, 2)?,
     ];
     let multichannel = channels[1] != channels[0] || channels[2] != channels[0];
+    make_apple_tmap_payload_with_channel_count(
+        info,
+        use_base_colour_space,
+        if multichannel { 3 } else { 1 },
+    )
+}
+
+/// Preserve an input gain map's metadata component count, even if its RGB
+/// parameter sets happen to agree. This count is independent of pixel channels.
+pub fn make_apple_tmap_payload_with_channel_count(
+    info: &[f64],
+    use_base_colour_space: bool,
+    channel_count: u8,
+) -> Result<Vec<u8>> {
+    let [cap_min, cap_max, ..] = canonical_first_channel_values(info)?;
+    let channels = [
+        canonical_channel_values(info, 0)?,
+        canonical_channel_values(info, 1)?,
+        canonical_channel_values(info, 2)?,
+    ];
+    if !matches!(channel_count, 1 | 3)
+        || (channel_count == 1 && (channels[1] != channels[0] || channels[2] != channels[0]))
+    {
+        return Err(MetadataError::invalid(
+            "ISO 21496 tmap",
+            "metadata channel count does not match its parameters",
+        ));
+    }
+    let multichannel = channel_count == 3;
     let flags = if multichannel { 0x80 } else { 0 } | if use_base_colour_space { 0x40 } else { 0 };
     let mut output = vec![0, 0, 0, 0, 0, flags];
     append_imageio_rational(cap_min, &mut output);

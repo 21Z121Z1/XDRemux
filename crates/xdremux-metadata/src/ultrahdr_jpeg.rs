@@ -56,9 +56,14 @@ impl UltraHdrGainMapMetadata {
     }
 
     fn validate(&self) -> Result<()> {
+        let context = if self.uses_iso_colorimetry {
+            ISO_CONTEXT
+        } else {
+            XMP_CONTEXT
+        };
         if !matches!(self.channel_count, 1 | 3) {
             return Err(MetadataError::invalid(
-                ISO_CONTEXT,
+                context,
                 format!("unsupported gain-map channel count {}", self.channel_count),
             ));
         }
@@ -73,14 +78,36 @@ impl UltraHdrGainMapMetadata {
             .any(|value| !value.is_finite())
         {
             return Err(MetadataError::invalid(
-                ISO_CONTEXT,
+                context,
                 "gain-map metadata contains a non-finite number",
             ));
         }
         if self.gamma.iter().any(|value| *value <= 0.0) {
             return Err(MetadataError::invalid(
-                ISO_CONTEXT,
+                context,
                 "gain-map gamma must be positive",
+            ));
+        }
+        for channel in 0..usize::from(self.channel_count) {
+            if self.gain_map_min[channel] > self.gain_map_max[channel] {
+                return Err(MetadataError::invalid(
+                    context,
+                    format!("gainMapMin[{channel}] exceeds gainMapMax[{channel}]"),
+                ));
+            }
+        }
+        if self.uses_iso_colorimetry {
+            // ISO headrooms describe baseline and alternate, not a sorted range.
+            if self.hdr_capacity_min == self.hdr_capacity_max {
+                return Err(MetadataError::invalid(
+                    context,
+                    "baseline and alternate HDR headrooms must differ",
+                ));
+            }
+        } else if self.hdr_capacity_min < 0.0 || self.hdr_capacity_max <= self.hdr_capacity_min {
+            return Err(MetadataError::invalid(
+                context,
+                "HDRCapacityMin must be nonnegative and HDRCapacityMax must exceed HDRCapacityMin",
             ));
         }
         Ok(())
@@ -509,16 +536,18 @@ fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
 
 /// Parse public gain-map metadata from a compressed Ultra HDR gain-map JPEG.
 ///
-/// Adobe hdrgm XMP is preferred when present, matching existing product
-/// semantics. ISO 21496-1 APP2 is the standards fallback used by newer Android
-/// encoders. A JPEG containing neither form is not considered a gain map.
+/// Prefer ISO APP2 as recommended by Android's cross-format compatibility guide.
+/// An invalid or unsupported ISO payload is an error under XDRemux's conversion
+/// policy, even when XMP is valid. Only absent ISO permits the Android hdrgm path.
+/// The caller must pass the located gain JPEG, not the baseline's version-only APP2.
 pub fn parse_ultrahdr_gain_map_metadata(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
-    if let Some(xmp) = extract_xmp(jpeg)? {
-        if let Some(metadata) = parse_hdrgm_xmp(xmp)? {
-            return Ok(Some(metadata));
-        }
+    if let Some(metadata) = parse_iso_jpeg(jpeg)? {
+        return Ok(Some(metadata));
     }
-    parse_iso_jpeg(jpeg)
+    if let Some(xmp) = extract_xmp(jpeg)? {
+        return parse_hdrgm_xmp(xmp);
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -577,5 +606,122 @@ mod tests {
     #[test]
     fn rejects_nonzero_iso_reserved_bits() {
         assert!(decode_iso_payload(&iso_payload(0x04)).is_err());
+    }
+
+    const XMP: &[u8] = br#"<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"><description hdrgm:GainMapMax="2" hdrgm:HDRCapacityMax="2"/></x:xmpmeta>"#;
+
+    fn gain_jpeg(iso: Option<&[u8]>, xmp: Option<&[u8]>) -> Vec<u8> {
+        let mut jpeg = vec![0xff, 0xd8];
+        for (marker, prefix, payload) in [
+            (0xe1, b"http://ns.adobe.com/xap/1.0/\0".as_slice(), xmp),
+            (0xe2, ISO_NAMESPACE, iso),
+        ] {
+            if let Some(payload) = payload {
+                jpeg.extend_from_slice(&[0xff, marker]);
+                jpeg.extend_from_slice(
+                    &u16::try_from(prefix.len() + payload.len() + 2)
+                        .unwrap()
+                        .to_be_bytes(),
+                );
+                jpeg.extend_from_slice(prefix);
+                jpeg.extend_from_slice(payload);
+            }
+        }
+        jpeg.extend_from_slice(&[0xff, 0xd9]);
+        jpeg
+    }
+
+    #[test]
+    fn gain_jpeg_selects_iso_values_and_colorimetry_before_reading_xmp() {
+        for flags in [0, 0x40, 0x80, 0xc0] {
+            let iso = iso_payload(flags);
+            let expected = decode_iso_payload(&iso).unwrap();
+            // XMP conflicts with ISO's gains and flag; malformed XMP must also
+            // be irrelevant when the gain JPEG supplies valid ISO metadata.
+            for xmp in [Some(XMP), Some(b"<x:xmpmeta broken".as_slice()), None] {
+                let parsed = parse_ultrahdr_gain_map_metadata(&gain_jpeg(Some(&iso), xmp))
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(parsed, expected);
+            }
+        }
+        let parsed = parse_ultrahdr_gain_map_metadata(&gain_jpeg(None, Some(XMP)))
+            .unwrap()
+            .unwrap();
+        assert!(!parsed.uses_iso_colorimetry);
+        assert!(parsed.use_base_color_space);
+        assert_eq!(parsed.gain_map_max, [2.0; 3]);
+        assert!(parse_ultrahdr_gain_map_metadata(&gain_jpeg(None, None))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn invalid_iso_never_falls_back_to_valid_xmp() {
+        let valid = iso_payload(0x40);
+        let mut unsupported = valid.clone();
+        unsupported[..2].copy_from_slice(&1_u16.to_be_bytes());
+        let mut reserved = valid.clone();
+        reserved[4] |= 1;
+        let mut zero_denominator = valid.clone();
+        zero_denominator[9..13].fill(0);
+        let mut inverted_gain = valid.clone();
+        inverted_gain[21..25].copy_from_slice(&2_i32.to_be_bytes());
+        let mut equal_headrooms = valid.clone();
+        equal_headrooms[13..17].fill(0);
+        for invalid in [
+            &valid[..4],
+            &valid[..valid.len() - 1],
+            &unsupported,
+            &reserved,
+            &zero_denominator,
+            &inverted_gain,
+            &equal_headrooms,
+        ] {
+            let error = parse_ultrahdr_gain_map_metadata(&gain_jpeg(Some(invalid), Some(XMP)))
+                .expect_err("declared invalid ISO must fail even when XMP is usable");
+            assert!(error.to_string().contains(ISO_CONTEXT), "{error}");
+        }
+    }
+
+    #[test]
+    fn iso_checks_each_gain_interval_and_distinct_headrooms() {
+        for flags in [0, 0x80] {
+            for channel in 0..if flags == 0 { 1 } else { 3 } {
+                let mut payload = iso_payload(flags);
+                let offset = 21 + channel * 40;
+                payload[offset..offset + 4].copy_from_slice(&2_i32.to_be_bytes());
+                assert!(decode_iso_payload(&payload).is_err(), "channel {channel}");
+            }
+        }
+        let mut payload = iso_payload(0);
+        payload[13..17].fill(0);
+        assert!(decode_iso_payload(&payload).is_err());
+        // ISO permits the HDR baseline -> SDR alternate direction. It also
+        // permits a constant gain interval, signed offsets and future tails.
+        payload[5..9].copy_from_slice(&2_u32.to_be_bytes());
+        payload[29..33].copy_from_slice(&0_i32.to_be_bytes());
+        payload[45..49].copy_from_slice(&(-1_i32).to_be_bytes());
+        payload[49..53].copy_from_slice(&4_u32.to_be_bytes());
+        payload[2..4].copy_from_slice(&7_u16.to_be_bytes());
+        let expected = decode_iso_payload(&payload).unwrap();
+        assert_eq!(expected.hdr_capacity_min, 2.0);
+        assert_eq!(expected.hdr_capacity_max, 0.0);
+        assert_eq!(expected.gain_map_min, expected.gain_map_max);
+        assert_eq!(expected.offset_sdr, [-0.25; 3]);
+        payload.extend_from_slice(&[0xff, 0xff, 1, 2, 3]);
+        assert_eq!(decode_iso_payload(&payload).unwrap(), expected);
+    }
+
+    #[test]
+    fn xmp_capacity_constraints_are_separate_from_iso_direction() {
+        for (minimum, maximum) in [("-1", "2"), ("2", "2"), ("2", "1")] {
+            let xmp = format!(
+                r#"<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"><description hdrgm:GainMapMax="2" hdrgm:HDRCapacityMin="{minimum}" hdrgm:HDRCapacityMax="{maximum}"/></x:xmpmeta>"#
+            );
+            let error = parse_ultrahdr_gain_map_metadata(&gain_jpeg(None, Some(xmp.as_bytes())))
+                .expect_err("invalid Android HDR capacities must be rejected");
+            assert!(error.to_string().contains(XMP_CONTEXT), "{error}");
+        }
     }
 }

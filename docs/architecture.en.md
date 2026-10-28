@@ -61,6 +61,18 @@ Styles reconstruction and HDR Look fit scene pixels in linear Display P3. When g
 
 For ISO JPEG input, Exif `ColorSpace=1` selects sRGB even when an ICC is present (C.4.4). Other Exif values retain the source ICC when available. Android hdrgm input retains its existing ICC selection.
 
+### JPEG gain-map metadata selection
+
+The runtime locates a complete gain JPEG after the baseline image and checks any declared GainMap length before parsing its metadata. The baseline's version-only ISO APP2 is not a gain-map payload. On the located gain JPEG, valid ISO APP2 takes precedence over Adobe hdrgm XMP, including conflicting values. This follows the [Android Ultra HDR v1.1 compatibility recommendation](https://developer.android.com/media/platform/hdr-image-format#iso_21496-1_compatibility). It is not an ISO-defined cross-format priority. Valid ISO is read without parsing XMP. Only absent ISO permits the XMP path.
+
+Present but malformed or unsupported ISO fails conversion, even if XMP is valid or the Motion Photo has no mapped GainMap resource. The error identifies the ISO failure. It cannot become an XMP or SDR success. This is XDRemux's conservative conversion policy. ISO C.2.3 instead tells a general reader to ignore an unknown minimum version and display the baseline. A converter failure leaves the source available and preserves existing outputs.
+
+ISO validation requires each component's minimum gain to be no greater than its maximum, positive gamma, finite values, and distinct baseline/alternate headrooms. The headrooms may decrease for an HDR baseline. Zero rational denominators, unsupported minimum versions, truncated required fields and nonzero reserved flags fail. Higher writer versions and optional trailing bytes remain accepted when the minimum version and required fields are supported. XMP keeps its Android color binding and defaults, with separate checks for nonnegative `HDRCapacityMin` and strictly larger `HDRCapacityMax`. The existing real JPEG corpus has no capacity conflict with those checks.
+
+Selected ISO values, metadata component count and application-space flag flow to the HEIF writer. Without an alternate ICC, C.4.7 selects baseline application primaries even for a zero source flag. `tmap` references exactly `[base, gain]`; each image has its own color property. Gain compression remains full-range BT.601 nclx `(2, 2, 6)`. `tmap.colr` describes the alternate representation and can carry its supplied ICC. The [sample audit](validation/20261028-iso-jpeg.en.md) records the compatibility scope and commands.
+
+An ISO alternate ICC must pass minimum admission checks before gain encoding: declared length, `acsp` signature, supported ICC v2/v4 header, RGB data with XYZ/Lab PCS, an image profile class, bounded/aligned tag data and unique tag signatures. If a CICP tag exists, its structure, class binding and H.273 code points must be valid, with matrix 0 for RGB and a range flag of 0 or 1. An HDR alternate (alternate log2 headroom greater than zero) requires CICP. A damaged present profile fails conversion; it is never treated as missing or replaced with a guessed gamut. Accepted profile bytes remain unchanged in `tmap.prof`. These are structural and encoding checks, not evaluation of every ICC transform or proof of native color equivalence. Baseline ICC admission and XMP-only gain ICC handling retain their existing behavior.
+
 ### Live Photo
 
 The default output contains an HEIC/HEIF still and a MOV with the same asset identifier. The converter maps the resolved source cover time to Apple `still-image-time`.

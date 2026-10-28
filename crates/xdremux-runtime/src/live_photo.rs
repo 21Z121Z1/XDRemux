@@ -18,8 +18,8 @@ use xdremux_heif::{
     GainMapTile, IsoGainMapAssembly,
 };
 use xdremux_metadata::{
-    make_apple_tmap_payload_with_colour_space, make_hdrgm_xmp, parse_ultrahdr_gain_map_metadata,
-    UltraHdrGainMapMetadata,
+    make_apple_tmap_payload_with_channel_count, make_hdrgm_xmp, parse_ultrahdr_gain_map_metadata,
+    validate_iso_alternate_icc, UltraHdrGainMapMetadata,
 };
 use xdremux_motion_photo::{
     apple, build_live_photo_jpeg_exif, companion_video_path, parse_first_lpex_object,
@@ -156,13 +156,6 @@ fn validated_gain_jpeg<'a>(
             }
         };
         let candidate = &static_bytes[start..end];
-        let metadata = match parse_ultrahdr_gain_map_metadata(candidate) {
-            Ok(Some(metadata)) => metadata,
-            Ok(None) | Err(_) => {
-                search = start.saturating_add(2);
-                continue;
-            }
-        };
         let candidate_length = u64::try_from(candidate.len()).map_err(|_| {
             RuntimeError::new("Ultra HDR JPEG/R", "gain-map JPEG length exceeds u64")
         })?;
@@ -170,6 +163,12 @@ fn validated_gain_jpeg<'a>(
             search = start.saturating_add(2);
             continue;
         }
+        let Some(metadata) = parse_ultrahdr_gain_map_metadata(candidate)
+            .map_err(|error| RuntimeError::external("Ultra HDR gain-map metadata", error))?
+        else {
+            search = start.saturating_add(2);
+            continue;
+        };
         if !declared {
             return Err(RuntimeError::new(
                 "Ultra HDR JPEG/R",
@@ -239,6 +238,17 @@ fn assemble_jpeg_gain_map(
     base_heif: &[u8],
     gain: &ValidatedGainJpeg<'_>,
 ) -> Result<Vec<u8>> {
+    let alternate_icc = if gain.metadata.uses_iso_colorimetry {
+        let profile = jpeg_icc_profile(gain.bytes)
+            .map_err(|error| RuntimeError::external("Ultra HDR alternate ICC", error))?;
+        if let Some(profile) = &profile {
+            validate_iso_alternate_icc(profile, gain.metadata.hdr_capacity_max > 0.0)
+                .map_err(|error| RuntimeError::external("Ultra HDR alternate ICC", error))?;
+        }
+        profile
+    } else {
+        None
+    };
     let (format, target) = gain_map_target(gain.bytes)?;
     let decoded = jpeg
         .decode_raster(&JpegRasterDecodeRequest {
@@ -262,19 +272,17 @@ fn assemble_jpeg_gain_map(
         .metadata
         .to_info_floats()
         .map_err(|error| RuntimeError::external("Ultra HDR metadata normalization", error))?;
-    let alternate_icc = if gain.metadata.uses_iso_colorimetry {
-        jpeg_icc_profile(gain.bytes)
-            .map_err(|error| RuntimeError::external("Ultra HDR alternate ICC", error))?
-    } else {
-        None
-    };
     // ISO 21496-1 C.4.7: without an alternate ICC the application primaries
     // are the base primaries, including when the source flag is zero. The
     // HEIF writer may choose a new alternate encoding, but must not move the
     // per-channel gain operation into that new space.
     let use_base_colour_space = gain.metadata.use_base_color_space || alternate_icc.is_none();
-    let tmap_payload = make_apple_tmap_payload_with_colour_space(&info, use_base_colour_space)
-        .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
+    let tmap_payload = make_apple_tmap_payload_with_channel_count(
+        &info,
+        use_base_colour_space,
+        gain.metadata.channel_count,
+    )
+    .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
     let xmp_payload = make_hdrgm_xmp(&info)
         .map_err(|error| RuntimeError::external("Ultra HDR hdrgm XMP", error))?;
     let tiles = encoded
@@ -722,8 +730,18 @@ mod tests {
                     gamma: [1.0; 3],
                     offset_sdr: [0.0; 3],
                     offset_hdr: [0.0; 3],
-                    hdr_capacity_min: 0.0,
-                    hdr_capacity_max: 2.0,
+                    // This real ICC describes an SDR alternate, so the ISO
+                    // HDR -> SDR case does not require a CICP tag on it.
+                    hdr_capacity_min: if is_iso && alternate_icc.is_some() {
+                        2.0
+                    } else {
+                        0.0
+                    },
+                    hdr_capacity_max: if is_iso && alternate_icc.is_some() {
+                        0.0
+                    } else {
+                        2.0
+                    },
                     channel_count: 1,
                     use_base_color_space: !is_iso,
                     uses_iso_colorimetry: is_iso,

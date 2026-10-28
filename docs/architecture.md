@@ -61,6 +61,18 @@ Styles 重建和 HDR Look 在线性 Display P3 中拟合场景像素。生成新
 
 ISO JPEG 输入中，Exif `ColorSpace=1` 即使在存在 ICC 时也选择 sRGB（C.4.4）。其他 Exif 值在源文件提供 ICC 时保留它。Android hdrgm 输入沿用现有 ICC 选择行为。
 
+### JPEG 增益图元数据选择
+
+运行时在基线图像之后定位完整的增益 JPEG，并在解析元数据前核对已声明的 GainMap 长度。基线 JPEG 中只含版本的 ISO APP2 不是增益图参数。在已定位的增益 JPEG 中，有效 ISO APP2 优先于 Adobe hdrgm XMP，包括参数冲突的情形。这采用 [Android Ultra HDR v1.1 的兼容建议](https://developer.android.com/media/platform/hdr-image-format#iso_21496-1_compatibility)，不是 ISO 自身定义的跨格式优先级。有效 ISO 无需先解析 XMP；只有 ISO 缺失时才进入 XMP 路径。
+
+ISO 已存在但损坏或版本不受支持时，转换失败；即使 XMP 有效或 Motion Photo 没有映射 GainMap 资源，也不能转为 XMP 或 SDR 成功输出。错误会指出 ISO 失败原因。这是 XDRemux 的保守转换策略。ISO C.2.3 对通用阅读器的规定则是忽略未知最低版本并显示基线图像。转换失败会保留源文件和已有输出。
+
+ISO 校验要求逐分量最小增益不大于最大增益、gamma 为正、数值有限，以及基线与替代 headroom 不相等。HDR 基线允许 headroom 递减。有理数分母为零、最低版本不受支持、必需字段截断和保留标志非零都会失败。只要最低版本和必需字段受支持，就继续接受更高的 writer version 和可选尾部字节。XMP 保留 Android 色彩绑定和默认值，单独检查 `HDRCapacityMin` 非负且 `HDRCapacityMax` 严格大于它。现有真实 JPEG 样本与这些 capacity 检查没有冲突。
+
+选中的 ISO 数值、元数据分量数和应用空间标志传入 HEIF 写入器。替代 ICC 缺失时，C.4.7 要求使用基线应用基色，即使源标志为零。`tmap` 恰好引用 `[base, gain]`，各图像分别携带色彩属性。增益压缩保留全范围 BT.601 nclx `(2, 2, 6)`；`tmap.colr` 描述替代表示，可承载源替代 ICC。[样本审计](validation/20261028-iso-jpeg.md)记录兼容性范围和验证命令。
+
+ISO 替代 ICC 在增益图编码前执行最低准入检查：声明长度、`acsp` 签名、受支持的 ICC v2/v4 头部、RGB 数据及 XYZ/Lab PCS、图像配置文件类别、标签数据的边界与对齐，以及标签签名唯一性。存在 CICP 时，检查其结构、类别绑定及 H.273 代码点；RGB 的矩阵必须为 0，范围标志可以为 0 或 1。HDR 替代表示（替代 log2 headroom 大于零）必须带 CICP。存在但损坏的配置文件会使转换失败，不能当成缺失或替换成猜测的色域。通过检查的原字节保留到 `tmap.prof`。这些检查覆盖结构和编码声明，不计算全部 ICC 变换，也不证明原生颜色等价。基线 ICC 准入和 XMP-only 增益 ICC 处理保留现有行为。
+
 ### Live Photo
 
 默认输出由一张 HEIC/HEIF 照片和一个 MOV 组成，两者共享资产标识符。转换器把解析出的源封面时间映射为 Apple `still-image-time`。
