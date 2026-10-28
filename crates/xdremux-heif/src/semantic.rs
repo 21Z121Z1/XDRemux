@@ -1435,16 +1435,103 @@ fn normalized_source_final_location(
     Ok(normalized)
 }
 
+struct AppleHdrRationals {
+    order: xdremux_format::cursor::Endian,
+    values: BTreeMap<u16, (usize, [u32; 2])>,
+}
+
+fn apple_hdr_rationals(note: &[u8]) -> Result<Option<AppleHdrRationals>> {
+    use xdremux_format::cursor::{Cursor, Endian};
+    if !note.starts_with(b"Apple iOS\0\0\x01") {
+        return Ok(None);
+    }
+    let order = match note.get(12..14) {
+        Some(b"MM") => Endian::Big,
+        Some(b"II") => Endian::Little,
+        _ => return Err(invalid("Apple HDR MakerNote has no byte order")),
+    };
+    let mut entries = Cursor::new(note, order, "Apple HDR MakerNote");
+    entries.skip(14)?;
+    let count = usize::from(entries.read_u16()?);
+    let values_start = 16 + count * 12 + 4;
+    let mut values = BTreeMap::new();
+    for _ in 0..count {
+        let tag = entries.read_u16()?;
+        let kind = entries.read_u16()?;
+        let length = entries.read_u32()?;
+        let offset = entries.read_u32()? as usize;
+        if ![33, 48].contains(&tag) {
+            continue;
+        }
+        if kind != 10 || length != 1 || offset < values_start || values.contains_key(&tag) {
+            return Err(invalid("ambiguous or invalid Apple HDR rational"));
+        }
+        let mut value = Cursor::new(note, order, "Apple HDR rational");
+        value.set_position(offset)?;
+        let rational = [value.read_u32()?, value.read_u32()?];
+        if rational[1] == 0
+            || values
+                .values()
+                .any(|(other, _)| offset.abs_diff(*other) < 8)
+        {
+            return Err(invalid("invalid or overlapping Apple HDR rational"));
+        }
+        values.insert(tag, (offset, rational));
+    }
+    entries.read_u32()?;
+    Ok(Some(AppleHdrRationals { order, values }))
+}
+
+fn preserve_apple_hdr_exif(
+    source_data: &[u8],
+    scaffold_data: &[u8],
+    scaffold_payload: Vec<u8>,
+) -> Result<Vec<u8>> {
+    let Some(source_tiff) = xdremux_format::heif_exif_tiff(source_data)? else {
+        return Ok(scaffold_payload);
+    };
+    let Some(source_note) = xdremux_format::exif_makernote(&source_tiff)? else {
+        return Ok(scaffold_payload);
+    };
+    let Some(source) = apple_hdr_rationals(&source_note)? else {
+        return Ok(scaffold_payload);
+    };
+    if source.values.is_empty() {
+        return Ok(scaffold_payload);
+    }
+    let tiff = xdremux_format::heif_exif_tiff(scaffold_data)?
+        .ok_or_else(|| invalid("semantic scaffold lost Apple HDR Exif"))?;
+    let mut note = xdremux_format::exif_makernote(&tiff)?
+        .ok_or_else(|| invalid("semantic scaffold lost Apple HDR MakerNote"))?;
+    let destination = apple_hdr_rationals(&note)?
+        .ok_or_else(|| invalid("semantic scaffold replaced Apple HDR MakerNote"))?;
+    for (tag, (_, rational)) in source.values {
+        let (offset, _) = destination
+            .values
+            .get(&tag)
+            .ok_or_else(|| invalid("semantic scaffold lost Apple HDR rational"))?;
+        for (index, value) in rational.into_iter().enumerate() {
+            let bytes = match destination.order {
+                xdremux_format::cursor::Endian::Big => value.to_be_bytes(),
+                xdremux_format::cursor::Endian::Little => value.to_le_bytes(),
+            };
+            let start = offset + index * 4;
+            note[start..start + 4].copy_from_slice(&bytes);
+        }
+    }
+    let mut payload = vec![0; 4];
+    payload.extend(xdremux_format::replace_exif_makernote(Some(&tiff), &note)?);
+    Ok(payload)
+}
+
 /// Merge semantic image resources produced by the ImageIO write primitive
 /// into the Rust-owned HDR graph while retaining the source base/Gain Map
 /// payloads byte-for-byte.
 ///
-/// ImageIO is intentionally used only to encode and describe the semantic
-/// resources. Re-running its destination writer over a Rust-authored ISO Gain
-/// Map can hide the Gain Map from ImageIO when an auxiliary matte is added.
-/// This graph merge is therefore part of the Rust container ownership layer:
-/// it imports only the scaffold's semantic items, properties, and references,
-/// and keeps the source primary/tmap items and mdat prefix authoritative.
+/// ImageIO encodes the semantic resources and generated editing state. Rust
+/// keeps the source primary/tmap graph, mdat prefix, and exact numeric Apple
+/// HDR rationals authoritative. Rewriting those rationals through ImageIO's
+/// number representation can change HDR readback while SDR remains identical.
 pub fn merge_apple_semantic_auxiliary_heif(
     source_data: &[u8],
     scaffold_data: &[u8],
@@ -1480,6 +1567,10 @@ pub fn merge_apple_semantic_auxiliary_heif(
         scaffold_exif,
         "semantic scaffold Exif",
     )?;
+    // The scaffold contributes generated editing state. Its ImageIO rewrite
+    // must not round the source's numeric Gain Map descriptors.
+    let scaffold_exif_payload =
+        preserve_apple_hdr_exif(source_data, scaffold_data, scaffold_exif_payload)?;
 
     let mut next_item_id = source_maximum_item_id(&source.meta)?
         .checked_add(1)
@@ -2624,7 +2715,15 @@ mod tests {
                 (PRIMARY, root_type, format!("{label}-primary").into_bytes()),
                 (GAIN, root_type, format!("{label}-gain").into_bytes()),
                 (TONE_MAP, TMAP, b"tone-map-metadata".to_vec()),
-                (EXIF_ID, EXIF, format!("{label}-exif").into_bytes()),
+                (
+                    EXIF_ID,
+                    EXIF,
+                    [
+                        b"\0\0\0\0MM\0*\0\0\0\x08\0\0\0\0\0\0".as_slice(),
+                        label.as_bytes(),
+                    ]
+                    .concat(),
+                ),
             ];
             let mut references = vec![
                 IrefEntry {
@@ -2902,6 +3001,105 @@ mod tests {
             ] {
                 assert!(assemble(&source, &scaffold.bytes(), 3).is_err());
             }
+        }
+    }
+
+    #[test]
+    fn semantic_merge_preserves_exact_hdr_rationals_and_generated_style_state() {
+        // ImageIO exposes these rationals as numbers and may re-encode them at
+        // lower precision while adding the generated SmartStyle dictionary.
+        fn note(values: [(i32, i32); 2], little: bool) -> Vec<u8> {
+            let u16_bytes = |v: u16| {
+                if little {
+                    v.to_le_bytes()
+                } else {
+                    v.to_be_bytes()
+                }
+            };
+            let u32_bytes = |v: u32| {
+                if little {
+                    v.to_le_bytes()
+                } else {
+                    v.to_be_bytes()
+                }
+            };
+            let mut note = b"Apple iOS\0\0\x01".to_vec();
+            note.extend_from_slice(if little { b"II" } else { b"MM" });
+            note.extend_from_slice(&u16_bytes(3));
+            for (index, tag) in [33, 48, 84].into_iter().enumerate() {
+                note.extend_from_slice(&u16_bytes(tag));
+                note.extend_from_slice(&u16_bytes(if tag == 84 { 7 } else { 10 }));
+                note.extend_from_slice(&u32_bytes(if tag == 84 { 8 } else { 1 }));
+                note.extend_from_slice(&u32_bytes(56 + index as u32 * 8));
+            }
+            note.extend_from_slice(&[0; 4]);
+            for (numerator, denominator) in values {
+                note.extend_from_slice(&u32_bytes(numerator as u32));
+                note.extend_from_slice(&u32_bytes(denominator as u32));
+            }
+            note.extend_from_slice(b"style-84");
+            note
+        }
+        fn exif(note: &[u8]) -> Vec<u8> {
+            let mut payload = vec![0; 4];
+            payload.extend(xdremux_format::replace_exif_makernote(None, note).unwrap());
+            payload
+        }
+        for source_little in [false, true] {
+            for scaffold_little in [false, true] {
+                let mut source = Fixture::new(false, false, "source");
+                let mut scaffold = Fixture::new(false, true, "framework");
+                let mut source_note = note(
+                    [(123_456_789, 987_654_321), (-234_567, 765_432)],
+                    source_little,
+                );
+                source_note[72..80].copy_from_slice(b"withheld");
+                source.items.iter_mut().find(|i| i.0 == EXIF_ID).unwrap().2 = exif(&source_note);
+                scaffold
+                    .items
+                    .iter_mut()
+                    .find(|i| i.0 == EXIF_ID)
+                    .unwrap()
+                    .2 = exif(&note([(1, 8), (-3, 10)], scaffold_little));
+                let output =
+                    merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold.bytes(), 3)
+                        .unwrap();
+                let tiff = xdremux_format::heif_exif_tiff(&output).unwrap().unwrap();
+                let actual = xdremux_format::exif_makernote(&tiff).unwrap().unwrap();
+                assert_eq!(
+                    actual,
+                    note(
+                        [(123_456_789, 987_654_321), (-234_567, 765_432)],
+                        scaffold_little
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hdr_rationals_reject_ambiguous_or_invalid_numeric_storage() {
+        // Two big-endian SRATIONAL fields at note-relative offsets 44 and 52.
+        let mut note = b"Apple iOS\0\0\x01MM\0\x02".to_vec();
+        note.extend_from_slice(b"\0\x21\0\x0a\0\0\0\x01\0\0\0\x2c");
+        note.extend_from_slice(b"\0\x30\0\x0a\0\0\0\x01\0\0\0\x34");
+        note.extend_from_slice(b"\0\0\0\0\0\0\0\x01\0\0\0\x08\0\0\0\x03\0\0\0\x0a");
+        assert_eq!(apple_hdr_rationals(&note).unwrap().unwrap().values.len(), 2);
+        for (offset, replacement) in [
+            (28, b"\0\x21".as_slice()),   // duplicate tag
+            (18, b"\0\x05".as_slice()),   // unsigned rather than signed rational
+            (23, b"\x02".as_slice()),     // more than one value
+            (27, b"\x10".as_slice()),     // value points into the IFD
+            (39, b"\x2f".as_slice()),     // overlapping rational values
+            (39, b"\xff".as_slice()),     // value outside the note
+            (48, b"\0\0\0\0".as_slice()), // zero denominator
+        ] {
+            let mut invalid = note.clone();
+            invalid[offset..offset + replacement.len()].copy_from_slice(replacement);
+            assert!(apple_hdr_rationals(&invalid).is_err(), "offset {offset}");
+        }
+        for end in [12, 14, 20, 43, 59] {
+            assert!(apple_hdr_rationals(&note[..end]).is_err());
         }
     }
 

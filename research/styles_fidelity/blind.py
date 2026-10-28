@@ -14,7 +14,7 @@ import tempfile
 import numpy as np
 
 from scripts.apple.check_style_tone_response import prepare_consumer_compatibility, PINNED_RESEARCH_REVISION
-from . import corpus, isolate, native
+from . import corpus, hdr_exif, isolate, native
 from .texture import measurement_host, primitive, run
 
 TONES = (-0.5, 0.0, 0.5)
@@ -166,6 +166,16 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
         raise ValueError('resource producer did not preserve its blind input')
     before, after = isolate.Graph(source.read_bytes()), isolate.Graph(output.read_bytes())
     coded_preserved = before.image_fingerprint(before.primary) == after.image_fingerprint(after.primary)
+    descriptors = []
+    for graph in (before, after):
+        exif = [i for i, identity in graph.identities.items() if identity['kind'] == 'Exif'
+                and graph.primary in graph.targets(i, 'cdsc')]
+        if len(exif) != 1:
+            raise ValueError('resource generation has no unambiguous primary Exif')
+        descriptor = hdr_exif.redact(graph.payloads[exif[0]])
+        descriptors.append(None if descriptor is None else isolate.sha(descriptor))
+    if descriptors[0] != descriptors[1]:
+        raise ValueError('resource generation changed exact numeric HDR Exif: ' + json.dumps(descriptors))
     preservation = None
     if verify_pixels:
         width, height = native.display_geometry(before)
@@ -178,7 +188,8 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
             if left['hdr_content_headroom'] != right['hdr_content_headroom'] or not all(c['passed'] for c in comparisons.values()):
                 raise ValueError('resource assembly changed native SDR/HDR base pixels: ' + json.dumps({
                     'input_headroom': left['hdr_content_headroom'], 'rebuilt_headroom': right['hdr_content_headroom'],
-                    'comparisons': comparisons}))
+                    'comparisons': comparisons, 'coded_primary_preserved': coded_preserved,
+                    'numeric_hdr_exif_sha256': descriptors[0]}))
             preservation = {'headroom': right['hdr_content_headroom'], 'comparisons': comparisons}
     if not coded_preserved:
         raise ValueError('resource regeneration altered the coded primary: ' + json.dumps({
@@ -186,6 +197,7 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
             'rebuilt_properties': [(p['kind'], isolate.sha(p['raw'])) for p in after.props(after.primary)],
             'native_base_preservation': preservation}))
     return {'style': corpus.inspect_bytes(output.read_bytes())['style'],
+            'numeric_hdr_exif_sha256': descriptors[0],
             'native_base_preservation': preservation}
 
 

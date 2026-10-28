@@ -104,6 +104,10 @@ authoritative source graph. The source primary, Gain Map, transforms and color
 properties remain intact. A Gain Map identified by the ordered tmap graph may
 link to the primary alone or to both primary and tmap; semantic mattes still
 require both targets. Unrelated or duplicate Gain Map targets remain errors.
+The merge preserves the exact source HDR MakerNote rationals 33/48 alongside
+the scaffold's newly generated editing state. Re-encoding those source facts
+through ImageIO's number representation must not change the HDR base. Each
+trial checks their exact values before evaluating edit responses.
 
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity

@@ -60,6 +60,8 @@ python3 -m research.styles_fidelity.native \
 
 研究路径将新语义资源合入原始 Apple HDR 资源图，保留源主图、Gain Map、变换与颜色属性。由有序 tmap 图识别的 Gain Map 可以只关联主图，也可以同时关联主图与 tmap；语义蒙版仍须关联两者。无关或重复的 Gain Map 目标仍会被拒绝。
 
+合并时保留源 HDR MakerNote 字段 33／48 的精确有理数值，同时采用脚手架新生成的编辑状态。经 ImageIO 数值表示重新编码这些源信息不得改变 HDR 基图。每次试验在评估编辑响应前核对其精确值。
+
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
 python3 -m research.styles_fidelity.blind \
