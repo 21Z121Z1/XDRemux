@@ -9,7 +9,16 @@ import zipfile
 
 import numpy as np
 
-from research.styles_fidelity import corpus, isolate, native, split
+from research.styles_fidelity import corpus, hdr_exif, isolate, native, split
+
+
+def hdr_note():
+    # Independent wire fixture: HDR rationals, a forbidden tag 84, and trailing bytes.
+    header = b'Apple iOS\0\0\x01MM\0\x03'
+    entries = struct.pack('>HHII', 33, 10, 1, 56)
+    entries += struct.pack('>HHII', 48, 10, 1, 64)
+    entries += struct.pack('>HHII', 84, 7, 8, 72)
+    return header + entries + b'\0' * 4 + struct.pack('>iiii', 7, 4, 1, 2) + b'WITHHELD-EXIF-AND-MAKERNOTE'
 
 
 def box(kind, payload):
@@ -28,7 +37,7 @@ def sample(style_version=16, *, baseline=8.0, texture='Standard', broken_referen
         4: b'WITHHELD-LINEAR-THUMBNAIL',
         5: plistlib.dumps({'Preset': texture, 'HardwareModel': 'test-only',
                            'TextureStylePostProcessedPeopleData': []}),
-        6: b'WITHHELD-EXIF-AND-MAKERNOTE',
+        6: hdr_exif.wrap_note(hdr_note()),
         7: b'WITHHELD-PERSON-MATTE',
     }
     kinds = {1: 'hvc1', 2: 'hvc1', 3: 'uri ', 4: 'hvc1', 5: 'uri ', 6: 'Exif', 7: 'hvc1'}
@@ -138,12 +147,32 @@ class StyleFidelityTests(unittest.TestCase):
         self.assertNotIn(b'WITHHELD', output)
         self.assertNotIn(isolate.STYLES_URI.encode(), output)
         self.assertNotIn(isolate.TEXTURE_URI.encode(), output)
-        self.assertNotIn(b'Exif', output)
         before, after = isolate.Graph(original), isolate.Graph(output)
         self.assertEqual(before.image_fingerprint(before.primary), after.image_fingerprint(after.primary))
-        self.assertEqual(sorted(before.payloads[i] for i in (1, 2)), sorted(after.payloads.values()))
+        self.assertEqual(sorted(before.payloads[i] for i in (1, 2)),
+                         sorted(after.payloads[i] for i in after.items if after.identities[i]['kind'] == 'hvc1'))
         self.assertEqual(receipt['retained_image_payloads'], 2)
         self.assertFalse(receipt['native_hdr_equivalence_verified'])
+
+    def test_minimal_hdr_exif_keeps_exact_rationals_without_smartstyle_or_trailing_bytes(self):
+        payload = hdr_exif.wrap_note(hdr_note())
+        clean = hdr_exif.redact(payload)
+        self.assertNotIn(b'WITHHELD', clean)
+        self.assertIn(struct.pack('>iiii', 7, 4, 1, 2), clean)
+        self.assertEqual(hdr_exif.redact(clean), clean)
+        from PIL import Image
+        exif = Image.Exif()
+        exif.load(b'Exif\0\0' + clean[4:])
+        self.assertEqual(set(exif.keys()), {271, 34665})
+        self.assertEqual(set(exif.get_ifd(34665)), {37500})
+        note = exif.get_ifd(34665)[37500]
+        self.assertEqual(struct.unpack_from('>H', note, 14)[0], 2)
+        self.assertEqual([struct.unpack_from('>H', note, 16 + i * 12)[0] for i in range(2)], [33, 48])
+
+    def test_invalid_hdr_rational_is_rejected(self):
+        note = hdr_note().replace(struct.pack('>ii', 7, 4), struct.pack('>ii', 7, 0))
+        with self.assertRaisesRegex(ValueError, 'rational'):
+            hdr_exif.redact(hdr_exif.wrap_note(note))
 
     def test_broken_dependency_cannot_be_silently_removed(self):
         with self.assertRaisesRegex(ValueError, 'missing|dependency'):

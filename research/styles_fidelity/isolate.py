@@ -1,8 +1,9 @@
 """Build a research input containing only coded SDR and its HDR resources.
 
 This is an allow-list projection, not an in-place deletion. The producer file
-never contains original Styles, semantic mattes, EXIF, MakerNotes, or unused
-mdat bytes. Native SDR/HDR equivalence is a separate, required measurement.
+never contains original Styles, semantic mattes, SmartStyle state, or unused
+mdat bytes. EXIF is rebuilt with numeric HDR fields only. Native SDR/HDR
+equivalence is a separate, required measurement.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from scripts.diagnostics import inspect_oppo_heif as H
+from . import hdr_exif
 
 STYLES_URI = 'tag:apple.com,2023:photo:metadata:styles'
 TEXTURE_URI = 'tag:apple.com,2026:photo:metadata:texture_styles'
@@ -248,8 +250,19 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
     payloads = {i: graph.payloads[i] for i in order}
     selected_refs = [r for r in graph.refs if r['from'] in order
                      and r['type'] in {'dimg', 'auxl'} and all(t in order for t in r['to'])]
-    redacted = []
+    redacted, exif_items = [], []
     for item, identity in graph.identities.items():
+        if identity['kind'] == 'Exif' and graph.targets(item, 'cdsc') == [graph.primary]:
+            exif_items.append(item)
+            if len(exif_items) > 1:
+                raise ValueError('ambiguous primary EXIF')
+            hdr = hdr_exif.redact(graph.payloads[item])
+            if hdr is not None:
+                order.append(item)
+                payloads[item] = hdr
+                redacted.append(item)
+                selected_refs.append({'type': 'cdsc', 'from': item, 'to': [graph.primary]})
+            continue
         if identity['kind'] != 'mime' or not set(graph.targets(item, 'cdsc')) & set((graph.primary, gain[0], *tmap)):
             continue
         hdr = _hdr_xmp(graph.payloads[item])
@@ -311,7 +324,7 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
         raise ValueError('projection changed coded primary geometry or color')
     if graph.image_fingerprint(gain[0]) != actual.image_fingerprint(mapping[gain[0]]):
         raise ValueError('projection changed coded HDR gain geometry or color')
-    if any(v['kind'] in {'Exif', 'uri '} for v in actual.identities.values()):
+    if any(v['kind'] == 'uri ' for v in actual.identities.values()):
         raise ValueError('withheld metadata reached producer input')
     return output, {'schema': 'styles-blind-projection-v1', 'source_sha256': sha(source),
                     'producer_input_sha256': sha(output), 'source_items': len(graph.items),
@@ -320,6 +333,7 @@ def isolate_bytes(source: bytes) -> tuple[bytes, dict]:
                     'coded_hdr_gain_preserved': True, 'original_styles_available_to_producer': False,
                     'original_mattes_available_to_producer': False,
                     'original_exif_available_to_producer': False,
+                    'rebuilt_numeric_hdr_exif': any(graph.identities[i]['kind'] == 'Exif' for i in redacted),
                     'native_hdr_equivalence_verified': False}
 
 
