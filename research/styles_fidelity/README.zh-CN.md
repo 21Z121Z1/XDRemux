@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-本研究为盲重建对照准备输入：用同一张照片的 SDR／HDR 信息重建资源，再与原始 Apple Styles 资源比较。本次不改变产品生成流程、标定常数或支持的输入类型。
+本研究用同一张照片隔离后的 SDR／HDR 信息重建资源，再与原始 Apple Styles 的原生编辑响应比较；同时使用最终 HDR 产品文件中解码出的蒙版、人物数据执行原生纹理效果重放。产品默认参数和支持的输入类型保持不变。
 
 ## 准备样本
 
@@ -54,12 +54,45 @@ python3 -m research.styles_fidelity.native \
 
 现有 `research.yml` 的 Tone 任务对固定版本的公开 Apple 样本运行此检查，仅上传报告。用户提供的私人照片保留在 Git 和公开产物之外。便携解析或解码不能证明 Apple HDR 等价、重建后的滑块响应或 Photos 编辑／保存／重开。
 
+## 重建资源与联合校准
+
+`styles-research` Cargo 特性提供研究示例，对隔离后的 Apple HDR 基图调用共享 Rust Styles 生成器；它不把源文件伪装成 ProXDR，也不扩展产品 CLI 准入。引擎接受明确的 baseline、gain 缩放和 baseline 上限，默认值沿用现有产品标定。每次试验共同重建缩略图、GTC、系数、光照图、统计和元数据；原资源仅供评估。
+
+```sh
+cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
+python3 -m research.styles_fidelity.blind \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --generator /absolute/path/target/debug/examples/styles_fidelity \
+  --research-root /absolute/path/pinned-consumer-research \
+  --calibration /absolute/path/calibration-a.heic \
+  --calibration /absolute/path/calibration-b.heic \
+  --holdout /absolute/path/holdout.heic --output /absolute/path/new-fit
+```
+
+每例先通过完整原生 SDR／HDR 输入等价性检查，评估响应前固定场景划分。默认试验与 3×3 曝光／增益网格仅按校准组原生编辑 RMSE 选择；选择完成后才评估留出组。报告记录非零 Tone、移除风格响应；只有原生滤镜确实提供 Color 控制时才执行 Color 响应。缺失能力明确保留为未测。数值比较覆盖暗部、中间调和高光；替代拟合不能豁免默认试验的失败。
+
+CI 使用公开的三份语义 Standard 对照 `IMG_2600/2604/2608`。其 Studio 纹理元数据没有人物，因而不能激活人物效果。这些是旧研究已使用过的公开风景对照，不能替代更严格的私人 Standard 样本集，也不支持人像或夜景泛化结论。已有私人样本的筛选与场景划分保持不变；其原生拟合需要私人 Mac 环境，照片不会发送到公开 Actions 或公开产物。
+
+## 重放最终 HDR 文件的纹理资源
+
+```sh
+python3 -m research.styles_fidelity.texture \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --research-root /absolute/path/pinned-texture-research \
+  --input /absolute/path/current-product.heic --output /absolute/path/new-replay
+```
+
+固定版本的纹理原语来自 `texture.py` 指定的研究提交。源文件必须包含原生人物，并实际产生高于 SDR 白点的像素。蒙版由最终编码资源投影后交给 ImageIO 解码，人物几何与统计来自最终文件；重放不使用新 Vision 观察或编码前蒙版。尺寸须与产品的最长边 1024 工作域吻合，不提供蒙版缩放回退。
+
+对每个人物分别渲染 Mattify、UnderEyeBrighten、SkinSmoothStandalone，测量产品 SDR 派生线性 P3 分析图和按面积缩小的原生线性 P3 HDR 两种受控域。后者绕过 8 位 SDR 中间图，保留大于 1 的值。每个域分别使用原统计，以及清除统计但保留最终文件人物几何后从最终解码蒙版重新计算的统计进行渲染，两者像素差异用于测量编码前统计的敏感性。报告保留 GPU 状态、有限像素检查、输出变化及原统计与重算统计的差异；跨域差异表示域敏感性，不是相对 Photos 参考渲染的误差。这里尚未验证全尺寸效果合成、多人物混合或设备保存重开。
+
+现有研究 Tone 任务先由当前产品 CLI 生成 HDR 人像，再执行两项实验，仅导出数值报告。图像、人物关键点、输入资源与像素缓冲留在本次临时目录中。
+
 ## 后续实验
 
 1. 每份私人样本通过原生 SDR／HDR 等价检查后，才能进入下一阶段。
-2. 对隔离输入调用共享的 Rust 资源生成器；原系数、曲线、蒙版和统计仅供评估使用。
-3. 改变曝光、GTC 或局部拟合标定前，对照原生非零 Tone／Color 及移除风格结果；拟合前固定场景划分。
-4. 将已有纹理最终文件重放用于完整 HDR 产品输出，记录解码蒙版、颜色域、尺寸和逐效果响应。
-5. 同帧人物提亮曲线捕获、RAW 验证与元数据合成分开；逆问题不唯一时保留不确定性。
+2. 标定只有通过更广的独立场景和原生编辑响应验证后才能进入产品；此前保留现有默认值。
+3. 将纹理重放与完整 Photos 合成及真机编辑比较，覆盖多人物交互和全分辨率输出。
+4. 同帧人物提亮曲线捕获、RAW 验证与元数据合成分开；逆问题不唯一时保留不确定性。
 
 便携边界回归：`python3 -m unittest tests.test_style_fidelity -v`。

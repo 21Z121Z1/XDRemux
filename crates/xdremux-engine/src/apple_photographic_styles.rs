@@ -66,6 +66,25 @@ pub struct AppleStyleLinearMetadata {
     pub encoding_gain: f32,
 }
 
+/// Joint controls for thumbnail exposure and gain. Product defaults preserve
+/// the established calibration; research evaluates alternatives on held-out scenes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleLinearCalibration {
+    pub baseline_scale: f32,
+    pub gain_scale: f32,
+    pub baseline_maximum: f32,
+}
+
+impl Default for AppleStyleLinearCalibration {
+    fn default() -> Self {
+        Self {
+            baseline_scale: 1.0,
+            gain_scale: 1.0,
+            baseline_maximum: 10.4,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppleStyleGlobalToneCurve {
     pub data: Vec<u8>,
@@ -101,6 +120,7 @@ pub enum AppleStyleDataError {
         actual: usize,
     },
     InvalidThumbnailExposure,
+    InvalidLinearCalibration,
     InvalidRefinementParameter {
         actual: usize,
         expected: usize,
@@ -165,6 +185,9 @@ impl fmt::Display for AppleStyleDataError {
             ),
             Self::InvalidThumbnailExposure => formatter.write_str(
                 "Apple Photographic Styles thumbnail exposure must be finite and positive",
+            ),
+            Self::InvalidLinearCalibration => formatter.write_str(
+                "Styles calibration requires positive finite scales and a baseline maximum in 4..64",
             ),
             Self::InvalidRefinementParameter { actual, expected } => write!(
                 formatter,
@@ -359,6 +382,29 @@ pub fn apple_style_linear_metadata(
     hdr_luminance: &[f32],
     gain_map_maximum_stops: f32,
 ) -> Result<AppleStyleLinearMetadata, AppleStyleDataError> {
+    apple_style_linear_metadata_with_calibration(
+        base_luminance,
+        hdr_luminance,
+        gain_map_maximum_stops,
+        AppleStyleLinearCalibration::default(),
+    )
+}
+
+pub fn apple_style_linear_metadata_with_calibration(
+    base_luminance: &[f32],
+    hdr_luminance: &[f32],
+    gain_map_maximum_stops: f32,
+    calibration: AppleStyleLinearCalibration,
+) -> Result<AppleStyleLinearMetadata, AppleStyleDataError> {
+    if !calibration.baseline_scale.is_finite()
+        || calibration.baseline_scale <= 0.0
+        || !calibration.gain_scale.is_finite()
+        || calibration.gain_scale <= 0.0
+        || !calibration.baseline_maximum.is_finite()
+        || !(4.0..=64.0).contains(&calibration.baseline_maximum)
+    {
+        return Err(AppleStyleDataError::InvalidLinearCalibration);
+    }
     if base_luminance.is_empty()
         || base_luminance.len() != hdr_luminance.len()
         || !base_luminance.iter().all(|value| value.is_finite())
@@ -373,13 +419,15 @@ pub fn apple_style_linear_metadata(
         return Err(AppleStyleDataError::InvalidLightMapInput);
     }
     let highlight_compression_ratio = hdr_p98 / base_p98;
-    let baseline_unclamped = highlight_compression_ratio / 0.401_264_06;
-    let baseline_clamped = baseline_unclamped.clamp(4.0, 10.4);
+    let baseline_unclamped =
+        highlight_compression_ratio / 0.401_264_06 * calibration.baseline_scale;
+    let baseline_clamped = baseline_unclamped.clamp(4.0, calibration.baseline_maximum);
     let baseline_exposure = (baseline_clamped * 65.0).round() / 65.0;
     let base_gain = (1.512_718_43
         + 0.156_706_32 * gain_map_maximum_stops
         + 0.147_667_24 * highlight_compression_ratio)
-        .clamp(0.5, 2.5);
+        * calibration.gain_scale;
+    let base_gain = base_gain.clamp(0.5, 2.5);
     Ok(AppleStyleLinearMetadata {
         baseline_exposure,
         baseline_exposure_unclamped: baseline_unclamped,
@@ -2126,6 +2174,64 @@ fn solve_linear_system(matrix: &[f64], vector: &[f64]) -> Result<Vec<f64>, Apple
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn joint_linear_calibration_preserves_default_and_changes_both_scales() {
+        let base = [0.2, 0.4, 0.6, 0.8];
+        let hdr = [1.6, 3.2, 4.8, 6.4];
+        let original = super::apple_style_linear_metadata(&base, &hdr, 3.0).unwrap();
+        let defaults = super::apple_style_linear_metadata_with_calibration(
+            &base,
+            &hdr,
+            3.0,
+            super::AppleStyleLinearCalibration::default(),
+        )
+        .unwrap();
+        assert_eq!(original, defaults);
+        let changed = super::apple_style_linear_metadata_with_calibration(
+            &base,
+            &hdr,
+            3.0,
+            super::AppleStyleLinearCalibration {
+                baseline_scale: 2.0,
+                gain_scale: 0.25,
+                baseline_maximum: 64.0,
+            },
+        )
+        .unwrap();
+        assert!(changed.baseline_exposure > original.baseline_exposure);
+        assert!(changed.base_gain < original.base_gain);
+        assert_eq!(changed.encoding_gain, changed.base_gain * 4.0);
+    }
+
+    #[test]
+    fn invalid_joint_calibration_cannot_enter_the_resource_fit() {
+        for scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            let calibration = super::AppleStyleLinearCalibration {
+                baseline_scale: scale,
+                ..Default::default()
+            };
+            assert!(super::apple_style_linear_metadata_with_calibration(
+                &[0.5],
+                &[2.0],
+                2.0,
+                calibration
+            )
+            .is_err());
+        }
+        for maximum in [3.0, 65.0, f32::NAN] {
+            let calibration = super::AppleStyleLinearCalibration {
+                baseline_maximum: maximum,
+                ..Default::default()
+            };
+            assert!(super::apple_style_linear_metadata_with_calibration(
+                &[0.5],
+                &[2.0],
+                2.0,
+                calibration
+            )
+            .is_err());
+        }
+    }
     use super::*;
 
     #[test]

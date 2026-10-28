@@ -2,9 +2,10 @@
 
 [简体中文](README.zh-CN.md)
 
-This research prepares a blind comparison between original Apple Styles resources
-and resources reconstructed from the same photo's SDR/HDR information. It does
-not change product generation, calibration constants, or supported input types.
+This research compares original Apple Styles resources with resources rebuilt
+from the same photo's isolated SDR/HDR information. It also replays the native
+Texture effects with masks and person data decoded from final HDR product files.
+Product defaults and supported input types are unchanged.
 
 ## Prepare the corpus
 
@@ -90,16 +91,83 @@ samples. Uploads contain only the report. Supplied private photos stay outside G
 and public artifacts. Portable parsing or decoding does not prove Apple HDR
 equivalence, reconstructed slider fidelity, or Photos editing and save/reopen.
 
-## Next experiments
+## Regenerate and jointly calibrate resources
+
+The `styles-research` Cargo feature exposes a research example that calls the
+shared Rust Styles producer on an isolated Apple HDR base. It does not disguise
+the source as ProXDR or expand product CLI admission. The engine accepts explicit
+baseline and gain scales plus a baseline maximum. Defaults preserve the existing
+product calibration. Each trial rebuilds the thumbnail, GTC, coefficients, light
+maps, statistics and metadata together; original resources are evaluator-only.
+
+```sh
+cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
+python3 -m research.styles_fidelity.blind \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --generator /absolute/path/target/debug/examples/styles_fidelity \
+  --research-root /absolute/path/pinned-consumer-research \
+  --calibration /absolute/path/calibration-a.heic \
+  --calibration /absolute/path/calibration-b.heic \
+  --holdout /absolute/path/holdout.heic --output /absolute/path/new-fit
+```
+
+Every case must pass full native SDR/HDR input equivalence. Scene assignments are
+fixed before response evaluation. A default trial and a 3-by-3 exposure/gain grid
+are selected only by calibration-set native edit RMSE. The holdout is evaluated
+after selection. Reports include nonzero Tone, remove-style, and Color responses
+only when the native filter actually exposes a Color control. Missing Color
+support stays explicit. Numeric comparisons include shadow, midtone and highlight
+regions. A failed default cannot be waived by an alternative fit.
+
+The CI controls are the three published semantic-Standard `IMG_2600/2604/2608`
+files. Their Studio Texture metadata has no people, so it cannot activate a
+person effect. They are public landscape controls with prior research exposure;
+they do not replace the stricter private Standard corpus or establish portrait
+or night-scene generalization. The existing private corpus eligibility and
+scene split are unchanged. Private native fitting requires a private Mac host;
+private photos are never sent to public Actions or artifacts.
+
+## Replay final HDR Texture resources
+
+```sh
+python3 -m research.styles_fidelity.texture \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --research-root /absolute/path/pinned-texture-research \
+  --input /absolute/path/current-product.heic --output /absolute/path/new-replay
+```
+
+The pinned Texture primitives come from the research revision named in
+`texture.py`. The source must have native people and actually exercise pixels
+above SDR white. Masks are projected from final encoded resources and decoded
+by ImageIO. Native final-file person geometry and statistics are reused; no
+fresh Vision observations or pre-encoding masks enter the replay. Dimensions
+must match the product's 1024-edge working domain without a mask resize fallback.
+
+Mattify, UnderEyeBrighten and SkinSmoothStandalone are rendered independently
+per person in two controlled domains: the product's SDR-derived linear P3
+analysis image and area-reduced native linear P3 HDR. The latter bypasses the
+8-bit SDR intermediate and retains values above one. Reports retain GPU status,
+finite-pixel checks, output changes and stored-versus-recomputed statistic
+differences. Each domain renders once with stored statistics and once after
+clearing statistics while retaining the exact final-file person geometry.
+The latter recalculates them from decoded final masks. Their pixel difference
+measures sensitivity to statistics computed before resource encoding.
+Differences across the two domains measure domain sensitivity;
+they are not an error against a Photos reference render. This is not full-size
+effect composition, multi-person blending or a device save/reopen test.
+
+The existing research tone job produces a portrait with the current product
+CLI, executes both experiments and exports only numeric reports. Images,
+landmarks, input resources and render buffers remain in owned temporary storage.
+
+## Remaining experiments
 
 1. Admit each private corpus case only after native SDR/HDR equivalence passes.
-2. Call the shared Rust resource producer on isolated inputs. Keep original
-   coefficients, curves, mattes and statistics accessible only to the evaluator.
-3. Compare native nonzero Tone/Color and remove-style results before changing
-   exposure, GTC or local-fit calibration. Freeze scene splits before fitting.
-4. Apply the established final-file Texture replay to full HDR product outputs,
-   recording decoded masks, color domain, scale and per-effect response.
-5. Keep same-frame face-boost curve capture and RAW validation separate from
+2. Promote calibration only after broader independent scene coverage and
+   native edit responses support it. Retain product defaults otherwise.
+3. Compare Texture replay with the complete Photos composition and real-device
+   editing, including multi-person interactions and full-resolution output.
+4. Keep same-frame face-boost curve capture and RAW validation separate from
    metadata synthesis. Preserve uncertainty where the inverse is non-unique.
 
 Run portable boundary regressions with
