@@ -16,9 +16,12 @@ class SimulatorInstallModel:
     udid = '12345678-ABCD-1234-ABCD-123456789ABC'
     bundle = 'org.xdremux.audit.PVTReadback.u' + 'a' * 32
 
-    def __init__(self, root, behavior='success', ready=True, inventory_delay=0):
+    def __init__(self, root, behavior='success', ready=True, inventory_delay=0,
+                 post_install_inventory_delay=0, container_query_delay=0):
         self.root, self.behavior, self.ready = root, behavior, ready
         self.inventory_delay = inventory_delay
+        self.post_install_inventory_delay = post_install_inventory_delay
+        self.container_query_delay = container_query_delay
         self.work = root / 'proof'; self.work.mkdir()
         self.staged = root / 'PVTReadback.app'; self.staged.mkdir()
         (self.staged / 'Info.plist').write_bytes(plistlib.dumps(probe.reader_info(self.bundle)))
@@ -42,7 +45,7 @@ class SimulatorInstallModel:
         self.report['commands'].append(record)
         self._result = subprocess.CompletedProcess(argv, 0, b'', b'')
         if action == 'listapps':
-            delay = self.inventory_delay if not self.app.exists() else 0
+            delay = self.inventory_delay if not self.app.exists() else self.post_install_inventory_delay
             if not self.ready or delay > kwargs['timeout']:
                 record['outcome'] = 'uncertain-after-timeout'
                 raise probe.Blocked('inventory service timeout')
@@ -61,6 +64,9 @@ class SimulatorInstallModel:
                 self._result.stderr = b'actual native installation error'
         elif action == 'get_app_container':
             self.assert_owned(argv)
+            if self.container_query_delay > kwargs['timeout']:
+                record['outcome'] = 'uncertain-after-timeout'
+                raise probe.Blocked('container service timeout')
             if argv[-1] == 'app':
                 self.app_queries += 1
                 if self.behavior == 'timeout-late' and self.app_queries == 2:
@@ -127,6 +133,21 @@ class SimulatorInstallTests(unittest.TestCase):
                 self.assertEqual(len(startup), 1)
                 self.assertEqual(startup[0]['state'], 'service-answered')
                 self.assertEqual(facts['installed_binary_sha256'], probe.sha(model.staged / 'PVTReadback'))
+
+    def test_slow_post_install_services_are_verified_without_reinstalling(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw), inventory_delay=78.5,
+                                          post_install_inventory_delay=78.5, container_query_delay=78.5)
+            facts = model.install()
+            self.assertEqual(facts['status'], 'installed-verified')
+            self.assertEqual(model.installs, 1)
+            self.assertEqual(model.app_queries, 1)
+            self.assertEqual(facts['installed_binary_sha256'], probe.sha(model.staged / 'PVTReadback'))
+            queries = [cmd for cmd in model.report['commands']
+                       if cmd['name'] == 'install-readiness-after-command'
+                       or cmd['name'].startswith('install-state-')]
+            self.assertEqual(len(queries), 3)
+            self.assertTrue(all(cmd['timeout_seconds'] >= 78.5 for cmd in queries))
 
     def test_startup_inventory_deadline_still_blocks_installation(self):
         with tempfile.TemporaryDirectory() as raw:

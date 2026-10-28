@@ -255,7 +255,7 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             facts['host_diagnostic_error'] = str(error)
         raise Blocked(reason, timed_out=timed_out)
 
-    def inventory(attempt, *, timeout=20):
+    def inventory(attempt, *, timeout=120):
         name = f'install-readiness-{attempt}'
         result = run(name, ['xcrun', 'simctl', 'listapps', owned_udid], timeout=timeout, required=False)
         if result.returncode:
@@ -283,7 +283,8 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
             paths = {}
             for kind in ('app', 'data'):
                 result = run(f'install-state-{attempt}-{kind}',
-                             ['xcrun', 'simctl', 'get_app_container', owned_udid, bundle, kind], timeout=10, required=False)
+                             ['xcrun', 'simctl', 'get_app_container', owned_udid, bundle, kind],
+                             timeout=facts['readiness_query_timeout_seconds'], required=False)
                 observation[kind + '_query_exit_code'] = result.returncode
                 if result.returncode:
                     continue
