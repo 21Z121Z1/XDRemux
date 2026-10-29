@@ -34,9 +34,9 @@ Unsupported environment locales fall back to English. An unsupported explicit `-
 
 The binaries have ad-hoc signatures. They do not have Developer ID signatures or notarization. Gatekeeper, download quarantine, and interactive Photos editing require separate acceptance checks. Do not disable system-wide security protections.
 
-`share/licenses/` contains upstream notices. `share/sources/` contains native source archives with pinned checksums. The dependency manifest identifies x265 as GPL-2.0-or-later, libheif and libde265 as LGPL-3.0-or-later, and libwebp as BSD-3-Clause.
+`share/licenses/xdremux/` contains the complete **GPL-3.0-only** text and the project's licensing scope. The original photographs/videos in `fixtures/` and Core ML model packages are excluded from that grant. `share/licenses/rust/` preserves resolved Rust dependencies' original notices and `share/licenses/rust-dependencies.json` inventories their versions, source identities, and notice checksums. Native dependency notices are in `share/licenses/`; their pinned source archives are in `share/sources/`. x265 is GPL-2.0-or-later; libheif and libde265 are LGPL-3.0-or-later; libwebp is BSD-3-Clause.
 
-These notices do not relicense XDRemux. A production publisher must resolve the project's distribution license and corresponding-source duties. The exact product revision is in `manifest.json`.
+`CORRESPONDING_SOURCE.md` links to the **exact XDRemux source revision** recorded in `manifest.json` and the relevant build instructions. Retain these files when redistributing. A passing package test does not itself establish compliance with every applicable license, patent, SDK, or source-offer obligation.
 
 ## 简体中文
 
@@ -72,6 +72,6 @@ These notices do not relicense XDRemux. A production publisher must resolve the 
 
 二进制仅有 ad-hoc 签名，没有 Developer ID 签名，也未公证。Gatekeeper、下载隔离和 Photos 交互编辑需要独立验收。不要关闭全系统安全保护。
 
-`share/licenses/` 包含上游许可声明，`share/sources/` 包含固定校验和的原生依赖源码包。依赖清单标明 x265 使用 GPL-2.0-or-later，libheif 和 libde265 使用 LGPL-3.0-or-later，libwebp 使用 BSD-3-Clause。
+`share/licenses/xdremux/` 包含项目完整的 **GPL-3.0-only** 许可证和适用范围说明。`fixtures/` 中的照片、视频及 Core ML 模型包不在 GPL 授权范围内。`share/licenses/rust/` 收录 Rust 依赖的原始许可文本，`share/licenses/rust-dependencies.json` 记录依赖版本、来源与许可文件校验和。`share/licenses/` 还保留原生依赖声明，`share/sources/` 提供固定校验和的原生依赖源码包。x265 使用 GPL-2.0-or-later，libheif 与 libde265 使用 LGPL-3.0-or-later，libwebp 使用 BSD-3-Clause。
 
-这些声明不改变 XDRemux 自身许可。生产发布者必须确认项目分发许可及对应源码提供义务。具体产品提交记录在 `manifest.json` 中。
+`CORRESPONDING_SOURCE.md` 提供与 `manifest.json` 所记载提交**精确对应**的项目源码地址及构建说明。再分发时保留这些文件。包测试通过本身不等于所有许可、专利、SDK 及源码提供义务均已满足。

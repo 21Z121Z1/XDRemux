@@ -123,3 +123,7 @@ CLI 调用 Rust runtime。runtime 通过媒体 crate 和平台适配器执行 en
 | [文档索引](docs/README.md) | 研究工具、验证记录和其他指南。 |
 
 `fixtures/` 中纳入版本控制的媒体用于真实文件测试。样本身份和来源记录属于测试约定的一部分。
+
+## 许可证
+
+XDRemux 的原创程序代码采用 [GPL-3.0-only](LICENSE) 许可，版权人同时对 v1.0–v1.4 的自有代码追加该授权。真实照片及视频样张、Core ML 模型权重**不属于 GPLv3**；具体范围和历史版本说明见[授权说明](LICENSING.zh-CN.md)。
