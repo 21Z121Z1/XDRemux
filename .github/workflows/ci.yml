@@ -49,7 +49,6 @@ jobs:
       XDREMUX_GATE_BASE: ${{ needs.changes.outputs.base }}
       XDREMUX_ORIENTATION_OUTPUT: ${{ github.workspace }}/artifacts/product-integration/orientation
       XDREMUX_STYLES_ACCEPTANCE_DIR: ${{ github.workspace }}/artifacts/styles-acceptance
-      XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
     steps:
       - name: Require successful check selection
         env:
@@ -89,6 +88,7 @@ jobs:
         shell: bash
         env:
           PLAN: ${{ needs.changes.outputs.plan }}
+          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
         run: |
           python3 scripts/ci/agent_completion_gate.py run \
             --base "$XDREMUX_GATE_BASE" --plan "scripts/ci/$PLAN-plan.json"

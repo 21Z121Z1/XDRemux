@@ -360,5 +360,15 @@ class WorkflowConfigurationTests(unittest.TestCase):
             self.assertNotIn("workflow_dispatch", block)
 
 
+    def test_runner_paths_are_defined_after_runner_allocation(self):
+        workflow = self.workflow("ci.yml")
+        job = workflow.split("  exact-head:\n", 1)[1]
+        job_env = re.search(r"(?ms)^    env:\n(.*?)^    steps:", job)[1]
+        self.assertNotIn("runner.", job_env)
+        gate_step = workflow.split("- name: Run exact-HEAD completion gate", 1)[1].split("- name:", 1)[0]
+        self.assertIn("XDREMUX_DERIVED_DATA:", gate_step)
+        self.assertIn("runner.temp", gate_step)
+
+
 if __name__ == "__main__":
     unittest.main()
