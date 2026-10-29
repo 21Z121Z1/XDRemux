@@ -623,7 +623,7 @@ fn build_iref(
     Ok(make_iref_box(version, &entries)?)
 }
 
-fn entity_group_ids(source: &[u8], children: &[BoxHeader]) -> Result<Vec<u32>> {
+pub(crate) fn entity_group_ids(source: &[u8], children: &[BoxHeader]) -> Result<Vec<u32>> {
     let mut group_ids = Vec::new();
     for grpl in children.iter().filter(|header| header.kind == GRPL) {
         for group in parse_boxes(source, grpl.payload_range())? {

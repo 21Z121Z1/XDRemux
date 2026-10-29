@@ -62,6 +62,8 @@ python3 -m research.styles_fidelity.native \
 
 合并时保留源 HDR MakerNote 字段 33／48 的精确有理数值，同时采用脚手架新生成的编辑状态。经 ImageIO 数值表示重新编码这些源信息不得改变 HDR 基图。每次试验在评估编辑响应前核对其精确值。
 
+分配语义项目 ID 时同时保留已有实体组占用的 ID，两者共享命名空间。HDR 回读失败时附带对重建输出再次隔离的诊断；该诊断不能让实际重建文件通过验收。
+
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
 python3 -m research.styles_fidelity.blind \

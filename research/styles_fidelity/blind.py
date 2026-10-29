@@ -176,6 +176,14 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
         descriptors.append(None if descriptor is None else isolate.sha(descriptor))
     if descriptors[0] != descriptors[1]:
         raise ValueError('resource generation changed exact numeric HDR Exif: ' + json.dumps(descriptors))
+    hdr_graphs = []
+    for graph in (before, after):
+        roots = [i for i, identity in graph.identities.items() if identity['kind'] == 'tmap']
+        if len(roots) != 1:
+            raise ValueError('resource generation has no unambiguous HDR graph')
+        hdr_graphs.append(graph.image_fingerprint(roots[0]))
+    if hdr_graphs[0] != hdr_graphs[1]:
+        raise ValueError('resource generation changed the coded HDR graph: ' + json.dumps(hdr_graphs))
     preservation = None
     if verify_pixels:
         width, height = native.display_geometry(before)
@@ -186,10 +194,25 @@ def regenerate(generator: Path, adapter: Path, source: Path, output: Path, headr
             comparisons = {kind: native.compare_buffers(work / 'input' / f'published_{kind}.f32',
                 work / 'rebuilt' / f'published_{kind}.f32', width, height) for kind in ('sdr', 'hdr')}
             if left['hdr_content_headroom'] != right['hdr_content_headroom'] or not all(c['passed'] for c in comparisons.values()):
+                diagnostic = {}
+                try:
+                    # Re-project only for diagnosis. A passing projection never
+                    # waives the failure of the actual regenerated final file.
+                    projected, _ = isolate.isolate_bytes(output.read_bytes())
+                    projection = work / 'projected.heic'
+                    projection.write_bytes(projected)
+                    facts = native.readback(adapter, projection, work / 'projected', width, height)
+                    diagnostic = {'headroom': facts['hdr_content_headroom'], 'comparisons': {
+                        kind: native.compare_buffers(work / 'input' / f'published_{kind}.f32',
+                            work / 'projected' / f'published_{kind}.f32', width, height)
+                        for kind in ('sdr', 'hdr')}}
+                except (ValueError, RuntimeError, OSError, KeyError, subprocess.TimeoutExpired) as error:
+                    diagnostic = {'error': str(error)}
                 raise ValueError('resource assembly changed native SDR/HDR base pixels: ' + json.dumps({
                     'input_headroom': left['hdr_content_headroom'], 'rebuilt_headroom': right['hdr_content_headroom'],
                     'comparisons': comparisons, 'coded_primary_preserved': coded_preserved,
-                    'numeric_hdr_exif_sha256': descriptors[0]}))
+                    'numeric_hdr_exif_sha256': descriptors[0], 'coded_hdr_graph_preserved': True,
+                    're_isolated_output_diagnostic': diagnostic}))
             preservation = {'headroom': right['hdr_content_headroom'], 'comparisons': comparisons}
     if not coded_preserved:
         raise ValueError('resource regeneration altered the coded primary: ' + json.dumps({

@@ -108,6 +108,9 @@ The merge preserves the exact source HDR MakerNote rationals 33/48 alongside
 the scaffold's newly generated editing state. Re-encoding those source facts
 through ImageIO's number representation must not change the HDR base. Each
 trial checks their exact values before evaluating edit responses.
+Semantic item allocation also reserves existing entity-group IDs, which share
+the item namespace. An HDR readback failure includes a re-isolated-output
+diagnostic; it cannot make the actual regenerated file pass.
 
 ```sh
 cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity

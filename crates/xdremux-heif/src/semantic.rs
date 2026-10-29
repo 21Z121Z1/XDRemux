@@ -1273,14 +1273,15 @@ fn remap_infe_item_id(
     let version = raw[8];
     let mut output = raw.to_vec();
     match version {
+        2 if new_id > u32::from(u16::MAX) => {
+            let mut payload = raw[8..12].to_vec();
+            payload[0] = 3;
+            payload.extend_from_slice(&new_id.to_be_bytes());
+            payload.extend_from_slice(&raw[14..]);
+            return Ok(make_box(INFE, &payload)?);
+        }
         2 => {
-            let id = u16::try_from(new_id).map_err(|_| {
-                invalid(format!(
-                    "semantic scaffold item {} cannot be remapped into infe version 2",
-                    item.item_id
-                ))
-            })?;
-            output[12..14].copy_from_slice(&id.to_be_bytes());
+            output[12..14].copy_from_slice(&(new_id as u16).to_be_bytes());
         }
         3 => {
             if output.len() < 16 {
@@ -1572,7 +1573,12 @@ pub fn merge_apple_semantic_auxiliary_heif(
     let scaffold_exif_payload =
         preserve_apple_hdr_exif(source_data, scaffold_data, scaffold_exif_payload)?;
 
+    let group_maximum = crate::styles::entity_group_ids(source_data, &source.meta_children)?
+        .into_iter()
+        .max()
+        .unwrap_or(0);
     let mut next_item_id = source_maximum_item_id(&source.meta)?
+        .max(group_maximum)
         .checked_add(1)
         .ok_or_else(|| invalid("semantic merge item ID overflows"))?;
     let mut id_map = BTreeMap::new();
@@ -2706,6 +2712,7 @@ mod tests {
         references: Vec<IrefEntry>,
         codec_marker: u8,
         auxiliary_properties: Vec<(u32, Vec<u8>)>,
+        group_boxes: Vec<Vec<u8>>,
     }
 
     impl Fixture {
@@ -2790,6 +2797,7 @@ mod tests {
                 references,
                 codec_marker: if semantic { 7 } else { 9 },
                 auxiliary_properties: Vec::new(),
+                group_boxes: Vec::new(),
             }
         }
 
@@ -2886,6 +2894,7 @@ mod tests {
                         make_iloc_box(1, 4, 4, 0, 0, &locations).unwrap(),
                         iprp.clone(),
                         iref.clone(),
+                        make_box(FourCC::new(*b"grpl"), &self.group_boxes.concat()).unwrap(),
                     ]
                     .concat(),
                 )
@@ -3100,6 +3109,38 @@ mod tests {
         }
         for end in [12, 14, 20, 43, 59] {
             assert!(apple_hdr_rationals(&note[..end]).is_err());
+        }
+    }
+
+    #[test]
+    fn semantic_merge_reserves_existing_entity_group_ids() {
+        for group_id in [5_u32, 65_535] {
+            let mut source = Fixture::new(false, false, "source");
+            let mut group = vec![0; 4];
+            for value in [group_id, 2, TONE_MAP, PRIMARY] {
+                group.extend_from_slice(&value.to_be_bytes());
+            }
+            source
+                .group_boxes
+                .push(make_box(FourCC::new(*b"altr"), &group).unwrap());
+            let scaffold = Fixture::new(false, true, "framework").bytes();
+            let output =
+                merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).unwrap();
+            let graph = parse_graph(&output, "test").unwrap();
+            assert!(graph
+                .meta
+                .iinf
+                .entries
+                .iter()
+                .all(|item| item.item_id <= EXIF_ID || item.item_id > group_id));
+            let grpl = graph
+                .meta_children
+                .iter()
+                .find(|h| h.kind == FourCC::new(*b"grpl"))
+                .unwrap();
+            assert_eq!(&output[grpl.payload_range()], source.group_boxes.concat());
+            assert_payload(&output, PRIMARY, b"source-primary");
+            assert_payload(&output, GAIN, b"source-gain");
         }
     }
 
