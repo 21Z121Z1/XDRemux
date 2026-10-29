@@ -222,6 +222,28 @@ Load command 8
             self.assertIn(f"https://github.com/21Z121Z1/XDRemux/tree/{sha}", text)
             self.assertIn("share/sources/", text)
 
+    def test_git_workspace_inherited_license_is_bundled(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / "liblivephoto-checkout"
+            crate = checkout / "crates/liblivephoto-format"
+            crate.mkdir(parents=True)
+            (checkout / "Cargo.toml").write_text("[workspace]\nmembers = []\n")
+            (checkout / "LICENSE").write_text("Apache License Version 2.0")
+            (crate / "Cargo.toml").write_text("[package]\nname = 'liblivephoto-format'\n")
+            entry = {"id": "git+https://example.org/LibLivePhoto#abcdef",
+                     "name": "liblivephoto-format", "version": "0.1.0",
+                     "license": "Apache-2.0", "source": "git+https://example.org/LibLivePhoto",
+                     "manifest_path": str(crate / "Cargo.toml")}
+            destination = root / "package"
+            macos.stage_rust_dependency_licenses(
+                destination, {"packages": [entry], "resolve": {"nodes": [{"id": entry["id"]}]}}
+            )
+            self.assertEqual(
+                (destination / "share/licenses/rust/liblivephoto-format-0.1.0/LICENSE").read_text(),
+                "Apache License Version 2.0",
+            )
+
     def test_rust_dependency_notices_are_verified_against_payload(self):
         checkout = Path(__file__).resolve().parents[1]
         sha = "b" * 40

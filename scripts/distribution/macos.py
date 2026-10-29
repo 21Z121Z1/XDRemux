@@ -88,6 +88,21 @@ def stage_rust_dependency_licenses(package: Path, metadata: dict) -> list[dict]:
             specified = origin / entry["license_file"]
             if specified.is_file():
                 candidates.add(specified)
+        # Git workspace crates (e.g. LibLivePhoto) can inherit a repository-root
+        # license without storing a second copy beside the individual crate.
+        if not candidates and entry["source"].startswith("git+"):
+            for ancestor in origin.parents:
+                if ancestor.name == "checkouts":
+                    break
+                if (ancestor / "Cargo.toml").is_file() and (ancestor / "crates").is_dir():
+                    candidates.update(
+                        file for file in ancestor.iterdir()
+                        if file.is_file() and file.name.upper().startswith(
+                            ("LICENSE", "LICENCE", "COPYING", "NOTICE", "COPYRIGHT", "PATENTS")
+                        )
+                    )
+                    if candidates:
+                        break
         if not candidates:
             raise ValueError(f"No Rust dependency license text: {entry['name']} {entry['version']}")
         target = destination / f"{entry['name']}-{entry['version']}"
