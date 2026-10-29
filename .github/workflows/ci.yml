@@ -40,8 +40,8 @@ jobs:
   exact-head:
     name: exact-head
     needs: changes
-    # A failed selector must fail the required context, rather than skip it.
-    if: ${{ always() }}
+    # Fail on selector errors, while allowing superseded runs to be cancelled.
+    if: ${{ !cancelled() }}
     runs-on: ${{ needs.changes.outputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 120
     env:

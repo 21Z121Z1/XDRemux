@@ -134,7 +134,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertIn("github.event.pull_request.base.sha || github.event.before", workflow)
         self.assertIn("XDREMUX_GATE_BASE: ${{ needs.changes.outputs.base }}", workflow)
         job = workflow.split("  exact-head:\n", 1)[1]
-        self.assertIn("if: ${{ always() }}", job)
+        self.assertIn("if: ${{ !cancelled() }}", job)
         self.assertIn('test "$SELECTION_RESULT" = success', job)
 
     def test_completion_gate_pr_trigger_is_always_on_without_paths(self) -> None:
