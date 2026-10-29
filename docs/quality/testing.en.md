@@ -35,6 +35,18 @@ An unavailable native environment, a failed operation, or an untested device beh
 
 When practical, add a regression assertion that fails for the original source defect. Use the smallest set of checks that covers the changed behavior.
 
+### CI execution owners
+
+[`ci.yml`](../../.github/workflows/ci.yml) owns the required `exact-head` check and runs the product checks once through the existing completion gate. The [product plan](../../scripts/ci/product-plan.json) retains Rust tests, native consumers, orientation readback, app models, component conformance, and real Motion Photo checks. Each result belongs to the same checked-out commit and completion receipt.
+
+Changes containing only Markdown use the [documentation plan](../../scripts/ci/documentation-plan.json) on `ubuntu-latest`. They retain documentation, link, and CI-policy checks without installing Rust, libheif, or Apple tools. Both paths publish an exact-HEAD receipt. A failed change selector fails the required check.
+
+The [change selector](../../scripts/ci/select_checks.py) uses the completion gate's NUL-delimited Git diff, including both sides of moves and deletions. Research jobs run for their source/test dependencies or shared build inputs. A manual research replay runs every experiment; it accepts no alternate source or secrets. Keep dependency rules beside this selector rather than adding a workflow for each experiment.
+
+`rust-proxdr-real-fixtures.yml` owns fixture hashes, inspection, and representative real conversions. The portability workflow owns the Linux unit suite; the fixture job does not repeat it. Cross-platform Rust tests and relocated macOS package checks remain in `rust-cli-core.yml`.
+
+`performance.yml` retains automatic product timing, RSS, helper-launch limits, and the native release RGB8 check. Isolated codec/VideoToolbox measurements and the full cross-revision Styles comparison run on manual replay. They supplement the budget checks and do not replace them.
+
 ### Preserve performance reference values
 
 The [macOS 27 budget](../../benchmarks/macos27-arm64-product-baseline.json) retains its original measurements. The `apple-styles` case permits twice the historical median and p95 wall times. This allowance covers full-resolution HDR reconstruction before Linear Thumbnail reduction.

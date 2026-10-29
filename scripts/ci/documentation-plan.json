@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "scope": "Documentation consistency, links, and CI selection contracts",
+  "checks": [
+    {
+      "name": "documentation-policy-and-links",
+      "kind": "static",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_public_documentation",
+        "tests.validation.test_repository_layout",
+        "tests.validation.test_workflow_configuration",
+        "tests.validation.test_ci_selection"
+      ],
+      "timeout_seconds": 300
+    }
+  ]
+}

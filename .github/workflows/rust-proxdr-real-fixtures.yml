@@ -67,7 +67,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
-          components: rustfmt, clippy
       - name: Verify canonical fixture identities
         shell: bash
         run: |
@@ -128,5 +127,3 @@ jobs:
             echo "output_bytes=$(stat -c %s "$output")"
             echo "::endgroup::"
           done
-      - name: Run Rust CLI/runtime regressions
-        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli

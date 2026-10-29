@@ -372,7 +372,7 @@ class StylesRevisionComparisonTests(unittest.TestCase):
     def test_workflow_keeps_absolute_failure_and_records_the_actual_base(self):
         workflow = (comparison.ROOT / ".github/workflows/performance.yml").read_text()
         step = workflow.split("- name: Compare exact Styles revisions on the same runner", 1)[1].split("- name:", 1)[0]
-        self.assertIn("if: ${{ !cancelled() }}", step)
+        self.assertIn("if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}", step)
         self.assertIn("github.event.pull_request.base.sha", step)
         self.assertIn("refs/remotes/origin/main", step)
         self.assertNotIn("continue-on-error", step)

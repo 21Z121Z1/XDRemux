@@ -94,7 +94,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("--expected-product-head", execution)
         self.assertNotIn("--expected-harness-head", execution)
         self.assertNotRegex(job, r"\b[0-9a-f]{40}\b", "the current-source experiment must not freeze a historical pin")
-        self.assertNotIn("needs:", job, "control and product must execute in the same job")
+        self.assertIn("needs: changes", job, "only check selection precedes the single control/product job")
         self.assertIn("github.event.repository.private == false", job)
         self.assertIn("github.event.repository.visibility == 'public'", job)
         self.assertIn("--execute-owned-simulator", job)
@@ -126,29 +126,25 @@ class WorkflowConfigurationTests(unittest.TestCase):
         return remaining[: next_top_level.start() if next_top_level else None]
 
     def test_completion_gate_has_the_required_exact_head_check_context(self) -> None:
-        workflow = self.workflow("completion-gate.yml")
+        workflow = self.workflow("ci.yml")
         self.assertRegex(workflow, r"(?m)^  exact-head:\n    name: exact-head$")
-        self.assertIn(
-            "XDREMUX_GATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}",
-            workflow,
-        )
-        self.assertIn(
-            "XDREMUX_GATE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.event.pull_request.base.ref) || github.event.before || 'main' }}",
-            workflow,
-        )
-        self.assertIn("ref: ${{ env.XDREMUX_GATE_SHA }}", workflow)
+        self.assertIn("EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", workflow)
         self.assertIn('--base "$XDREMUX_GATE_BASE"', workflow)
-        self.assertNotIn('--base "origin/$XDREMUX_GATE_BASE"', workflow)
+        self.assertIn("github.event.pull_request.base.sha || github.event.before", workflow)
+        self.assertIn("XDREMUX_GATE_BASE: ${{ needs.changes.outputs.base }}", workflow)
+        job = workflow.split("  exact-head:\n", 1)[1]
+        self.assertIn("if: ${{ always() }}", job)
+        self.assertIn('test "$SELECTION_RESULT" = success', job)
 
     def test_completion_gate_pr_trigger_is_always_on_without_paths(self) -> None:
-        workflow = self.workflow("completion-gate.yml")
+        workflow = self.workflow("ci.yml")
         pull_request = self.event_block(workflow, "pull_request")
         self.assertEqual(pull_request.strip(), "")
 
     def test_required_workflow_pushes_are_main_only(self) -> None:
         workflows = (
             "ci.yml",
-            "completion-gate.yml",
             "performance.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
@@ -162,13 +158,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
                 )
 
     def test_push_path_filters_remain_present(self) -> None:
-        path_filtered = (
-            "ci.yml",
-            "performance.yml",
-            "rust-cli-core.yml",
-            "rust-proxdr-real-fixtures.yml",
-        )
-        for name in path_filtered:
+        for name in ("performance.yml", "rust-cli-core.yml", "rust-proxdr-real-fixtures.yml"):
             with self.subTest(workflow=name):
                 push = self.event_block(self.workflow(name), "push")
                 self.assertRegex(push, r"(?m)^    paths(?:-ignore)?:")
@@ -176,7 +166,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
     def test_workflow_set_stays_minimal(self) -> None:
         expected = {
             "ci.yml",
-            "completion-gate.yml",
             "performance.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
@@ -195,8 +184,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
         self.assertIn(CONCURRENCY, workflow)
         self.assertIn("    branches: [main]", self.event_block(workflow, "push"))
-        for event in ("push", "pull_request"):
-            self.assertIn("    paths:", self.event_block(workflow, event))
+        self.assertIn("python3 -m scripts.ci.select_checks", workflow)
         for forbidden in ("contents: write", "secrets.", "pull_request_target", "git push",
                           "agent_completion_gate.py"):
             self.assertNotIn(forbidden, workflow)
@@ -231,7 +219,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
 
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
-            "completion-gate.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
@@ -327,14 +314,50 @@ class WorkflowConfigurationTests(unittest.TestCase):
         workflow = self.workflow("ci.yml")
         self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", workflow)
         self.assertIn("XDREMUX_ORIENTATION_OUTPUT:", workflow)
-        self.assertIn("scripts/apple/read_oriented_heif_imageio.swift", workflow)
-        self.assertIn("artifacts/product-integration/orientation/expected.json", workflow)
+        plan = (REPOSITORY_ROOT / "scripts/ci/product-plan.json").read_text()
+        self.assertIn("scripts/apple/read_oriented_heif_imageio.swift", plan)
+        self.assertIn("artifacts/product-integration/orientation/expected.json", plan)
 
     def test_completion_gate_owns_repository_policy_regressions(self) -> None:
-        completion_gate = self.workflow("completion-gate.yml")
-        self.assertIn("tests.validation.test_agent_completion_gate", completion_gate)
-        self.assertIn("tests.validation.test_workflow_configuration", completion_gate)
-        self.assertIn("scripts/validation/check_engine_plan_vectors.sh", completion_gate)
+        workflow = self.workflow("ci.yml")
+        self.assertIn('scripts/ci/$PLAN-plan.json', workflow)
+        plan = (REPOSITORY_ROOT / "scripts/ci/product-plan.json").read_text()
+        self.assertIn("tests.validation.test_agent_completion_gate", plan)
+        self.assertIn("tests.validation.test_workflow_configuration", plan)
+        self.assertIn("scripts/validation/check_engine_plan_vectors.sh", plan)
+
+    def test_product_checks_have_one_execution_owner(self):
+        self.assertFalse((WORKFLOW_ROOT / "completion-gate.yml").exists())
+        self.assertIn("agent_completion_gate.py run", self.workflow("ci.yml"))
+        self.assertNotIn("cargo test", self.workflow("ci.yml"))
+
+    def test_research_jobs_require_relevant_changes(self):
+        workflow = self.workflow("research.yml")
+        for job in ("video-carrier", "coreml-candidate", "texture-probe-build",
+                    "styles-version-control", "style-tone-response", "system-heif-hdr-api",
+                    "pvt-native-import"):
+            block = re.split(r"(?m)^  [a-z][a-z0-9-]*:", workflow.split("  " + job + ":\n", 1)[1], 1)[0]
+            self.assertIn("needs.changes.outputs.", block, job)
+
+    def test_real_fixture_job_does_not_repeat_portable_unit_suite(self):
+        workflow = self.workflow("rust-proxdr-real-fixtures.yml")
+        self.assertNotIn("cargo test", workflow)
+        self.assertIn("sha256sum -c SHA256SUMS", workflow)
+        self.assertIn("Inspect every ProXDR fixture through Rust", workflow)
+        self.assertIn("Convert representative real fixtures through Rust CLI", workflow)
+
+    def test_broad_performance_diagnostics_require_manual_replay(self):
+        workflow = self.workflow("performance.yml")
+        for name in ("Measure isolated portable Gain Map codec primitives",
+                     "Measure Apple VideoToolbox primitive separately",
+                     "Compare exact Styles revisions on the same runner"):
+            block = workflow.split("- name: " + name, 1)[1].split("- name:", 1)[0]
+            self.assertIn("github.event_name == 'workflow_dispatch'", block)
+        for name in ("Measure representative end-to-end product workloads",
+                     "Characterize Apple adapter process lifecycle",
+                     "Enforce stable-runner performance regression budget"):
+            block = workflow.split("- name: " + name, 1)[1].split("- name:", 1)[0]
+            self.assertNotIn("workflow_dispatch", block)
 
 
 if __name__ == "__main__":

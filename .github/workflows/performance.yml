@@ -138,6 +138,7 @@ jobs:
             2>&1 | tee artifacts/performance/product-benchmark.log
 
       - name: Measure isolated portable Gain Map codec primitives
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           "$GITHUB_WORKSPACE/target/release/xdremux-codec-gainmap-bench" \
@@ -149,6 +150,7 @@ jobs:
           cat artifacts/performance/gain-map-codec.json
 
       - name: Measure Apple VideoToolbox primitive separately
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           python3 scripts/performance/benchmark_apple_videotoolbox_primitive.py \
@@ -180,7 +182,7 @@ jobs:
             2>&1 | tee artifacts/performance/regression-budget.log
 
       - name: Compare exact Styles revisions on the same runner
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         shell: bash
         env:
           XDREMUX_PERF_PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
