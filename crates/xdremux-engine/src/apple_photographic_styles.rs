@@ -73,6 +73,8 @@ pub struct AppleStyleLinearCalibration {
     pub baseline_scale: f32,
     pub gain_scale: f32,
     pub baseline_maximum: f32,
+    /// Evaluate the histogram writer with source-derived guide statistics.
+    pub histogram_light_maps: bool,
 }
 
 impl Default for AppleStyleLinearCalibration {
@@ -81,6 +83,7 @@ impl Default for AppleStyleLinearCalibration {
             baseline_scale: 1.0,
             gain_scale: 1.0,
             baseline_maximum: 10.4,
+            histogram_light_maps: false,
         }
     }
 }
@@ -1219,10 +1222,87 @@ pub fn apple_style_light_map(
         }
     }
 
+    Ok(pack_light_map(&presentation, request.storage_orientation))
+}
+
+/// Conditional local-histogram writer using a supplied guide and normalizer.
+///
+/// The caller supplies arithmetic RGB means in its declared working space.
+/// Integer cell footprints approximate the camera sampling/ROI stage; they do
+/// not recover pre-LTM inputs. The bucket and ordered half writer follow
+/// AIR0002 (histogram 0/7 and lines 706-720), research reference 979bc34,
+/// research/hdr-native/lightmap_model_s55.py and evidence/s56/tail-summary.json.
+pub fn apple_style_histogram_light_map(
+    request: &AppleStyleLightMapRequest<'_>,
+    normalizer: f32,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    if request.width == 0
+        || request.height == 0
+        || request.width.checked_mul(request.height) != Some(request.luma.len())
+        || !normalizer.is_finite()
+        || normalizer <= 0.0
+        || !f16::from_f32(normalizer).is_finite()
+        || f16::from_f32(normalizer).to_f32() <= 0.0
+    {
+        return Err(AppleStyleDataError::InvalidLightMapInput);
+    }
+    if !(1..=8).contains(&request.storage_orientation) {
+        return Err(AppleStyleDataError::InvalidOrientation(
+            request.storage_orientation,
+        ));
+    }
+    if let Some(index) = request.luma.iter().position(|v| !v.is_finite()) {
+        return Err(AppleStyleDataError::InvalidLightMapSample { index });
+    }
+    let side = APPLE_STYLE_LIGHT_MAP_SIDE;
+    let half_normalizer = f16::from_f32(normalizer).to_f32();
+    let mut presentation = vec![f16::ZERO; side * side];
+    for y in 0..side {
+        let y0 = y * request.height / side;
+        let y1 = ((y + 1) * request.height / side)
+            .max(y0 + 1)
+            .min(request.height);
+        for x in 0..side {
+            let x0 = x * request.width / side;
+            let x1 = ((x + 1) * request.width / side)
+                .max(x0 + 1)
+                .min(request.width);
+            let mut histogram = [0_usize; 256];
+            for j in y0..y1 {
+                for i in x0..x1 {
+                    let normalized =
+                        f16::from_f32(request.luma[j * request.width + i] / half_normalizer)
+                            .to_f32();
+                    let scaled = f16::from_f32(normalized * 256.0).to_f32();
+                    let bucket = scaled.round().clamp(0.0, 255.0) as usize;
+                    histogram[bucket] += 1;
+                }
+            }
+            // Native cumulative count must be strictly greater than n/2.
+            let rank = (y1 - y0) * (x1 - x0) / 2;
+            let mut count = 0;
+            let bucket = histogram
+                .iter()
+                .position(|n| {
+                    count += n;
+                    count > rank
+                })
+                .unwrap_or(255);
+            let p50 = bucket as f32 * f32::from_bits(0x3b80_8081);
+            let product = (normalizer * f32::from_bits(0x401c_3d8f)) * p50;
+            let inner = f16::from_f32(product + f32::from_bits(0xbf87_ede0)).to_f32();
+            presentation[y * side + x] = f16::from_f32((inner + 1.2) * 0.29412);
+        }
+    }
+    Ok(pack_light_map(&presentation, request.storage_orientation))
+}
+
+fn pack_light_map(presentation: &[f16], orientation: u8) -> Vec<u8> {
+    let side = APPLE_STYLE_LIGHT_MAP_SIDE;
     let mut output = Vec::with_capacity(APPLE_STYLE_LIGHT_MAP_BYTE_COUNT);
     for storage_y in 0..side {
         for storage_x in 0..side {
-            let (display_x, display_y) = match request.storage_orientation {
+            let (display_x, display_y) = match orientation {
                 1 => (storage_x, storage_y),
                 2 => (side - 1 - storage_x, storage_y),
                 3 => (side - 1 - storage_x, side - 1 - storage_y),
@@ -1236,7 +1316,7 @@ pub fn apple_style_light_map(
             output.extend_from_slice(&presentation[display_y * side + display_x].to_le_bytes());
         }
     }
-    Ok(output)
+    output
 }
 
 /// The nine-number distribution stored for each style statistics channel.
@@ -2195,6 +2275,7 @@ mod tests {
                 baseline_scale: 2.0,
                 gain_scale: 0.25,
                 baseline_maximum: 64.0,
+                histogram_light_maps: false,
             },
         )
         .unwrap();

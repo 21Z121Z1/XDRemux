@@ -49,9 +49,9 @@ def substitute(base: Path, reference: Path, output: Path, groups):
     (output / 'styles.plist').write_bytes(plistlib.dumps(generated, fmt=plistlib.FMT_BINARY))
 
 
-def render(renderer: Path, source: Path, resources: Path, directory: Path, tone: float):
+def render(renderer: Path, source: Path, resources: Path, directory: Path, tone: float, color=0.0):
     run([renderer, source, resources, directory], env={**os.environ,
-        'XD_TONE_BIAS': str(tone), 'XD_COLOR_BIAS': '0',
+        'XD_TONE_BIAS': str(tone), 'XD_COLOR_BIAS': str(color),
         'XD_TONE_MAX_EDGE': '512', 'XD_TONE_THUMB_MODE': 'native-stage-mirror'})
     facts = json.loads((directory / 'facts.json').read_text())
     if facts.get('exception') or not any(t.get('use_style_engine') is False
@@ -65,21 +65,27 @@ def main(argv=None):
     for name in ('adapter', 'generator', 'research-root', 'output'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--input', type=Path, action='append', required=True)
+    parser.add_argument('--holdout', type=Path, action='append', default=[])
+    parser.add_argument('--compare-histogram-light-maps', action='store_true',
+                        help='compare the frozen source-derived histogram candidate with default generation')
     args = parser.parse_args(argv)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     report = {'schema': 'styles-tone-attribution-v1', 'passed': False, 'cases': [],
-        'oracle_resources_used_for_diagnosis': True, 'product_candidate': False,
+        'oracle_resources_used_for_diagnosis': not args.compare_histogram_light_maps,
+        'product_candidate': args.compare_histogram_light_maps,
         'product_defaults_changed': False,
         'native_consumer_scope': 'PISemanticStyleFilter useStyleEngine=NO; not full engine or reversal',
         'groups': {k: {'metadata_keys': v[0], 'files': v[1]} for k, v in GROUPS.items()}}
     try:
+        if {p.resolve() for p in args.input} & {p.resolve() for p in args.holdout}:
+            raise ValueError('one photo cannot be both calibration and holdout')
         report['host'] = measurement_host(args.adapter)
         report['experiment_sha256'] = isolate.sha(Path(__file__).read_bytes())
         with tempfile.TemporaryDirectory(prefix='tone-attribution-', dir=output) as temporary:
             work = Path(temporary)
             renderer, _, compatibility, report['renderer'] = blind.prepare_renderer(args.research_root, work)
-            for index, source in enumerate(args.input):
+            for index, source in enumerate([*args.input, *args.holdout]):
                 source = source.resolve()
                 identity = isolate.sha(source.read_bytes())
                 if corpus.inspect_bytes(source.read_bytes())['standard_semantic_state'] is not True:
@@ -93,18 +99,33 @@ def main(argv=None):
                 rebuilt = root / 'rebuilt.heic'
                 metadata = blind.regenerate(args.generator, args.adapter, root / 'producer/input.heic',
                     rebuilt, equivalence['reference_headroom'], blind.DEFAULT, verify_pixels=True)
-                # Generation has ended before the evaluator can access reference resources.
                 original, generated = root / 'reference', root / 'generated'
+                candidate = root / 'histogram-resources'
+                candidate_metadata = None
+                if args.compare_histogram_light_maps:
+                    candidate_file = root / 'histogram.heic'
+                    candidate_metadata = blind.regenerate(args.generator, args.adapter,
+                        root / 'producer/input.heic', candidate_file, equivalence['reference_headroom'],
+                        {**blind.DEFAULT, 'histogram_light_maps': True}, verify_pixels=True)
+                    blind.extract(compatibility, candidate_file, candidate)
+                # Both generations end before reference resources are extracted.
                 blind.extract(compatibility, source, original)
                 blind.extract(compatibility, rebuilt, generated)
                 case = {'name': source.name, 'source_sha256': identity,
+                        'evaluation_split': 'holdout' if source in {p.resolve() for p in args.holdout}
+                                            else 'calibration',
                         'native_equivalence': equivalence, 'generated_metadata': metadata, 'variants': {}}
                 reference_metadata = plistlib.loads((original / 'styles.plist').read_bytes())
                 case['reference_linear_metadata'] = {key: reference_metadata.get(key)
                                                      for key in ('4', 'h', 'i')}
+                if candidate_metadata is not None:
+                    case['candidate_generated_metadata'] = candidate_metadata
                 report['cases'].append(case)
                 references = {tone: render(renderer, source, original, root / f'ref-{tone}', tone)
                               for tone in blind.TONES}
+                color_references = {color: render(renderer, source, original,
+                    root / f'ref-color-{color}', 0.0, color) for color in (-0.5, 0.5)} \
+                    if args.compare_histogram_light_maps else {}
                 # Prior measurements found no effect from the other groups on
                 # these controls. Keep them in closure, not repeated singles.
                 singles = ('thumbnail_pixels', 'baseline_exposure', 'base_gain',
@@ -112,9 +133,12 @@ def main(argv=None):
                 variants = [('generated', ()), *[(key, (key,)) for key in singles],
                             ('brightness_bundle', ('linear_exposure', 'tone_curve', 'light_maps')),
                             ('all_renderer_inputs', tuple(GROUPS))]
+                if args.compare_histogram_light_maps:
+                    variants = [('generated', ()), ('histogram_light_maps', ())]
                 for label, groups in variants:
                     resources = root / ('bundle-' + label)
-                    substitute(generated, original, resources, groups)
+                    base = candidate if label == 'histogram_light_maps' else generated
+                    substitute(base, original, resources, groups)
                     metrics = {f'{tone:g}': blind.score(references[tone],
                         render(renderer, source, resources, root / f'{label}-{tone}', tone))
                         for tone in blind.TONES}
@@ -127,9 +151,15 @@ def main(argv=None):
                     case['variants'][label]['native_inputs'] = {
                         key: facts[key] for key in ('primary_input', 'thumbnail_input',
                                                    'native_curve_image', 'gtc_calls')}
-                closure = case['variants']['all_renderer_inputs']['metrics']
-                if any(m['maximum_absolute'] != 0 for m in closure.values()):
-                    raise ValueError('substituted renderer inputs do not reproduce the reference; attribution incomplete')
+                    if color_references:
+                        case['variants'][label]['color_metrics'] = {
+                            f'{color:g}': blind.score(reference, render(renderer, source,
+                                resources, root / f'{label}-color-{color}', 0.0, color))
+                            for color, reference in color_references.items()}
+                if not args.compare_histogram_light_maps:
+                    closure = case['variants']['all_renderer_inputs']['metrics']
+                    if any(m['maximum_absolute'] != 0 for m in closure.values()):
+                        raise ValueError('substituted renderer inputs do not reproduce the reference; attribution incomplete')
                 if isolate.sha(source.read_bytes()) != identity:
                     raise ValueError('reference source changed')
                 (output / 'report.json').write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')

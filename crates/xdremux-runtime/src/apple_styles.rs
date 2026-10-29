@@ -398,20 +398,54 @@ fn convert_file_impl(
     // Key c is the primary-image guide mean. Key d is the linear-thumbnail
     // guide mean. The consumer upsamples each with its guided filter and mixes
     // them; these maps are not multiplied onto luminance.
-    let tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
+    let mut tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.base_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
         storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles tone light map", error))?;
-    let linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
+    let mut linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.thumbnail_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
         storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles linear light map", error))?;
+    if calibration.histogram_light_maps {
+        // The native d histogram reads the GTC-mapped linear image, not the
+        // uncurved thumbnail. These guides/normalizers remain source proxies.
+        let mapped = apple_style_apply_global_tone_curve(
+            &scene_rasters.thumbnail_codes,
+            &scene_rasters.global_tone_curve.linear_samples,
+        )
+        .map_err(|error| RuntimeError::external("Styles histogram guide", error))?;
+        let build = |rgb: &[f32]| {
+            let guide = rgb
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .map(|p| (p[0] + p[1] + p[2]) / 3.0)
+                .collect::<Vec<_>>();
+            let normalizer = rgb
+                .iter()
+                .copied()
+                .fold(0.0_f32, f32::max)
+                .max(1.0 / 4096.0);
+            xdremux_engine::apple_style_histogram_light_map(
+                &AppleStyleLightMapRequest {
+                    luma: &guide,
+                    width: scene_rasters.width,
+                    height: scene_rasters.height,
+                    storage_orientation,
+                },
+                normalizer,
+            )
+            .map_err(|error| RuntimeError::external("Styles histogram map", error))
+        };
+        tone_light_map = build(&scene_rasters.base_rgb)?;
+        linear_light_map = build(&mapped)?;
+    }
     let scene_scores = adapter.vision_scene_scores(&base_path)?;
     let scene_decision = resolve_apple_style_scene_type(scene_scores)
         .map_err(|error| RuntimeError::external("Photographic Styles scene policy", error))?;

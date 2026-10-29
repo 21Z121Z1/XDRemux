@@ -268,10 +268,12 @@ jobs:
           cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
           adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
           python3 -m research.styles_fidelity.tone_attribution \
+            --compare-histogram-light-maps \
             --adapter "$adapter" --generator "$GITHUB_WORKSPACE/target/debug/examples/styles_fidelity" \
             --research-root "$GITHUB_WORKSPACE/consumer-research" \
             --input consumer-research/research/vm-native/samples/IMG_2600.HEIC \
             --input consumer-research/research/vm-native/samples/IMG_2604.HEIC \
+            --holdout consumer-research/research/vm-native/samples/IMG_2608.HEIC \
             --output "$RUNNER_TEMP/styles-tone-attribution"
 
       - name: Upload Tone attribution measurements without media

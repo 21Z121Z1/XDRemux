@@ -153,7 +153,7 @@ private photos are never sent to public Actions or artifacts.
 
 ## Attribute remaining Tone error
 
-The current CI diagnostic rebuilds each of two public calibration controls once
+The resource-substitution diagnostic rebuilds each of two public calibration controls once
 with product defaults. In the evaluator it separates thumbnail pixels, baseline
 exposure, base gain, and thumbnail encoding metadata (gain and range). It also
 tests the complete thumbnail/exposure group, GTC, light maps, and their combined
@@ -176,8 +176,28 @@ Reference resources are used only after blind generation, to diagnose a source
 of error. Mixed bundles are never published as a product or used as calibration
 candidates. Scores use `PISemanticStyleFilter` with `useStyleEngine=NO`; this
 does not test the full engine or reversal. The full joint-calibration command
-above remains available; CI runs this focused diagnostic instead of repeating
-the completed parameter search. Only numeric reports are uploaded.
+above remains available. Only numeric reports are uploaded.
+
+### Compare the histogram light-map candidate
+
+Current CI adds `--compare-histogram-light-maps` to the same command and supplies
+`--holdout .../IMG_2608.HEIC`. The two `--input` controls remain calibration cases.
+Both default and candidate regenerate all resources from the isolated input;
+no reference resource enters either generator. The candidate changes only c/d
+generation. It uses local quantized histogram medians and the ordered half
+writer from research reference `979bc34`,
+[`lightmap_model_s55.py`](https://github.com/21Z121Z1/Photographic_Style_Research/blob/979bc34aa4894a7205c8e6f0818b420c974215cf/research/hdr-native/lightmap_model_s55.py).
+The d guide uses GTC-mapped thumbnail RGB. Arithmetic RGB means, integer cell
+footprints and image-derived maximum normalizers are declared approximations
+to the native color/statistics/ROI context. The 269-case native tail comparison
+does not establish equivalence of those upstream approximations.
+
+The candidate is frozen before measuring the holdout. Reports compare Tone
+-0.5/0/+0.5 and Color -0.5/+0.5, preserve full native SDR/HDR base checks, and
+record both generated metadata sets. They do not select a trial using holdout
+scores. Default product calibration keeps `histogram_light_maps=false` until
+native response and remaining fidelity evidence support promotion. These are
+forward measurements; full-engine/reversal and Photos editing remain separate.
 
 ## Replay final HDR Texture resources
 

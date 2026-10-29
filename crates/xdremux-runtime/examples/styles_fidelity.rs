@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             baseline_scale: number("baseline_scale")? as f32,
             gain_scale: number("gain_scale")? as f32,
             baseline_maximum: number("baseline_maximum")? as f32,
+            histogram_light_maps: request["histogram_light_maps"].as_bool().unwrap_or(false),
         },
     )?;
     if xdremux_engine::apple_style_data_sha256(&fs::read(text("input")?)?) != before {
