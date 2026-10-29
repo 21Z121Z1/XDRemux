@@ -48,4 +48,15 @@ fn isolated_highlights_do_not_replace_the_local_median() {
         .iter()
         .all(|v| u16::from_le_bytes([v[0], v[1]]) == 0x2937));
     assert!(apple_style_histogram_light_map(&request, 0.0).is_err());
+    let extreme = vec![65504.0; 32 * 32];
+    assert!(apple_style_histogram_light_map(
+        &AppleStyleLightMapRequest {
+            luma: &extreme,
+            width: 32,
+            height: 32,
+            storage_orientation: 1,
+        },
+        65504.0
+    )
+    .is_err());
 }

@@ -1291,7 +1291,13 @@ pub fn apple_style_histogram_light_map(
             let p50 = bucket as f32 * f32::from_bits(0x3b80_8081);
             let product = (normalizer * f32::from_bits(0x401c_3d8f)) * p50;
             let inner = f16::from_f32(product + f32::from_bits(0xbf87_ede0)).to_f32();
-            presentation[y * side + x] = f16::from_f32((inner + 1.2) * 0.29412);
+            let encoded = f16::from_f32((inner + 1.2) * 0.29412);
+            if !encoded.is_finite() {
+                return Err(AppleStyleDataError::NonFiniteLightMapValue {
+                    index: y * side + x,
+                });
+            }
+            presentation[y * side + x] = encoded;
         }
     }
     Ok(pack_light_map(&presentation, request.storage_orientation))
