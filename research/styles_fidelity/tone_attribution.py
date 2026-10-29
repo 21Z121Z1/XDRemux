@@ -17,6 +17,10 @@ MASKS = tuple(key + '.heic' for key in (
     'inputSubjectMatteImage', 'inputSkinMatteImage', 'inputSkyMatteImage', 'inputGainMapImage'))
 GROUPS = {
     'linear_exposure': (('4', 'h', 'i'), ('linear.heic',)),
+    'thumbnail_pixels': ((), ('linear.heic',)),
+    'baseline_exposure': (('4',), ()),
+    'base_gain': (('h',), ()),
+    'thumbnail_encoding': (('i',), ()),
     'tone_curve': (('3',), ()),
     'light_maps': (('c', 'd', 'e', 'f', 'g'), ()),
     'statistics_scene': (('5', '6', '7', 'j', 'k'), ()),
@@ -95,10 +99,18 @@ def main(argv=None):
                 blind.extract(compatibility, rebuilt, generated)
                 case = {'name': source.name, 'source_sha256': identity,
                         'native_equivalence': equivalence, 'generated_metadata': metadata, 'variants': {}}
+                reference_metadata = plistlib.loads((original / 'styles.plist').read_bytes())
+                case['reference_linear_metadata'] = {key: reference_metadata.get(key)
+                                                     for key in ('4', 'h', 'i')}
                 report['cases'].append(case)
                 references = {tone: render(renderer, source, original, root / f'ref-{tone}', tone)
                               for tone in blind.TONES}
-                variants = [('generated', ()), *[(key, (key,)) for key in GROUPS],
+                # Prior measurements found no effect from the other groups on
+                # these controls. Keep them in closure, not repeated singles.
+                singles = ('thumbnail_pixels', 'baseline_exposure', 'base_gain',
+                           'thumbnail_encoding', 'linear_exposure', 'tone_curve', 'light_maps')
+                variants = [('generated', ()), *[(key, (key,)) for key in singles],
+                            ('brightness_bundle', ('linear_exposure', 'tone_curve', 'light_maps')),
                             ('all_renderer_inputs', tuple(GROUPS))]
                 for label, groups in variants:
                     resources = root / ('bundle-' + label)
@@ -108,6 +120,13 @@ def main(argv=None):
                         for tone in blind.TONES}
                     case['variants'][label] = {'metrics': metrics,
                         'mean_nonzero_tone_rmse': (metrics['-0.5']['rmse'] + metrics['0.5']['rmse']) / 2}
+                    # Observe what the native consumer actually decoded, rather
+                    # than inferring it from pre-encoding Rust samples.
+                    facts = json.loads((root / f'{label}-0.5/facts.json').read_text())
+                    case['variants'][label]['input_observation_tone'] = 0.5
+                    case['variants'][label]['native_inputs'] = {
+                        key: facts[key] for key in ('primary_input', 'thumbnail_input',
+                                                   'native_curve_image', 'gtc_calls')}
                 closure = case['variants']['all_renderer_inputs']['metrics']
                 if any(m['maximum_absolute'] != 0 for m in closure.values()):
                     raise ValueError('substituted renderer inputs do not reproduce the reference; attribution incomplete')

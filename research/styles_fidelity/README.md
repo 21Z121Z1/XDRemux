@@ -154,9 +154,13 @@ private photos are never sent to public Actions or artifacts.
 ## Attribute remaining Tone error
 
 The current CI diagnostic rebuilds each of two public calibration controls once
-with product defaults. In the evaluator it substitutes one reference group at a
-time: thumbnail/exposure, GTC, light maps, statistics/scene, masks, or metadata
-mode. It measures Tone -0.5/0/+0.5 on the same primary. Substituting all renderer
+with product defaults. In the evaluator it separates thumbnail pixels, baseline
+exposure, base gain, and thumbnail encoding metadata (gain and range). It also
+tests the complete thumbnail/exposure group, GTC, light maps, and their combined
+brightness bundle. Previously inactive statistics/scene, masks and metadata mode
+remain part of full-input closure rather than repeated single-group trials.
+Reports include reference exposure metadata and the native decoded input ranges
+and GTC arguments. It measures Tone -0.5/0/+0.5 on the same primary. Substituting all renderer
 inputs must reproduce the reference exactly before the attribution is accepted.
 
 ```sh
