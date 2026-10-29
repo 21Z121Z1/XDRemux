@@ -66,28 +66,6 @@ pub struct AppleStyleLinearMetadata {
     pub encoding_gain: f32,
 }
 
-/// Joint controls for thumbnail exposure and gain. Product defaults preserve
-/// the established calibration; research evaluates alternatives on held-out scenes.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AppleStyleLinearCalibration {
-    pub baseline_scale: f32,
-    pub gain_scale: f32,
-    pub baseline_maximum: f32,
-    /// Evaluate the histogram writer with source-derived guide statistics.
-    pub histogram_light_maps: bool,
-}
-
-impl Default for AppleStyleLinearCalibration {
-    fn default() -> Self {
-        Self {
-            baseline_scale: 1.0,
-            gain_scale: 1.0,
-            baseline_maximum: 10.4,
-            histogram_light_maps: false,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppleStyleGlobalToneCurve {
     pub data: Vec<u8>,
@@ -123,7 +101,6 @@ pub enum AppleStyleDataError {
         actual: usize,
     },
     InvalidThumbnailExposure,
-    InvalidLinearCalibration,
     InvalidRefinementParameter {
         actual: usize,
         expected: usize,
@@ -188,9 +165,6 @@ impl fmt::Display for AppleStyleDataError {
             ),
             Self::InvalidThumbnailExposure => formatter.write_str(
                 "Apple Photographic Styles thumbnail exposure must be finite and positive",
-            ),
-            Self::InvalidLinearCalibration => formatter.write_str(
-                "Styles calibration requires positive finite scales and a baseline maximum in 4..64",
             ),
             Self::InvalidRefinementParameter { actual, expected } => write!(
                 formatter,
@@ -379,35 +353,12 @@ pub fn apple_style_identity_global_tone_curve() -> Vec<u8> {
 /// documented by the producer contract. They describe a source-derived
 /// proxy for the unavailable camera-time LTMDigitalGain; they are not a donor
 /// image or a scene-independent identity fallback.
+#[allow(clippy::excessive_precision)]
 pub fn apple_style_linear_metadata(
     base_luminance: &[f32],
     hdr_luminance: &[f32],
     gain_map_maximum_stops: f32,
 ) -> Result<AppleStyleLinearMetadata, AppleStyleDataError> {
-    apple_style_linear_metadata_with_calibration(
-        base_luminance,
-        hdr_luminance,
-        gain_map_maximum_stops,
-        AppleStyleLinearCalibration::default(),
-    )
-}
-
-#[allow(clippy::excessive_precision)]
-pub fn apple_style_linear_metadata_with_calibration(
-    base_luminance: &[f32],
-    hdr_luminance: &[f32],
-    gain_map_maximum_stops: f32,
-    calibration: AppleStyleLinearCalibration,
-) -> Result<AppleStyleLinearMetadata, AppleStyleDataError> {
-    if !calibration.baseline_scale.is_finite()
-        || calibration.baseline_scale <= 0.0
-        || !calibration.gain_scale.is_finite()
-        || calibration.gain_scale <= 0.0
-        || !calibration.baseline_maximum.is_finite()
-        || !(4.0..=64.0).contains(&calibration.baseline_maximum)
-    {
-        return Err(AppleStyleDataError::InvalidLinearCalibration);
-    }
     if base_luminance.is_empty()
         || base_luminance.len() != hdr_luminance.len()
         || !base_luminance.iter().all(|value| value.is_finite())
@@ -422,15 +373,13 @@ pub fn apple_style_linear_metadata_with_calibration(
         return Err(AppleStyleDataError::InvalidLightMapInput);
     }
     let highlight_compression_ratio = hdr_p98 / base_p98;
-    let baseline_unclamped =
-        highlight_compression_ratio / 0.401_264_06 * calibration.baseline_scale;
-    let baseline_clamped = baseline_unclamped.clamp(4.0, calibration.baseline_maximum);
+    let baseline_unclamped = highlight_compression_ratio / 0.401_264_06;
+    let baseline_clamped = baseline_unclamped.clamp(4.0, 10.4);
     let baseline_exposure = (baseline_clamped * 65.0).round() / 65.0;
     let base_gain = (1.512_718_43
         + 0.156_706_32 * gain_map_maximum_stops
         + 0.147_667_24 * highlight_compression_ratio)
-        * calibration.gain_scale;
-    let base_gain = base_gain.clamp(0.5, 2.5);
+        .clamp(0.5, 2.5);
     Ok(AppleStyleLinearMetadata {
         baseline_exposure,
         baseline_exposure_unclamped: baseline_unclamped,
@@ -1222,93 +1171,10 @@ pub fn apple_style_light_map(
         }
     }
 
-    Ok(pack_light_map(&presentation, request.storage_orientation))
-}
-
-/// Conditional local-histogram writer using a supplied guide and normalizer.
-///
-/// The caller supplies arithmetic RGB means in its declared working space.
-/// Integer cell footprints approximate the camera sampling/ROI stage; they do
-/// not recover pre-LTM inputs. The bucket and ordered half writer follow
-/// AIR0002 (histogram 0/7 and lines 706-720), research reference 979bc34,
-/// research/hdr-native/lightmap_model_s55.py and evidence/s56/tail-summary.json.
-pub fn apple_style_histogram_light_map(
-    request: &AppleStyleLightMapRequest<'_>,
-    normalizer: f32,
-) -> Result<Vec<u8>, AppleStyleDataError> {
-    if request.width == 0
-        || request.height == 0
-        || request.width.checked_mul(request.height) != Some(request.luma.len())
-        || !normalizer.is_finite()
-        || normalizer <= 0.0
-        || !f16::from_f32(normalizer).is_finite()
-        || f16::from_f32(normalizer).to_f32() <= 0.0
-    {
-        return Err(AppleStyleDataError::InvalidLightMapInput);
-    }
-    if !(1..=8).contains(&request.storage_orientation) {
-        return Err(AppleStyleDataError::InvalidOrientation(
-            request.storage_orientation,
-        ));
-    }
-    if let Some(index) = request.luma.iter().position(|v| !v.is_finite()) {
-        return Err(AppleStyleDataError::InvalidLightMapSample { index });
-    }
-    let side = APPLE_STYLE_LIGHT_MAP_SIDE;
-    let half_normalizer = f16::from_f32(normalizer).to_f32();
-    let mut presentation = vec![f16::ZERO; side * side];
-    for y in 0..side {
-        let y0 = y * request.height / side;
-        let y1 = ((y + 1) * request.height / side)
-            .max(y0 + 1)
-            .min(request.height);
-        for x in 0..side {
-            let x0 = x * request.width / side;
-            let x1 = ((x + 1) * request.width / side)
-                .max(x0 + 1)
-                .min(request.width);
-            let mut histogram = [0_usize; 256];
-            for j in y0..y1 {
-                for i in x0..x1 {
-                    let normalized =
-                        f16::from_f32(request.luma[j * request.width + i] / half_normalizer)
-                            .to_f32();
-                    let scaled = f16::from_f32(normalized * 256.0).to_f32();
-                    let bucket = scaled.round().clamp(0.0, 255.0) as usize;
-                    histogram[bucket] += 1;
-                }
-            }
-            // Native cumulative count must be strictly greater than n/2.
-            let rank = (y1 - y0) * (x1 - x0) / 2;
-            let mut count = 0;
-            let bucket = histogram
-                .iter()
-                .position(|n| {
-                    count += n;
-                    count > rank
-                })
-                .unwrap_or(255);
-            let p50 = bucket as f32 * f32::from_bits(0x3b80_8081);
-            let product = (normalizer * f32::from_bits(0x401c_3d8f)) * p50;
-            let inner = f16::from_f32(product + f32::from_bits(0xbf87_ede0)).to_f32();
-            let encoded = f16::from_f32((inner + 1.2) * 0.29412);
-            if !encoded.is_finite() {
-                return Err(AppleStyleDataError::NonFiniteLightMapValue {
-                    index: y * side + x,
-                });
-            }
-            presentation[y * side + x] = encoded;
-        }
-    }
-    Ok(pack_light_map(&presentation, request.storage_orientation))
-}
-
-fn pack_light_map(presentation: &[f16], orientation: u8) -> Vec<u8> {
-    let side = APPLE_STYLE_LIGHT_MAP_SIDE;
     let mut output = Vec::with_capacity(APPLE_STYLE_LIGHT_MAP_BYTE_COUNT);
     for storage_y in 0..side {
         for storage_x in 0..side {
-            let (display_x, display_y) = match orientation {
+            let (display_x, display_y) = match request.storage_orientation {
                 1 => (storage_x, storage_y),
                 2 => (side - 1 - storage_x, storage_y),
                 3 => (side - 1 - storage_x, side - 1 - storage_y),
@@ -1322,7 +1188,7 @@ fn pack_light_map(presentation: &[f16], orientation: u8) -> Vec<u8> {
             output.extend_from_slice(&presentation[display_y * side + display_x].to_le_bytes());
         }
     }
-    output
+    Ok(output)
 }
 
 /// The nine-number distribution stored for each style statistics channel.
@@ -2260,65 +2126,6 @@ fn solve_linear_system(matrix: &[f64], vector: &[f64]) -> Result<Vec<f64>, Apple
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn joint_linear_calibration_preserves_default_and_changes_both_scales() {
-        let base = [0.2, 0.4, 0.6, 0.8];
-        let hdr = [1.6, 3.2, 4.8, 6.4];
-        let original = super::apple_style_linear_metadata(&base, &hdr, 3.0).unwrap();
-        let defaults = super::apple_style_linear_metadata_with_calibration(
-            &base,
-            &hdr,
-            3.0,
-            super::AppleStyleLinearCalibration::default(),
-        )
-        .unwrap();
-        assert_eq!(original, defaults);
-        let changed = super::apple_style_linear_metadata_with_calibration(
-            &base,
-            &hdr,
-            3.0,
-            super::AppleStyleLinearCalibration {
-                baseline_scale: 2.0,
-                gain_scale: 0.25,
-                baseline_maximum: 64.0,
-                histogram_light_maps: false,
-            },
-        )
-        .unwrap();
-        assert!(changed.baseline_exposure > original.baseline_exposure);
-        assert!(changed.base_gain < original.base_gain);
-        assert_eq!(changed.encoding_gain, changed.base_gain * 4.0);
-    }
-
-    #[test]
-    fn invalid_joint_calibration_cannot_enter_the_resource_fit() {
-        for scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            let calibration = super::AppleStyleLinearCalibration {
-                baseline_scale: scale,
-                ..Default::default()
-            };
-            assert!(super::apple_style_linear_metadata_with_calibration(
-                &[0.5],
-                &[2.0],
-                2.0,
-                calibration
-            )
-            .is_err());
-        }
-        for maximum in [3.0, 65.0, f32::NAN] {
-            let calibration = super::AppleStyleLinearCalibration {
-                baseline_maximum: maximum,
-                ..Default::default()
-            };
-            assert!(super::apple_style_linear_metadata_with_calibration(
-                &[0.5],
-                &[2.0],
-                2.0,
-                calibration
-            )
-            .is_err());
-        }
-    }
     use super::*;
 
     #[test]

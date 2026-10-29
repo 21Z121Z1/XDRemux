@@ -10,10 +10,10 @@ use xdremux_codec::EncodedHevcResource;
 use xdremux_codec::{HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
 use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_distribution, apple_style_face_exposure_boost,
-    apple_style_light_map, apple_style_linear_thumbnail_codes, apple_style_maker_apple_dictionary,
-    apple_style_monotonic_global_tone_curve, apple_style_property_list,
-    apple_style_revert_local_data, resolve_apple_style_scene_type, AppleL8Mask,
-    AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
+    apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
+    apple_style_maker_apple_dictionary, apple_style_monotonic_global_tone_curve,
+    apple_style_property_list, apple_style_revert_local_data, resolve_apple_style_scene_type,
+    AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
     AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
     APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
@@ -119,52 +119,8 @@ pub(crate) fn convert_file(
     source: &[u8],
     output: impl AsRef<Path>,
 ) -> Result<PhotographicStylesFileReceipt> {
-    convert_file_impl(runtime, executable.as_ref(), source, output.as_ref(), None)
-}
-
-#[cfg(feature = "styles-research")]
-pub(crate) fn rebuild_for_research(
-    runtime: &PortableRuntime,
-    executable: &Path,
-    source: &[u8],
-    output: &Path,
-    maximum_stops: f32,
-    calibration: xdremux_engine::AppleStyleLinearCalibration,
-) -> Result<PhotographicStylesFileReceipt> {
-    if !maximum_stops.is_finite() || !(0.0..=16.0).contains(&maximum_stops) {
-        return Err(RuntimeError::new(
-            "Styles research input",
-            "invalid measured HDR headroom",
-        ));
-    }
-    if output.exists() {
-        return Err(RuntimeError::new(
-            "Styles research output",
-            "output already exists",
-        ));
-    }
-    // The assembly owner rejects an existing Styles item. The caller supplies
-    // a blind HEIF projection, never a donor resource or a vendor disguise.
-    convert_file_impl(
-        runtime,
-        executable,
-        source,
-        output,
-        Some((maximum_stops, calibration)),
-    )
-}
-
-fn convert_file_impl(
-    runtime: &PortableRuntime,
-    executable: &Path,
-    source: &[u8],
-    output: &Path,
-    research: Option<(f32, xdremux_engine::AppleStyleLinearCalibration)>,
-) -> Result<PhotographicStylesFileReceipt> {
     let mut profile = profile_start();
-    let calibration = research
-        .map(|(_, calibration)| calibration)
-        .unwrap_or_default();
+    let output = output.as_ref();
     let parent = publication_parent(output);
     if !parent.is_dir() {
         return Err(RuntimeError::new(
@@ -172,11 +128,7 @@ fn convert_file_impl(
             format!("output parent is not a directory: {}", parent.display()),
         ));
     }
-    let prepared = if research.is_none() {
-        Some(runtime.analyze_proxdr(source)?)
-    } else {
-        None
-    };
+    let prepared = runtime.analyze_proxdr(source)?;
     profile_stage(&mut profile, "source_analysis");
 
     let staging = tempfile::Builder::new()
@@ -189,16 +141,12 @@ fn convert_file_impl(
     // Build the standard HDR base in memory so an in-place Styles conversion
     // cannot publish an intermediate file. The request is intentionally
     // feature-neutral: this operation owns the Styles graph separately.
-    let product_base = if research.is_some() {
-        source.to_vec()
-    } else {
-        runtime
-            .convert_proxdr_bytes(source, xdremux_engine::ConversionRequest::default(), |_| {})?
-            .bytes
-    };
-    let mut system_encoded = if research.is_none() && crate::system_heif_hdr::requested()? {
+    let product_base = runtime
+        .convert_proxdr_bytes(source, xdremux_engine::ConversionRequest::default(), |_| {})?
+        .bytes;
+    let mut system_encoded = if crate::system_heif_hdr::requested()? {
         Some(crate::system_heif_hdr::encode_system_base(
-            executable,
+            executable.as_ref(),
             &product_base,
             staging.path(),
             output,
@@ -218,7 +166,7 @@ fn convert_file_impl(
         .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
     profile_stage(&mut profile, "base_conversion");
 
-    let adapter = AppleAdapterClient::new(executable.to_path_buf());
+    let adapter = AppleAdapterClient::new(executable.as_ref().to_path_buf());
     if !adapter.supports_photographic_styles()? {
         return Err(RuntimeError::new(
             "Photographic Styles adapter",
@@ -277,21 +225,11 @@ fn convert_file_impl(
     let semantic_scaffold = fs::read(&semantic_scaffold_path).map_err(|error| {
         RuntimeError::external("Photographic Styles semantic scaffold read", error)
     })?;
-    let semantic_base = if research.is_some() {
-        // The blind Apple HDR base is authoritative. Import only the newly
-        // inferred resources, preserving its coded primary and HDR graph.
-        xdremux_heif::merge_apple_semantic_auxiliary_heif(
-            &base,
-            &semantic_scaffold,
-            APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
-        )
-    } else {
-        xdremux_heif::transplant_apple_semantic_auxiliary_heif(
-            &base,
-            &semantic_scaffold,
-            APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
-        )
-    }
+    let semantic_base = xdremux_heif::transplant_apple_semantic_auxiliary_heif(
+        &base,
+        &semantic_scaffold,
+        APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
+    )
     .map_err(|error| {
         note_system_carrier(
             carrier_report.as_deref(),
@@ -324,34 +262,22 @@ fn convert_file_impl(
             pair,
             encoded.content_headroom.log2(),
             LINEAR_THUMBNAIL_MAX_SIZE,
-            calibration,
         )?
     } else {
         let pair = scene_linear_pair(
             &adapter,
-            if research.is_some() {
-                &base
-            } else {
-                &semantic_base
-            },
+            &semantic_base,
             staging.path(),
             LINEAR_THUMBNAIL_MAX_SIZE,
         )?;
-        let maximum_stops = if let Some((stops, _)) = research {
-            stops
-        } else {
-            let prepared = prepared.as_ref().ok_or_else(|| {
-                RuntimeError::new("Photographic Styles source", "missing ProXDR analysis")
-            })?;
-            prepared
-                .scale
-                .per_channel_gain_map_max
-                .iter()
-                .copied()
-                .chain(std::iter::once(prepared.scale.gain_map_max))
-                .fold(f64::NEG_INFINITY, f64::max) as f32
-        };
-        derive_style_scene_from_pair(pair, maximum_stops, LINEAR_THUMBNAIL_MAX_SIZE, calibration)?
+        let maximum_stops = prepared
+            .scale
+            .per_channel_gain_map_max
+            .iter()
+            .copied()
+            .chain(std::iter::once(prepared.scale.gain_map_max))
+            .fold(f64::NEG_INFINITY, f64::max);
+        derive_style_scene_from_pair(pair, maximum_stops as f32, LINEAR_THUMBNAIL_MAX_SIZE)?
     };
     profile_stage(&mut profile, "scene_derivation");
     let display_thumbnail = linear_thumbnail_raster(&scene_rasters)?;
@@ -398,54 +324,20 @@ fn convert_file_impl(
     // Key c is the primary-image guide mean. Key d is the linear-thumbnail
     // guide mean. The consumer upsamples each with its guided filter and mixes
     // them; these maps are not multiplied onto luminance.
-    let mut tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
+    let tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.base_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
         storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles tone light map", error))?;
-    let mut linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
+    let linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.thumbnail_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
         storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles linear light map", error))?;
-    if calibration.histogram_light_maps {
-        // The native d histogram reads the GTC-mapped linear image, not the
-        // uncurved thumbnail. These guides/normalizers remain source proxies.
-        let mapped = apple_style_apply_global_tone_curve(
-            &scene_rasters.thumbnail_codes,
-            &scene_rasters.global_tone_curve.linear_samples,
-        )
-        .map_err(|error| RuntimeError::external("Styles histogram guide", error))?;
-        let build = |rgb: &[f32]| {
-            let guide = rgb
-                .as_chunks::<3>()
-                .0
-                .iter()
-                .map(|p| (p[0] + p[1] + p[2]) / 3.0)
-                .collect::<Vec<_>>();
-            let normalizer = rgb
-                .iter()
-                .copied()
-                .fold(0.0_f32, f32::max)
-                .max(1.0 / 4096.0);
-            xdremux_engine::apple_style_histogram_light_map(
-                &AppleStyleLightMapRequest {
-                    luma: &guide,
-                    width: scene_rasters.width,
-                    height: scene_rasters.height,
-                    storage_orientation,
-                },
-                normalizer,
-            )
-            .map_err(|error| RuntimeError::external("Styles histogram map", error))
-        };
-        tone_light_map = build(&scene_rasters.base_rgb)?;
-        linear_light_map = build(&mapped)?;
-    }
     let scene_scores = adapter.vision_scene_scores(&base_path)?;
     let scene_decision = resolve_apple_style_scene_type(scene_scores)
         .map_err(|error| RuntimeError::external("Photographic Styles scene policy", error))?;
@@ -519,11 +411,8 @@ fn convert_file_impl(
     fs::write(&styles_path, &assembled)
         .map_err(|error| RuntimeError::external("Texture source staging", error))?;
     profile_stage(&mut profile, "style_assembly");
-    let assembled = if research.is_none() {
-        crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?
-    } else {
-        assembled
-    };
+    let assembled =
+        crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?;
     profile_stage(&mut profile, "texture_generation");
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
         note_system_carrier(
@@ -862,7 +751,6 @@ fn derive_style_scene(
         &full_hdr,
         gain_map_maximum_stops as f32,
         maximum_edge,
-        xdremux_engine::AppleStyleLinearCalibration::default(),
     )
 }
 
@@ -870,7 +758,6 @@ fn derive_style_scene_from_pair(
     pair: SceneLinearPair,
     maximum_stops: f32,
     maximum_edge: u32,
-    calibration: xdremux_engine::AppleStyleLinearCalibration,
 ) -> Result<StyleSceneRasters> {
     let sdr = SceneLinearRgb {
         width: pair.width,
@@ -882,7 +769,7 @@ fn derive_style_scene_from_pair(
         height: pair.height,
         samples: pair.hdr,
     };
-    derive_style_scene_from_linear_images(&sdr, &hdr, maximum_stops, maximum_edge, calibration)
+    derive_style_scene_from_linear_images(&sdr, &hdr, maximum_stops, maximum_edge)
 }
 
 fn derive_style_scene_from_linear_images(
@@ -890,7 +777,6 @@ fn derive_style_scene_from_linear_images(
     full_hdr: &SceneLinearRgb,
     gain_map_maximum_stops: f32,
     maximum_edge: u32,
-    calibration: xdremux_engine::AppleStyleLinearCalibration,
 ) -> Result<StyleSceneRasters> {
     // Thumbnail reduction happens only after the gain is applied at the base
     // resolution. Both images use the same linear-light area footprint.
@@ -940,13 +826,11 @@ fn derive_style_scene_from_linear_images(
     let base_rgb = base_image.samples;
     let hdr_rgb = hdr_image.samples;
 
-    let linear_metadata = xdremux_engine::apple_style_linear_metadata_with_calibration(
-        &base_luminance,
-        &hdr_luminance,
-        gain_map_maximum_stops,
-        calibration,
-    )
-    .map_err(|error| RuntimeError::external("Photographic Styles linear metadata", error))?;
+    let linear_metadata =
+        apple_style_linear_metadata(&base_luminance, &hdr_luminance, gain_map_maximum_stops)
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles linear metadata", error)
+            })?;
     let coded_linear_luminance = hdr_luminance
         .iter()
         .map(|value| *value / linear_metadata.baseline_exposure)
@@ -1793,13 +1677,9 @@ mod tests {
                 .copied()
                 .chain(std::iter::once(prepared.scale.gain_map_max))
                 .fold(f64::NEG_INFINITY, f64::max);
-            let scene = derive_style_scene_from_pair(
-                pair,
-                maximum_stops as f32,
-                LINEAR_THUMBNAIL_MAX_SIZE,
-                xdremux_engine::AppleStyleLinearCalibration::default(),
-            )
-            .unwrap();
+            let scene =
+                derive_style_scene_from_pair(pair, maximum_stops as f32, LINEAR_THUMBNAIL_MAX_SIZE)
+                    .unwrap();
             let expected = linear_thumbnail_raster(&scene).unwrap();
             assert_eq!(
                 (decoded.width, decoded.height),
@@ -1905,7 +1785,6 @@ mod tests {
             },
             2.0,
             2,
-            xdremux_engine::AppleStyleLinearCalibration::default(),
         )
         .unwrap();
         assert_eq!(scene.base_rgb, sdr);

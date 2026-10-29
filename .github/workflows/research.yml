@@ -193,15 +193,6 @@ jobs:
           "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
           echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
 
-      - name: Check out the verified Texture replay primitives
-        uses: actions/checkout@v7
-        with:
-          repository: 21Z121Z1/Photographic_Style_Research
-          ref: 2bc4e3d16fc2c6028cdf708f06d79cf3be42a6d5
-          path: texture-research
-          sparse-checkout: research/texture-producer-20261020
-          persist-credentials: false
-
       - name: Test tone measurement failure handling
         env:
           RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
@@ -218,72 +209,6 @@ jobs:
           swift build --product xdremux-apple-adapter
           test -x target/debug/xdremux
           test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
-
-      - name: Verify blind source isolation against native SDR and HDR
-        shell: bash
-        run: |
-          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
-          python3 -m research.styles_fidelity.native \
-            --ablate-hdr-exif \
-            --adapter "$adapter" \
-            --input consumer-research/Apple_Native_Samples/IMG_0032.HEIC \
-            --input consumer-research/Apple_Native_Samples/IMG_0033.HEIC \
-            --output "$RUNNER_TEMP/styles-blind-native"
-
-      - name: Upload blind isolation measurements
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: styles-blind-native-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/styles-blind-native/report.json
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Replay encoded Texture resources from a current HDR product file
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
-          XDREMUX_APPLE_ADAPTER="$adapter" target/debug/xdremux convert \
-            --input fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic \
-            --output "$RUNNER_TEMP/styles-texture-final.heic" --apple-styles
-          python3 -m research.styles_fidelity.texture \
-            --adapter "$adapter" --research-root "$GITHUB_WORKSPACE/texture-research" \
-            --input "$RUNNER_TEMP/styles-texture-final.heic" \
-            --output "$RUNNER_TEMP/texture-final-replay"
-
-      - name: Upload final HDR Texture measurements without media
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: texture-final-replay-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/texture-final-replay/report.json
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Attribute native Tone error to resource groups
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          cargo build --locked -p xdremux-runtime --features styles-research --example styles_fidelity
-          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
-          python3 -m research.styles_fidelity.tone_attribution \
-            --compare-histogram-light-maps \
-            --adapter "$adapter" --generator "$GITHUB_WORKSPACE/target/debug/examples/styles_fidelity" \
-            --research-root "$GITHUB_WORKSPACE/consumer-research" \
-            --input consumer-research/research/vm-native/samples/IMG_2600.HEIC \
-            --input consumer-research/research/vm-native/samples/IMG_2604.HEIC \
-            --holdout consumer-research/research/vm-native/samples/IMG_2608.HEIC \
-            --output "$RUNNER_TEMP/styles-tone-attribution"
-
-      - name: Upload Tone attribution measurements without media
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: styles-tone-attribution-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/styles-tone-attribution/report.json
-          if-no-files-found: warn
-          retention-days: 7
 
       - name: Render tone sweeps
         shell: bash

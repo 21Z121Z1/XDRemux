@@ -426,27 +426,6 @@ impl PortableRuntime {
         apple_styles::convert_file(self, executable, source, output)
     }
 
-    /// Research-only resource generation from an already isolated Apple HDR
-    /// input. This calls the product's resource producer without ProXDR admission.
-    #[cfg(all(target_os = "macos", feature = "styles-research"))]
-    pub fn rebuild_styles_for_research(
-        &self,
-        executable: &Path,
-        source: &[u8],
-        output: &Path,
-        maximum_stops: f32,
-        calibration: xdremux_engine::AppleStyleLinearCalibration,
-    ) -> Result<PhotographicStylesFileReceipt> {
-        apple_styles::rebuild_for_research(
-            self,
-            executable,
-            source,
-            output,
-            maximum_stops,
-            calibration,
-        )
-    }
-
     /// Encode one SDR/HDR pair with Core Image's gain-map calculation.
     ///
     /// This is the opt-in measurement primitive. It does not publish a Styles
