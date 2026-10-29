@@ -11,11 +11,12 @@ from scripts.ci.agent_completion_gate import changed_files, repository_root, res
 
 # Changes to selection or its owning workflow exercise every selected consumer.
 COMMON = (
-    "Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",
-    "rust-toolchain*", ".cargo/**", ".github/workflows/research.yml",
-    "scripts/ci/**", "tests/validation/test_ci_selection.py",
+    ".github/workflows/research.yml", "scripts/ci/**",
+    "tests/validation/test_ci_selection.py",
 )
-STYLE_PRODUCT = (
+RUST_BUILD = ("Cargo.toml", "Cargo.lock", "rust-toolchain*", ".cargo/**")
+SWIFT_BUILD = ("Package.swift", "Package.resolved")
+STYLE_PRODUCT = RUST_BUILD + SWIFT_BUILD + (
     "crates/xdremux-cli/**", "crates/xdremux-engine/**",
     "crates/xdremux-runtime/src/apple*.rs",
     "crates/xdremux-runtime/src/style*.rs", "crates/xdremux-runtime/src/lib.rs",
@@ -26,7 +27,7 @@ STYLE_PRODUCT = (
     "Sources/**", "fixtures/proxdr/**", "fixtures/SHA256SUMS",
 )
 RESEARCH = {
-    "portable-evidence": (
+    "portable-evidence": RUST_BUILD + SWIFT_BUILD + (
         "tests/**", "research/**", "scripts/**", "xdremux_py/**",
         "model_adapters/**", "crates/**", "Sources/**", "apps/**",
         "pyproject.toml", ".gitignore",
@@ -54,7 +55,7 @@ RESEARCH = {
         "scripts/apple/score_system_hdr_tone.py", "tests/test_style_tone_response.py",
         "crates/xdremux-runtime/tests/system_heif_hdr.rs",
     ),
-    "pvt-native-import": (
+    "pvt-native-import": RUST_BUILD + (
         "scripts/apple/pvt_native_import/**", "tests/test_pvt*.py",
         "tests/fixtures/pvt_boot_status/**", "crates/xdremux-motion-photo/**",
         "crates/xdremux-runtime/src/live_photo/**", "crates/xdremux-runtime/src/lib.rs",

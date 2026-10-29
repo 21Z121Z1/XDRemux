@@ -54,10 +54,19 @@ class CheckSelectionTests(unittest.TestCase):
         self.assertNotIn("coreml-candidate", jobs)
         self.assertNotIn("texture-probe-build", jobs)
 
-    def test_shared_build_or_selection_changes_exercise_all_research_consumers(self):
-        for path in ("Cargo.lock", "Package.swift", "scripts/ci/select_checks.py"):
-            with self.subTest(path=path):
-                self.assertEqual(self.selected_jobs([path]), set(RESEARCH))
+    def test_selector_changes_exercise_every_research_consumer(self):
+        self.assertEqual(self.selected_jobs(["scripts/ci/select_checks.py"]), set(RESEARCH))
+
+    def test_rust_build_changes_do_not_launch_independently_compiled_probes(self):
+        expected = {"portable-evidence", "styles-version-control", "style-tone-response",
+                    "system-heif-hdr-api", "pvt-native-import"}
+        self.assertEqual(self.selected_jobs(["Cargo.lock"]), expected)
+        self.assertEqual(self.selected_jobs(["rust-toolchain.toml"]), expected)
+
+    def test_swift_package_changes_do_not_launch_the_rust_only_pvt_probe(self):
+        self.assertEqual(self.selected_jobs(["Package.swift"]),
+                         {"portable-evidence", "styles-version-control", "style-tone-response",
+                          "system-heif-hdr-api"})
 
     def test_manual_replay_preserves_every_experiment(self):
         result = select([], manual=True)
