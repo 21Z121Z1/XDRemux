@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -180,6 +181,71 @@ Load command 8
             smoke_macos.loaded_libraries(good + "dyld[12]: <uuid> /opt/homebrew/lib/libx265.1.dylib\n", package)
         with self.assertRaisesRegex(ValueError, "did not report"):
             smoke_macos.loaded_libraries("", package)
+
+
+    def test_repository_licenses_separate_code_fixtures_and_models(self):
+        root = Path(__file__).resolve().parents[1]
+        self.assertIn("GNU GENERAL PUBLIC LICENSE", (root / "LICENSE").read_text())
+        scope = (root / "LICENSING.md").read_text()
+        for tag in ("v1.0", "v1.1", "v1.2", "v1.3", "v1.3.1", "v1.4"):
+            self.assertIn(f"[{tag}]", scope)
+        self.assertIn("not licensed under GPL-3.0-only", scope)
+        fixtures = (root / "fixtures/LICENSE.md").read_text()
+        self.assertIn("metadata", fixtures)
+        self.assertIn("No additional permission is granted", fixtures)
+        self.assertIn("machine-learning models", fixtures)
+        self.assertIn("All rights reserved", (root / "research/oppo_styles/models/LICENSING.md").read_text())
+        with (root / "Cargo.toml").open("rb") as stream:
+            workspace = tomllib.load(stream)
+        self.assertEqual(workspace["workspace"]["package"]["license"], "GPL-3.0-only")
+        for crate in workspace["workspace"]["members"]:
+            with (root / crate / "Cargo.toml").open("rb") as stream:
+                cargo = tomllib.load(stream)
+            self.assertIs(cargo["package"]["license"]["workspace"], True)
+        with (root / "pyproject.toml").open("rb") as stream:
+            python = tomllib.load(stream)
+        self.assertEqual(python["project"]["license"], "GPL-3.0-only")
+        self.assertIn("/LICENSE", python["tool"]["hatch"]["build"]["targets"]["sdist"]["include"])
+
+    def test_project_license_staging_keeps_exact_source_revision(self):
+        checkout = Path(__file__).resolve().parents[1]
+        sha = "a" * 40
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary) / "package"
+            with self.assertRaisesRegex(ValueError, "exact 40-character"):
+                macos.stage_project_licenses(package, "main", checkout)
+            self.assertFalse(package.exists())
+            macos.stage_project_licenses(package, sha, checkout)
+            self.assertEqual((package / "share/licenses/xdremux/LICENSE").read_bytes(),
+                             (checkout / "LICENSE").read_bytes())
+            text = (package / "CORRESPONDING_SOURCE.md").read_text()
+            self.assertIn(f"https://github.com/21Z121Z1/XDRemux/tree/{sha}", text)
+            self.assertIn("share/sources/", text)
+
+    def test_rust_dependency_notices_are_verified_against_payload(self):
+        checkout = Path(__file__).resolve().parents[1]
+        sha = "b" * 40
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            package = root / "package"
+            cargo = root / "liblivephoto-format"
+            cargo.mkdir()
+            (cargo / "LICENSE").write_text("Apache License Version 2.0")
+            (cargo / "Cargo.toml").write_text("[package]\nname = 'liblivephoto-format'\n")
+            entry = {"id": "git+https://example.org/project#deadbeef", "name": "liblivephoto-format",
+                     "version": "1.0.0", "license": "Apache-2.0",
+                     "source": "git+https://example.org/project", "manifest_path": str(cargo / "Cargo.toml")}
+            metadata = {"packages": [entry], "resolve": {"nodes": [{"id": entry["id"]}]}}
+            macos.stage_project_licenses(package, sha, checkout)
+            records = macos.stage_rust_dependency_licenses(package, metadata)
+            self.assertEqual(records[0]["license"], "Apache-2.0")
+            manifest = {"rust_dependencies": 1}
+            verified = smoke_macos.verify_license_payload(package, manifest, sha)
+            self.assertEqual(verified["rust_dependencies"], 1)
+            self.assertIn("liblivephoto-format", verified["rust_packages"])
+            (package / "share/licenses/rust/liblivephoto-format-1.0.0/LICENSE").write_text("tampered")
+            with self.assertRaisesRegex(ValueError, "license mismatch"):
+                smoke_macos.verify_license_payload(package, manifest, sha)
 
 
 if __name__ == "__main__":

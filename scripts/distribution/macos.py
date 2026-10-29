@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import posixpath
+import re
 import shutil
 import subprocess
 import tarfile
@@ -33,6 +34,81 @@ def call(*args: object) -> None:
 def sha256(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+def stage_project_licenses(package: Path, head: str, checkout: Path) -> None:
+    """Include the project's license and immutable source location in an exported package."""
+    if re.fullmatch(r"[0-9a-f]{40}", head) is None:
+        raise ValueError("Product source revision must be an exact 40-character Git SHA")
+    destination = package / "share/licenses/xdremux"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ("LICENSE", "LICENSING.md", "LICENSING.zh-CN.md"):
+        shutil.copy2(checkout / name, destination / name)
+    (package / "CORRESPONDING_SOURCE.md").write_text(
+        "# Corresponding source for XDRemux\n\n"
+        f"Product source revision: `{head}`\n\n"
+        f"Repository source snapshot: https://github.com/21Z121Z1/XDRemux/tree/{head}\n\n"
+        "Build scripts, Rust workspace, Swift adapter source, Cargo.lock, and dependency "
+        "declarations live in that snapshot. See `docs/development.en.md` and "
+        "`scripts/distribution/` in that exact revision.\n\n"
+        "The matching native dependency source archives are in `share/sources/`, "
+        "with license notices under `share/licenses/`. Cargo dependency versions "
+        "and source identities are recorded in `share/licenses/rust-dependencies.json`. "
+        "The source archive is not a claim of patent or Apple SDK rights.\n"
+    )
+
+
+def rust_metadata(checkout: Path) -> dict:
+    return json.loads(subprocess.check_output(
+        ["cargo", "metadata", "--locked", "--format-version", "1",
+         "--filter-platform", "aarch64-apple-darwin"],
+        cwd=checkout, text=True,
+    ))
+
+
+def stage_rust_dependency_licenses(package: Path, metadata: dict) -> list[dict]:
+    """Preserve resolved Rust dependencies' original license texts and identities."""
+    resolved = {node["id"] for node in metadata["resolve"]["nodes"]}
+    destination = package / "share/licenses/rust"
+    destination.mkdir(parents=True, exist_ok=True)
+    records = []
+    packages = sorted(
+        (entry for entry in metadata["packages"]
+         if entry["id"] in resolved and entry.get("source") is not None),
+        key=lambda entry: (entry["name"], entry["version"], entry["id"]),
+    )
+    for entry in packages:
+        origin = Path(entry["manifest_path"]).parent
+        candidates = {
+            file for file in origin.iterdir()
+            if file.is_file() and file.name.upper().startswith(
+                ("LICENSE", "LICENCE", "COPYING", "NOTICE", "COPYRIGHT", "PATENTS")
+            )
+        }
+        if entry.get("license_file"):
+            specified = origin / entry["license_file"]
+            if specified.is_file():
+                candidates.add(specified)
+        if not candidates:
+            raise ValueError(f"No Rust dependency license text: {entry['name']} {entry['version']}")
+        target = destination / f"{entry['name']}-{entry['version']}"
+        target.mkdir()
+        notices = []
+        for file in sorted(candidates):
+            filename = file.name
+            if (target / filename).exists():
+                raise ValueError(f"Duplicate Rust license filename: {entry['name']} {filename}")
+            shutil.copy2(file, target / filename)
+            notices.append({"file": filename, "sha256": sha256(target / filename)})
+        records.append({
+            "name": entry["name"], "version": entry["version"],
+            "license": entry.get("license"), "source": entry["source"],
+            "notices": notices,
+        })
+    (package / "share/licenses/rust-dependencies.json").write_text(
+        json.dumps({"schema_version": 1, "packages": records}, indent=2) + "\n"
+    )
+    return records
+
 
 def system_reference(value: str) -> bool:
     normalized = posixpath.normpath(value)
@@ -164,8 +240,12 @@ def stage(args: argparse.Namespace) -> None:
             shutil.copy2(path, destination / path.name)
     for path in (args.native / "sources").iterdir():
         shutil.copy2(path, package / "share/sources" / path.name)
+    checkout = Path(__file__).resolve().parents[2]
+    stage_project_licenses(package, args.head, checkout)
+    rust_dependencies = stage_rust_dependency_licenses(package, rust_metadata(checkout))
     shutil.copy2(Path(__file__).with_name("package-readme.md"), package / "README.md")
     manifest.update({"head": args.head, "architecture": args.arch, "minimum_macos": MINIMUM_MACOS,
+                     "rust_dependencies": len(rust_dependencies),
                      "build_os": platform.mac_ver()[0], "plugin_loading": False,
                      "native_features": "Require their documented OS, SDK and runtime capabilities; portable package smoke does not certify them",
                      "signature": "ad-hoc, not Developer ID or notarized"})

@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "xdremux-python-tools"
 description = "Research and training tooling for XDRemux"
 readme = "README.md"
+license = "GPL-3.0-only"
 requires-python = ">=3.11"
 dynamic = ["version"]
 keywords = ["heic", "hdr", "gain-map", "iso21496", "proxdr", "oppo"]
@@ -44,4 +45,7 @@ include = [
     "/xdremux_py/apple_reverse_key1_training.py",
     "/README.md",
     "/README.en.md",
+    "/LICENSE",
+    "/LICENSING.md",
+    "/LICENSING.zh-CN.md",
 ]

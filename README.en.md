@@ -123,3 +123,7 @@ The CLI calls the Rust runtime. The runtime executes plans from the engine throu
 | [Documentation index](docs/README.en.md) | Research tools, validation records, and other guides. |
 
 The versioned media in `fixtures/` supports real-file tests. Fixture identity and provenance remain part of the test contract.
+
+## License
+
+XDRemux's original source code is licensed under [GPL-3.0-only](LICENSE), including an additional grant for the author's code in v1.0–v1.4. Photographic/video fixtures and Core ML model weights are **not** GPL-licensed; see [licensing scope and historical versions](LICENSING.md).
