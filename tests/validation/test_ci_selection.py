@@ -62,6 +62,7 @@ class CheckSelectionTests(unittest.TestCase):
                     "system-heif-hdr-api", "pvt-native-import"}
         self.assertEqual(self.selected_jobs(["Cargo.lock"]), expected)
         self.assertEqual(self.selected_jobs(["rust-toolchain.toml"]), expected)
+        self.assertEqual(self.selected_jobs(["crates/xdremux-runtime/Cargo.toml"]), expected)
 
     def test_swift_package_changes_do_not_launch_the_rust_only_pvt_probe(self):
         self.assertEqual(self.selected_jobs(["Package.swift"]),

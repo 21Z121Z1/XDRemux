@@ -14,7 +14,7 @@ COMMON = (
     ".github/workflows/research.yml", "scripts/ci/**",
     "tests/validation/test_ci_selection.py",
 )
-RUST_BUILD = ("Cargo.toml", "Cargo.lock", "rust-toolchain*", ".cargo/**")
+RUST_BUILD = ("Cargo.toml", "crates/*/Cargo.toml", "Cargo.lock", "rust-toolchain*", ".cargo/**")
 SWIFT_BUILD = ("Package.swift", "Package.resolved")
 STYLE_PRODUCT = RUST_BUILD + SWIFT_BUILD + (
     "crates/xdremux-cli/**", "crates/xdremux-engine/**",
