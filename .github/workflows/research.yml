@@ -3,30 +3,7 @@ name: Research evidence
 on:
   push:
     branches: [main]
-    paths:
-      - "research/**"
-      - "fixtures/proxdr/**"
-      - "Sources/XDRemuxAppleAdapter/**"
-      - "crates/**"
-      - "xdremux_py/**"
-      - "tests/**"
-      - "scripts/**"
-      - ".gitignore"
-      - "pyproject.toml"
-      - ".github/workflows/research.yml"
   pull_request:
-    paths:
-      - "research/**"
-      - "fixtures/proxdr/**"
-      - "Sources/XDRemuxAppleAdapter/**"
-      - "crates/**"
-      - "xdremux_py/**"
-      - "tests/**"
-      - "scripts/**"
-      - ".gitignore"
-      - "pyproject.toml"
-      - ".github/workflows/research.yml"
-
   workflow_dispatch:
 
 permissions:
@@ -37,7 +14,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      portable-evidence: ${{ steps.select.outputs.portable-evidence }}
+      video-carrier: ${{ steps.select.outputs.video-carrier }}
+      coreml-candidate: ${{ steps.select.outputs.coreml-candidate }}
+      texture-probe-build: ${{ steps.select.outputs.texture-probe-build }}
+      styles-version-control: ${{ steps.select.outputs.styles-version-control }}
+      style-tone-response: ${{ steps.select.outputs.style-tone-response }}
+      system-heif-hdr-api: ${{ steps.select.outputs.system-heif-hdr-api }}
+      pvt-native-import: ${{ steps.select.outputs.pvt-native-import }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select checks for the current change
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 -m scripts.ci.select_checks \
+            --base "$BASE_SHA" --head "$EXPECTED_HEAD" --event "$EVENT_NAME" >> "$GITHUB_OUTPUT"
+
   portable-evidence:
+    needs: changes
+    if: needs.changes.outputs.portable-evidence == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -54,6 +60,8 @@ jobs:
         run: python -m unittest discover -s tests -t . -p 'test_*.py' -v
 
   video-carrier:
+    needs: changes
+    if: needs.changes.outputs.video-carrier == 'true'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -79,6 +87,8 @@ jobs:
           retention-days: 7
 
   coreml-candidate:
+    needs: changes
+    if: needs.changes.outputs.coreml-candidate == 'true'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -108,6 +118,8 @@ jobs:
           retention-days: 7
 
   texture-probe-build:
+    needs: changes
+    if: needs.changes.outputs.texture-probe-build == 'true'
     runs-on: macos-26
     timeout-minutes: 10
     steps:
@@ -132,6 +144,8 @@ jobs:
           retention-days: 7
 
   styles-version-control:
+    needs: changes
+    if: needs.changes.outputs.styles-version-control == 'true'
     runs-on: xcode-27
     timeout-minutes: 40
     steps:
@@ -167,6 +181,8 @@ jobs:
           retention-days: 7
 
   style-tone-response:
+    needs: changes
+    if: needs.changes.outputs.style-tone-response == 'true'
     runs-on: xcode-27
     timeout-minutes: 180
     steps:
@@ -241,6 +257,8 @@ jobs:
             artifacts/tone-response/xdremux/diagnostics/*.log
 
   system-heif-hdr-api:
+    needs: changes
+    if: needs.changes.outputs.system-heif-hdr-api == 'true'
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
@@ -329,7 +347,8 @@ jobs:
             artifacts/system-heif-hdr-measurement/tone/diagnostics/*.log
 
   pvt-native-import:
-    if: ${{ github.event.repository.visibility == 'public' && github.event.repository.private == false }}
+    needs: changes
+    if: ${{ needs.changes.outputs.pvt-native-import == 'true' && github.event.repository.visibility == 'public' && github.event.repository.private == false }}
     runs-on: xcode-27
     timeout-minutes: 25
     env:

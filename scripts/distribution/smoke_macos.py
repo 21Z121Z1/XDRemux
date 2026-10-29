@@ -42,6 +42,33 @@ def loaded_libraries(stderr: str, package: Path, *, require_heif: bool = True) -
     return libraries
 
 
+def verify_license_payload(package: Path, manifest: dict, expected_head: str) -> dict:
+    notices = package / "share/licenses/xdremux"
+    for name in ("LICENSE", "LICENSING.md", "LICENSING.zh-CN.md"):
+        item = notices / name
+        if not item.is_file() or not item.stat().st_size:
+            raise ValueError(f"Missing XDRemux license notice: {name}")
+    if "GNU GENERAL PUBLIC LICENSE" not in (notices / "LICENSE").read_text():
+        raise ValueError("Missing GPLv3 legal text")
+    source_notice = (package / "CORRESPONDING_SOURCE.md").read_text()
+    if f"https://github.com/21Z121Z1/XDRemux/tree/{expected_head}" not in source_notice:
+        raise ValueError("Missing exact corresponding-source URL")
+    inventory = json.loads((package / "share/licenses/rust-dependencies.json").read_text())
+    dependencies = inventory["packages"]
+    if not dependencies or len(dependencies) != manifest["rust_dependencies"]:
+        raise ValueError("Incomplete resolved Rust dependency license inventory")
+    for dependency in dependencies:
+        names = dependency["notices"]
+        if not names:
+            raise ValueError(f"Missing Rust dependency license: {dependency['name']}")
+        for notice in names:
+            item = package / "share/licenses/rust" / f"{dependency['name']}-{dependency['version']}" / notice["file"]
+            if not item.is_file() or sha256(item) != notice["sha256"]:
+                raise ValueError(f"Rust dependency license mismatch: {item}")
+    return {"project_license": "GPL-3.0-only", "rust_dependencies": len(dependencies),
+            "rust_packages": [entry["name"] for entry in dependencies]}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", required=True, type=Path)
@@ -81,6 +108,7 @@ def main() -> None:
             if (manifest["head"] != args.expected_head or manifest["architecture"] != args.arch
                     or manifest.get("minimum_macos") != MINIMUM_MACOS):
                 raise ValueError("Package identity differs from requested source/architecture/minimum OS")
+            report["licenses"] = verify_license_payload(package, manifest, args.expected_head)
             report["sources"] = []
             for name, dependency in manifest["packages"].items():
                 source = package / "share/sources" / Path(urlsplit(dependency["url"]).path).name

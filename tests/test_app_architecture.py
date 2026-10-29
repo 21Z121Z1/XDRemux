@@ -72,17 +72,14 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("cp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"", PROJECT)
 
     def test_ci_runs_architecture_and_app_model_checks(self) -> None:
-        marker = "- name: Run ownership and repository policy regressions"
-        self.assertIn(marker, CI_WORKFLOW)
-        policy_step = CI_WORKFLOW.split(marker, 1)[1].split("\n      - name:", 1)[0]
-        self.assertIn("python3 -m unittest", policy_step)
-        self.assertIn("tests.test_app_architecture", policy_step)
-        self.assertIn("-scheme XDRemuxApp", CI_WORKFLOW)
-        self.assertIn("-scheme XDRemuxAppModelTests", CI_WORKFLOW)
-        self.assertIn("CODE_SIGNING_ALLOWED=NO", CI_WORKFLOW)
-        self.assertIn("XDRemuxAppModelTests\"", CI_WORKFLOW)
+        plan = (ROOT / "scripts/ci/product-plan.json").read_text()
+        self.assertIn("tests.test_app_architecture", plan)
+        self.assertIn("-scheme XDRemuxApp", plan)
+        self.assertIn("-scheme XDRemuxAppModelTests", plan)
+        self.assertIn("CODE_SIGNING_ALLOWED=NO", plan)
+        self.assertIn("XDRemuxAppModelTests", plan)
+        self.assertIn('scripts/ci/$PLAN-plan.json', CI_WORKFLOW)
         self.assertIn("actions/upload-artifact@v7", CI_WORKFLOW)
-
 
 if __name__ == "__main__":
     unittest.main()

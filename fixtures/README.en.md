@@ -50,3 +50,7 @@ Generated ISO HDR HEIC files and Live Photo pairs are temporary test or workflow
 5. Add or update a test that states what the fixture proves.
 
 Do not infer unrelated device support from one fixture. The [testing policy](../docs/quality/testing.en.md) defines evidence and upload limits.
+
+## License
+
+The 28 original media files are copyright © 2026 21Z121Z1 and are available for format/metadata research and testing under [the Research Fixture Permission](LICENSE.md). They are not GPL-licensed or available as general photographic assets.
