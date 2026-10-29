@@ -151,6 +151,30 @@ or night-scene generalization. The existing private corpus eligibility and
 scene split are unchanged. Private native fitting requires a private Mac host;
 private photos are never sent to public Actions or artifacts.
 
+## Attribute remaining Tone error
+
+The current CI diagnostic rebuilds each of two public calibration controls once
+with product defaults. In the evaluator it substitutes one reference group at a
+time: thumbnail/exposure, GTC, light maps, statistics/scene, masks, or metadata
+mode. It measures Tone -0.5/0/+0.5 on the same primary. Substituting all renderer
+inputs must reproduce the reference exactly before the attribution is accepted.
+
+```sh
+python3 -m research.styles_fidelity.tone_attribution \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --generator /absolute/path/target/debug/examples/styles_fidelity \
+  --research-root /absolute/path/pinned-consumer-research \
+  --input /absolute/path/IMG_2600.HEIC --input /absolute/path/IMG_2604.HEIC \
+  --output /absolute/path/new-attribution
+```
+
+Reference resources are used only after blind generation, to diagnose a source
+of error. Mixed bundles are never published as a product or used as calibration
+candidates. Scores use `PISemanticStyleFilter` with `useStyleEngine=NO`; this
+does not test the full engine or reversal. The full joint-calibration command
+above remains available; CI runs this focused diagnostic instead of repeating
+the completed parameter search. Only numeric reports are uploaded.
+
 ## Replay final HDR Texture resources
 
 ```sh
@@ -183,7 +207,8 @@ they are not an error against a Photos reference render. This is not full-size
 effect composition, multi-person blending or a device save/reopen test.
 
 The existing research tone job converts `uhdr-portrait-02.heic` with the current
-product CLI, executes both experiments and exports only numeric reports.
+product CLI, executes Texture replay and Tone attribution, and exports only
+numeric reports.
 This public fixture depicts shop mannequins, not human skin. Its native detected
 person context exercises resource replay but does not establish human portrait
 fidelity. `uhdr-portrait-01.heic` depicts a toy and has no native face context.

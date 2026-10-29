@@ -85,6 +85,21 @@ python3 -m research.styles_fidelity.blind \
 
 CI 使用公开的三份语义 Standard 对照 `IMG_2600/2604/2608`。其 Studio 纹理元数据没有人物，因而不能激活人物效果。这些是旧研究已使用过的公开风景对照，不能替代更严格的私人 Standard 样本集，也不支持人像或夜景泛化结论。已有私人样本的筛选与场景划分保持不变；其原生拟合需要私人 Mac 环境，照片不会发送到公开 Actions 或公开产物。
 
+## 定位剩余影调误差
+
+当前 CI 对两份公开校准对照各用默认值盲生成一次，再由评估器逐组替换参考资源：缩略图／曝光、GTC、光照图、统计／场景、蒙版、元数据模式。所有版本使用同一主图，测量 Tone -0.5／0／+0.5。替换全部滤镜输入后必须精确复现参考，才接受误差归因。
+
+```sh
+python3 -m research.styles_fidelity.tone_attribution \
+  --adapter /absolute/path/xdremux-apple-adapter \
+  --generator /absolute/path/target/debug/examples/styles_fidelity \
+  --research-root /absolute/path/pinned-consumer-research \
+  --input /absolute/path/IMG_2600.HEIC --input /absolute/path/IMG_2604.HEIC \
+  --output /absolute/path/new-attribution
+```
+
+参考资源只在盲生成结束后用于定位误差；混合资源包不会作为产品或参数候选发布。分数来自 `PISemanticStyleFilter` 的 `useStyleEngine=NO` 路径，不验证完整引擎或反演。上面的完整联合校准命令仍可使用；CI 运行这项集中诊断，避免重复已完成的参数搜索。仅上传数值报告。
+
 ## 重放最终 HDR 文件的纹理资源
 
 ```sh
@@ -100,7 +115,7 @@ python3 -m research.styles_fidelity.texture \
 
 HDR 路径不上传 SDR 图像。每个效果回读的输入哈希必须与提交的 HDR 像素完全一致，同一域的所有效果也须使用完全相同的工作像素；报告保留这些输入事实和输出最大值。
 
-现有研究 Tone 任务先由当前产品 CLI 转换 `uhdr-portrait-02.heic`，再执行两项实验，仅导出数值报告。这份公开样本拍摄的是商店人体模特，不能验证真人皮肤真实性；其原生检测的人物上下文用于核查资源重放。`uhdr-portrait-01.heic` 拍摄的是玩偶，没有原生人脸上下文。图像、人物关键点、输入资源与像素缓冲留在本次临时目录中。
+现有研究 Tone 任务先由当前产品 CLI 转换 `uhdr-portrait-02.heic`，再执行纹理重放与影调误差归因，仅导出数值报告。这份公开样本拍摄的是商店人体模特，不能验证真人皮肤真实性；其原生检测的人物上下文用于核查资源重放。`uhdr-portrait-01.heic` 拍摄的是玩偶，没有原生人脸上下文。图像、人物关键点、输入资源与像素缓冲留在本次临时目录中。
 
 ## 后续实验
 
