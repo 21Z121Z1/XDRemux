@@ -35,6 +35,18 @@
 
 可行时，添加能够在原源码缺陷上失败的回归断言。检查集应当尽量小，但必须覆盖修改的行为。
 
+### CI 执行职责
+
+[`ci.yml`](../../.github/workflows/ci.yml) 负责必需的 `exact-head` 检查，通过现有 completion gate 只执行一次产品检查。[产品计划](../../scripts/ci/product-plan.json) 保留 Rust 测试、原生消费者、方向回读、App 模型、组件一致性和真实 Motion Photo 检查。各项结果绑定同一次检出的提交和 completion receipt。
+
+仅包含 Markdown 的改动在 `ubuntu-latest` 上执行[文档计划](../../scripts/ci/documentation-plan.json)，保留文档、链接和 CI 政策检查，无需安装 Rust、libheif 或 Apple 工具。两条路径都会生成绑定当前 HEAD 的 receipt。改动选择器失败时，必需检查也会失败。
+
+[改动选择器](../../scripts/ci/select_checks.py) 复用 completion gate 以 NUL 分隔的 Git diff，包括移动和删除的两侧路径。研究 job 仅在其源码、测试依赖或共享构建输入变化时执行。手动重放仍运行全部实验，不接受替代源码或秘密。依赖规则集中在选择器中，不为每个实验另建工作流。
+
+`rust-proxdr-real-fixtures.yml` 负责样张哈希、检查和代表性真实转换。Linux 单元测试由可移植性工作流负责，样张 job 不再重复执行。跨平台 Rust 测试和迁移目录后的 macOS 安装包检查仍归入 `rust-cli-core.yml`。
+
+`performance.yml` 保留自动执行的产品耗时、RSS、helper 启动次数预算及原生 release RGB8 检查。独立 codec、VideoToolbox 测量和完整的跨版本 Styles 比较改为手动重放；这些诊断补充预算检查，不替代预算检查。
+
 ### 保留性能参考值
 
 [macOS 27 预算](../../benchmarks/macos27-arm64-product-baseline.json)保留原始测量值。`apple-styles` 用例允许历史中位数和 p95 耗时的两倍，用于容纳 Linear Thumbnail 缩小前的全分辨率 HDR 重建。

@@ -144,12 +144,11 @@ class PublicDocumentationTests(unittest.TestCase):
             self.assertNotIn("Real samples are not in the repository", text)
 
     def test_public_documentation_is_wired_into_completion_gate(self) -> None:
-        workflow = (
-            ROOT / ".github" / "workflows" / "completion-gate.yml"
-        ).read_text(encoding="utf-8")
-        self.assertIn("tests.test_public_documentation", workflow)
-        self.assertTrue((ROOT / "tests" / "test_public_documentation.py").is_file())
-
+        for name in ("product", "documentation"):
+            plan = (ROOT / "scripts" / "ci" / (name + "-plan.json")).read_text(encoding="utf-8")
+            self.assertIn("tests.test_public_documentation", plan)
+        self.assertIn('scripts/ci/$PLAN-plan.json',
+                      (ROOT / ".github/workflows/ci.yml").read_text())
 
 if __name__ == "__main__":
     unittest.main()

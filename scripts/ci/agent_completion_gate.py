@@ -163,7 +163,7 @@ def enforce_evidence_policy(plan: dict[str, Any], files: list[str]) -> dict[str,
         for path in files
     )
     production_changed = build_changed or any(
-        path.startswith(PRODUCTION_PREFIXES) for path in files
+        path.startswith(PRODUCTION_PREFIXES) and not path.endswith(".md") for path in files
     )
     source_changed = build_changed or any(Path(path).suffix in SOURCE_SUFFIXES for path in files)
     if source_changed and "regression" not in kinds:
