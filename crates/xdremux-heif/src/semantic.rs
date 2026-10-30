@@ -200,7 +200,7 @@ fn item_payload(data: &[u8], graph: &Graph, item_id: u32, context: &str) -> Resu
             method => {
                 return Err(invalid(format!(
                     "{context} item {item_id} uses unsupported construction_method {method}"
-                )))
+                )));
             }
         };
         payload.extend_from_slice(
@@ -339,17 +339,20 @@ fn semantic_items(
             if alpha.is_some_and(|alpha| alpha.root == reference.from_item_id) {
                 continue;
             }
-            if reference.to_item_ids.len() != 2
-                || !reference.to_item_ids.contains(&scaffold_primary)
-                || !reference.to_item_ids.contains(&scaffold_tmap)
-            {
-                return Err(invalid(
-                    "semantic scaffold has an unsupported auxiliary relationship",
-                ));
-            }
             // The tmap dimg graph identifies the Gain Map even when ImageIO
-            // encodes it as a direct hvc1 with the same auxl targets as mattes.
+            // encodes it as a direct hvc1. Native Apple HDR sources can link
+            // that image only to the primary; semantic mattes still name both.
             if reference.from_item_id == gain_image {
+                let targets = &reference.to_item_ids;
+                if targets.as_slice() != [scaffold_primary]
+                    && !(targets.len() == 2
+                        && targets.contains(&scaffold_primary)
+                        && targets.contains(&scaffold_tmap))
+                {
+                    return Err(invalid(
+                        "semantic scaffold has an unsupported Gain Map auxiliary relationship",
+                    ));
+                }
                 if seen_gain_auxiliary {
                     return Err(invalid(
                         "semantic scaffold has multiple Gain Map auxl references",
@@ -357,6 +360,14 @@ fn semantic_items(
                 }
                 seen_gain_auxiliary = true;
                 continue;
+            }
+            if reference.to_item_ids.len() != 2
+                || !reference.to_item_ids.contains(&scaffold_primary)
+                || !reference.to_item_ids.contains(&scaffold_tmap)
+            {
+                return Err(invalid(
+                    "semantic scaffold has an unsupported auxiliary relationship",
+                ));
             }
             if item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
                 != Some(HVC1)
@@ -521,7 +532,7 @@ fn primary_alpha_image(data: &[u8], graph: &Graph, context: &str) -> Result<Opti
             _ => {
                 return Err(invalid(format!(
                     "{context} auxiliary image has multiple auxC properties"
-                )))
+                )));
             }
         };
         let (uri, _) = auxiliary_type_bytes(data, property)?;
@@ -732,7 +743,7 @@ fn paired_alpha_images(
         _ => {
             return Err(invalid(
                 "source and scaffold must contain a matching alpha resource",
-            ))
+            ));
         }
     }
     Ok((source_alpha, scaffold_alpha))
@@ -1262,14 +1273,15 @@ fn remap_infe_item_id(
     let version = raw[8];
     let mut output = raw.to_vec();
     match version {
+        2 if new_id > u32::from(u16::MAX) => {
+            let mut payload = raw[8..12].to_vec();
+            payload[0] = 3;
+            payload.extend_from_slice(&new_id.to_be_bytes());
+            payload.extend_from_slice(&raw[14..]);
+            return Ok(make_box(INFE, &payload)?);
+        }
         2 => {
-            let id = u16::try_from(new_id).map_err(|_| {
-                invalid(format!(
-                    "semantic scaffold item {} cannot be remapped into infe version 2",
-                    item.item_id
-                ))
-            })?;
-            output[12..14].copy_from_slice(&id.to_be_bytes());
+            output[12..14].copy_from_slice(&(new_id as u16).to_be_bytes());
         }
         3 => {
             if output.len() < 16 {
@@ -1284,7 +1296,7 @@ fn remap_infe_item_id(
             return Err(invalid(format!(
                 "semantic scaffold item {} uses unsupported infe version {other}",
                 item.item_id
-            )))
+            )));
         }
     }
     Ok(output)
@@ -1424,16 +1436,103 @@ fn normalized_source_final_location(
     Ok(normalized)
 }
 
+struct AppleHdrRationals {
+    order: xdremux_format::cursor::Endian,
+    values: BTreeMap<u16, (usize, [u32; 2])>,
+}
+
+fn apple_hdr_rationals(note: &[u8]) -> Result<Option<AppleHdrRationals>> {
+    use xdremux_format::cursor::{Cursor, Endian};
+    if !note.starts_with(b"Apple iOS\0\0\x01") {
+        return Ok(None);
+    }
+    let order = match note.get(12..14) {
+        Some(b"MM") => Endian::Big,
+        Some(b"II") => Endian::Little,
+        _ => return Err(invalid("Apple HDR MakerNote has no byte order")),
+    };
+    let mut entries = Cursor::new(note, order, "Apple HDR MakerNote");
+    entries.skip(14)?;
+    let count = usize::from(entries.read_u16()?);
+    let values_start = 16 + count * 12 + 4;
+    let mut values = BTreeMap::new();
+    for _ in 0..count {
+        let tag = entries.read_u16()?;
+        let kind = entries.read_u16()?;
+        let length = entries.read_u32()?;
+        let offset = entries.read_u32()? as usize;
+        if ![33, 48].contains(&tag) {
+            continue;
+        }
+        if kind != 10 || length != 1 || offset < values_start || values.contains_key(&tag) {
+            return Err(invalid("ambiguous or invalid Apple HDR rational"));
+        }
+        let mut value = Cursor::new(note, order, "Apple HDR rational");
+        value.set_position(offset)?;
+        let rational = [value.read_u32()?, value.read_u32()?];
+        if rational[1] == 0
+            || values
+                .values()
+                .any(|(other, _)| offset.abs_diff(*other) < 8)
+        {
+            return Err(invalid("invalid or overlapping Apple HDR rational"));
+        }
+        values.insert(tag, (offset, rational));
+    }
+    entries.read_u32()?;
+    Ok(Some(AppleHdrRationals { order, values }))
+}
+
+fn preserve_apple_hdr_exif(
+    source_data: &[u8],
+    scaffold_data: &[u8],
+    scaffold_payload: Vec<u8>,
+) -> Result<Vec<u8>> {
+    let Some(source_tiff) = xdremux_format::heif_exif_tiff(source_data)? else {
+        return Ok(scaffold_payload);
+    };
+    let Some(source_note) = xdremux_format::exif_makernote(&source_tiff)? else {
+        return Ok(scaffold_payload);
+    };
+    let Some(source) = apple_hdr_rationals(&source_note)? else {
+        return Ok(scaffold_payload);
+    };
+    if source.values.is_empty() {
+        return Ok(scaffold_payload);
+    }
+    let tiff = xdremux_format::heif_exif_tiff(scaffold_data)?
+        .ok_or_else(|| invalid("semantic scaffold lost Apple HDR Exif"))?;
+    let mut note = xdremux_format::exif_makernote(&tiff)?
+        .ok_or_else(|| invalid("semantic scaffold lost Apple HDR MakerNote"))?;
+    let destination = apple_hdr_rationals(&note)?
+        .ok_or_else(|| invalid("semantic scaffold replaced Apple HDR MakerNote"))?;
+    for (tag, (_, rational)) in source.values {
+        let (offset, _) = destination
+            .values
+            .get(&tag)
+            .ok_or_else(|| invalid("semantic scaffold lost Apple HDR rational"))?;
+        for (index, value) in rational.into_iter().enumerate() {
+            let bytes = match destination.order {
+                xdremux_format::cursor::Endian::Big => value.to_be_bytes(),
+                xdremux_format::cursor::Endian::Little => value.to_le_bytes(),
+            };
+            let start = offset + index * 4;
+            note[start..start + 4].copy_from_slice(&bytes);
+        }
+    }
+    let mut payload = vec![0; 4];
+    payload.extend(xdremux_format::replace_exif_makernote(Some(&tiff), &note)?);
+    Ok(payload)
+}
+
 /// Merge semantic image resources produced by the ImageIO write primitive
 /// into the Rust-owned HDR graph while retaining the source base/Gain Map
 /// payloads byte-for-byte.
 ///
-/// ImageIO is intentionally used only to encode and describe the semantic
-/// resources. Re-running its destination writer over a Rust-authored ISO Gain
-/// Map can hide the Gain Map from ImageIO when an auxiliary matte is added.
-/// This graph merge is therefore part of the Rust container ownership layer:
-/// it imports only the scaffold's semantic items, properties, and references,
-/// and keeps the source primary/tmap items and mdat prefix authoritative.
+/// ImageIO encodes the semantic resources and generated editing state. Rust
+/// keeps the source primary/tmap graph, mdat prefix, and exact numeric Apple
+/// HDR rationals authoritative. Rewriting those rationals through ImageIO's
+/// number representation can change HDR readback while SDR remains identical.
 pub fn merge_apple_semantic_auxiliary_heif(
     source_data: &[u8],
     scaffold_data: &[u8],
@@ -1469,8 +1568,17 @@ pub fn merge_apple_semantic_auxiliary_heif(
         scaffold_exif,
         "semantic scaffold Exif",
     )?;
+    // The scaffold contributes generated editing state. Its ImageIO rewrite
+    // must not round the source's numeric Gain Map descriptors.
+    let scaffold_exif_payload =
+        preserve_apple_hdr_exif(source_data, scaffold_data, scaffold_exif_payload)?;
 
+    let group_maximum = crate::styles::entity_group_ids(source_data, &source.meta_children)?
+        .into_iter()
+        .max()
+        .unwrap_or(0);
     let mut next_item_id = source_maximum_item_id(&source.meta)?
+        .max(group_maximum)
         .checked_add(1)
         .ok_or_else(|| invalid("semantic merge item ID overflows"))?;
     let mut id_map = BTreeMap::new();
@@ -1941,7 +2049,7 @@ pub(crate) fn coded_image_items(
         _ => {
             return Err(invalid(format!(
                 "{context} image {image_id} is neither hvc1 nor grid"
-            )))
+            )));
         }
     };
     let mut seen = BTreeSet::new();
@@ -2053,7 +2161,7 @@ fn rebuild_meta_children(data: &[u8], graph: &Graph, iloc: &[u8], iprp: &[u8]) -
             ILOC => {
                 return Err(invalid(
                     "semantic scaffold meta contains multiple iloc boxes",
-                ))
+                ));
             }
             IPRP if !saw_iprp => {
                 saw_iprp = true;
@@ -2062,7 +2170,7 @@ fn rebuild_meta_children(data: &[u8], graph: &Graph, iloc: &[u8], iprp: &[u8]) -
             IPRP => {
                 return Err(invalid(
                     "semantic scaffold meta contains multiple iprp boxes",
-                ))
+                ));
             }
             _ => payload.extend_from_slice(raw_box(data, header, "semantic scaffold meta child")?),
         }
@@ -2604,6 +2712,7 @@ mod tests {
         references: Vec<IrefEntry>,
         codec_marker: u8,
         auxiliary_properties: Vec<(u32, Vec<u8>)>,
+        group_boxes: Vec<Vec<u8>>,
     }
 
     impl Fixture {
@@ -2613,7 +2722,15 @@ mod tests {
                 (PRIMARY, root_type, format!("{label}-primary").into_bytes()),
                 (GAIN, root_type, format!("{label}-gain").into_bytes()),
                 (TONE_MAP, TMAP, b"tone-map-metadata".to_vec()),
-                (EXIF_ID, EXIF, format!("{label}-exif").into_bytes()),
+                (
+                    EXIF_ID,
+                    EXIF,
+                    [
+                        b"\0\0\0\0MM\0*\0\0\0\x08\0\0\0\0\0\0".as_slice(),
+                        label.as_bytes(),
+                    ]
+                    .concat(),
+                ),
             ];
             let mut references = vec![
                 IrefEntry {
@@ -2680,6 +2797,7 @@ mod tests {
                 references,
                 codec_marker: if semantic { 7 } else { 9 },
                 auxiliary_properties: Vec::new(),
+                group_boxes: Vec::new(),
             }
         }
 
@@ -2776,6 +2894,7 @@ mod tests {
                         make_iloc_box(1, 4, 4, 0, 0, &locations).unwrap(),
                         iprp.clone(),
                         iref.clone(),
+                        make_box(FourCC::new(*b"grpl"), &self.group_boxes.concat()).unwrap(),
                     ]
                     .concat(),
                 )
@@ -2839,6 +2958,189 @@ mod tests {
                 .find(|p| p.index == index)
                 .unwrap();
             assert_eq!(raw_property(&output, property).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_accepts_native_primary_only_gain_map_links() {
+        for grid in [false, true] {
+            let source = Fixture::new(grid, false, "source").bytes();
+            let mut scaffold = Fixture::new(grid, true, "framework");
+            scaffold
+                .references
+                .iter_mut()
+                .find(|reference| reference.kind == AUXL && reference.from_item_id == GAIN)
+                .unwrap()
+                .to_item_ids = vec![PRIMARY];
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                let output = assemble(&source, &scaffold.bytes(), 3).unwrap();
+                if grid {
+                    assert_payload(&output, PRIMARY_TILES[0], b"source-primary-tile-0");
+                    assert_payload(&output, GAIN_TILES[0], b"source-gain-tile-0");
+                } else {
+                    assert_payload(&output, PRIMARY, b"source-primary");
+                    assert_payload(&output, GAIN, b"source-gain");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_rejects_unrelated_or_duplicate_gain_map_links() {
+        let source = Fixture::new(false, false, "source").bytes();
+        for targets in [
+            vec![],
+            vec![TONE_MAP],
+            vec![PRIMARY, PRIMARY],
+            vec![PRIMARY, SEMANTICS[0]],
+        ] {
+            let mut scaffold = Fixture::new(false, true, "framework");
+            scaffold
+                .references
+                .iter_mut()
+                .find(|reference| reference.kind == AUXL && reference.from_item_id == GAIN)
+                .unwrap()
+                .to_item_ids = targets;
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                assert!(assemble(&source, &scaffold.bytes(), 3).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_merge_preserves_exact_hdr_rationals_and_generated_style_state() {
+        // ImageIO exposes these rationals as numbers and may re-encode them at
+        // lower precision while adding the generated SmartStyle dictionary.
+        fn note(values: [(i32, i32); 2], little: bool) -> Vec<u8> {
+            let u16_bytes = |v: u16| {
+                if little {
+                    v.to_le_bytes()
+                } else {
+                    v.to_be_bytes()
+                }
+            };
+            let u32_bytes = |v: u32| {
+                if little {
+                    v.to_le_bytes()
+                } else {
+                    v.to_be_bytes()
+                }
+            };
+            let mut note = b"Apple iOS\0\0\x01".to_vec();
+            note.extend_from_slice(if little { b"II" } else { b"MM" });
+            note.extend_from_slice(&u16_bytes(3));
+            for (index, tag) in [33, 48, 84].into_iter().enumerate() {
+                note.extend_from_slice(&u16_bytes(tag));
+                note.extend_from_slice(&u16_bytes(if tag == 84 { 7 } else { 10 }));
+                note.extend_from_slice(&u32_bytes(if tag == 84 { 8 } else { 1 }));
+                note.extend_from_slice(&u32_bytes(56 + index as u32 * 8));
+            }
+            note.extend_from_slice(&[0; 4]);
+            for (numerator, denominator) in values {
+                note.extend_from_slice(&u32_bytes(numerator as u32));
+                note.extend_from_slice(&u32_bytes(denominator as u32));
+            }
+            note.extend_from_slice(b"style-84");
+            note
+        }
+        fn exif(note: &[u8]) -> Vec<u8> {
+            let mut payload = vec![0; 4];
+            payload.extend(xdremux_format::replace_exif_makernote(None, note).unwrap());
+            payload
+        }
+        for source_little in [false, true] {
+            for scaffold_little in [false, true] {
+                let mut source = Fixture::new(false, false, "source");
+                let mut scaffold = Fixture::new(false, true, "framework");
+                let mut source_note = note(
+                    [(123_456_789, 987_654_321), (-234_567, 765_432)],
+                    source_little,
+                );
+                source_note[72..80].copy_from_slice(b"withheld");
+                source.items.iter_mut().find(|i| i.0 == EXIF_ID).unwrap().2 = exif(&source_note);
+                scaffold
+                    .items
+                    .iter_mut()
+                    .find(|i| i.0 == EXIF_ID)
+                    .unwrap()
+                    .2 = exif(&note([(1, 8), (-3, 10)], scaffold_little));
+                let output =
+                    merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold.bytes(), 3)
+                        .unwrap();
+                let tiff = xdremux_format::heif_exif_tiff(&output).unwrap().unwrap();
+                let actual = xdremux_format::exif_makernote(&tiff).unwrap().unwrap();
+                assert_eq!(
+                    actual,
+                    note(
+                        [(123_456_789, 987_654_321), (-234_567, 765_432)],
+                        scaffold_little
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hdr_rationals_reject_ambiguous_or_invalid_numeric_storage() {
+        // Two big-endian SRATIONAL fields at note-relative offsets 44 and 52.
+        let mut note = b"Apple iOS\0\0\x01MM\0\x02".to_vec();
+        note.extend_from_slice(b"\0\x21\0\x0a\0\0\0\x01\0\0\0\x2c");
+        note.extend_from_slice(b"\0\x30\0\x0a\0\0\0\x01\0\0\0\x34");
+        note.extend_from_slice(b"\0\0\0\0\0\0\0\x01\0\0\0\x08\0\0\0\x03\0\0\0\x0a");
+        assert_eq!(apple_hdr_rationals(&note).unwrap().unwrap().values.len(), 2);
+        for (offset, replacement) in [
+            (28, b"\0\x21".as_slice()),   // duplicate tag
+            (18, b"\0\x05".as_slice()),   // unsigned rather than signed rational
+            (23, b"\x02".as_slice()),     // more than one value
+            (27, b"\x10".as_slice()),     // value points into the IFD
+            (39, b"\x2f".as_slice()),     // overlapping rational values
+            (39, b"\xff".as_slice()),     // value outside the note
+            (48, b"\0\0\0\0".as_slice()), // zero denominator
+        ] {
+            let mut invalid = note.clone();
+            invalid[offset..offset + replacement.len()].copy_from_slice(replacement);
+            assert!(apple_hdr_rationals(&invalid).is_err(), "offset {offset}");
+        }
+        for end in [12, 14, 20, 43, 59] {
+            assert!(apple_hdr_rationals(&note[..end]).is_err());
+        }
+    }
+
+    #[test]
+    fn semantic_merge_reserves_existing_entity_group_ids() {
+        for group_id in [5_u32, 65_535] {
+            let mut source = Fixture::new(false, false, "source");
+            let mut group = vec![0; 4];
+            for value in [group_id, 2, TONE_MAP, PRIMARY] {
+                group.extend_from_slice(&value.to_be_bytes());
+            }
+            source
+                .group_boxes
+                .push(make_box(FourCC::new(*b"altr"), &group).unwrap());
+            let scaffold = Fixture::new(false, true, "framework").bytes();
+            let output =
+                merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).unwrap();
+            let graph = parse_graph(&output, "test").unwrap();
+            assert!(graph
+                .meta
+                .iinf
+                .entries
+                .iter()
+                .all(|item| item.item_id <= EXIF_ID || item.item_id > group_id));
+            let grpl = graph
+                .meta_children
+                .iter()
+                .find(|h| h.kind == FourCC::new(*b"grpl"))
+                .unwrap();
+            assert_eq!(&output[grpl.payload_range()], source.group_boxes.concat());
+            assert_payload(&output, PRIMARY, b"source-primary");
+            assert_payload(&output, GAIN, b"source-gain");
         }
     }
 

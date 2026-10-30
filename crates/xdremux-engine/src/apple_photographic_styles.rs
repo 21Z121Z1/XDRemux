@@ -44,8 +44,52 @@ pub fn apple_style_maker_apple_dictionary() -> BTreeMap<String, BTreeMap<String,
 
 const IDENTITY_INDICES: [usize; 3] = [3, 7, 11];
 const DIRECT_PARAMETER_INDICES: [usize; 6] = [0, 1, 2, 3, 7, 11];
-const LINEAR_BOUND: f64 = 1.0 / 8.0;
-const QUADRATIC_BOUND: f64 = 1.0 / 16.0;
+
+/// Photographic Style that selects the Key 1 coefficient box.
+///
+/// Constant and linear terms share one limit. Quadratic terms use the other.
+/// The styles plist has no bounds field, so the fitter applies the box for the
+/// style being written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppleKey1Style {
+    Standard,
+    Gold,
+    /// Amber, Bright, Natural, and every other non-Standard style.
+    Other,
+}
+
+impl AppleKey1Style {
+    /// Map a style name to a Key 1 box.
+    ///
+    /// `Standard` and `Gold` match after trimming, ignoring ASCII case. Every
+    /// other name, including Amber, Bright, Natural, and an empty name, uses
+    /// [`Self::Other`].
+    pub fn from_name(name: &str) -> Self {
+        let name = name.trim();
+        if name.eq_ignore_ascii_case("Standard") {
+            Self::Standard
+        } else if name.eq_ignore_ascii_case("Gold") {
+            Self::Gold
+        } else {
+            Self::Other
+        }
+    }
+
+    /// `(linear, quadratic)` absolute limits for this style.
+    fn term_bounds(self) -> (f64, f64) {
+        match self {
+            Self::Standard => (1.0 / 4.0, 3.0 / 16.0),
+            Self::Gold => (3.0 / 4.0, 5.0 / 8.0),
+            Self::Other => (3.0 / 8.0, 1.0 / 4.0),
+        }
+    }
+}
+
+/// Style written by the current Photographic Styles transaction.
+///
+/// That transaction generates Standard resources. Key 1 fitting uses this
+/// value unless a revert request names a different style.
+pub const APPLE_GENERATED_KEY1_STYLE: AppleKey1Style = AppleKey1Style::Standard;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppleStyleDataFacts {
@@ -693,9 +737,10 @@ pub fn apple_style_polynomial_basis(
 /// The renderer remains a platform primitive, but this policy is pure numeric
 /// work: sample the RGB pair deterministically, run three Huber-weighted IRLS
 /// passes, add the same trace-scaled ridge, and clamp each coefficient to the
-/// verified key-1 bounds. Keeping it here means a future Apple adapter can
+/// Key 1 box for `style`. Keeping it here means a future Apple adapter can
 /// provide observations without owning a second solver.
 pub fn apple_style_fit_global_polynomial(
+    style: AppleKey1Style,
     source_rgb8: &[f32],
     target_rgb8: &[f32],
 ) -> Result<Vec<f64>, AppleStyleDataError> {
@@ -783,7 +828,7 @@ pub fn apple_style_fit_global_polynomial(
             let solution = solve_linear_system(&normal, &right_hand_side)?;
             for (term, value) in solution.into_iter().enumerate() {
                 let coefficient_index = term * APPLE_STYLE_CHANNEL_COUNT + output;
-                let bound = coefficient_bound(coefficient_index);
+                let bound = coefficient_bound(style, coefficient_index);
                 coefficients[coefficient_index] = value.clamp(-bound, bound);
             }
         }
@@ -1731,6 +1776,8 @@ fn mix(start: f64, end: f64, weight: f64) -> f64 {
 /// applying it to that primary approximates `recovered_rgb`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AppleStyleRevertRequest<'a> {
+    /// Style being written. Selects the Key 1 coefficient box.
+    pub style: AppleKey1Style,
     pub width: usize,
     pub height: usize,
     pub styled_rgb: &'a [f32],
@@ -1748,9 +1795,10 @@ pub struct AppleStyleRevertRequest<'a> {
 /// identity transform.
 ///
 /// A plane whose samples do not identify a coefficient keeps that coefficient
-/// at the identity residual. The existing numerical ridge is only a stabilizer
-/// for that underdetermined case. It is not a scene calibration. Half rounding
-/// of the plane weight and the optional 3×3 spatial filter are not reproduced.
+/// at the identity residual. Solved residuals are clamped to the Key 1 box for
+/// `request.style`. The existing numerical ridge is only a stabilizer for that
+/// underdetermined case. It is not a scene calibration. Half rounding of the
+/// plane weight and the optional 3×3 spatial filter are not reproduced.
 pub fn apple_style_revert_local_data(
     request: &AppleStyleRevertRequest<'_>,
 ) -> Result<Vec<u8>, AppleStyleDataError> {
@@ -1891,7 +1939,10 @@ pub fn apple_style_revert_local_data(
                     let solution = solve_linear_system(&matrix, &vector)
                         .unwrap_or_else(|_| vec![0.0; APPLE_STYLE_POLYNOMIAL_COUNT]);
                     for (basis, value) in solution.into_iter().enumerate() {
-                        let bound = coefficient_bound(basis * APPLE_STYLE_CHANNEL_COUNT + channel);
+                        let bound = coefficient_bound(
+                            request.style,
+                            basis * APPLE_STYLE_CHANNEL_COUNT + channel,
+                        );
                         let index = style_coefficient_index(cell_x, cell_y, plane, basis, channel);
                         deltas[index] = value.clamp(-bound, bound);
                     }
@@ -1986,9 +2037,10 @@ fn style_coefficient_index(
 
 /// Serialize bounded coefficient deltas over the verified identity payload.
 pub fn apple_style_data_from_coefficient_deltas(
+    style: AppleKey1Style,
     coefficient_deltas: &[f64],
 ) -> Result<Vec<u8>, AppleStyleDataError> {
-    validate_coefficient_deltas(coefficient_deltas)?;
+    validate_coefficient_deltas(style, coefficient_deltas)?;
     let mut block = [0.0_f32; APPLE_STYLE_BLOCK_VALUE_COUNT];
     for index in IDENTITY_INDICES {
         block[index] = 1.0;
@@ -2009,6 +2061,7 @@ pub fn apple_style_data_from_coefficient_deltas(
 
 /// Serialize the six direct editor parameters into the full coefficient block.
 pub fn apple_style_data_from_parameters(
+    style: AppleKey1Style,
     parameters: &[f64],
 ) -> Result<Vec<u8>, AppleStyleDataError> {
     if parameters.len() != DIRECT_PARAMETER_INDICES.len() {
@@ -2022,16 +2075,17 @@ pub fn apple_style_data_from_parameters(
     {
         deltas[coefficient_index] = parameters[parameter_index];
     }
-    apple_style_data_from_coefficient_deltas(&deltas)
+    apple_style_data_from_coefficient_deltas(style, &deltas)
 }
 
 /// Add bounded coefficient deltas to an existing Float16 key-1 payload.
 pub fn apple_style_data_apply_coefficient_deltas(
+    style: AppleKey1Style,
     base: &[u8],
     coefficient_deltas: &[f64],
 ) -> Result<Vec<u8>, AppleStyleDataError> {
     validate_apple_style_data(base)?;
-    validate_coefficient_deltas(coefficient_deltas)?;
+    validate_coefficient_deltas(style, coefficient_deltas)?;
 
     let mut result = Vec::with_capacity(base.len());
     for value_index in 0..(base.len() / APPLE_STYLE_VALUE_BYTE_COUNT) {
@@ -2045,7 +2099,10 @@ pub fn apple_style_data_apply_coefficient_deltas(
     Ok(result)
 }
 
-fn validate_coefficient_deltas(values: &[f64]) -> Result<(), AppleStyleDataError> {
+fn validate_coefficient_deltas(
+    style: AppleKey1Style,
+    values: &[f64],
+) -> Result<(), AppleStyleDataError> {
     if values.len() != APPLE_STYLE_BLOCK_VALUE_COUNT {
         return Err(AppleStyleDataError::InvalidCoefficientCount {
             actual: values.len(),
@@ -2056,7 +2113,7 @@ fn validate_coefficient_deltas(values: &[f64]) -> Result<(), AppleStyleDataError
         if !value.is_finite() {
             return Err(AppleStyleDataError::NonFiniteCoefficient { index });
         }
-        let bound = coefficient_bound(index);
+        let bound = coefficient_bound(style, index);
         if value.abs() > bound + 1e-9 {
             return Err(AppleStyleDataError::CoefficientOutOfBounds {
                 index,
@@ -2068,11 +2125,12 @@ fn validate_coefficient_deltas(values: &[f64]) -> Result<(), AppleStyleDataError
     Ok(())
 }
 
-fn coefficient_bound(index: usize) -> f64 {
+fn coefficient_bound(style: AppleKey1Style, index: usize) -> f64 {
+    let (linear, quadratic) = style.term_bounds();
     if index / APPLE_STYLE_CHANNEL_COUNT >= 4 {
-        QUADRATIC_BOUND
+        quadratic
     } else {
-        LINEAR_BOUND
+        linear
     }
 }
 
@@ -2413,6 +2471,7 @@ mod tests {
             }
         }
         let data = apple_style_revert_local_data(&AppleStyleRevertRequest {
+            style: AppleKey1Style::Standard,
             width,
             height,
             styled_rgb: &styled,
@@ -2464,8 +2523,11 @@ mod tests {
 
     #[test]
     fn direct_parameters_change_only_the_six_owned_coefficients() {
-        let data =
-            apple_style_data_from_parameters(&[0.01, -0.02, 0.03, 0.04, -0.05, 0.06]).unwrap();
+        let data = apple_style_data_from_parameters(
+            AppleKey1Style::Standard,
+            &[0.01, -0.02, 0.03, 0.04, -0.05, 0.06],
+        )
+        .unwrap();
         let facts = validate_apple_style_data(&data).unwrap();
         assert!(!facts.complete_identity);
         let first = data
@@ -2490,14 +2552,14 @@ mod tests {
     #[test]
     fn coefficient_bounds_and_malformed_payloads_fail_closed() {
         let mut deltas = vec![0.0; APPLE_STYLE_BLOCK_VALUE_COUNT];
-        deltas[0] = 0.125 + 1e-6;
+        deltas[0] = 0.25 + 1e-6;
         assert!(matches!(
-            apple_style_data_from_coefficient_deltas(&deltas),
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas),
             Err(AppleStyleDataError::CoefficientOutOfBounds { index: 0, .. })
         ));
         deltas[0] = f64::NAN;
         assert!(matches!(
-            apple_style_data_from_coefficient_deltas(&deltas),
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas),
             Err(AppleStyleDataError::NonFiniteCoefficient { index: 0 })
         ));
         assert!(matches!(
@@ -2505,15 +2567,23 @@ mod tests {
             Err(AppleStyleDataError::InvalidLength { .. })
         ));
         assert!(matches!(
-            apple_style_data_apply_coefficient_deltas(&apple_style_identity_data(), &[0.0; 11]),
+            apple_style_data_apply_coefficient_deltas(
+                AppleKey1Style::Standard,
+                &apple_style_identity_data(),
+                &[0.0; 11]
+            ),
             Err(AppleStyleDataError::InvalidCoefficientCount { .. })
         ));
         assert!(matches!(
-            apple_style_fit_global_polynomial(&[], &[]),
+            apple_style_fit_global_polynomial(AppleKey1Style::Standard, &[], &[]),
             Err(AppleStyleDataError::InvalidRasterPair)
         ));
         assert!(matches!(
-            apple_style_fit_global_polynomial(&[0.0, 0.0, 0.0], &[f32::NAN, 0.0, 0.0]),
+            apple_style_fit_global_polynomial(
+                AppleKey1Style::Standard,
+                &[0.0, 0.0, 0.0],
+                &[f32::NAN, 0.0, 0.0]
+            ),
             Err(AppleStyleDataError::InvalidRasterPair)
         ));
     }
@@ -2523,7 +2593,9 @@ mod tests {
         let base = apple_style_identity_data();
         let mut deltas = vec![0.0; APPLE_STYLE_BLOCK_VALUE_COUNT];
         deltas[3] = 0.01;
-        let output = apple_style_data_apply_coefficient_deltas(&base, &deltas).unwrap();
+        let output =
+            apple_style_data_apply_coefficient_deltas(AppleKey1Style::Standard, &base, &deltas)
+                .unwrap();
         let block_size = APPLE_STYLE_BLOCK_VALUE_COUNT * 2;
         let first = &output[..block_size];
         let last = &output[output.len() - block_size..];
@@ -2575,11 +2647,12 @@ mod tests {
             }
         }
 
-        let fitted = apple_style_fit_global_polynomial(&source, &target).unwrap();
+        let fitted =
+            apple_style_fit_global_polynomial(AppleKey1Style::Standard, &source, &target).unwrap();
         assert_eq!(fitted.len(), APPLE_STYLE_BLOCK_VALUE_COUNT);
         for (index, value) in fitted.iter().copied().enumerate() {
             assert!(value.is_finite());
-            assert!(value.abs() <= coefficient_bound(index) + 1e-9);
+            assert!(value.abs() <= coefficient_bound(AppleKey1Style::Standard, index) + 1e-9);
             assert!(
                 (value - expected[index]).abs() < 2e-3,
                 "coefficient {index}"
@@ -2587,7 +2660,7 @@ mod tests {
         }
         assert_eq!(
             fitted,
-            apple_style_fit_global_polynomial(&source, &target).unwrap()
+            apple_style_fit_global_polynomial(AppleKey1Style::Standard, &source, &target).unwrap()
         );
     }
 
@@ -2976,5 +3049,202 @@ mod tests {
             apple_style_property_list(&invalid_stats),
             Err(AppleStyleDataError::InvalidPropertyListInput)
         ));
+    }
+
+    #[test]
+    fn key1_bounds_follow_the_style_being_written() {
+        assert_eq!(APPLE_GENERATED_KEY1_STYLE, AppleKey1Style::Standard);
+        for name in ["Standard", " standard ", "STANDARD"] {
+            assert_eq!(AppleKey1Style::from_name(name), AppleKey1Style::Standard);
+        }
+        for name in ["Gold", "gold"] {
+            assert_eq!(AppleKey1Style::from_name(name), AppleKey1Style::Gold);
+        }
+        for name in ["Amber", "Bright", "Natural", "Rose Gold", ""] {
+            assert_eq!(
+                AppleKey1Style::from_name(name),
+                AppleKey1Style::Other,
+                "{name}"
+            );
+        }
+
+        let linear = 0;
+        let quadratic = 4 * APPLE_STYLE_CHANNEL_COUNT;
+        let mut deltas = vec![0.0; APPLE_STYLE_BLOCK_VALUE_COUNT];
+
+        // Above the retired ±1/8 linear box, inside Standard's 1/4 box.
+        deltas[linear] = 0.20;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_ok()
+        );
+        deltas[linear] = -0.20;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_ok()
+        );
+        deltas[linear] = -0.30;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_err()
+        );
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_ok());
+        deltas[linear] = 0.25 + 1e-6;
+        assert!(matches!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas),
+            Err(AppleStyleDataError::CoefficientOutOfBounds { index: 0, .. })
+        ));
+
+        // Between Standard 1/4 and the other-style 3/8 box.
+        deltas[linear] = 0.30;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_err()
+        );
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_ok());
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Gold, &deltas).is_ok());
+
+        // Between the other-style 3/8 box and Gold's 3/4 box.
+        deltas[linear] = 0.50;
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_err());
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Gold, &deltas).is_ok());
+        deltas[linear] = 0.75 + 1e-6;
+        assert!(matches!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Gold, &deltas),
+            Err(AppleStyleDataError::CoefficientOutOfBounds { index: 0, .. })
+        ));
+
+        // Above the retired ±1/16 quadratic box, inside Standard's 3/16 box.
+        deltas[linear] = 0.0;
+        deltas[quadratic] = 0.10;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_ok()
+        );
+        deltas[quadratic] = 3.0 / 16.0 + 1e-6;
+        assert!(matches!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas),
+            Err(AppleStyleDataError::CoefficientOutOfBounds {
+                index: quadratic_index,
+                ..
+            }) if quadratic_index == quadratic
+        ));
+
+        // Between Standard 3/16 and the other-style 1/4 quadratic box.
+        deltas[quadratic] = 0.22;
+        assert!(
+            apple_style_data_from_coefficient_deltas(AppleKey1Style::Standard, &deltas).is_err()
+        );
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_ok());
+        deltas[quadratic] = 0.25 + 1e-6;
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_err());
+
+        // Between the other-style 1/4 box and Gold's 5/8 quadratic box.
+        deltas[quadratic] = 0.50;
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Other, &deltas).is_err());
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Gold, &deltas).is_ok());
+        deltas[quadratic] = 5.0 / 8.0 + 1e-6;
+        assert!(apple_style_data_from_coefficient_deltas(AppleKey1Style::Gold, &deltas).is_err());
+
+        let (styled, recovered) = constant_shift_pair(0.30);
+        let standard_constant = constant_coefficient(&styled, &recovered, AppleKey1Style::Standard);
+        let other_constant = constant_coefficient(&styled, &recovered, AppleKey1Style::Other);
+        let gold_constant = constant_coefficient(&styled, &recovered, AppleKey1Style::Gold);
+        assert!(
+            (standard_constant - 0.25).abs() < 1e-3,
+            "Standard should clamp a 0.30 constant to 1/4, got {standard_constant}"
+        );
+        assert!(
+            (other_constant - gold_constant).abs() < 1e-3
+                && other_constant > standard_constant + 0.02,
+            "wider boxes should keep the same unclamped constant above 1/4; standard {standard_constant}, other {other_constant}, gold {gold_constant}"
+        );
+        let (wide_styled, wide_recovered) = constant_shift_pair(0.70);
+        let wide_standard =
+            constant_coefficient(&wide_styled, &wide_recovered, AppleKey1Style::Standard);
+        let wide_other = constant_coefficient(&wide_styled, &wide_recovered, AppleKey1Style::Other);
+        let wide_gold = constant_coefficient(&wide_styled, &wide_recovered, AppleKey1Style::Gold);
+        assert!(
+            (wide_standard - 0.25).abs() < 1e-3,
+            "Standard local revert should clamp to 1/4, got {wide_standard}"
+        );
+        assert!(
+            (wide_other - 0.375).abs() < 1e-3,
+            "other styles should clamp a larger constant to 3/8, got {wide_other}"
+        );
+        assert!(
+            wide_gold > 0.375 + 0.05 && wide_gold < 0.75,
+            "Gold should keep this constant inside its 3/4 box, got {wide_gold}"
+        );
+        assert_coefficients_within_style_box(&styled, &recovered, AppleKey1Style::Standard);
+        assert_coefficients_within_style_box(&styled, &recovered, AppleKey1Style::Other);
+        assert_coefficients_within_style_box(&styled, &recovered, AppleKey1Style::Gold);
+        assert_coefficients_within_style_box(&wide_styled, &wide_recovered, AppleKey1Style::Gold);
+    }
+
+    fn constant_shift_pair(shift: f32) -> (Vec<f32>, Vec<f32>) {
+        let width = 12;
+        let height = 9;
+        let mut styled = Vec::with_capacity(width * height * 3);
+        let mut recovered = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            for x in 0..width {
+                let red = 0.15 + x as f32 * 0.05;
+                let green = 0.10 + y as f32 * 0.07;
+                let blue = 0.20 + ((x * 3 + y) % 5) as f32 * 0.08;
+                styled.extend_from_slice(&[red, green, blue]);
+                recovered.extend_from_slice(&[red + shift, green + shift, blue + shift]);
+            }
+        }
+        (styled, recovered)
+    }
+
+    fn constant_coefficient(styled: &[f32], recovered: &[f32], style: AppleKey1Style) -> f32 {
+        let data = fit_revert(styled, recovered, style);
+        let index = style_coefficient_index(0, 0, 0, 0, 0);
+        f16::from_le_bytes([data[index * 2], data[index * 2 + 1]]).to_f32()
+    }
+
+    fn assert_coefficients_within_style_box(
+        styled: &[f32],
+        recovered: &[f32],
+        style: AppleKey1Style,
+    ) {
+        let data = fit_revert(styled, recovered, style);
+        for x in 0..APPLE_STYLE_GRID_WIDTH {
+            for y in 0..APPLE_STYLE_GRID_HEIGHT {
+                for plane in 0..APPLE_STYLE_PLANE_COUNT {
+                    for basis in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                        for channel in 0..APPLE_STYLE_CHANNEL_COUNT {
+                            let index = style_coefficient_index(x, y, plane, basis, channel);
+                            let stored =
+                                f16::from_le_bytes([data[index * 2], data[index * 2 + 1]]).to_f32();
+                            let identity = if IDENTITY_INDICES
+                                .contains(&(basis * APPLE_STYLE_CHANNEL_COUNT + channel))
+                            {
+                                1.0
+                            } else {
+                                0.0
+                            };
+                            let delta = f64::from(stored - identity);
+                            let bound = coefficient_bound(
+                                style,
+                                basis * APPLE_STYLE_CHANNEL_COUNT + channel,
+                            );
+                            assert!(
+                                delta.abs() <= bound + 1e-4,
+                                "style {style:?} coefficient {index} delta {delta} exceeds {bound}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn fit_revert(styled: &[f32], recovered: &[f32], style: AppleKey1Style) -> Vec<u8> {
+        apple_style_revert_local_data(&AppleStyleRevertRequest {
+            style,
+            width: 12,
+            height: 9,
+            styled_rgb: styled,
+            recovered_rgb: recovered,
+        })
+        .unwrap()
     }
 }
