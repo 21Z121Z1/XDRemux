@@ -12,10 +12,13 @@ use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_distribution, apple_style_face_exposure_boost,
     apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
     apple_style_maker_apple_dictionary, apple_style_monotonic_global_tone_curve,
-    apple_style_property_list, apple_style_revert_local_data, resolve_apple_style_scene_type,
+    apple_style_property_list, apple_style_standard_key1, resolve_apple_style_scene_type,
     AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
-    AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
-    APPLE_GENERATED_KEY1_STYLE, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+};
+#[cfg(test)]
+use xdremux_engine::{
+    apple_style_revert_local_data, AppleStyleRevertRequest, APPLE_GENERATED_KEY1_STYLE,
 };
 use xdremux_hdr::{area_resize_linear_rgb, SceneLinearRgb};
 #[cfg(test)]
@@ -1040,16 +1043,17 @@ fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
             "source-derived style raster geometry or values are invalid",
         ));
     }
-    // Remove-style reads the displayed primary and applies key1. The recovered
-    // target is the same per-channel thumbnail code the semantic-tone stage
-    // uses. A forward primary-to-styled residual would point the other way.
-    apple_style_revert_local_data(&AppleStyleRevertRequest {
-        style: APPLE_GENERATED_KEY1_STYLE,
-        width: scene.width,
-        height: scene.height,
-        styled_rgb: &scene.base_rgb,
-        recovered_rgb: &scene.thumbnail_codes,
-    })
+    // Photos applies key 1 to the displayed primary. Fitting the primary onto
+    // thumbnail codes puts the gain-map ratio through a bounded 12×9 quadratic.
+    // That solve clamps cross-channel terms and paints a color grid. Standard
+    // keeps the identity polynomial. The linear thumbnail and key 3 still carry
+    // the scene and the global tone curve.
+    apple_style_standard_key1(
+        scene.width,
+        scene.height,
+        &scene.base_rgb,
+        &scene.thumbnail_codes,
+    )
     .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
 }
 
@@ -1417,6 +1421,94 @@ fn style_grid_size(width: u32, height: u32) -> (u32, u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn standard_key1_stays_identity_when_rgb_gain_moves_thumbnail_chroma() {
+        let width = 48_u32;
+        let height = 36_u32;
+        let mut base = vec![0_u8; (width * height * 3) as usize];
+        let mut gain = vec![0_u8; (width * height * 3) as usize];
+        for y in 0..height {
+            for x in 0..width {
+                let index = ((y * width + x) * 3) as usize;
+                let level = 40 + (x % 7) * 12 + (y % 5) * 8;
+                let warm = x > width / 2;
+                base[index] = if warm { level.min(220) } else { level / 2 };
+                base[index + 1] = if warm { level / 2 } else { level.min(200) };
+                base[index + 2] = if warm {
+                    level / 5
+                } else {
+                    (level / 2).saturating_add(30)
+                };
+                gain[index] = if warm { 230 } else { 30 };
+                gain[index + 1] = if warm { 90 } else { 30 };
+                gain[index + 2] = if warm { 20 } else { 40 };
+            }
+        }
+        let base = Raster8::new(width, height, width * 3, RasterPixelFormat::Rgb8, base).unwrap();
+        let gain = Raster8::new(width, height, width * 3, RasterPixelFormat::Rgb8, gain).unwrap();
+        let scale = xdremux_hdr::resolve(
+            &[
+                1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 4.926, 4.926, 0.0,
+            ],
+            xdremux_hdr::ExtractionMode::Uhdr,
+        )
+        .unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, 48).unwrap();
+        let published = source_derived_style_data(&scene).unwrap();
+        let legacy = apple_style_revert_local_data(&AppleStyleRevertRequest {
+            style: APPLE_GENERATED_KEY1_STYLE,
+            width: scene.width,
+            height: scene.height,
+            styled_rgb: &scene.base_rgb,
+            recovered_rgb: &scene.thumbnail_codes,
+        })
+        .unwrap();
+        let painted = xdremux_engine::apple_style_apply_local(
+            scene.width,
+            scene.height,
+            &scene.base_rgb,
+            &legacy,
+        )
+        .unwrap();
+        let legacy_chroma = mean_abs_chroma_delta(&scene.base_rgb, &painted);
+        assert!(
+            legacy != xdremux_engine::apple_style_identity_data() && legacy_chroma > 0.02,
+            "the thumbnail-target fit should invent chroma, delta {legacy_chroma}"
+        );
+        assert_eq!(
+            published,
+            xdremux_engine::apple_style_identity_data(),
+            "Standard key1 must stay identity when the gain-map ratio cannot fit the coefficient box"
+        );
+        let kept = xdremux_engine::apple_style_apply_local(
+            scene.width,
+            scene.height,
+            &scene.base_rgb,
+            &published,
+        )
+        .unwrap();
+        let kept_chroma = mean_abs_chroma_delta(&scene.base_rgb, &kept);
+        assert!(
+            kept_chroma < 1.0e-3,
+            "identity key1 changed chromaticity by {kept_chroma}"
+        );
+    }
+
+    fn mean_abs_chroma_delta(source: &[f32], rendered: &[f32]) -> f64 {
+        let mut total = 0.0_f64;
+        let mut count = 0.0_f64;
+        for (before, after) in source.chunks_exact(3).zip(rendered.chunks_exact(3)) {
+            let before_y = luminance([before[0], before[1], before[2]]).max(1.0e-4);
+            let after_y = luminance([after[0], after[1], after[2]]).max(1.0e-4);
+            for channel in 0..3 {
+                total += f64::from((after[channel] / after_y - before[channel] / before_y).abs());
+            }
+            count += 3.0;
+        }
+        total / count
+    }
 
     #[test]
     fn native_float_scene_keeps_precision_hdr_values_and_row_order() {
@@ -2001,5 +2093,309 @@ mod tests {
             0, 0, 0, 1, 0x26, 7, // IDR type 19
         ];
         assert_eq!(single_idr_payload(&annex_b).unwrap(), [0, 0, 0, 2, 0x26, 7]);
+    }
+
+    #[test]
+    fn key1_color_evidence_renders_proxdr_fixtures() {
+        let Ok(directory) = std::env::var("XDREMUX_KEY1_COLOR_DIR") else {
+            return;
+        };
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let fixtures = [
+            ("sun-v2", "find-x9-ultra/uhdr-master-v2-01.heic"),
+            ("river-hr02", "find-x9-ultra/uhdr-hr-02.heic"),
+            ("tealab-v1", "find-x9-ultra/uhdr-master-v1-01.heic"),
+            ("x7-mono", "find-x7-ultra/lhdr-v2-01.heic"),
+        ];
+        let mut reports = Vec::with_capacity(fixtures.len());
+        for (name, relative) in fixtures {
+            reports.push(render_key1_fixture(&directory, name, relative));
+        }
+        std::fs::write(
+            directory.join("metrics.json"),
+            serde_json::to_vec_pretty(&reports).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn render_key1_fixture(
+        directory: &std::path::Path,
+        name: &str,
+        relative: &str,
+    ) -> serde_json::Value {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/proxdr/oppo")
+            .join(relative);
+        let source = std::fs::read(&path)
+            .unwrap_or_else(|error| panic!("read {} failed: {error}", path.display()));
+        let runtime = PortableRuntime::new();
+        let prepared = runtime
+            .analyze_proxdr(&source)
+            .unwrap_or_else(|error| panic!("{name} analyze failed: {error}"));
+        let base = runtime
+            .heif
+            .decode_raster(&HeifRasterDecodeRequest {
+                data: source,
+                format: RasterPixelFormat::Rgb8,
+            })
+            .unwrap_or_else(|error| panic!("{name} primary decode failed: {error}"));
+        let gain_format = match prepared.analysis.gain_map.channels {
+            xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
+            xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
+        };
+        let gain = runtime
+            .jpeg
+            .decode_raster(&xdremux_codec::JpegRasterDecodeRequest {
+                data: prepared.extracted.mask_jpeg_data,
+                format: gain_format,
+            })
+            .unwrap_or_else(|error| panic!("{name} gain-map decode failed: {error}"));
+        let base = nearest_downsample(&base, 384).unwrap();
+        let gain = nearest_downsample(&gain, 384).unwrap();
+        let scene = derive_style_scene(&base, &gain, &prepared.scale, 384)
+            .unwrap_or_else(|error| panic!("{name} scene failed: {error}"));
+        let before = apple_style_revert_local_data(&AppleStyleRevertRequest {
+            style: APPLE_GENERATED_KEY1_STYLE,
+            width: scene.width,
+            height: scene.height,
+            styled_rgb: &scene.base_rgb,
+            recovered_rgb: &scene.thumbnail_codes,
+        })
+        .unwrap();
+        let after = source_derived_style_data(&scene).unwrap();
+        assert_eq!(after, xdremux_engine::apple_style_identity_data());
+        let before_rgb = xdremux_engine::apple_style_apply_local(
+            scene.width,
+            scene.height,
+            &scene.base_rgb,
+            &before,
+        )
+        .unwrap();
+        let after_rgb = xdremux_engine::apple_style_apply_local(
+            scene.width,
+            scene.height,
+            &scene.base_rgb,
+            &after,
+        )
+        .unwrap();
+        let before_de = delta_e_stats(&scene.base_rgb, &before_rgb);
+        let after_de = delta_e_stats(&scene.base_rgb, &after_rgb);
+        let before_cells = cell_delta_e(&scene.base_rgb, &before_rgb, scene.width, scene.height);
+        let after_cells = cell_delta_e(&scene.base_rgb, &after_rgb, scene.width, scene.height);
+        write_scene_jpeg(
+            &directory.join(format!("{name}-sdr.jpg")),
+            scene.width,
+            scene.height,
+            &scene.base_rgb,
+        );
+        write_scene_jpeg(
+            &directory.join(format!("{name}-before-key1.jpg")),
+            scene.width,
+            scene.height,
+            &before_rgb,
+        );
+        write_scene_jpeg(
+            &directory.join(format!("{name}-after-key1.jpg")),
+            scene.width,
+            scene.height,
+            &after_rgb,
+        );
+        write_delta_jpeg(
+            &directory.join(format!("{name}-before-delta-e.jpg")),
+            scene.width,
+            scene.height,
+            &before_de.samples,
+        );
+        if name != "x7-mono" {
+            assert!(
+                before_de.mean > 4.0 && after_de.mean < 0.5,
+                "{name} before mean {} after mean {}",
+                before_de.mean,
+                after_de.mean
+            );
+        }
+        serde_json::json!({
+            "name": name,
+            "fixture": relative,
+            "gainMapChannels": match prepared.analysis.gain_map.channels {
+                xdremux_engine::GainMapChannels::Mono => 1,
+                xdremux_engine::GainMapChannels::Rgb => 3,
+            },
+            "fitWidth": scene.width,
+            "fitHeight": scene.height,
+            "reconstruction": "portable sRGB linearization plus ISO gain, then the product thumbnail codes",
+            "before": {
+                "polynomial": "thumbnail-target local quadratic, the previous Standard fit",
+                "deltaE76VsPrimary": before_de.summary(),
+                "cellMeanDeltaE76Max": before_cells,
+                "chromaDelta": mean_abs_chroma_delta(&scene.base_rgb, &before_rgb),
+            },
+            "after": {
+                "polynomial": "identity Standard key1",
+                "deltaE76VsPrimary": after_de.summary(),
+                "cellMeanDeltaE76Max": after_cells,
+                "chromaDelta": mean_abs_chroma_delta(&scene.base_rgb, &after_rgb),
+            },
+        })
+    }
+
+    struct DeltaStats {
+        mean: f64,
+        p95: f64,
+        max: f64,
+        samples: Vec<f64>,
+    }
+
+    impl DeltaStats {
+        fn summary(&self) -> serde_json::Value {
+            serde_json::json!({
+                "mean": self.mean,
+                "p95": self.p95,
+                "max": self.max,
+            })
+        }
+    }
+
+    fn delta_e_stats(reference: &[f32], rendered: &[f32]) -> DeltaStats {
+        let mut samples = reference
+            .chunks_exact(3)
+            .zip(rendered.chunks_exact(3))
+            .map(|(before, after)| pixel_delta_e(before, after))
+            .collect::<Vec<_>>();
+        let mean = samples.iter().sum::<f64>() / samples.len() as f64;
+        let max = samples.iter().copied().fold(0.0_f64, f64::max);
+        let mut ordered = samples.clone();
+        ordered.sort_by(f64::total_cmp);
+        let p95 = ordered[((ordered.len() - 1) as f64 * 0.95) as usize];
+        DeltaStats {
+            mean,
+            p95,
+            max,
+            samples,
+        }
+    }
+
+    fn cell_delta_e(reference: &[f32], rendered: &[f32], width: usize, height: usize) -> f64 {
+        let mut sums = vec![0.0_f64; 12 * 9];
+        let mut counts = vec![0.0_f64; 12 * 9];
+        for y in 0..height {
+            let cell_y = (y * 9 / height).min(8);
+            for x in 0..width {
+                let cell_x = (x * 12 / width).min(11);
+                let offset = (y * width + x) * 3;
+                let index = cell_y * 12 + cell_x;
+                sums[index] += pixel_delta_e(
+                    &reference[offset..offset + 3],
+                    &rendered[offset..offset + 3],
+                );
+                counts[index] += 1.0;
+            }
+        }
+        sums.iter()
+            .zip(counts)
+            .filter(|(_, count)| *count > 0.0)
+            .map(|(sum, count)| sum / count)
+            .fold(0.0_f64, f64::max)
+    }
+
+    fn pixel_delta_e(before: &[f32], after: &[f32]) -> f64 {
+        fn lab(rgb: &[f32]) -> [f64; 3] {
+            let red = f64::from(rgb[0].max(0.0));
+            let green = f64::from(rgb[1].max(0.0));
+            let blue = f64::from(rgb[2].max(0.0));
+            let x = (0.486_570_95 * red + 0.265_667_69 * green + 0.198_217_29 * blue) / 0.95047;
+            let y = 0.228_974_56 * red + 0.691_738_52 * green + 0.079_286_91 * blue;
+            let z = (0.045_113_38 * green + 1.043_944_37 * blue) / 1.08883;
+            let f = |value: f64| {
+                if value > 0.008856 {
+                    value.cbrt()
+                } else {
+                    7.787 * value + 16.0 / 116.0
+                }
+            };
+            let (fx, fy, fz) = (f(x), f(y), f(z));
+            [116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)]
+        }
+        let left = lab(before);
+        let right = lab(after);
+        let dl = left[0] - right[0];
+        let da = left[1] - right[1];
+        let db = left[2] - right[2];
+        (dl * dl + da * da + db * db).sqrt()
+    }
+
+    fn nearest_downsample(raster: &Raster8, maximum: u32) -> Result<Raster8> {
+        let channels: usize = match raster.format {
+            RasterPixelFormat::Rgb8 => 3,
+            RasterPixelFormat::Mono8 => 1,
+        };
+        let scale = (f64::from(maximum) / f64::from(raster.width.max(raster.height))).min(1.0);
+        let width = ((f64::from(raster.width) * scale / 2.0).round() * 2.0)
+            .clamp(2.0, f64::from(maximum)) as u32;
+        let height = ((f64::from(raster.height) * scale / 2.0).round() * 2.0)
+            .clamp(2.0, f64::from(maximum)) as u32;
+        let width_usize = width as usize;
+        let height_usize = height as usize;
+        let mut data = vec![0_u8; width_usize * height_usize * channels];
+        let source_width = raster.width as usize;
+        let source_height = raster.height as usize;
+        for y in 0..height_usize {
+            let source_y = y * source_height / height_usize;
+            for x in 0..width_usize {
+                let source_x = x * source_width / width_usize;
+                let source = source_y * raster.bytes_per_row + source_x * channels;
+                let destination = (y * width_usize + x) * channels;
+                data[destination..destination + channels]
+                    .copy_from_slice(&raster.data[source..source + channels]);
+            }
+        }
+        Raster8::new(width, height, width_usize * channels, raster.format, data)
+            .map_err(|error| RuntimeError::external("Key 1 color evidence", error))
+    }
+
+    fn write_scene_jpeg(path: &std::path::Path, width: usize, height: usize, linear: &[f32]) {
+        let bytes = linear
+            .iter()
+            .map(|value| linear_to_srgb_u8(*value))
+            .collect::<Vec<_>>();
+        write_rgb_jpeg(path, width, height, &bytes);
+    }
+
+    fn write_delta_jpeg(path: &std::path::Path, width: usize, height: usize, samples: &[f64]) {
+        let bytes = samples
+            .iter()
+            .flat_map(|value| {
+                let heat = (value / 30.0).clamp(0.0, 1.0);
+                [
+                    (heat * 255.0).round() as u8,
+                    0,
+                    ((1.0 - heat) * 255.0).round() as u8,
+                ]
+            })
+            .collect::<Vec<_>>();
+        write_rgb_jpeg(path, width, height, &bytes);
+    }
+
+    fn write_rgb_jpeg(path: &std::path::Path, width: usize, height: usize, rgb: &[u8]) {
+        let mut file = std::fs::File::create(path).unwrap();
+        jpeg_encoder::Encoder::new(&mut file, 85)
+            .encode(
+                rgb,
+                u16::try_from(width).unwrap(),
+                u16::try_from(height).unwrap(),
+                jpeg_encoder::ColorType::Rgb,
+            )
+            .unwrap();
+    }
+
+    fn linear_to_srgb_u8(value: f32) -> u8 {
+        let value = value.clamp(0.0, 1.0);
+        let encoded = if value <= 0.003_130_8 {
+            value * 12.92
+        } else {
+            1.055 * value.powf(1.0 / 2.4) - 0.055
+        };
+        (encoded.clamp(0.0, 1.0) * 255.0).round() as u8
     }
 }

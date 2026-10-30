@@ -108,6 +108,21 @@ jobs:
       - name: Test portable Rust CLI semantics
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
 
+      - name: Render Key 1 color evidence
+        if: runner.os == 'macOS'
+        env:
+          XDREMUX_KEY1_COLOR_DIR: ${{ runner.temp }}/key1-color
+        run: cargo test --locked -p xdremux-runtime --lib key1_color_evidence_renders_proxdr_fixtures -- --nocapture
+
+      - name: Upload Key 1 color evidence
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v7
+        with:
+          name: key1-color-before-after
+          path: ${{ runner.temp }}/key1-color
+          if-no-files-found: error
+          retention-days: 14
+
   macos-package:
     name: macos-package (arm64)
     runs-on: xcode-27
