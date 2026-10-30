@@ -1,0 +1,85 @@
+name: ProXDR Photographic Styles samples
+
+# Sample generator for one branch. It is not a product CI gate.
+# Photographic Styles generation needs the same GitHub-hosted macOS 27
+# runner, libheif, and Rust setup as the product exact-head and
+# style-tone-response jobs.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/samples-proxdr-styles-20261030-7149
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proxdr-styles-samples-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  samples:
+    name: macos styles samples
+    runs-on: xcode-27
+    timeout-minutes: 180
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "27.0"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the Key 1 product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor dfed3afe5e721bc8fb94faac24f5a0037559071d HEAD
+          unexpected="$(git diff --name-only dfed3afe5e721bc8fb94faac24f5a0037559071d HEAD \
+            | grep -v '^\.github/workflows/proxdr-styles-samples\.' || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo "This samples branch must not change product sources:" >&2
+            printf '%s\n' "$unexpected" >&2
+            exit 1
+          fi
+
+      - name: Install libheif
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Build the product CLI and the Apple adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p xdremux-cli
+          swift build --product xdremux-apple-adapter
+          test -x target/debug/xdremux
+          test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
+
+      - name: Generate Standard Photographic Styles samples
+        shell: bash
+        env:
+          XDREMUX_CLI: ${{ github.workspace }}/target/debug/xdremux
+          SAMPLE_ROOT: ${{ github.workspace }}/artifacts/proxdr-styles-samples
+        run: |
+          set -euo pipefail
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          export XDREMUX_APPLE_ADAPTER="$adapter"
+          bash .github/workflows/proxdr-styles-samples.sh
+
+      - name: Upload Styles HEIC samples and verification JSON
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: proxdr-photographic-styles-samples
+          path: artifacts/proxdr-styles-samples/
+          if-no-files-found: warn
+          retention-days: 30
