@@ -120,7 +120,7 @@ The 26A434 `PISemanticStyleFilter` consumer determines how XDRemux constructs th
 | --- | --- | --- |
 | Key `3` | One 256-node curve, sampled independently for each channel. | The x value is `min(S, 1)` after the plist base gain. There is no luminance reduction or percentile normalization. |
 | Keys `c` and `d` | Two 32×32 guide maps. | Each cell stores an area mean. `c` represents the primary image. `d` represents the linear thumbnail. |
-| Key `1` | An x-major 12×9×8×10×3 half array. | Each spotlight cell and luminance plane is fit separately with a quadratic basis. |
+| Key `1` | An x-major 12×9×8×10×3 half array. | Each spotlight cell and luminance plane is fit separately with a quadratic basis. Constant and linear residuals share the style's linear box; quadratic residuals use its quadratic box. Standard is 1/4 and 3/16, Gold is 3/4 and 5/8, and every other style is 3/8 and 1/4. |
 
 Key `3` is the monotone projection of observed primary-channel means. The consumer's extra exposure `E` is a render parameter. It is not included in this curve.
 
@@ -135,6 +135,8 @@ q = mix(mix(d, c, l_b), mix(d, c, l_f), m)
 The maps do not use a fixed affine scale and do not multiply luminance directly. Later shader stages that consume `q` have not been inverted. These means therefore do not solve the local tone transform.
 
 Key `1` uses the basis `[1, R, G, B, R², RG, RB, G², GB, B²]`. Its polynomial reads the displayed primary image and targets thumbnail codes. This is the remove-style direction. Coefficients that local samples cannot identify retain the identity residual. Plane weights use the verified `inputIsLinear = false` formula in `f64`, not half precision. The optional 3×3 spatial filter is not applied.
+
+The fit clamps each residual to the box for the style being written. `Standard` and `Gold` select their own boxes. Amber, Bright, Natural, and any other or unrecognized name use the third box. The plist does not store the box. The current Styles transaction writes Standard, so it uses 1/4 and 3/16.
 
 At background and foreground local tone mapping (LTM) values of 1, the semantic-tone stage returns the primary image. This is the captured `tone=0` setting. The stage does not read the thumbnail or curve, so a tone-zero render cannot measure either resource.
 

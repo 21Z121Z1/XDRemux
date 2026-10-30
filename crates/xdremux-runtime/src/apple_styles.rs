@@ -15,7 +15,7 @@ use xdremux_engine::{
     apple_style_property_list, apple_style_revert_local_data, resolve_apple_style_scene_type,
     AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
     AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
-    APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    APPLE_GENERATED_KEY1_STYLE, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
 use xdremux_hdr::{area_resize_linear_rgb, SceneLinearRgb};
 #[cfg(test)]
@@ -1044,6 +1044,7 @@ fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
     // target is the same per-channel thumbnail code the semantic-tone stage
     // uses. A forward primary-to-styled residual would point the other way.
     apple_style_revert_local_data(&AppleStyleRevertRequest {
+        style: APPLE_GENERATED_KEY1_STYLE,
         width: scene.width,
         height: scene.height,
         styled_rgb: &scene.base_rgb,
