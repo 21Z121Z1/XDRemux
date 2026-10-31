@@ -111,7 +111,7 @@ jobs:
   macos-package:
     name: macos-package (arm64)
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
       MACOSX_DEPLOYMENT_TARGET: "27.0"
@@ -179,10 +179,20 @@ jobs:
             --fixtures "$GITHUB_WORKSPACE/fixtures" --arch arm64 \
             --expected-head "$EXPECTED_HEAD" \
             --output "$RUNNER_TEMP/distribution-artifacts/evidence/relocated"
+      - name: Convert X9 Ultra fixtures and render Key 1 before and after
+        shell: bash
+        run: bash scripts/apple/render_proxdr_styles_color.sh
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: XDRemux-macOS-arm64
           path: ${{ runner.temp }}/distribution-artifacts/
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: key1-color-before-after
+          path: ${{ runner.temp }}/key1-color
           retention-days: 14
           if-no-files-found: error

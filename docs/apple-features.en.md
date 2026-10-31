@@ -134,9 +134,11 @@ q = mix(mix(d, c, l_b), mix(d, c, l_f), m)
 
 The maps do not use a fixed affine scale and do not multiply luminance directly. Later shader stages that consume `q` have not been inverted. These means therefore do not solve the local tone transform.
 
-Key `1` uses the basis `[1, R, G, B, R², RG, RB, G², GB, B²]`. Its polynomial reads the displayed primary image and targets thumbnail codes. This is the remove-style direction. Coefficients that local samples cannot identify retain the identity residual. Plane weights use the verified `inputIsLinear = false` formula in `f64`, not half precision. The optional 3×3 spatial filter is not applied.
+Key `1` uses the basis `[1, R, G, B, R², RG, RB, G², GB, B²]`. Its polynomial reads the displayed primary. A caller can fit that primary toward another RGB image; coefficients that local samples cannot identify retain the identity residual. Plane weights use the verified `inputIsLinear = false` formula in `f64`, not half precision. The optional 3×3 spatial filter is not applied.
 
-The fit clamps each residual to the box for the style being written. `Standard` and `Gold` select their own boxes. Amber, Bright, Natural, and any other or unrecognized name use the third box. The plist does not store the box. The current Styles transaction writes Standard, so it uses 1/4 and 3/16.
+The fit clamps each residual to the box for the style being written. `Standard` and `Gold` select their own boxes. Amber, Bright, Natural, and any other or unrecognized name use the third box. The plist does not store the box.
+
+The generated Standard payload is the identity polynomial. Photos applies key 1 to the displayed primary. The ratio from that primary to the linear-thumbnail codes, including the per-channel ratio of a 3-channel gain map, does not fit in the Standard box. The clamped quadratic then uses cross-channel terms and paints a 12×9 color grid. The linear thumbnail and key 3 still carry the scene and the global tone curve.
 
 At background and foreground local tone mapping (LTM) values of 1, the semantic-tone stage returns the primary image. This is the captured `tone=0` setting. The stage does not read the thumbnail or curve, so a tone-zero render cannot measure either resource.
 

@@ -1976,6 +1976,129 @@ pub fn apple_style_revert_local_data(
     Ok(result)
 }
 
+/// Key 1 for the Standard style this product writes.
+///
+/// Photos applies this polynomial to the displayed primary. The SDR primary and
+/// the linear-thumbnail codes differ by the gain-map ratio. That ratio, including
+/// a per-channel 3-channel gain, does not fit in the Standard coefficient box.
+/// Solving it clamps cross-channel terms and paints a 12×9 color grid. This
+/// function checks that both rasters are finite and the same shape, then returns
+/// the identity polynomial. The linear thumbnail and global tone curve still
+/// carry the scene.
+pub fn apple_style_standard_key1(
+    width: usize,
+    height: usize,
+    styled_rgb: &[f32],
+    recovered_rgb: &[f32],
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    let value_count = pixel_count
+        .checked_mul(APPLE_STYLE_CHANNEL_COUNT)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    if width == 0
+        || height == 0
+        || styled_rgb.len() != value_count
+        || recovered_rgb.len() != value_count
+        || styled_rgb.iter().any(|value| !value.is_finite())
+        || recovered_rgb.iter().any(|value| !value.is_finite())
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    Ok(apple_style_identity_data())
+}
+
+/// Evaluate a key-1 payload on an interleaved linear RGB image.
+///
+/// Spatial spotlight weights and luminance-plane weights match
+/// [`apple_style_revert_local_data`]. Stored half values already include the
+/// identity diagonal. This is the remove-style polynomial applied to the
+/// displayed primary.
+pub fn apple_style_apply_local(
+    width: usize,
+    height: usize,
+    rgb: &[f32],
+    data: &[u8],
+) -> Result<Vec<f32>, AppleStyleDataError> {
+    validate_apple_style_data(data)?;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    let value_count = pixel_count
+        .checked_mul(APPLE_STYLE_CHANNEL_COUNT)
+        .ok_or(AppleStyleDataError::InvalidRasterPair)?;
+    if width == 0
+        || height == 0
+        || rgb.len() != value_count
+        || rgb.iter().any(|value| !value.is_finite())
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    let coefficients = data
+        .as_chunks::<APPLE_STYLE_VALUE_BYTE_COUNT>()
+        .0
+        .iter()
+        .map(|bytes| f64::from(f16::from_le_bytes(*bytes).to_f32()))
+        .collect::<Vec<_>>();
+    let mut output = Vec::with_capacity(value_count);
+    for y in 0..height {
+        let row_weights = spotlight_weights(y, height, APPLE_STYLE_GRID_HEIGHT);
+        for x in 0..width {
+            let offset = (y * width + x) * APPLE_STYLE_CHANNEL_COUNT;
+            let styled = [
+                f64::from(rgb[offset]),
+                f64::from(rgb[offset + 1]),
+                f64::from(rgb[offset + 2]),
+            ];
+            let basis = quadratic_basis(styled);
+            let mean = (styled[0] + styled[1] + styled[2]) / 3.0;
+            let peak = styled[0].max(styled[1]).max(styled[2]);
+            let brightness = 0.5 * (mean + peak);
+            let mut plane_weights = [0.0_f64; APPLE_STYLE_PLANE_COUNT];
+            let mut plane_sum = 0.0_f64;
+            for (plane, weight) in plane_weights.iter_mut().enumerate() {
+                let center = (plane as f64 + 1.0) / (APPLE_STYLE_PLANE_COUNT as f64 + 1.0);
+                let distance = (brightness - center) * APPLE_STYLE_PLANE_COUNT as f64;
+                *weight = (-0.5 * (distance / 2.5).powi(2)).exp();
+                plane_sum += *weight;
+            }
+            let mut accum = [0.0_f64; APPLE_STYLE_CHANNEL_COUNT];
+            if plane_sum > 0.0 {
+                let column_weights = spotlight_weights(x, width, APPLE_STYLE_GRID_WIDTH);
+                for &(cell_y, y_weight) in &row_weights {
+                    for &(cell_x, x_weight) in &column_weights {
+                        let spatial = x_weight * y_weight;
+                        if spatial <= 0.0 {
+                            continue;
+                        }
+                        for (plane, plane_weight) in plane_weights.iter().copied().enumerate() {
+                            let weight = spatial * plane_weight / plane_sum;
+                            if weight <= 0.0 {
+                                continue;
+                            }
+                            for (channel, accum_channel) in accum.iter_mut().enumerate() {
+                                let predicted = basis.iter().enumerate().fold(
+                                    0.0,
+                                    |sum, (term, term_value)| {
+                                        let index = style_coefficient_index(
+                                            cell_x, cell_y, plane, term, channel,
+                                        );
+                                        sum + coefficients[index] * term_value
+                                    },
+                                );
+                                *accum_channel += weight * predicted;
+                            }
+                        }
+                    }
+                }
+            }
+            output.extend(accum.map(|value| value as f32));
+        }
+    }
+    Ok(output)
+}
+
 fn quadratic_basis(rgb: [f64; 3]) -> [f64; APPLE_STYLE_POLYNOMIAL_COUNT] {
     let [red, green, blue] = rgb;
     [
@@ -2493,6 +2616,97 @@ mod tests {
             "right cell should not copy the left residual: left {left}, right {right}"
         );
         assert_ne!(data, apple_style_identity_data());
+    }
+
+    #[test]
+    fn apply_local_identity_preserves_rgb_and_rejects_a_short_payload() {
+        let rgb = [0.2_f32, 0.45, 0.7, 0.05, 0.1, 0.9];
+        let applied = apple_style_apply_local(2, 1, &rgb, &apple_style_identity_data()).unwrap();
+        for (actual, expected) in applied.iter().zip(rgb) {
+            assert!(
+                (actual - expected).abs() < 1.0e-3,
+                "identity apply moved {expected} to {actual}"
+            );
+        }
+        assert!(apple_style_apply_local(1, 1, &[0.0, 0.0, 0.0], &[0, 0]).is_err());
+    }
+
+    #[test]
+    fn standard_key1_stays_identity_when_the_recovered_ratio_is_outside_the_box() {
+        let width = 24;
+        let height = 18;
+        let mut styled = Vec::with_capacity(width * height * 3);
+        let mut recovered = Vec::with_capacity(width * height * 3);
+        for y in 0..height {
+            for x in 0..width {
+                let red = 0.08 + (x as f32 / width as f32) * 0.55;
+                let green = 0.05 + (y as f32 / height as f32) * 0.35;
+                let blue = 0.04 + ((x + y) % 5) as f32 * 0.03;
+                let warm = x >= width / 2;
+                let scale = if warm {
+                    [0.35_f32, 0.9, 1.8]
+                } else {
+                    [1.4, 0.7, 0.25]
+                };
+                styled.extend_from_slice(&[red, green, blue]);
+                recovered.extend_from_slice(&[
+                    (red * scale[0]).clamp(0.0, 1.0),
+                    (green * scale[1]).clamp(0.0, 1.0),
+                    (blue * scale[2]).clamp(0.0, 1.0),
+                ]);
+            }
+        }
+        let legacy = apple_style_revert_local_data(&AppleStyleRevertRequest {
+            style: AppleKey1Style::Standard,
+            width,
+            height,
+            styled_rgb: &styled,
+            recovered_rgb: &recovered,
+        })
+        .unwrap();
+        let painted = apple_style_apply_local(width, height, &styled, &legacy).unwrap();
+        let invented = mean_abs_chroma_delta(&styled, &painted);
+        assert!(
+            invented > 0.02,
+            "thumbnail-ratio fit should repaint chromaticity, got {invented}"
+        );
+        let standard = apple_style_standard_key1(width, height, &styled, &recovered).unwrap();
+        assert_eq!(standard, apple_style_identity_data());
+        let kept = apple_style_apply_local(width, height, &styled, &standard).unwrap();
+        let preserved = mean_abs_chroma_delta(&styled, &kept);
+        assert!(
+            preserved < 1.0e-3,
+            "Standard key1 changed chromaticity by {preserved}"
+        );
+        assert!(apple_style_standard_key1(0, 1, &[], &[]).is_err());
+    }
+
+    fn mean_abs_chroma_delta(source: &[f32], rendered: &[f32]) -> f64 {
+        const Y: [f64; 3] = [0.228_974_56, 0.691_738_52, 0.079_286_91];
+        let mut total = 0.0_f64;
+        let mut count = 0.0_f64;
+        for (before, after) in source
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(rendered.as_chunks::<3>().0)
+        {
+            let before_y = (0..3)
+                .map(|channel| f64::from(before[channel]) * Y[channel])
+                .sum::<f64>()
+                .max(1.0e-4);
+            let after_y = (0..3)
+                .map(|channel| f64::from(after[channel]) * Y[channel])
+                .sum::<f64>()
+                .max(1.0e-4);
+            for channel in 0..3 {
+                total += (f64::from(after[channel]) / after_y
+                    - f64::from(before[channel]) / before_y)
+                    .abs();
+            }
+            count += 3.0;
+        }
+        total / count
     }
 
     #[test]
