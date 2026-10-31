@@ -177,9 +177,10 @@ for path in sys.argv[1:]:
     )
 PY
 
-# The Rust product path must also carry source-derived Styles policy. A
-# structurally valid graph with the fixed identity key-1 or fixed identity GTC
-# would only prove container admission, not migration of the producer policy.
+# Standard Key 1 is the identity polynomial. Fitting the primary onto thumbnail
+# codes paints a 12×9 color grid, so a non-identity key-1 is the defect here.
+# The global tone curve and exposure metadata still have to come from the photo.
+# An identity GTC would only prove container admission.
 python3 - "$output" "$inspect" "$batch_output" "$batch_inspect" <<'PY'
 import hashlib
 import json
@@ -219,8 +220,11 @@ identity_style_sha256 = "43e0ae73508cc10684d4be708fa1d19f3b55b8de15cb8e3544ef163
 for path, inspect_path in ((output, inspect_path), (batch_output, batch_inspect_path)):
     plist = read_style_plist(path, inspect_path)
     style_data = plist["1"]
-    if hashlib.sha256(style_data).hexdigest() == identity_style_sha256:
-        raise SystemExit(f"{path}: Rust Styles output still uses the fixed identity key-1 payload")
+    style_sha256 = hashlib.sha256(style_data).hexdigest()
+    if style_sha256 != identity_style_sha256:
+        raise SystemExit(
+            f"{path}: Standard Key 1 must be the identity polynomial, got {style_sha256}"
+        )
     if plist["3"] == identity_gtc:
         raise SystemExit(f"{path}: Rust Styles output still uses the fixed identity GTC")
     if len(plist["3"]) != 516 or plist["4"] <= 0 or plist["h"] <= 0 or plist["i"]["Gain"] <= 0:
