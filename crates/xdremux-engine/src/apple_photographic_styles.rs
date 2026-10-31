@@ -2036,8 +2036,10 @@ pub fn apple_style_apply_local(
         return Err(AppleStyleDataError::InvalidRasterPair);
     }
     let coefficients = data
-        .chunks_exact(APPLE_STYLE_VALUE_BYTE_COUNT)
-        .map(|bytes| f64::from(f16::from_le_bytes([bytes[0], bytes[1]]).to_f32()))
+        .as_chunks::<APPLE_STYLE_VALUE_BYTE_COUNT>()
+        .0
+        .iter()
+        .map(|bytes| f64::from(f16::from_le_bytes(*bytes).to_f32()))
         .collect::<Vec<_>>();
     let mut output = Vec::with_capacity(value_count);
     for y in 0..height {
@@ -2075,15 +2077,17 @@ pub fn apple_style_apply_local(
                             if weight <= 0.0 {
                                 continue;
                             }
-                            for channel in 0..APPLE_STYLE_CHANNEL_COUNT {
-                                let mut predicted = 0.0_f64;
-                                for term in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
-                                    let index = style_coefficient_index(
-                                        cell_x, cell_y, plane, term, channel,
-                                    );
-                                    predicted += coefficients[index] * basis[term];
-                                }
-                                accum[channel] += weight * predicted;
+                            for (channel, accum_channel) in accum.iter_mut().enumerate() {
+                                let predicted = basis.iter().enumerate().fold(
+                                    0.0,
+                                    |sum, (term, term_value)| {
+                                        let index = style_coefficient_index(
+                                            cell_x, cell_y, plane, term, channel,
+                                        );
+                                        sum + coefficients[index] * term_value
+                                    },
+                                );
+                                *accum_channel += weight * predicted;
                             }
                         }
                     }
@@ -2681,7 +2685,12 @@ mod tests {
         const Y: [f64; 3] = [0.228_974_56, 0.691_738_52, 0.079_286_91];
         let mut total = 0.0_f64;
         let mut count = 0.0_f64;
-        for (before, after) in source.chunks_exact(3).zip(rendered.chunks_exact(3)) {
+        for (before, after) in source
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(rendered.as_chunks::<3>().0)
+        {
             let before_y = (0..3)
                 .map(|channel| f64::from(before[channel]) * Y[channel])
                 .sum::<f64>()

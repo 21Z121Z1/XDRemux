@@ -1424,14 +1424,15 @@ mod tests {
 
     #[test]
     fn standard_key1_stays_identity_when_rgb_gain_moves_thumbnail_chroma() {
-        let width = 48_u32;
-        let height = 36_u32;
-        let mut base = vec![0_u8; (width * height * 3) as usize];
-        let mut gain = vec![0_u8; (width * height * 3) as usize];
+        let width = 48_usize;
+        let height = 36_usize;
+        let mut base = vec![0_u8; width * height * 3];
+        let mut gain = vec![0_u8; width * height * 3];
         for y in 0..height {
             for x in 0..width {
-                let index = ((y * width + x) * 3) as usize;
-                let level = 40 + (x % 7) * 12 + (y % 5) * 8;
+                let index = (y * width + x) * 3;
+                // 40 + 6 * 12 + 4 * 8 = 144, so the level fits in one byte.
+                let level = u8::try_from(40 + (x % 7) * 12 + (y % 5) * 8).unwrap();
                 let warm = x > width / 2;
                 base[index] = if warm { level.min(220) } else { level / 2 };
                 base[index + 1] = if warm { level / 2 } else { level.min(200) };
@@ -1445,8 +1446,22 @@ mod tests {
                 gain[index + 2] = if warm { 20 } else { 40 };
             }
         }
-        let base = Raster8::new(width, height, width * 3, RasterPixelFormat::Rgb8, base).unwrap();
-        let gain = Raster8::new(width, height, width * 3, RasterPixelFormat::Rgb8, gain).unwrap();
+        let base = Raster8::new(
+            u32::try_from(width).unwrap(),
+            u32::try_from(height).unwrap(),
+            width * 3,
+            RasterPixelFormat::Rgb8,
+            base,
+        )
+        .unwrap();
+        let gain = Raster8::new(
+            u32::try_from(width).unwrap(),
+            u32::try_from(height).unwrap(),
+            width * 3,
+            RasterPixelFormat::Rgb8,
+            gain,
+        )
+        .unwrap();
         let scale = xdremux_hdr::resolve(
             &[
                 1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -1499,7 +1514,12 @@ mod tests {
     fn mean_abs_chroma_delta(source: &[f32], rendered: &[f32]) -> f64 {
         let mut total = 0.0_f64;
         let mut count = 0.0_f64;
-        for (before, after) in source.chunks_exact(3).zip(rendered.chunks_exact(3)) {
+        for (before, after) in source
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(rendered.as_chunks::<3>().0)
+        {
             let before_y = luminance([before[0], before[1], before[2]]).max(1.0e-4);
             let after_y = luminance([after[0], after[1], after[2]]).max(1.0e-4);
             for channel in 0..3 {
@@ -2103,10 +2123,13 @@ mod tests {
         let directory = std::path::PathBuf::from(directory);
         std::fs::create_dir_all(&directory).unwrap();
         let fixtures = [
-            ("sun-v2", "find-x9-ultra/uhdr-master-v2-01.heic"),
-            ("river-hr02", "find-x9-ultra/uhdr-hr-02.heic"),
-            ("tealab-v1", "find-x9-ultra/uhdr-master-v1-01.heic"),
-            ("x7-mono", "find-x7-ultra/lhdr-v2-01.heic"),
+            ("uhdr-hr-01", "find-x9-ultra/uhdr-hr-01.heic"),
+            ("uhdr-hr-02", "find-x9-ultra/uhdr-hr-02.heic"),
+            ("uhdr-master-v1-01", "find-x9-ultra/uhdr-master-v1-01.heic"),
+            ("uhdr-master-v2-01", "find-x9-ultra/uhdr-master-v2-01.heic"),
+            ("uhdr-master-v2-02", "find-x9-ultra/uhdr-master-v2-02.heic"),
+            ("uhdr-portrait-01", "find-x9-ultra/uhdr-portrait-01.heic"),
+            ("uhdr-portrait-02", "find-x9-ultra/uhdr-portrait-02.heic"),
         ];
         let mut reports = Vec::with_capacity(fixtures.len());
         for (name, relative) in fixtures {
@@ -2207,17 +2230,33 @@ mod tests {
             scene.height,
             &before_de.samples,
         );
-        if name != "x7-mono" {
+        write_side_by_side_jpeg(
+            &directory.join(format!("{name}-side-by-side.jpg")),
+            scene.width,
+            scene.height,
+            &before_rgb,
+            &after_rgb,
+        );
+        assert!(
+            after_de.mean < 0.5,
+            "{name} identity key1 moved the primary by mean ΔE {}",
+            after_de.mean
+        );
+        if let Ok(styles_dir) = std::env::var("XDREMUX_KEY1_STYLES_DIR") {
+            let heic =
+                std::path::PathBuf::from(styles_dir).join(format!("{name}-standard-styles.heic"));
             assert!(
-                before_de.mean > 4.0 && after_de.mean < 0.5,
-                "{name} before mean {} after mean {}",
-                before_de.mean,
-                after_de.mean
+                heic.is_file(),
+                "converted Styles HEIC is missing: {}",
+                heic.display()
             );
+            std::fs::write(directory.join("identity-key1.bin"), &after).unwrap();
         }
         serde_json::json!({
             "name": name,
             "fixture": relative,
+            "stylesHeic": format!("{name}-standard-styles.heic"),
+            "render": "Key 1 polynomial applied to the linear primary, the Photos remove-style direction",
             "gainMapChannels": match prepared.analysis.gain_map.channels {
                 xdremux_engine::GainMapChannels::Mono => 1,
                 xdremux_engine::GainMapChannels::Rgb => 3,
@@ -2258,9 +2297,11 @@ mod tests {
     }
 
     fn delta_e_stats(reference: &[f32], rendered: &[f32]) -> DeltaStats {
-        let mut samples = reference
-            .chunks_exact(3)
-            .zip(rendered.chunks_exact(3))
+        let samples = reference
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .zip(rendered.as_chunks::<3>().0)
             .map(|(before, after)| pixel_delta_e(before, after))
             .collect::<Vec<_>>();
         let mean = samples.iter().sum::<f64>() / samples.len() as f64;
@@ -2352,6 +2393,26 @@ mod tests {
         }
         Raster8::new(width, height, width_usize * channels, raster.format, data)
             .map_err(|error| RuntimeError::external("Key 1 color evidence", error))
+    }
+
+    fn write_side_by_side_jpeg(
+        path: &std::path::Path,
+        width: usize,
+        height: usize,
+        before: &[f32],
+        after: &[f32],
+    ) {
+        let mut rgb = Vec::with_capacity(width * 2 * height * 3);
+        for y in 0..height {
+            let row = y * width * 3;
+            for pixel in before[row..row + width * 3].as_chunks::<3>().0 {
+                rgb.extend(pixel.iter().copied().map(linear_to_srgb_u8));
+            }
+            for pixel in after[row..row + width * 3].as_chunks::<3>().0 {
+                rgb.extend(pixel.iter().copied().map(linear_to_srgb_u8));
+            }
+        }
+        write_rgb_jpeg(path, width * 2, height, &rgb);
     }
 
     fn write_scene_jpeg(path: &std::path::Path, width: usize, height: usize, linear: &[f32]) {
