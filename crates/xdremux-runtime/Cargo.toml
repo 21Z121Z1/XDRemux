@@ -25,7 +25,7 @@ xdremux-motion-photo = { path = "../xdremux-motion-photo" }
 xdremux-source = { path = "../xdremux-source" }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
-rustix = { version = "=1.1.5", features = ["fs", "process"] }
+rustix = { version = "=1.1.6", features = ["fs", "process"] }
 
 [dev-dependencies]
 jpeg-encoder = "=0.7.1"
