@@ -128,6 +128,7 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         }
         ("inspect", "json") => "输出稳定的机器可读检查 schema。",
         ("validate", "json") => "输出一个稳定的机器可读验证文档。",
+        ("validate", "semantic") => "同时检查 Gain Map 数值元数据与 HDR 输出色彩属性。",
         (_, "json") => "输出一个稳定的 JSON 回执，而不是终端进度信息。",
         (_, "oppo_compatible") => "转换 ProXDR 静态照片时保留 OPPO 相册兼容性。",
         (_, "live_photo_output") => {
