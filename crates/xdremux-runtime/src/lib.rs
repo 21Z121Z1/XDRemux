@@ -56,7 +56,9 @@ pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflig
 #[cfg(target_os = "macos")]
 pub use system_heif_hdr::SystemHeifHdrReport;
 pub use validation::{
-    validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
+    reconstruct_hdr_gain_map, validate_media_file, validate_media_file_with_profile,
+    GainMapValidationProfile, IsoHdrSemanticsReport, IsoHdrValidationReport,
+    LivePhotoValidationReport, ValidationReport,
 };
 pub use xdremux_heif::PhotographicStylesAssembly;
 
@@ -80,8 +82,8 @@ use xdremux_container::{extract, ExtractedLhdr, ExtractionMode as ContainerExtra
 use xdremux_engine::{
     execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder, ArtifactPublisher,
     ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan, ConversionRequest,
-    ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, OperationCapability,
-    RasterDecoder,
+    ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, HdrExportProfile,
+    OperationCapability, RasterDecoder,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
@@ -95,7 +97,16 @@ use xdremux_heif::{
 };
 #[cfg(target_os = "macos")]
 use xdremux_metadata::make_apple_portrait_focus_xmp;
+pub use xdremux_metadata::HdrTransfer;
 use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp};
+
+fn hdr_profile_transfer(profile: HdrExportProfile) -> Option<xdremux_metadata::HdrTransfer> {
+    match profile {
+        HdrExportProfile::Compatible => None,
+        HdrExportProfile::Bt2020Pq => Some(xdremux_metadata::HdrTransfer::Pq),
+        HdrExportProfile::Bt2020Hlg => Some(xdremux_metadata::HdrTransfer::Hlg),
+    }
+}
 
 #[cfg(target_os = "macos")]
 const APPLE_PORTRAIT_BASE_QUALITY: f64 = 0.9;
@@ -737,6 +748,12 @@ impl PortableRuntime {
         output: impl AsRef<Path>,
         request: ConversionRequest,
     ) -> Result<LivePhotoFileReceipt> {
+        if request.hdr_profile != HdrExportProfile::Compatible {
+            return Err(RuntimeError::new(
+                "Motion Photo conversion",
+                "explicit HDR profiles apply only to ProXDR still images",
+            ));
+        }
         if request.requests_oppo_gallery_compatibility() {
             return Err(RuntimeError::new(
                 "Motion Photo conversion",
@@ -821,6 +838,15 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
     type Error = RuntimeError;
 
     fn build_artifact(&mut self, plan: &ConversionPlan) -> Result<Self::Artifact> {
+        let transfer = hdr_profile_transfer(plan.hdr_profile);
+        let body = standard_heif_body(
+            self.source,
+            self.prepared.extracted.manifest_info.extension_start,
+        )?;
+        if transfer.is_some() {
+            xdremux_heif::primary_sdr_color_space(body)
+                .map_err(|e| RuntimeError::external("HDR profile source color", e))?;
+        }
         let decoded = self
             .jpeg
             .decode_raster(&JpegRasterDecodeRequest {
@@ -881,9 +907,15 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
                 chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
             },
         };
+        let static_metadata = xdremux_metadata::HdrStaticMetadata::default();
         let mut output = assemble_iso_gain_map_heif(
             body,
             &IsoGainMapAssembly {
+                profile: transfer.map(|transfer| xdremux_heif::HdrGainMapProfile {
+                    transfer,
+                    static_metadata: &static_metadata,
+                    registered_metadata: None,
+                }),
                 alternate_icc: None,
                 gain_map,
                 tmap_payload: &tmap_payload,
@@ -1032,10 +1064,16 @@ struct IsoGainMapValidator;
 impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
     type Error = RuntimeError;
 
-    fn validate_artifact(&mut self, _plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
-        validate_gain_map_structure(artifact)
-            .map(|_| ())
-            .map_err(|error| RuntimeError::external("ISO Gain Map validation", error))
+    fn validate_artifact(&mut self, plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
+        if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
+            xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)
+                .map(|_| ())
+                .map_err(|e| RuntimeError::external("HDR profile validation", e))
+        } else {
+            validate_gain_map_structure(artifact)
+                .map(|_| ())
+                .map_err(|error| RuntimeError::external("ISO Gain Map validation", error))
+        }
     }
 }
 
@@ -1188,6 +1226,7 @@ mod tests {
         fs::write(&path, b"old").unwrap();
         let mut publisher = AtomicFilePublisher::new(path.clone());
         let plan = ConversionPlan {
+            hdr_profile: HdrExportProfile::Compatible,
             output: OutputIntent::Standard,
             gain_map_target: xdremux_engine::GainMapEncodeProfile {
                 width: 1,

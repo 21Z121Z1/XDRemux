@@ -345,7 +345,7 @@ fn validate_channel(channel: &IsoGainChannel) -> Result<()> {
     Ok(())
 }
 
-fn validate_linear(image: &SceneLinearRgb) -> Result<()> {
+pub(crate) fn validate_linear(image: &SceneLinearRgb) -> Result<()> {
     if image.width == 0 || image.height == 0 {
         return Err(HdrError::invalid(
             "scene linear image",

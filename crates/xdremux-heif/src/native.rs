@@ -7,6 +7,7 @@ use xdremux_format::isobmff::{
     PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPMA, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
+use xdremux_metadata::{HdrStaticMetadata, HdrTransfer};
 
 use crate::direct::{DirectHevcGainMap, GainMapChannels};
 use crate::error::{HeifError, Result};
@@ -40,6 +41,15 @@ pub struct IsoGainMapAssembly<'a> {
     /// Source alternate-image ICC, when present. Otherwise the reconstructed
     /// image uses BT.2020 PQ; gain application primaries remain in tmap.
     pub alternate_icc: Option<&'a [u8]>,
+    /// Explicit BT.2020 profile. None retains the existing consumer layout.
+    pub profile: Option<HdrGainMapProfile<'a>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HdrGainMapProfile<'a> {
+    pub transfer: HdrTransfer,
+    pub static_metadata: &'a HdrStaticMetadata,
+    pub registered_metadata: Option<&'a xdremux_metadata::RegisteredHdrMetadata>,
 }
 
 fn invalid(message: impl Into<String>) -> HeifError {
@@ -381,6 +391,7 @@ fn build_iprp(
     gain: &DirectHevcGainMap<'_>,
     graph: AssemblyGraph<'_>,
     alternate_icc: Option<&[u8]>,
+    profile: Option<HdrGainMapProfile<'_>>,
 ) -> Result<Vec<u8>> {
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
@@ -419,7 +430,9 @@ fn build_iprp(
         geometry.height,
         geometry.quarter_turns_ccw,
     );
-    let tmap_ispe = if (display_width, display_height) == (geometry.width, geometry.height) {
+    let tmap_ispe = if profile.is_some()
+        || (display_width, display_height) == (geometry.width, geometry.height)
+    {
         primary_ispe
     } else {
         append_property(
@@ -431,7 +444,7 @@ fn build_iprp(
     // Apple and Samsung rotated photos declare the tone-map item at the
     // display size with irot 0. The gain map keeps the primary irot and the
     // coded pixel grid.
-    let tmap_irot = if geometry.quarter_turns_ccw == 0 {
+    let tmap_irot = if profile.is_some() || geometry.quarter_turns_ccw == 0 {
         irot
     } else {
         append_property(
@@ -441,6 +454,10 @@ fn build_iprp(
         )?
     };
     let imir = associated_property_index(meta, meta.primary_item_id, IMIR);
+    let mirror_before_rotation = geometry.mirror_before_rotation
+        || (profile.is_some()
+            && imir.is_some()
+            && associated_property_index(meta, meta.primary_item_id, IROT).is_none());
     let auxc = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -474,7 +491,7 @@ fn build_iprp(
         payload.extend_from_slice(icc);
         make_box(COLR, &payload)?
     } else {
-        make_nclx_box(9, 16, 9)?
+        make_nclx_box(9, profile.map_or(16, |p| p.transfer.cicp()), 9)?
     };
     let tmap_colr = append_property(&mut ipco_payload, &mut next_property_index, &alternate_colr)?;
     let tmap_pixi = append_property(
@@ -482,6 +499,33 @@ fn build_iprp(
         &mut next_property_index,
         &make_tmap_pixi_box()?,
     )?;
+    let mut hdr_static_properties = Vec::new();
+    if let Some(profile) = profile {
+        profile
+            .static_metadata
+            .validate()
+            .map_err(|e| invalid(e.to_string()))?;
+        if let Some(mastering) = &profile.static_metadata.mastering_display {
+            let payload = mastering
+                .to_mdcv_payload()
+                .map_err(|e| invalid(e.to_string()))?;
+            hdr_static_properties.push(append_property(
+                &mut ipco_payload,
+                &mut next_property_index,
+                &make_box(FourCC::new(*b"mdcv"), &payload)?,
+            )?);
+        }
+        if let Some(light) = profile.static_metadata.content_light_level {
+            let payload = light
+                .to_clli_payload()
+                .map_err(|e| invalid(e.to_string()))?;
+            hdr_static_properties.push(append_property(
+                &mut ipco_payload,
+                &mut next_property_index,
+                &make_box(FourCC::new(*b"clli"), &payload)?,
+            )?);
+        }
+    }
 
     let mut tile_ispe_by_size = BTreeMap::new();
     for tile in gain.tiles {
@@ -505,6 +549,45 @@ fn build_iprp(
         .filter(|entry| !graph.removed.contains(&entry.item_id))
         .cloned()
         .collect::<Vec<_>>();
+    if profile.is_some() && associated_property_index(meta, meta.primary_item_id, IROT).is_none() {
+        let primary = ipma_entries
+            .iter_mut()
+            .find(|entry| entry.item_id == meta.primary_item_id)
+            .ok_or_else(|| invalid("primary item has no property associations"))?;
+        primary.associations.push(IpmaAssociation {
+            property_index: irot,
+            essential: true,
+        });
+    }
+    if profile.is_some() && associated_property_index(meta, meta.primary_item_id, COLR).is_none() {
+        let color_indices = crate::validation::primary_color_property_indices(meta)?;
+        let primary = ipma_entries
+            .iter_mut()
+            .find(|e| e.item_id == meta.primary_item_id)
+            .ok_or_else(|| invalid("primary image has no property associations"))?;
+        for property_index in color_indices {
+            primary.associations.push(IpmaAssociation {
+                property_index,
+                essential: true,
+            });
+        }
+    }
+    if profile.is_some() {
+        let base_items = crate::validation::primary_image_items(meta)?;
+        for entry in ipma_entries
+            .iter_mut()
+            .filter(|e| base_items.contains(&e.item_id))
+        {
+            for association in &mut entry.associations {
+                if meta.properties.iter().any(|p| {
+                    p.index == u32::from(association.property_index)
+                        && matches!(p.kind.as_bytes(), b"colr" | b"hvcC" | b"irot")
+                }) {
+                    association.essential = true;
+                }
+            }
+        }
+    }
     for (tile_id, tile) in graph
         .ids
         .tile_ids
@@ -563,7 +646,7 @@ fn build_iprp(
             .last_mut()
             .expect("gain-map ipma entry was just pushed")
             .associations;
-        let position = if geometry.mirror_before_rotation {
+        let position = if mirror_before_rotation {
             associations
                 .iter()
                 .position(|association| association.property_index == irot)
@@ -600,6 +683,29 @@ fn build_iprp(
             },
         ],
     });
+    let tmap_associations = &mut ipma_entries.last_mut().unwrap().associations;
+    if profile.is_some() {
+        if let Some(imir) = imir {
+            let position = if mirror_before_rotation {
+                3
+            } else {
+                tmap_associations.len()
+            };
+            tmap_associations.insert(
+                position,
+                IpmaAssociation {
+                    property_index: imir,
+                    essential: true,
+                },
+            );
+        }
+    }
+    for property_index in hdr_static_properties {
+        tmap_associations.push(IpmaAssociation {
+            property_index,
+            essential: false,
+        });
+    }
 
     let maximum_item_id = ipma_entries
         .iter()
@@ -645,18 +751,17 @@ fn build_iprp(
     Ok(make_box(IPRP, &payload)?)
 }
 
-fn build_iinf(
-    source: &[u8],
-    meta: &ParsedMeta,
-    tile_ids: &[u32],
-    gain_id: u32,
-    tmap_id: u32,
-    xmp_id: u32,
-    removed: &BTreeSet<u32>,
-) -> Result<Vec<u8>> {
+fn build_iinf(source: &[u8], meta: &ParsedMeta, graph: AssemblyGraph<'_>) -> Result<Vec<u8>> {
+    let AssemblyItemIds {
+        tile_ids,
+        gain_id,
+        tmap_id,
+        xmp_id,
+        extension_id,
+    } = graph.ids;
     let mut entries = Vec::new();
     for item in &meta.iinf.entries {
-        if removed.contains(&item.item_id) {
+        if graph.removed.contains(&item.item_id) {
             continue;
         }
         entries.push(
@@ -672,6 +777,9 @@ fn build_iinf(
     entries.push(make_infe_box(gain_id, GRID, 1)?);
     entries.push(make_infe_box(tmap_id, TMAP, 0)?);
     entries.push(make_mime_infe_box(xmp_id, 1)?);
+    if let Some(id) = extension_id {
+        entries.push(make_infe_box(id, FourCC::new(*b"it35"), 1)?);
+    }
 
     let version = if meta.iinf.version == 0 && entries.len() > usize::from(u16::MAX) {
         1
@@ -681,14 +789,15 @@ fn build_iinf(
     Ok(make_iinf_box(version, &entries)?)
 }
 
-fn build_iref(
-    meta: &ParsedMeta,
-    tile_ids: &[u32],
-    gain_id: u32,
-    tmap_id: u32,
-    xmp_id: u32,
-    removed: &BTreeSet<u32>,
-) -> Result<Vec<u8>> {
+fn build_iref(meta: &ParsedMeta, graph: AssemblyGraph<'_>) -> Result<Vec<u8>> {
+    let AssemblyItemIds {
+        tile_ids,
+        gain_id,
+        tmap_id,
+        xmp_id,
+        extension_id,
+    } = graph.ids;
+    let removed = graph.removed;
     let mut entries = meta.iref.as_ref().map_or_else(Vec::new, |iref| {
         iref.entries
             .iter()
@@ -734,6 +843,13 @@ fn build_iref(
         from_item_id: xmp_id,
         to_item_ids: vec![meta.primary_item_id, tmap_id],
     });
+    if let Some(id) = extension_id {
+        entries.push(IrefEntry {
+            kind: CDSC,
+            from_item_id: id,
+            to_item_ids: vec![tmap_id],
+        });
+    }
 
     let maximum_item_id = entries
         .iter()
@@ -816,6 +932,7 @@ struct AssemblyItemIds<'a> {
     gain_id: u32,
     tmap_id: u32,
     xmp_id: u32,
+    extension_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -832,6 +949,7 @@ struct AppendedIdatLayout {
     tmap_length: u64,
     xmp_offset: u64,
     xmp_length: u64,
+    extension: Option<(u64, u64)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -876,7 +994,13 @@ fn build_placeholder_locations(
         ),
         (ids.tmap_id, layout.tmap_offset, layout.tmap_length),
         (ids.xmp_id, layout.xmp_offset, layout.xmp_length),
-    ] {
+    ]
+    .into_iter()
+    .chain(
+        ids.extension_id
+            .zip(layout.extension)
+            .map(|(id, (offset, length))| (id, offset, length)),
+    ) {
         entries.push(IlocEntry {
             item_id,
             construction_method: 1,
@@ -995,7 +1119,15 @@ fn build_final_locations(
         ),
         (graph.ids.tmap_id, layout.tmap_offset, layout.tmap_length),
         (graph.ids.xmp_id, layout.xmp_offset, layout.xmp_length),
-    ] {
+    ]
+    .into_iter()
+    .chain(
+        graph
+            .ids
+            .extension_id
+            .zip(layout.extension)
+            .map(|(id, (offset, length))| (id, offset, length)),
+    ) {
         ensure_u32(offset, "native idat offset")?;
         ensure_u32(length, "native idat length")?;
         entries.push(IlocEntry {
@@ -1074,6 +1206,9 @@ pub fn assemble_iso_gain_map_heif(
     source: &[u8],
     assembly: &IsoGainMapAssembly<'_>,
 ) -> Result<Vec<u8>> {
+    if assembly.profile.is_some() && assembly.alternate_icc.is_some() {
+        return Err(invalid("explicit BT.2020 profiles cannot override the derived color encoding with an alternate ICC"));
+    }
     let (rows, columns) = validate_assembly(assembly)?;
     let gain = &assembly.gain_map;
 
@@ -1121,27 +1256,30 @@ pub fn assemble_iso_gain_map_heif(
     let gain_id = allocate()?;
     let tmap_id = allocate()?;
     let xmp_id = allocate()?;
-    let maximum_item_id = xmp_id;
+    let extension_payload = assembly
+        .profile
+        .and_then(|p| p.registered_metadata)
+        .map(|m| m.to_it35_payload().map_err(|e| invalid(e.to_string())))
+        .transpose()?;
+    let extension_id = if extension_payload.is_some() {
+        Some(allocate()?)
+    } else {
+        None
+    };
+    let maximum_item_id = extension_id.unwrap_or(xmp_id);
     let ids = AssemblyItemIds {
         tile_ids: &tile_ids,
         gain_id,
         tmap_id,
         xmp_id,
+        extension_id,
     };
     let graph = AssemblyGraph {
         ids,
         removed: &removed_graph_ids,
     };
 
-    let iinf = build_iinf(
-        source,
-        &meta,
-        &tile_ids,
-        gain_id,
-        tmap_id,
-        xmp_id,
-        &removed_graph_ids,
-    )?;
+    let iinf = build_iinf(source, &meta, graph)?;
     let iprp = build_iprp(
         source,
         iprp_header,
@@ -1149,15 +1287,9 @@ pub fn assemble_iso_gain_map_heif(
         gain,
         graph,
         assembly.alternate_icc,
+        assembly.profile,
     )?;
-    let iref = build_iref(
-        &meta,
-        &tile_ids,
-        gain_id,
-        tmap_id,
-        xmp_id,
-        &removed_graph_ids,
-    )?;
+    let iref = build_iref(&meta, graph)?;
 
     let mut idat_payload = existing_idat_payload(source, &meta)?.to_vec();
     let gain_grid_offset =
@@ -1171,6 +1303,13 @@ pub fn assemble_iso_gain_map_heif(
     let xmp_offset =
         u64::try_from(idat_payload.len()).map_err(|_| invalid("native XMP offset exceeds u64"))?;
     idat_payload.extend_from_slice(assembly.xmp_payload);
+    let extension = if let Some(payload) = &extension_payload {
+        let offset = idat_payload.len() as u64;
+        idat_payload.extend_from_slice(payload);
+        Some((offset, payload.len() as u64))
+    } else {
+        None
+    };
     let idat = make_box(IDAT, &idat_payload)?;
 
     let gain_grid_length = u64::try_from(gain_grid_payload.len())
@@ -1192,6 +1331,7 @@ pub fn assemble_iso_gain_map_heif(
         tmap_length,
         xmp_offset,
         xmp_length,
+        extension,
     };
     let placeholder_locations =
         build_placeholder_locations(&meta, ids, idat_layout, gain, &removed_graph_ids)?;
@@ -1410,10 +1550,11 @@ mod tests {
                 gain_id: next_id + 1,
                 tmap_id,
                 xmp_id: next_id + 3,
+                extension_id: None,
             },
             removed: &BTreeSet::new(),
         };
-        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, None).unwrap();
+        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, None, None).unwrap();
         let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
         let children = parse_boxes(&bytes, root.payload_range()).unwrap();
         let props = parse_ipco_properties(&bytes, &root).unwrap();
@@ -1456,6 +1597,123 @@ mod tests {
                 .find(|e| e.item_id == meta.primary_item_id)
                 .unwrap()
         );
+        let static_metadata = HdrStaticMetadata::default();
+        for turns in [Some(0), Some(1), Some(2), Some(3), None] {
+            for axis in [None, Some(0), Some(1)] {
+                for before in [false, true] {
+                    let mut input = source.clone();
+                    *input.last_mut().unwrap() = turns.unwrap_or(0);
+                    let mut meta = meta.clone();
+                    if turns.is_none() {
+                        meta.ipma
+                            .entries
+                            .iter_mut()
+                            .find(|e| e.item_id == meta.primary_item_id)
+                            .unwrap()
+                            .associations
+                            .retain(|a| a.property_index != index);
+                    }
+                    if let Some(axis) = axis {
+                        let start = input.len();
+                        input.extend(make_box(IMIR, &[axis]).unwrap());
+                        let index = meta.properties.len() as u16 + 1;
+                        meta.properties.push(PropertyInfo {
+                            index: u32::from(index),
+                            kind: IMIR,
+                            box_range: start..input.len(),
+                        });
+                        let rotation_index =
+                            associated_property_index(&meta, meta.primary_item_id, IROT);
+                        let a = &mut meta
+                            .ipma
+                            .entries
+                            .iter_mut()
+                            .find(|e| e.item_id == meta.primary_item_id)
+                            .unwrap()
+                            .associations;
+                        let at = if before {
+                            rotation_index
+                                .and_then(|index| a.iter().position(|a| a.property_index == index))
+                                .unwrap_or(a.len())
+                        } else {
+                            a.len()
+                        };
+                        a.insert(
+                            at,
+                            IpmaAssociation {
+                                property_index: index,
+                                essential: true,
+                            },
+                        );
+                    }
+                    let bytes = build_iprp(
+                        &input,
+                        iprp,
+                        &meta,
+                        &gain,
+                        graph,
+                        None,
+                        Some(HdrGainMapProfile {
+                            transfer: HdrTransfer::Pq,
+                            static_metadata: &static_metadata,
+                            registered_metadata: None,
+                        }),
+                    )
+                    .unwrap();
+                    let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
+                    let props = parse_ipco_properties(&bytes, &root).unwrap();
+                    let children = parse_boxes(&bytes, root.payload_range()).unwrap();
+                    let associations =
+                        parse_ipma(&bytes, children.iter().find(|h| h.kind == IPMA).unwrap())
+                            .unwrap();
+                    let transforms = |id| {
+                        associations
+                            .entries
+                            .iter()
+                            .find(|e| e.item_id == id)
+                            .unwrap()
+                            .associations
+                            .iter()
+                            .filter_map(|a| {
+                                let p = props
+                                    .iter()
+                                    .find(|p| p.index == u32::from(a.property_index))
+                                    .unwrap();
+                                matches!(p.kind.as_bytes(), b"irot" | b"imir")
+                                    .then(|| (p.kind, bytes[p.box_range.end - 1]))
+                            })
+                            .collect::<Vec<_>>()
+                    };
+                    assert_eq!(
+                        transforms(meta.primary_item_id),
+                        transforms(graph.ids.gain_id)
+                    );
+                    assert_eq!(transforms(meta.primary_item_id), transforms(tmap_id));
+                    let tmap = associations
+                        .entries
+                        .iter()
+                        .find(|e| e.item_id == tmap_id)
+                        .unwrap();
+                    let ispe = tmap
+                        .associations
+                        .iter()
+                        .find_map(|a| {
+                            props
+                                .iter()
+                                .find(|p| p.index == u32::from(a.property_index) && p.kind == ISPE)
+                        })
+                        .unwrap();
+                    assert_eq!(
+                        parse_ispe_dimensions(
+                            &bytes,
+                            &parse_boxes(&bytes, ispe.box_range.clone()).unwrap()[0]
+                        )
+                        .unwrap(),
+                        dimensions
+                    );
+                }
+            }
+        }
     }
 
     #[test]
@@ -1486,6 +1744,7 @@ mod tests {
         assert!(assemble_iso_gain_map_heif(
             &[],
             &IsoGainMapAssembly {
+                profile: None,
                 alternate_icc: None,
                 gain_map: gain,
                 tmap_payload: &[],

@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use clap::Args;
 use serde_json::json;
-use xdremux_runtime::{validate_media_file, ValidationReport};
+use xdremux_runtime::{
+    validate_media_file_with_profile, GainMapValidationProfile, ValidationReport,
+};
 
 const VALIDATE_SCHEMA_VERSION: u32 = 1;
 
@@ -19,6 +21,15 @@ pub(crate) struct ValidateArgs {
     /// Also require generated Photographic Styles and Texture data (macOS 27).
     #[arg(long)]
     apple_styles: bool,
+    /// Check numeric tone-map metadata and derived HDR colorimetry as well as the graph.
+    #[arg(long)]
+    semantic: bool,
+    /// Validate a selected BT.2020 HDR profile, orientation, color and optional metadata.
+    #[arg(long, value_name = "bt2020-pq|bt2020-hlg", value_parser = ["bt2020-pq", "bt2020-hlg"], conflicts_with = "apple_styles")]
+    hdr_profile: Option<String>,
+    /// Decode final-file samples and reconstruct relative linear BT.2020 pixels; requires an HDR profile.
+    #[arg(long, requires = "hdr_profile")]
+    decode_hdr: bool,
 }
 
 fn write_human(
@@ -95,7 +106,45 @@ fn write_human(
                     value.luma_bit_depth,
                     value.chroma_bit_depth
                 )
-            )
+            )?;
+            if let Some(semantics) = &value.semantics {
+                writeln!(
+                    output,
+                    "{}",
+                    message!(
+                        language,
+                        "semantics: metadata-channels={} color={} base-stops={} alternate-stops={}",
+                        "语义：元数据通道={} 色彩={} 基础档位={} 增强档位={}",
+                        semantics.metadata_channel_count,
+                        semantics.output_color,
+                        semantics.base_headroom_stops,
+                        semantics.alternate_headroom_stops
+                    )
+                )?;
+                if let Some(profile) = semantics.hdr_profile {
+                    writeln!(
+                        output,
+                        "{}",
+                        message!(language, "hdr-profile: {}", "HDR 配置：{}", profile)
+                    )?;
+                }
+                if let Some(decoded) = &semantics.decoded_hdr {
+                    writeln!(
+                        output,
+                        "{}",
+                        message!(
+                            language,
+                            "decoded-hdr: {}x{} linear-bt2020 min={:?} max={:?}",
+                            "HDR 重建：{}x{} linear-bt2020 最小值={:?} 最大值={:?}",
+                            decoded.width,
+                            decoded.height,
+                            decoded.minimum_rgb,
+                            decoded.maximum_rgb
+                        )
+                    )?;
+                }
+            }
+            Ok(())
         }
         ValidationReport::LivePhoto(value) => {
             writeln!(
@@ -154,7 +203,21 @@ pub(crate) fn run(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
-    let result = validate_media_file(&arguments.input)
+    let profile = if let Some(name) = &arguments.hdr_profile {
+        GainMapValidationProfile::Bt2020 {
+            transfer: if name == "bt2020-pq" {
+                xdremux_runtime::HdrTransfer::Pq
+            } else {
+                xdremux_runtime::HdrTransfer::Hlg
+            },
+            decode_pixels: arguments.decode_hdr,
+        }
+    } else if arguments.semantic {
+        GainMapValidationProfile::Semantics
+    } else {
+        GainMapValidationProfile::Structure
+    };
+    let result = validate_media_file_with_profile(&arguments.input, profile)
         .map_err(|e| e.to_string())
         .and_then(|report| {
             if arguments.apple_styles {
@@ -248,11 +311,60 @@ mod tests {
         }
         let cli = TestCli::try_parse_from(["validate", "result.heic", "--apple-styles"]).unwrap();
         assert!(cli.args.apple_styles);
+        assert!(!cli.args.semantic);
         assert!(
             !TestCli::try_parse_from(["validate", "result.heic"])
                 .unwrap()
                 .args
                 .apple_styles
         );
+    }
+
+    #[test]
+    fn semantic_validation_is_explicit_opt_in() {
+        #[derive(clap::Parser)]
+        struct TestCli {
+            #[command(flatten)]
+            args: ValidateArgs,
+        }
+        assert!(
+            TestCli::try_parse_from(["validate", "result.heic", "--semantic"])
+                .unwrap()
+                .args
+                .semantic
+        );
+        assert!(
+            !TestCli::try_parse_from(["validate", "result.heic"])
+                .unwrap()
+                .args
+                .semantic
+        );
+    }
+
+    #[test]
+    fn decoded_validation_requires_an_explicit_supported_hdr_profile() {
+        #[derive(clap::Parser)]
+        struct TestCli {
+            #[command(flatten)]
+            args: ValidateArgs,
+        }
+        assert!(TestCli::try_parse_from(["validate", "result.heic", "--decode-hdr"]).is_err());
+        assert!(TestCli::try_parse_from([
+            "validate",
+            "result.heic",
+            "--hdr-profile",
+            "compatible"
+        ])
+        .is_err());
+        let value = TestCli::try_parse_from([
+            "validate",
+            "result.heic",
+            "--hdr-profile",
+            "bt2020-hlg",
+            "--decode-hdr",
+        ])
+        .unwrap();
+        assert!(value.args.decode_hdr);
+        assert_eq!(value.args.hdr_profile.as_deref(), Some("bt2020-hlg"));
     }
 }

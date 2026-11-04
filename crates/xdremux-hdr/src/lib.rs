@@ -2,6 +2,11 @@
 
 mod display_family;
 mod display_methods;
+mod dual_layer;
+pub use dual_layer::{
+    decode_hlg, decode_pq, decode_srgb, encode_hlg, encode_pq, reconstruct_bt2020_hdr,
+    sdr_linear_to_bt2020, GainMapSamples,
+};
 mod edr;
 mod error;
 mod gainmap;

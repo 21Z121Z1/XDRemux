@@ -117,7 +117,7 @@ impl UltraHdrGainMapMetadata {
         Ok(info)
     }
 
-    fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if let Some(source) = &self.iso_payload {
             // Public float observations must not be edited independently of
             // the exact source facts that will be serialized.
@@ -587,15 +587,21 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
     })
 }
 
-/// Check the actual HEIF metadata bytes after a writer has changed representation.
-pub(crate) fn validate_tmap_payload(payload: &[u8]) -> Result<()> {
+/// Read the actual HEIF tone-map item without projecting source rationals
+/// through an XMP round-trip. Any optional extension bytes remain untouched.
+pub fn parse_heif_tmap_metadata(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
     if payload.first() != Some(&0) {
         return Err(MetadataError::invalid(
             ISO_CONTEXT,
             "unsupported HEIF tone-map version",
         ));
     }
-    decode_iso_payload(&payload[1..]).map(|_| ())
+    decode_iso_payload(&payload[1..])
+}
+
+/// Check the actual HEIF metadata bytes after a writer has changed representation.
+pub(crate) fn validate_tmap_payload(payload: &[u8]) -> Result<()> {
+    parse_heif_tmap_metadata(payload).map(|_| ())
 }
 
 fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {

@@ -2,7 +2,11 @@
 
 mod apple_portrait;
 mod error;
+mod hdr;
 mod icc;
+mod registered_hdr;
+pub use hdr::{ContentLightLevel, HdrStaticMetadata, HdrTransfer, MasteringDisplay};
+pub use registered_hdr::{DynamicHdrMetadata, RegisteredHdrMetadata};
 mod scene_gain_map;
 pub use scene_gain_map::{
     make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity,
@@ -14,7 +18,7 @@ pub mod ultrahdr_jpeg;
 
 pub use apple_portrait::make_apple_portrait_focus_xmp;
 pub use error::{MetadataError, Result};
-pub use icc::validate_iso_alternate_icc;
+pub use icc::{identify_sdr_color_space, validate_iso_alternate_icc, SdrColorSpace};
 pub use iso21496::{
     make_apple_tmap_payload, make_apple_tmap_payload_with_channel_count,
     make_apple_tmap_payload_with_colour_space, make_hdrgm_xmp, make_imageio_native_tmap_payload,
@@ -27,4 +31,6 @@ pub use oppo::{
     ISO_ULTRA_HDR_FLAG, LOCAL_HDR_FLAG, OPPO_ULTRA_HDR_FLAG,
 };
 pub use oppo_heif::{oppo_tag_flags_in_heif, patch_oppo_user_comment_in_heif};
-pub use ultrahdr_jpeg::{parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata};
+pub use ultrahdr_jpeg::{
+    parse_heif_tmap_metadata, parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata,
+};

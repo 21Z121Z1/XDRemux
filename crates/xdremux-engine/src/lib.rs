@@ -116,6 +116,27 @@ pub enum OutputIntent {
     OppoGallery,
 }
 
+/// Explicit dual-layer alternate encoding, independent of vendor intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HdrExportProfile {
+    #[default]
+    Compatible,
+    Bt2020Pq,
+    Bt2020Hlg,
+}
+
+impl std::str::FromStr for HdrExportProfile {
+    type Err = &'static str;
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "compatible" => Ok(Self::Compatible),
+            "bt2020-pq" => Ok(Self::Bt2020Pq),
+            "bt2020-hlg" => Ok(Self::Bt2020Hlg),
+            _ => Err("HDR profile must be compatible, bt2020-pq or bt2020-hlg"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AppleFeatureRequest {
     pub photographic_styles: bool,
@@ -152,6 +173,7 @@ impl std::str::FromStr for LivePhotoOutput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConversionRequest {
     pub output: OutputIntent,
+    pub hdr_profile: HdrExportProfile,
     pub apple_features: AppleFeatureRequest,
     pub live_photo_output: LivePhotoOutput,
 }
@@ -164,6 +186,7 @@ impl ConversionRequest {
     pub const fn oppo_gallery_compatible() -> Self {
         Self {
             output: OutputIntent::OppoGallery,
+            hdr_profile: HdrExportProfile::Compatible,
             live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
@@ -175,6 +198,17 @@ impl ConversionRequest {
 
     pub const fn requests_oppo_gallery_compatibility(self) -> bool {
         matches!(self.output, OutputIntent::OppoGallery)
+    }
+
+    pub fn validate_hdr_profile_intents(self) -> Result<()> {
+        if self.hdr_profile != HdrExportProfile::Compatible
+            && (self.requests_oppo_gallery_compatibility() || self.apple_features.any())
+        {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "explicit HDR profiles cannot be combined with OPPO Gallery compatibility or Apple editing features",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -260,6 +294,7 @@ pub struct ConversionAnalysis {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionPlan {
     pub output: OutputIntent,
+    pub hdr_profile: HdrExportProfile,
     pub gain_map_target: GainMapEncodeProfile,
     pub required_capabilities: Vec<OperationCapability>,
 }
@@ -381,6 +416,7 @@ pub fn plan_conversion(
     request: ConversionRequest,
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
+    request.validate_hdr_profile_intents()?;
     if request.requests_oppo_gallery_compatibility() && request.apple_features.any() {
         return Err(PlannerError::IncompatibleProductIntents(
             "Apple features cannot be combined with OPPO Gallery compatibility",
@@ -418,6 +454,7 @@ pub fn plan_conversion(
 
     Ok(ConversionPlan {
         output: request.output,
+        hdr_profile: request.hdr_profile,
         gain_map_target,
         required_capabilities,
     })
@@ -580,6 +617,49 @@ mod tests {
                     "Apple features cannot be combined with OPPO Gallery compatibility",
                 ))
             );
+        }
+    }
+
+    #[test]
+    fn hdr_profiles_reject_incompatible_product_intents_before_execution() {
+        for profile in [HdrExportProfile::Bt2020Pq, HdrExportProfile::Bt2020Hlg] {
+            for request in [
+                ConversionRequest::oppo_gallery_compatible(),
+                ConversionRequest {
+                    apple_features: AppleFeatureRequest {
+                        photographic_styles: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ConversionRequest {
+                    apple_features: AppleFeatureRequest {
+                        portrait: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ConversionRequest {
+                    apple_features: AppleFeatureRequest {
+                        cinematic: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            ] {
+                assert!(ConversionRequest {
+                    hdr_profile: profile,
+                    ..request
+                }
+                .validate_hdr_profile_intents()
+                .is_err());
+            }
+            assert!(ConversionRequest {
+                hdr_profile: profile,
+                ..Default::default()
+            }
+            .validate_hdr_profile_intents()
+            .is_ok());
         }
     }
 

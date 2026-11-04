@@ -95,7 +95,11 @@ fn decode_hex(value: &str) -> Vec<u8> {
         .collect()
 }
 
-fn assemble_and_validate(source: &[u8], encoded: &xdremux_codec::EncodedGainMapTiles) -> Vec<u8> {
+fn assemble_and_validate(
+    source: &[u8],
+    encoded: &xdremux_codec::EncodedGainMapTiles,
+    profile: Option<xdremux_heif::HdrGainMapProfile<'_>>,
+) -> Vec<u8> {
     let tiles: Vec<GainMapTile<'_>> = encoded
         .tiles
         .iter()
@@ -114,6 +118,7 @@ fn assemble_and_validate(source: &[u8], encoded: &xdremux_codec::EncodedGainMapT
     let output = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
+            profile,
             alternate_icc: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: encoded.gain_map_width,
@@ -173,7 +178,7 @@ fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_in
         let encoded = provider
             .encode_gain_map_tiles(&request)
             .unwrap_or_else(|error| panic!("libheif {chroma:?} encode failed: {error}"));
-        let output = assemble_and_validate(&source, &encoded);
+        let output = assemble_and_validate(&source, &encoded, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         assert_eq!(structure.width, width);
         assert_eq!(structure.height, height);
@@ -184,6 +189,92 @@ fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_in
         assert_eq!(structure.rows, 2);
         assert_eq!(structure.columns, 2);
     }
+}
+
+#[test]
+fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
+    use xdremux_format::{
+        isobmff::{parse_meta_box, scan_top_level_boxes, META},
+        FourCC,
+    };
+    use xdremux_metadata::{
+        ContentLightLevel, DynamicHdrMetadata, HdrStaticMetadata, HdrTransfer, MasteringDisplay,
+        RegisteredHdrMetadata,
+    };
+    let source = fs::read(source_fixture()).unwrap();
+    let encoded = LibHeifProvider::new()
+        .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
+            rgb_raster(64, 48),
+            engine_profile(64, 48, EngineChannels::Rgb, ChromaSampling::Yuv444),
+        ))
+        .unwrap();
+    let mastering = MasteringDisplay {
+        primaries: [[8500, 39850], [6550, 2300], [35400, 14600]],
+        white_point: [15635, 16450],
+        maximum_luminance: 10_000_000,
+        minimum_luminance: 50,
+    };
+    let light = ContentLightLevel {
+        maximum_content_light_level: 1000,
+        maximum_frame_average_light_level: 400,
+    };
+    let static_metadata = HdrStaticMetadata {
+        mastering_display: Some(mastering.clone()),
+        content_light_level: Some(light),
+    };
+    let registered = RegisteredHdrMetadata {
+        static_metadata: Some((mastering, light)),
+        dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+    };
+    let output = assemble_and_validate(
+        &source,
+        &encoded,
+        Some(xdremux_heif::HdrGainMapProfile {
+            transfer: HdrTransfer::Pq,
+            static_metadata: &static_metadata,
+            registered_metadata: Some(&registered),
+        }),
+    );
+    let observed = xdremux_heif::validate_hdr_gain_map_profile(&output, HdrTransfer::Pq).unwrap();
+    assert_eq!(observed.static_metadata, static_metadata);
+    assert_eq!(observed.registered_metadata, Some(registered));
+    let top = scan_top_level_boxes(&output).unwrap();
+    let meta = parse_meta_box(&output, top.boxes.iter().find(|b| b.kind == META).unwrap()).unwrap();
+    let item = meta
+        .iinf
+        .entries
+        .iter()
+        .find(|i| i.item_type == Some(FourCC::new(*b"it35")))
+        .unwrap();
+    let location = meta
+        .iloc
+        .entries
+        .iter()
+        .find(|l| l.item_id == item.item_id)
+        .unwrap();
+    assert_eq!(location.construction_method, 1);
+    let start = meta.idat.as_ref().unwrap().data_start + location.extents[0].offset as usize;
+    let mut malformed = output.clone();
+    malformed[start + 11] ^= 0xff;
+    validate_gain_map_structure(&malformed).unwrap();
+    assert!(xdremux_heif::validate_hdr_gain_map_profile(&malformed, HdrTransfer::Pq).is_err());
+    // A present carrier must agree with the HDR item's static properties.
+    let clli = meta
+        .properties
+        .iter()
+        .find(|p| {
+            p.kind == FourCC::new(*b"clli")
+                && output[p.box_range.end - 4..p.box_range.end] == light.to_clli_payload().unwrap()
+        })
+        .unwrap();
+    let mut conflicting = output;
+    conflicting[clli.box_range.end - 1] ^= 1;
+    assert!(
+        xdremux_heif::validate_hdr_gain_map_profile(&conflicting, HdrTransfer::Pq)
+            .unwrap_err()
+            .to_string()
+            .contains("disagrees")
+    );
 }
 
 #[test]
@@ -210,7 +301,7 @@ fn gain_map_matrix_range_and_rgb_codes_agree_after_assembly() {
         request.tile_size = 256;
         request.quality = 100;
         let encoded = provider.encode_gain_map_tiles(&request).unwrap();
-        let output = assemble_and_validate(&source, &encoded);
+        let output = assemble_and_validate(&source, &encoded, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         let top = scan_top_level_boxes(&output).unwrap();
         let meta =

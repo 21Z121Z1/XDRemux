@@ -1402,6 +1402,7 @@ mod tests {
             let canonical = crate::assemble_iso_gain_map_heif(
                 &source,
                 &crate::IsoGainMapAssembly {
+                    profile: None,
                     alternate_icc: None,
                     gain_map: gain,
                     tmap_payload: &[0; 4],

@@ -95,6 +95,16 @@ pub struct Raster8 {
     pub data: Vec<u8>,
 }
 
+/// Coded-orientation normalized components, decoded without an 8-bit reduction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NormalizedRaster {
+    pub width: u32,
+    pub height: u32,
+    pub channels: u8,
+    pub bit_depth: u8,
+    pub samples: Vec<f32>,
+}
+
 impl Raster8 {
     pub fn new(
         width: u32,
