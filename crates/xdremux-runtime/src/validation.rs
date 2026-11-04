@@ -8,7 +8,7 @@ use xdremux_motion_photo::{apple, companion_video_path, Input, MotionPhoto, Pars
 
 use crate::{Result, RuntimeError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct IsoHdrValidationReport {
     pub input: PathBuf,
     pub primary_item_id: u32,
