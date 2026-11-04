@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use xdremux_format::ChromaSampling;
-use xdremux_heif::validate_gain_map_structure;
+use xdremux_heif::{validate_gain_map_semantics, validate_gain_map_structure, HdrOutputColor};
 use xdremux_motion_photo::{apple, companion_video_path, Input, MotionPhoto, ParseOptions};
 
 use crate::{Result, RuntimeError};
@@ -25,6 +25,25 @@ pub struct IsoHdrValidationReport {
     pub luma_bit_depth: u8,
     pub chroma_bit_depth: u8,
     pub general_profile_idc: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub semantics: Option<IsoHdrSemanticsReport>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GainMapValidationProfile {
+    Structure,
+    Semantics,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct IsoHdrSemanticsReport {
+    pub metadata_channel_count: u8,
+    pub use_base_color_space: bool,
+    pub base_headroom_stops: f64,
+    pub alternate_headroom_stops: f64,
+    pub output_color: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_nclx: Option<[u16; 3]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -65,9 +84,33 @@ fn read_file(path: &Path, context: &'static str) -> Result<Vec<u8>> {
     fs::read(path).map_err(|error| RuntimeError::external(context, error))
 }
 
-fn validate_iso_hdr(input: &Path, bytes: &[u8]) -> Result<ValidationReport> {
+fn validate_iso_hdr(
+    input: &Path,
+    bytes: &[u8],
+    profile: GainMapValidationProfile,
+) -> Result<ValidationReport> {
     let structure = validate_gain_map_structure(bytes)
         .map_err(|error| RuntimeError::external("ISO HDR HEIF validation", error))?;
+    let semantics = if profile == GainMapValidationProfile::Semantics {
+        let observed = validate_gain_map_semantics(bytes)
+            .map_err(|error| RuntimeError::external("ISO HDR HEIF semantics", error))?;
+        let (output_color, output_nclx) = match observed.output_color {
+            HdrOutputColor::Nclx { primaries, transfer, matrix, .. } => {
+                ("nclx", Some([primaries, transfer, matrix]))
+            }
+            HdrOutputColor::Icc => ("icc", None),
+        };
+        Some(IsoHdrSemanticsReport {
+            metadata_channel_count: observed.metadata.channel_count,
+            use_base_color_space: observed.metadata.use_base_color_space,
+            base_headroom_stops: observed.metadata.hdr_capacity_min,
+            alternate_headroom_stops: observed.metadata.hdr_capacity_max,
+            output_color,
+            output_nclx,
+        })
+    } else {
+        None
+    };
     Ok(ValidationReport::IsoHdrHeif(IsoHdrValidationReport {
         input: input.to_path_buf(),
         primary_item_id: structure.primary_item_id,
@@ -84,6 +127,7 @@ fn validate_iso_hdr(input: &Path, bytes: &[u8]) -> Result<ValidationReport> {
         luma_bit_depth: structure.luma_bit_depth,
         chroma_bit_depth: structure.chroma_bit_depth,
         general_profile_idc: structure.general_profile_idc,
+        semantics,
     }))
 }
 
@@ -167,6 +211,23 @@ fn companion_still_path(video: &Path) -> Result<PathBuf> {
 }
 
 pub fn validate_media_file(input: &Path) -> Result<ValidationReport> {
+    validate_media_file_with_profile(input, GainMapValidationProfile::Structure)
+}
+
+pub fn validate_media_file_with_profile(
+    input: &Path,
+    profile: GainMapValidationProfile,
+) -> Result<ValidationReport> {
+    if profile == GainMapValidationProfile::Semantics
+        && !input.extension().is_some_and(|value| {
+            value.eq_ignore_ascii_case("heic") || value.eq_ignore_ascii_case("heif")
+        })
+    {
+        return Err(RuntimeError::new(
+            "ISO HDR HEIF semantics",
+            "semantic validation requires a standalone HEIC/HEIF input",
+        ));
+    }
     if input
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("pvt"))
@@ -200,6 +261,12 @@ pub fn validate_media_file(input: &Path) -> Result<ValidationReport> {
     let apple_identifier = apple::read_still_identifier(&bytes)
         .map_err(|error| RuntimeError::external("Live Photo still probe", error))?;
     if apple_identifier.is_some() {
+        if profile == GainMapValidationProfile::Semantics {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF semantics",
+                "semantic validation expects a standalone HDR image, not a Live Photo pair",
+            ));
+        }
         let video = companion_video_path(input);
         if !video.is_file() {
             return Err(RuntimeError::new(
@@ -213,7 +280,7 @@ pub fn validate_media_file(input: &Path) -> Result<ValidationReport> {
         return validate_live_photo_pair(input, input, &video, Some(bytes));
     }
 
-    validate_iso_hdr(input, &bytes)
+    validate_iso_hdr(input, &bytes, profile)
 }
 
 #[cfg(test)]

@@ -32,7 +32,10 @@ pub use texture::{
     assemble_texture_styles_heif, has_texture_style_metadata, TextureStyleMask,
     TEXTURE_METADATA_URI,
 };
-pub use validation::{validate_gain_map_structure, GainMapStructure};
+pub use validation::{
+    validate_gain_map_semantics, validate_gain_map_structure, GainMapSemantics, GainMapStructure,
+    HdrOutputColor,
+};
 
 pub fn assemble_iso_gain_map_heif(
     source: &[u8],

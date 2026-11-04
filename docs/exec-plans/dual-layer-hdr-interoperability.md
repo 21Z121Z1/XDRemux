@@ -54,7 +54,7 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 
 ## Implementation slices
 
-- [ ] A. Typed metadata and independent semantic validator, with malformed-input tests.
+- [ ] A. Typed metadata and independent semantic validator, with malformed-input tests. **In progress:** standalone HEIF `tmap` rational parsing and explicit `validate --semantic` inspect the final item bytes and output `colr`; optional extension schemas and pixel reconstruction remain pending.
 - [ ] B. HEIF profile construction and orientation/association regressions.
 - [ ] C. HDR color reconstruction, source preservation, and numerical round-trip tests.
 - [ ] D. Optional static/dynamic HDR and mapping metadata carriers.
@@ -80,3 +80,13 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 - xdremux-cli: minimal profile selection and machine-readable validation report.
 
 Use the repository's existing tests, fixture integrity rules, and exact-HEAD verification workflow. No new standalone backend or CI framework is needed.
+
+## Validation commands for the current slice
+
+```sh
+cargo test --locked -p xdremux-metadata -p xdremux-heif -p xdremux-runtime -p xdremux-cli
+cargo clippy --locked --workspace --all-targets -- --deny warnings
+cargo run --locked -p xdremux-cli -- validate output.heic --semantic --json
+```
+
+The semantic check is opt-in and reports graph, numeric tone-map metadata, and declared HDR output color properties. It is **not** a decoded HDR pixel comparison, a cross-device recognition test, or a claim of a complete export profile. Existing output and default validation are unchanged.

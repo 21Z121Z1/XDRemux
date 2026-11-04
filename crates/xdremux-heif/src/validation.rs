@@ -16,6 +16,7 @@ const TMAP: FourCC = FourCC::new(*b"tmap");
 const ISPE: FourCC = FourCC::new(*b"ispe");
 const PIXI: FourCC = FourCC::new(*b"pixi");
 const DIMG: FourCC = FourCC::new(*b"dimg");
+const COLR: FourCC = FourCC::new(*b"colr");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GainMapStructure {
@@ -37,6 +38,26 @@ pub struct GainMapStructure {
     pub luma_bit_depth: u8,
     pub chroma_bit_depth: u8,
     pub general_profile_idc: u8,
+}
+
+/// Observed metadata and output colorimetry from a complete HEIF gain-map graph.
+/// Pixel decoding and platform recognition are separate verification gates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GainMapSemantics {
+    pub structure: GainMapStructure,
+    pub metadata: xdremux_metadata::UltraHdrGainMapMetadata,
+    pub output_color: HdrOutputColor,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HdrOutputColor {
+    Nclx {
+        primaries: u16,
+        transfer: u16,
+        matrix: u16,
+        full_range: bool,
+    },
+    Icc,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -705,6 +726,80 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
     })
 }
 
+fn read_hdr_output_color(source: &[u8], property: &PropertyInfo) -> Result<HdrOutputColor> {
+    let (raw, header) = property_box(source, property)?;
+    let payload = raw
+        .get(header.payload_range())
+        .ok_or_else(|| invalid("HDR colr payload is outside its property box"))?;
+    match payload.get(..4) {
+        Some(four) if four == b"nclx" && payload.len() == 11 => {
+            let read = |offset| u16::from_be_bytes([payload[offset], payload[offset + 1]]);
+            let (primaries, transfer, matrix) = (read(4), read(6), read(8));
+            if primaries == 0 || primaries == 2 || transfer == 0 || transfer == 2 {
+                return Err(invalid("HDR output nclx does not identify its colorimetry"));
+            }
+            if payload[10] & 0x7f != 0 {
+                return Err(invalid("HDR output nclx has nonzero reserved bits"));
+            }
+            Ok(HdrOutputColor::Nclx {
+                primaries,
+                transfer,
+                matrix,
+                full_range: payload[10] & 0x80 != 0,
+            })
+        }
+        Some(four) if four == b"prof" || four == b"rICC" => {
+            xdremux_metadata::validate_iso_alternate_icc(&payload[4..], true)
+                .map_err(|error| invalid(format!("HDR output ICC: {error}")))?;
+            Ok(HdrOutputColor::Icc)
+        }
+        _ => Err(invalid("HDR output colr must contain a valid nclx or ICC profile")),
+    }
+}
+
+/// Validate gain-map numeric semantics and output color properties in addition
+/// to the structural graph. Does not infer application primaries from the
+/// Gain Map's compression color space or equate metadata and pixel channels.
+pub fn validate_gain_map_semantics(source: &[u8]) -> Result<GainMapSemantics> {
+    let structure = validate_gain_map_structure(source)?;
+    let top = scan_top_level_boxes(source)?;
+    let meta_header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, meta_header)?;
+    let indices = validate_meta_integrity(source, &meta)?;
+
+    let location = indices
+        .locations
+        .get(&structure.tmap_item_id)
+        .ok_or_else(|| invalid("tmap has no iloc entry"))?;
+    let payload = item_payload(source, meta.idat.as_ref(), location)?;
+    let metadata = xdremux_metadata::parse_heif_tmap_metadata(&payload)
+        .map_err(|error| invalid(format!("invalid tmap metadata: {error}")))?;
+
+    let tmap_pixi = associated_property(
+        structure.tmap_item_id,
+        PIXI,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    let (channels, bits) = parse_pixi(source, tmap_pixi)?;
+    if channels != 3 || bits.iter().any(|bit| *bit == 0) {
+        return Err(invalid("derived HDR tmap pixi must describe three nonzero-depth channels"));
+    }
+
+    let color = associated_property(
+        structure.tmap_item_id,
+        COLR,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    let output_color = read_hdr_output_color(source, color)?;
+    Ok(GainMapSemantics {
+        structure,
+        metadata,
+        output_color,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -737,6 +832,8 @@ mod tests {
         gain_omit_property: Option<FourCC>,
         gain_payload_length: Option<u64>,
         extra_references: Vec<IrefEntry>,
+        tmap_payload: Vec<u8>,
+        tmap_color: Vec<u8>,
     }
 
     impl Default for FixtureOptions {
@@ -759,6 +856,8 @@ mod tests {
                 gain_omit_property: None,
                 gain_payload_length: None,
                 extra_references: Vec::new(),
+                tmap_payload: vec![0xb2],
+                tmap_color: b"nclx\0\x09\0\x10\0\x09\x80".to_vec(),
             }
         }
     }
@@ -788,7 +887,7 @@ mod tests {
         } else {
             vec![0xa1]
         };
-        let tmap_payload = [0xb2];
+        let tmap_payload = options.tmap_payload.as_slice();
         let tile_payload = [0xc3];
         let mut idat_payload = Vec::new();
         let primary_offset = idat_payload.len() as u64;
@@ -824,6 +923,7 @@ mod tests {
             &tile_hvcc,
             &tile_hvcc,
             &make_ispe_box(4, 4).unwrap(),
+            &make_box(COLR, &options.tmap_color).unwrap(),
         ] {
             ipco_payload.extend_from_slice(property);
         }
@@ -867,6 +967,10 @@ mod tests {
                         IpmaAssociation {
                             property_index: 4,
                             essential: false,
+                        },
+                        IpmaAssociation {
+                            property_index: 9,
+                            essential: true,
                         },
                     ],
                 },
@@ -942,7 +1046,7 @@ mod tests {
                     extents: vec![IlocExtent {
                         index: None,
                         offset: tmap_offset,
-                        length: 1,
+                        length: tmap_payload.len() as u64,
                     }],
                 },
                 IlocEntry {
@@ -991,6 +1095,85 @@ mod tests {
             gain_targets: Vec::new(),
             ..FixtureOptions::default()
         }
+    }
+
+    fn valid_tmap_payload() -> Vec<u8> {
+        let mut bytes = vec![0, 0, 0, 0, 0, 0x40];
+        for (numerator, denominator) in [(0_u32, 1_u32), (2, 1)] {
+            bytes.extend_from_slice(&numerator.to_be_bytes());
+            bytes.extend_from_slice(&denominator.to_be_bytes());
+        }
+        for (numerator, denominator) in [(0_i32, 1_u32), (2, 1)] {
+            bytes.extend_from_slice(&numerator.to_be_bytes());
+            bytes.extend_from_slice(&denominator.to_be_bytes());
+        }
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        for _ in 0..2 {
+            bytes.extend_from_slice(&0_i32.to_be_bytes());
+            bytes.extend_from_slice(&1_u32.to_be_bytes());
+        }
+        assert_eq!(bytes.len(), 62);
+        bytes
+    }
+
+    #[test]
+    fn semantic_validation_reads_real_tmap_and_independent_channel_counts() {
+        let source = fixture(FixtureOptions {
+            tmap_payload: valid_tmap_payload(),
+            ..FixtureOptions::default()
+        });
+        let result = validate_gain_map_semantics(&source).unwrap();
+        assert_eq!(result.structure.channel_count, 3);
+        assert_eq!(result.metadata.channel_count, 1);
+        assert_eq!(result.metadata.hdr_capacity_max, 2.0);
+        assert!(result.metadata.use_base_color_space);
+        assert_eq!(
+            result.output_color,
+            HdrOutputColor::Nclx {
+                primaries: 9,
+                transfer: 16,
+                matrix: 9,
+                full_range: true,
+            }
+        );
+    }
+
+    #[test]
+    fn semantic_validation_rejects_invalid_payload_without_changing_structural_contract() {
+        for (case, mutate, expected) in [
+            ("version", 0, "tone-map version"),
+            ("reserved flags", 5, "reserved gain-map flags"),
+            ("zero denominator", 10, "zero denominator"),
+        ] {
+            let mut payload = valid_tmap_payload();
+            payload[mutate] = if case == "zero denominator" { 0 } else { 1 };
+            // The denominator's last byte is at offset 13.
+            if case == "zero denominator" {
+                payload[13] = 0;
+            }
+            let source = fixture(FixtureOptions {
+                tmap_payload: payload,
+                ..FixtureOptions::default()
+            });
+            validate_gain_map_structure(&source).unwrap();
+            let error = validate_gain_map_semantics(&source).unwrap_err().to_string();
+            assert!(error.contains(expected), "{case}: {error}");
+        }
+    }
+
+    #[test]
+    fn semantic_validation_rejects_ambiguous_hdr_colorimetry() {
+        let source = fixture(FixtureOptions {
+            tmap_payload: valid_tmap_payload(),
+            tmap_color: b"nclx\0\x02\0\x02\0\x09\x80".to_vec(),
+            ..FixtureOptions::default()
+        });
+        validate_gain_map_structure(&source).unwrap();
+        assert!(validate_gain_map_semantics(&source)
+            .unwrap_err()
+            .to_string()
+            .contains("does not identify its colorimetry"));
     }
 
     #[test]

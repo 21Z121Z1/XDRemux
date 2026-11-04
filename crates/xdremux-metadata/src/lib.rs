@@ -27,4 +27,6 @@ pub use oppo::{
     ISO_ULTRA_HDR_FLAG, LOCAL_HDR_FLAG, OPPO_ULTRA_HDR_FLAG,
 };
 pub use oppo_heif::{oppo_tag_flags_in_heif, patch_oppo_user_comment_in_heif};
-pub use ultrahdr_jpeg::{parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata};
+pub use ultrahdr_jpeg::{
+    parse_heif_tmap_metadata, parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata,
+};

@@ -56,7 +56,8 @@ pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflig
 #[cfg(target_os = "macos")]
 pub use system_heif_hdr::SystemHeifHdrReport;
 pub use validation::{
-    validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
+    validate_media_file, validate_media_file_with_profile, GainMapValidationProfile,
+    IsoHdrSemanticsReport, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
 pub use xdremux_heif::PhotographicStylesAssembly;
 
