@@ -12,6 +12,7 @@ xdremux-format = { path = "../xdremux-format" }
 
 [dev-dependencies]
 xdremux-heif = { path = "../xdremux-heif" }
+xdremux-metadata = { path = "../xdremux-metadata" }
 
 [lints]
 workspace = true

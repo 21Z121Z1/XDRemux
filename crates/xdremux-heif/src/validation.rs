@@ -60,6 +60,372 @@ pub enum HdrOutputColor {
     Icc,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct HdrProfileSemantics {
+    pub semantics: GainMapSemantics,
+    pub base_color_space: xdremux_metadata::SdrColorSpace,
+    pub static_metadata: xdremux_metadata::HdrStaticMetadata,
+    pub registered_metadata: Option<xdremux_metadata::RegisteredHdrMetadata>,
+}
+
+fn item_properties(meta: &ParsedMeta, item_id: u32) -> Result<Vec<(&PropertyInfo, bool)>> {
+    let mut entries = meta.ipma.entries.iter().filter(|e| e.item_id == item_id);
+    let entry = entries
+        .next()
+        .ok_or_else(|| invalid(format!("item {item_id} has no property associations")))?;
+    if entries.next().is_some() {
+        return Err(invalid("duplicate item property associations"));
+    }
+    entry
+        .associations
+        .iter()
+        .map(|a| {
+            meta.properties
+                .iter()
+                .find(|p| p.index == u32::from(a.property_index))
+                .map(|p| (p, a.essential))
+                .ok_or_else(|| invalid("association references missing property"))
+        })
+        .collect()
+}
+
+pub(crate) fn primary_image_items(meta: &ParsedMeta) -> Result<Vec<u32>> {
+    let mut result = vec![meta.primary_item_id];
+    let mut seen = HashSet::from([meta.primary_item_id]);
+    let mut cursor = 0;
+    while cursor < result.len() {
+        let id = result[cursor];
+        cursor += 1;
+        if let Some(iref) = &meta.iref {
+            for reference in iref
+                .entries
+                .iter()
+                .filter(|r| r.kind == DIMG && r.from_item_id == id)
+            {
+                for target in &reference.to_item_ids {
+                    if !meta.iinf.entries.iter().any(|i| i.item_id == *target) {
+                        return Err(invalid("primary graph references a missing image"));
+                    }
+                    if seen.insert(*target) {
+                        result.push(*target);
+                    }
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
+pub(crate) fn primary_color_property_indices(meta: &ParsedMeta) -> Result<Vec<u16>> {
+    for id in primary_image_items(meta)? {
+        let properties = item_properties(meta, id)?
+            .into_iter()
+            .filter(|(p, _)| p.kind == COLR)
+            .map(|(p, _)| {
+                u16::try_from(p.index).map_err(|_| invalid("color property index exceeds u16"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if !properties.is_empty() {
+            return Ok(properties);
+        }
+    }
+    Err(invalid("primary image tree has no color property"))
+}
+
+fn item_color_space(
+    source: &[u8],
+    meta: &ParsedMeta,
+    item_id: u32,
+) -> Result<Option<xdremux_metadata::SdrColorSpace>> {
+    let mut icc = None;
+    let mut nclx = None;
+    for (p, _) in item_properties(meta, item_id)? {
+        if p.kind != COLR {
+            continue;
+        }
+        let (raw, header) = property_box(source, p)?;
+        let payload = &raw[header.payload_range()];
+        match payload.get(..4) {
+            Some(b"prof" | b"rICC") => {
+                if icc.replace(&payload[4..]).is_some() {
+                    return Err(invalid("duplicate primary ICC profile"));
+                }
+            }
+            Some(b"nclx") => {
+                if payload.len() != 11 || payload[10] & 0x7f != 0 {
+                    return Err(invalid("malformed primary nclx"));
+                }
+                let c = std::array::from_fn(|i| {
+                    u16::from_be_bytes([payload[4 + 2 * i], payload[5 + 2 * i]])
+                });
+                if nclx.replace(c).is_some() {
+                    return Err(invalid("duplicate primary nclx"));
+                }
+            }
+            _ => return Err(invalid("unsupported primary color property")),
+        }
+    }
+    if icc.is_none() && nclx.is_none_or(|c| c[0] == 2 && c[1] == 2) {
+        return Ok(None);
+    }
+    xdremux_metadata::identify_sdr_color_space(icc, nclx)
+        .map(Some)
+        .map_err(|e| invalid(e.to_string()))
+}
+
+fn primary_color_space(
+    source: &[u8],
+    meta: &ParsedMeta,
+) -> Result<xdremux_metadata::SdrColorSpace> {
+    let mut color = None;
+    let mut checked = HashSet::new();
+    for id in primary_image_items(meta)? {
+        let properties = item_properties(meta, id)?;
+        if properties
+            .iter()
+            .any(|(p, _)| matches!(p.kind.as_bytes(), b"clap" | b"pasp"))
+        {
+            return Err(invalid(
+                "BT.2020 HDR profiles do not support cropped or non-square source pixel geometry",
+            ));
+        }
+        // Shared property indices refer to the same immutable bytes. Execute
+        // the ICC consistency probe once per distinct set of declarations.
+        let mut colors = properties
+            .iter()
+            .filter(|(p, _)| p.kind == COLR)
+            .map(|(p, _)| p.index)
+            .collect::<Vec<_>>();
+        colors.sort_unstable();
+        if !checked.insert(colors) {
+            continue;
+        }
+        if let Some(observed) = item_color_space(source, meta, id)? {
+            if color.is_some_and(|c| c != observed) {
+                return Err(invalid(
+                    "primary image and its coded resources declare conflicting color encodings",
+                ));
+            }
+            color = Some(observed);
+        }
+    }
+    color.ok_or_else(|| invalid("primary image tree has no supported SDR color encoding"))
+}
+
+/// Resolve source facts before codec work for an explicitly selected profile.
+pub fn primary_sdr_color_space(source: &[u8]) -> Result<xdremux_metadata::SdrColorSpace> {
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    primary_color_space(source, &parse_meta_box(source, header)?)
+}
+
+/// Validate the explicitly selected SDR-base / BT.2020 alternate profile.
+/// Optional static metadata remains optional; absence is returned as absence.
+/// Decoded pixels, dynamic tone mapping and consumer behavior are separate.
+pub fn validate_hdr_gain_map_profile(
+    source: &[u8],
+    transfer: xdremux_metadata::HdrTransfer,
+) -> Result<HdrProfileSemantics> {
+    let semantics = validate_gain_map_semantics(source)?;
+    if semantics.output_color
+        != (HdrOutputColor::Nclx {
+            primaries: 9,
+            transfer: transfer.cicp(),
+            matrix: 9,
+            full_range: true,
+        })
+    {
+        return Err(invalid(
+            "derived HDR color must match the selected full-range BT.2020 PQ/HLG profile",
+        ));
+    }
+    if semantics.metadata.hdr_capacity_min != 0.0 || semantics.metadata.hdr_capacity_max <= 0.0 {
+        return Err(invalid(
+            "BT.2020 export profiles require an SDR base and a positive alternate HDR headroom",
+        ));
+    }
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, header)?;
+    let indices = validate_meta_integrity(source, &meta)?;
+    let structure = &semantics.structure;
+    let ftyp = one_top_level(&top.boxes, FTYP, "ftyp")?;
+    let brands = &source[ftyp.payload_range()];
+    if brands.len() < 8
+        || !(brands.len() - 8).is_multiple_of(4)
+        || !brands[8..].as_chunks::<4>().0.contains(b"tmap")
+    {
+        return Err(invalid("HDR profile requires the tmap compatible brand"));
+    }
+    if !meta
+        .iinf
+        .entries
+        .iter()
+        .any(|i| i.item_id == structure.gain_map_item_id && i.flags & 1 != 0)
+    {
+        return Err(invalid("Gain Map item must be hidden"));
+    }
+    let base_color_space = primary_color_space(source, &meta)?;
+    let orientation = |item_id| -> Result<Vec<(FourCC, u8)>> {
+        let mut transforms = Vec::new();
+        for (p, essential) in item_properties(&meta, item_id)? {
+            if !matches!(p.kind.as_bytes(), b"irot" | b"imir") {
+                continue;
+            }
+            let (raw, h) = property_box(source, p)?;
+            let bytes = &raw[h.payload_range()];
+            let limit = if p.kind.as_bytes() == b"irot" { 3 } else { 1 };
+            if bytes.len() != 1
+                || bytes[0] > limit
+                || !essential
+                || transforms.iter().any(|(k, _)| *k == p.kind)
+            {
+                return Err(invalid(
+                    "invalid, duplicate or nonessential image orientation property",
+                ));
+            }
+            transforms.push((p.kind, bytes[0]));
+        }
+        if !transforms.iter().any(|(k, _)| k.as_bytes() == b"irot") {
+            return Err(invalid(
+                "explicit HDR profile requires an essential irot on each image",
+            ));
+        }
+        Ok(transforms)
+    };
+    let base_orientation = orientation(structure.primary_item_id)?;
+    if orientation(structure.gain_map_item_id)? != base_orientation
+        || orientation(structure.tmap_item_id)? != base_orientation
+    {
+        return Err(invalid(
+            "base, Gain Map and tmap must have identical ordered orientation transforms",
+        ));
+    }
+    let base_ispe = associated_property(
+        structure.primary_item_id,
+        ISPE,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    let tmap_ispe = associated_property(
+        structure.tmap_item_id,
+        ISPE,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    if parse_ispe(source, base_ispe)? != parse_ispe(source, tmap_ispe)? {
+        return Err(invalid(
+            "tmap dimensions must equal base coded dimensions before their common orientation",
+        ));
+    }
+    let pixi = associated_property(
+        structure.tmap_item_id,
+        PIXI,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    if parse_pixi(source, pixi)?.1.iter().any(|b| *b < 10) {
+        return Err(invalid(
+            "BT.2020 HDR alternate must declare at least 10-bit channels",
+        ));
+    }
+    let gain_color = associated_property(
+        structure.gain_map_item_id,
+        COLR,
+        &indices.ipma_by_item,
+        &indices.properties,
+    )?;
+    let (raw, h) = property_box(source, gain_color)?;
+    if &raw[h.payload_range()] != b"nclx\0\x02\0\x02\0\x06\x80" {
+        return Err(invalid(
+            "unsupported Gain Map compression color encoding for the BT.2020 profile",
+        ));
+    }
+    for id in [
+        structure.primary_item_id,
+        structure.gain_map_item_id,
+        structure.tmap_item_id,
+    ] {
+        for (p, essential) in item_properties(&meta, id)? {
+            if p.kind == COLR && !essential {
+                return Err(invalid("profile color properties must be essential"));
+            }
+        }
+    }
+    let mut static_metadata = xdremux_metadata::HdrStaticMetadata::default();
+    for (p, _) in item_properties(&meta, structure.tmap_item_id)? {
+        let slot = match p.kind.as_bytes() {
+            b"mdcv" => 0,
+            b"clli" => 1,
+            _ => continue,
+        };
+        let (raw, h) = property_box(source, p)?;
+        let bytes = &raw[h.payload_range()];
+        if slot == 0 {
+            let value = xdremux_metadata::MasteringDisplay::from_mdcv_payload(bytes)
+                .map_err(|e| invalid(e.to_string()))?;
+            if static_metadata.mastering_display.replace(value).is_some() {
+                return Err(invalid("duplicate HDR mastering property"));
+            }
+        } else {
+            let value = xdremux_metadata::ContentLightLevel::from_clli_payload(bytes)
+                .map_err(|e| invalid(e.to_string()))?;
+            if static_metadata.content_light_level.replace(value).is_some() {
+                return Err(invalid("duplicate HDR content light property"));
+            }
+        }
+    }
+    let mut registered_metadata = None;
+    for item in meta
+        .iinf
+        .entries
+        .iter()
+        .filter(|i| i.item_type == Some(FourCC::new(*b"it35")))
+    {
+        if registered_metadata.is_some() {
+            return Err(invalid("ambiguous registered HDR metadata items"));
+        }
+        let references = meta
+            .iref
+            .as_ref()
+            .map(|r| {
+                r.entries
+                    .iter()
+                    .filter(|r| r.kind == FourCC::new(*b"cdsc") && r.from_item_id == item.item_id)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if references.len() != 1 || references[0].to_item_ids != [structure.tmap_item_id] {
+            return Err(invalid(
+                "registered HDR metadata must describe exactly the derived HDR item",
+            ));
+        }
+        let location = indices
+            .locations
+            .get(&item.item_id)
+            .ok_or_else(|| invalid("registered HDR metadata has no location"))?;
+        let payload = item_payload(source, meta.idat.as_ref(), location)?;
+        let data = xdremux_metadata::RegisteredHdrMetadata::parse_it35(&payload)
+            .map_err(|e| invalid(e.to_string()))?;
+        if let Some((mastering, light)) = &data.static_metadata {
+            if static_metadata.mastering_display.as_ref() != Some(mastering)
+                || static_metadata.content_light_level != Some(*light)
+            {
+                return Err(invalid(
+                    "registered HDR static metadata disagrees with mdcv/clli properties",
+                ));
+            }
+        }
+        registered_metadata = Some(data);
+    }
+    Ok(HdrProfileSemantics {
+        semantics,
+        base_color_space,
+        static_metadata,
+        registered_metadata,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct GridGeometry {
     rows: u32,
@@ -753,7 +1119,9 @@ fn read_hdr_output_color(source: &[u8], property: &PropertyInfo) -> Result<HdrOu
                 .map_err(|error| invalid(format!("HDR output ICC: {error}")))?;
             Ok(HdrOutputColor::Icc)
         }
-        _ => Err(invalid("HDR output colr must contain a valid nclx or ICC profile")),
+        _ => Err(invalid(
+            "HDR output colr must contain a valid nclx or ICC profile",
+        )),
     }
 }
 
@@ -774,6 +1142,11 @@ pub fn validate_gain_map_semantics(source: &[u8]) -> Result<GainMapSemantics> {
     let payload = item_payload(source, meta.idat.as_ref(), location)?;
     let metadata = xdremux_metadata::parse_heif_tmap_metadata(&payload)
         .map_err(|error| invalid(format!("invalid tmap metadata: {error}")))?;
+    if metadata.channel_count == 3 && structure.channel_count != 3 {
+        return Err(invalid(
+            "three-component tmap metadata requires an RGB Gain Map",
+        ));
+    }
 
     let tmap_pixi = associated_property(
         structure.tmap_item_id,
@@ -782,8 +1155,10 @@ pub fn validate_gain_map_semantics(source: &[u8]) -> Result<GainMapSemantics> {
         &indices.properties,
     )?;
     let (channels, bits) = parse_pixi(source, tmap_pixi)?;
-    if channels != 3 || bits.iter().any(|bit| *bit == 0) {
-        return Err(invalid("derived HDR tmap pixi must describe three nonzero-depth channels"));
+    if channels != 3 || bits.contains(&0) {
+        return Err(invalid(
+            "derived HDR tmap pixi must describe three nonzero-depth channels",
+        ));
     }
 
     let color = associated_property(
@@ -895,7 +1270,7 @@ mod tests {
         let gain_offset = idat_payload.len() as u64;
         idat_payload.extend_from_slice(&grid_payload);
         let tmap_offset = idat_payload.len() as u64;
-        idat_payload.extend_from_slice(&tmap_payload);
+        idat_payload.extend_from_slice(tmap_payload);
         let tile_offset = idat_payload.len() as u64;
         idat_payload.extend_from_slice(&tile_payload);
 
@@ -1157,7 +1532,9 @@ mod tests {
                 ..FixtureOptions::default()
             });
             validate_gain_map_structure(&source).unwrap();
-            let error = validate_gain_map_semantics(&source).unwrap_err().to_string();
+            let error = validate_gain_map_semantics(&source)
+                .unwrap_err()
+                .to_string();
             assert!(error.contains(expected), "{case}: {error}");
         }
     }
@@ -1174,6 +1551,24 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("does not identify its colorimetry"));
+    }
+
+    #[test]
+    fn semantic_validation_rejects_rgb_metadata_for_a_monochrome_gain_map() {
+        let mono = valid_tmap_payload();
+        let mut rgb = mono[..22].to_vec();
+        rgb[5] |= 0x80;
+        for _ in 0..3 {
+            rgb.extend_from_slice(&mono[22..]);
+        }
+        let source = fixture(FixtureOptions {
+            tmap_payload: rgb,
+            gain_pixi_channels: 1,
+            hvcc_chroma: 0,
+            ..FixtureOptions::default()
+        });
+        validate_gain_map_structure(&source).unwrap();
+        assert!(validate_gain_map_semantics(&source).is_err());
     }
 
     #[test]

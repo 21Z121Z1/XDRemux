@@ -899,6 +899,7 @@ dependencies = [
  "xdremux-engine",
  "xdremux-format",
  "xdremux-heif",
+ "xdremux-metadata",
  "zune-jpeg",
 ]
 
@@ -930,6 +931,9 @@ dependencies = [
 [[package]]
 name = "xdremux-hdr"
 version = "0.1.0"
+dependencies = [
+ "xdremux-metadata",
+]
 
 [[package]]
 name = "xdremux-heif"

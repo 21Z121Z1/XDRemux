@@ -309,6 +309,7 @@ fn assemble_jpeg_gain_map(
     let output = assemble_iso_gain_map_heif(
         base_heif,
         &IsoGainMapAssembly {
+            profile: None,
             alternate_icc: alternate_icc.as_deref(),
             gain_map: direct,
             tmap_payload: &tmap_payload,

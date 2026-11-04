@@ -108,6 +108,7 @@ The following options are available to both `convert` and `batch`.
 | Option | Requirement and effect |
 | --- | --- |
 | `--live-photo-output pair\|pvt` | Default `pair`. Selects a Live Photo file pair or PVT directory. Other assets keep their normal format. |
+| `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | Default `compatible`. Selects an explicit BT.2020 alternate encoding for ProXDR stills. Motion Photo items reject explicit BT.2020 profiles. |
 | `--oppo-compatible` | Requests OPPO Gallery output for a ProXDR still. Motion Photo items reject this request. |
 | `--apple-portrait` | Requests the complete Apple Portrait resource set, including Vision semantics. |
 | `--apple-portrait-oppo` | Uses OPPO depth and available masks. Requires macOS ImageIO and Core Image. Effects are reduced. |
@@ -119,11 +120,24 @@ The following options are available to both `convert` and `batch`.
 
 `--oppo-compatible`, `--apple-portrait`, `--apple-portrait-oppo`, `--apple-styles`, and `--apple-cinematic` are mutually exclusive. A failed feature does not silently switch to another profile. Required source data or native capabilities must exist before the program publishes output.
 
+An explicit `--hdr-profile` option cannot be combined with these compatibility or Apple editing options. The BT.2020 profiles admit SDR bases with verified sRGB or Display P3 colorimetry and the sRGB transfer function. The exporter checks ICC transforms and coexisting color declarations. Unsupported color encodings, cropped geometry, non-square pixels, and unsupported additional matrix or LUT mappings fail before publication.
+
+The BT.2020 profiles preserve the compressed SDR resources and their color data. The base, Gain Map, and derived HDR item share the same ordered rotation and mirror transforms. The derived item uses the base's coded dimensions and declares BT.2020 with PQ or HLG. Its Gain Map compression color property remains separate. An existing camera or display compatibility layout remains selected by `compatible`.
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_pq.heic --hdr-profile bt2020-pq
+xdremux convert --input IMG_001.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
+```
+
+The CLI does not synthesize mastering, content light, or dynamic metadata. The Rust HEIF assembly API accepts checked `mdcv`, `clli`, and registered `it35` metadata from a caller that has source data. Registered static data must agree with the derived item's properties. Dynamic payloads receive syntax checks and retain their bytes. Applying dynamic display mapping is outside this exporter. The JPEG APP8 payload codec does not provide a dual-JFIF writer.
+
 ### PVT directory output
 
 ```bash
 xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
 xdremux validate capture.pvt --json
+xdremux validate output.heic --semantic --json
+xdremux validate IMG_001_pq.heic --hdr-profile bt2020-pq --decode-hdr --json
 ```
 
 This example requires a supported Motion Photo. `capture.pvt` contains `capture.heic`, `capture.mov`, and `metadata.plist`. The plist stores `PFVideoComplementMetadataVersionKey` as the string `"1"`.
@@ -226,6 +240,12 @@ xdremux validate capture.pvt --json
 ```
 
 The positional `INPUT` is required. Plain validation recognizes supported ISO HDR HEIF, either member of a Live Photo pair, or a three-member PVT directory. It checks the corresponding media, pairing, and timing contract.
+
+`--semantic` additionally checks the final HEIF's numeric tone-map metadata and declared alternate color encoding. It rejects contradictory metadata and image channel counts. `--hdr-profile bt2020-pq` or `bt2020-hlg` also checks the selected color encoding, source colorimetry, coded dimensions, ordered orientation properties, and any supported HDR metadata carriers. These options apply to standalone HEIF files.
+
+`--decode-hdr` requires `--hdr-profile`. It decodes the final base and Gain Map without reducing component precision to eight bits. The decoder keeps coded coordinates. Reconstruction inverts Gain Map gamma before co-sited bilinear interpolation, applies gains and offsets in the declared application primaries, and converts to linear BT.2020. The JSON report gives actual decode precision and minimum and maximum relative RGB values. Negative gamut-conversion values are retained.
+
+`valid: true` means that the selected checks passed. Missing optional HDR metadata is reported as missing. Pixel reconstruction is checked only with `--decode-hdr`. Relative linear reconstruction does not establish absolute display luminance, dynamic tone mapping, SDR equivalence to a separate source file, or device recognition. PQ and HLG transfer references are tested separately from display adaptation.
 
 PVT validation also checks the XML plist's string version and unambiguous regular member files. It rejects missing, nested, symbolic-link, duplicate, or malformed members without changing them. This check is structural validation, not Photos import.
 

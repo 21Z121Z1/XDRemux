@@ -265,9 +265,87 @@ fn check_transforms(profile: &ColorProfile, codes: Option<[u8; 4]>, has_lut: boo
     Ok(())
 }
 
+/// SDR encodings admitted by the BT.2020 dual-layer exporter. The Gain Map
+/// application primaries remain independent of its YCbCr compression matrix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SdrColorSpace {
+    Srgb,
+    DisplayP3,
+}
+
+impl SdrColorSpace {
+    pub const fn primaries(self) -> u16 {
+        match self {
+            Self::Srgb => 1,
+            Self::DisplayP3 => 12,
+        }
+    }
+}
+
+/// Resolve an executable SDR encoding and check any coexisting ICC/nclx
+/// declarations. Unknown encodings are rejected, never replaced with sRGB.
+pub fn identify_sdr_color_space(
+    icc: Option<&[u8]>,
+    nclx: Option<[u16; 3]>,
+) -> Result<SdrColorSpace> {
+    let parsed = if let Some(bytes) = icc {
+        validate_iso_alternate_icc(bytes, false)?;
+        let mut profile = ColorProfile::new_from_slice(bytes)
+            .map_err(|e| invalid(&format!("cannot read SDR ICC: {e}")))?;
+        profile.cicp = None;
+        Some(profile)
+    } else {
+        None
+    };
+    let mut mismatches = Vec::new();
+    for candidate in [SdrColorSpace::Srgb, SdrColorSpace::DisplayP3] {
+        if nclx.is_some_and(|c| {
+            (c[0] != 2 && c[0] != candidate.primaries()) || (c[1] != 2 && c[1] != 13)
+        }) {
+            continue;
+        }
+        if let Some(profile) = &parsed {
+            match check_transforms(profile, Some([candidate.primaries() as u8, 13, 0, 1]), true) {
+                Ok(()) => return Ok(candidate),
+                Err(error) => mismatches.push(error.to_string()),
+            }
+        } else if nclx.is_some_and(|c| c[0] == candidate.primaries() && c[1] == 13) {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid(&format!("SDR color encoding is unsupported or ICC and nclx contradict each other; expected sRGB or Display P3 with the sRGB transfer function; nclx={nclx:?}; {}",mismatches.join("; "))))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sdr_admission_checks_actual_icc_transforms_and_nclx_agreement() {
+        for (mut profile, space) in [
+            (ColorProfile::new_srgb(), SdrColorSpace::Srgb),
+            (ColorProfile::new_display_p3(), SdrColorSpace::DisplayP3),
+        ] {
+            profile.cicp = None;
+            let bytes = encode_aligned(&profile);
+            assert_eq!(identify_sdr_color_space(Some(&bytes), None).unwrap(), space);
+            assert_eq!(
+                identify_sdr_color_space(Some(&bytes), Some([space.primaries(), 13, 6])).unwrap(),
+                space
+            );
+            let other = if space == SdrColorSpace::Srgb { 12 } else { 1 };
+            assert!(identify_sdr_color_space(Some(&bytes), Some([other, 13, 6])).is_err());
+            assert!(
+                identify_sdr_color_space(Some(&bytes), Some([space.primaries(), 16, 9])).is_err()
+            );
+        }
+        assert!(identify_sdr_color_space(None, None).is_err());
+        assert!(identify_sdr_color_space(None, Some([2, 2, 6])).is_err());
+        assert_eq!(
+            identify_sdr_color_space(None, Some([12, 13, 6])).unwrap(),
+            SdrColorSpace::DisplayP3
+        );
+    }
 
     // Deliberately synthetic: these are admission-test headers, not a color
     // transform or native-decoder acceptance fixture.

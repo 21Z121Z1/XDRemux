@@ -105,6 +105,7 @@ xdremux convert --input IMG_001.jpg
 | 选项 | 条件和效果 |
 | --- | --- |
 | `--live-photo-output pair\|pvt` | 默认为 `pair`。选择 Live Photo 文件对或 PVT 目录，其他资产保留原有格式。 |
+| `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | 默认为 `compatible`。为 ProXDR 静态照片显式选择 BT.2020 替代图像编码。Motion Photo 项拒绝显式 BT.2020 配置。 |
 | `--oppo-compatible` | 为 ProXDR 静态照片请求 OPPO 相册兼容输出。Motion Photo 项拒绝此请求。 |
 | `--apple-portrait` | 请求完整 Apple 人像资源集，包括 Vision 语义资源。 |
 | `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
@@ -116,11 +117,24 @@ xdremux convert --input IMG_001.jpg
 
 `--oppo-compatible`、`--apple-portrait`、`--apple-portrait-oppo`、`--apple-styles` 和 `--apple-cinematic` 相互排斥。功能失败后不会静默切换模式。发布输出前，必须具备所需源数据和原生能力。
 
+显式 `--hdr-profile` 选项不能与上述兼容性或 Apple 编辑选项组合。BT.2020 配置接受经验证采用 sRGB 或 Display P3 色域、sRGB 传递函数的 SDR 基础图像。导出器检查 ICC 变换及并存的色彩声明。不支持的色彩编码、裁剪几何、非方形像素，以及不支持的额外矩阵或 LUT 映射，会在发布前失败。
+
+BT.2020 配置保留 SDR 压缩资源及其色彩数据。基础图像、Gain Map 和 HDR 派生图像使用相同顺序的旋转与镜像变换。派生图像采用基础图像的编码尺寸，并声明 BT.2020 与 PQ 或 HLG。Gain Map 的压缩色彩属性独立保留。`compatible` 继续选择现有相机或显示兼容布局。
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_pq.heic --hdr-profile bt2020-pq
+xdremux convert --input IMG_001.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
+```
+
+CLI 不生成推测的母版、内容亮度或动态元数据。Rust HEIF 组装 API 接受调用方基于源数据提供的、经过检查的 `mdcv`、`clli` 和注册 `it35` 元数据。注册载荷中的静态数据必须与派生图像属性一致。动态载荷接受语法检查，并保留原始字节。动态显示映射不属于此导出器的处理范围。JPEG APP8 载荷编解码器不提供双 JFIF 写入器。
+
 ### PVT 目录输出
 
 ```bash
 xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
 xdremux validate capture.pvt --json
+xdremux validate output.heic --semantic --json
+xdremux validate IMG_001_pq.heic --hdr-profile bt2020-pq --decode-hdr --json
 ```
 
 示例要求输入是支持的 Motion Photo。`capture.pvt` 包含 `capture.heic`、`capture.mov` 和 `metadata.plist`。plist 中 `PFVideoComplementMetadataVersionKey` 的值为字符串 `"1"`。
@@ -223,6 +237,12 @@ xdremux validate capture.pvt --json
 ```
 
 位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
+
+`--semantic` 额外检查最终 HEIF 中的数值色调映射元数据和替代图像色彩编码声明，并拒绝矛盾的元数据与图像通道数。`--hdr-profile bt2020-pq` 或 `bt2020-hlg` 还检查所选色彩编码、源色彩信息、编码尺寸、方向属性顺序，以及存在的受支持 HDR 元数据载荷。这些选项适用于独立 HEIF 文件。
+
+`--decode-hdr` 需要 `--hdr-profile`。它从最终文件解码基础图像与 Gain Map，保留分量精度，不降低至八位。解码器保留编码坐标。重建先对 Gain Map 反伽马，再做共位双线性插值，在声明的应用色域中处理增益与偏移量，最后转换至线性 BT.2020。JSON 报告实际解码精度及相对 RGB 的最小值和最大值，并保留色域转换产生的负分量。
+
+`valid: true` 表示所选检查通过。可选 HDR 元数据缺失时会如实报告。只有使用 `--decode-hdr` 才检查像素重建。相对线性重建不能证明绝对显示亮度、动态色调映射、与另一源文件的 SDR 等价性或设备识别。PQ 和 HLG 传递函数参考值的测试与显示适配分开进行。
 
 PVT 验证还检查 XML plist 的字符串版本及无歧义的普通成员文件。成员缺失、嵌套、符号链接、重复或损坏时拒绝验证，且不改变文件。这是结构验证，不是 Photos 导入验证。
 

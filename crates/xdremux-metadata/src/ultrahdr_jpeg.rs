@@ -117,7 +117,7 @@ impl UltraHdrGainMapMetadata {
         Ok(info)
     }
 
-    fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if let Some(source) = &self.iso_payload {
             // Public float observations must not be edited independently of
             // the exact source facts that will be serialized.

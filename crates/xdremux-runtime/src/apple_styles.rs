@@ -1662,6 +1662,7 @@ mod tests {
             let source = xdremux_heif::assemble_iso_gain_map_heif(
                 &base,
                 &IsoGainMapAssembly {
+                    profile: None,
                     alternate_icc: None,
                     gain_map: DirectHevcGainMap {
                         gain_map_width: 64,

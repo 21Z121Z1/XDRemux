@@ -10,6 +10,40 @@ fn public_proxdr_fixture() -> PathBuf {
         .join("../../fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic")
 }
 
+#[test]
+fn explicit_hdr_batch_rejects_motion_photo_before_checkpoint_reuse() {
+    let scratch = unique_dir();
+    let output_dir = scratch.path().join("outputs");
+    let input = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let code = xdremux_cli::run_from(
+        vec![
+            "batch".into(),
+            "--input".into(),
+            input.into_os_string(),
+            "--output-dir".into(),
+            output_dir.clone().into_os_string(),
+            "--hdr-profile".into(),
+            "bt2020-pq".into(),
+            "--skip-existing".into(),
+            "--json".into(),
+        ],
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(code, 1, "{}", String::from_utf8_lossy(&stderr));
+    let report: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(report["successes"].as_array().unwrap().len(), 0);
+    assert_eq!(report["failures"].as_array().unwrap().len(), 1);
+    assert!(report["failures"][0]["error"]
+        .as_str()
+        .unwrap()
+        .contains("only to ProXDR"));
+    assert!(!output_dir.join("jpeg-ultrahdr-01.xdremux.heic").exists());
+}
+
 fn unique_dir() -> tempfile::TempDir {
     let directory = tempfile::Builder::new()
         .prefix("xdremux-cli-batch-")

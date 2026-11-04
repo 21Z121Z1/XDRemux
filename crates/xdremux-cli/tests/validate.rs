@@ -43,6 +43,94 @@ fn validate_json(input: &Path) -> (u8, Value, Vec<u8>) {
 }
 
 #[test]
+fn explicit_hdr_profile_runs_through_convert_and_final_file_validation() {
+    let root = unique_dir();
+    fs::create_dir_all(&root).unwrap();
+    let input = proxdr_fixture();
+    let original = fs::read(&input).unwrap();
+    let output = root.join("hlg.heic");
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let code = xdremux_cli::run_from(
+        vec![
+            OsString::from("convert"),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--hdr-profile".into(),
+            "bt2020-hlg".into(),
+        ],
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&stderr));
+    let bytes = fs::read(&output).unwrap();
+    stdout.clear();
+    stderr.clear();
+    let code = xdremux_cli::run_from(
+        vec![
+            OsString::from("validate"),
+            output.as_os_str().to_owned(),
+            "--hdr-profile".into(),
+            "bt2020-hlg".into(),
+            "--decode-hdr".into(),
+            "--json".into(),
+        ],
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&stderr));
+    let report: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(report["valid"], true);
+    let semantics = &report["details"]["value"]["semantics"];
+    assert_eq!(semantics["hdr_profile"], "bt2020-hlg");
+    assert_eq!(semantics["output_nclx"], serde_json::json!([9, 18, 9]));
+    assert_eq!(
+        semantics["static_metadata"]["dynamic_metadata"],
+        "not-present"
+    );
+    assert_eq!(semantics["decoded_hdr"]["color_space"], "linear-bt2020");
+    stdout.clear();
+    stderr.clear();
+    let code = xdremux_cli::run_from(
+        vec![
+            OsString::from("validate"),
+            output.as_os_str().to_owned(),
+            "--hdr-profile".into(),
+            "bt2020-pq".into(),
+            "--json".into(),
+        ],
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(code, 1);
+    let failure: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(failure["valid"], false);
+    assert_eq!(fs::read(&output).unwrap(), bytes);
+    assert_eq!(fs::read(&input).unwrap(), original);
+    if let Some(evidence) = std::env::var_os("XDREMUX_HDR_PROFILE_OUTPUT_DIR") {
+        let evidence = PathBuf::from(evidence);
+        fs::create_dir_all(&evidence).unwrap();
+        fs::write(evidence.join("cli-hlg.heic"), &bytes).unwrap();
+        let geometry = xdremux_heif::primary_coded_geometry(&bytes).unwrap();
+        let gain = xdremux_heif::validate_gain_map_structure(&bytes).unwrap();
+        let (dw, dh) = if geometry.quarter_turns_ccw % 2 == 1 {
+            (geometry.height, geometry.width)
+        } else {
+            (geometry.width, geometry.height)
+        };
+        let (gw, gh) = if geometry.quarter_turns_ccw % 2 == 1 {
+            (gain.height, gain.width)
+        } else {
+            (gain.width, gain.height)
+        };
+        fs::write(evidence.join("cli-hlg-geometry.json"),serde_json::to_vec_pretty(&serde_json::json!({"primary_coded_width":geometry.width,"primary_coded_height":geometry.height,"primary_display_width":dw,"primary_display_height":dh,"quarter_turns_ccw":geometry.quarter_turns_ccw,"gain_coded_width":gain.width,"gain_coded_height":gain.height,"gain_display_width":gw,"gain_display_height":gh})).unwrap()).unwrap();
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
     let root = unique_dir();
     fs::create_dir_all(&root).unwrap();

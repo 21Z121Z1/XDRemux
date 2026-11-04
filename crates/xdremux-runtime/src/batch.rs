@@ -445,6 +445,9 @@ fn process_batch_item_with_options(
     let _ = (apple_options.portrait_profile, &apple_options.cinematic);
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
+        request
+            .validate_hdr_profile_intents()
+            .map_err(|e| RuntimeError::external("HDR profile batch intent", e))?;
         if item.input == item.output {
             return Err(RuntimeError::new(
                 "batch output",
@@ -496,6 +499,14 @@ fn process_batch_item_with_options(
             .map_err(|error| RuntimeError::external("batch input read", error))?;
         let asset = probe_bytes(&source)
             .map_err(|error| RuntimeError::external("batch source probe", error))?;
+        if request.hdr_profile != xdremux_engine::HdrExportProfile::Compatible
+            && !matches!(asset, SourceAsset::ProXdr { .. })
+        {
+            return Err(RuntimeError::new(
+                "HDR profile batch intent",
+                "explicit HDR profiles apply only to ProXDR still images",
+            ));
+        }
 
         match asset {
             SourceAsset::MotionPhoto { .. } => {

@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
-use xdremux_engine::{AppleFeatureRequest, ConversionRequest, LivePhotoOutput};
+use xdremux_engine::{AppleFeatureRequest, ConversionRequest, HdrExportProfile, LivePhotoOutput};
 use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, ApplePortraitSemanticProfile, BatchAssetKind,
     BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
@@ -76,6 +76,9 @@ struct InspectArgs {
 
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
+    /// Explicit HDR alternate encoding for ProXDR stills; compatible retains the default layout.
+    #[arg(long, default_value = "compatible", value_name = "compatible|bt2020-pq|bt2020-hlg", conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
+    hdr_profile: HdrExportProfile,
     /// Live Photo container: pair (default) or pvt directory; other assets keep their format.
     #[arg(long, default_value = "pair", value_name = "pair|pvt")]
     live_photo_output: LivePhotoOutput,
@@ -134,6 +137,7 @@ impl ProductConversionArgs {
             ConversionRequest::default()
         };
         request.live_photo_output = self.live_photo_output;
+        request.hdr_profile = self.hdr_profile;
         request
     }
 
@@ -1476,6 +1480,42 @@ mod tests {
         assert!(arguments.product.oppo_compatible);
         let request = arguments.product.request();
         assert!(request.requests_oppo_gallery_compatibility());
+    }
+
+    #[test]
+    fn hdr_profile_is_carried_by_convert_and_batch_and_conflicts_with_editing() {
+        for command in ["convert", "batch"] {
+            let cli = parse(&[
+                command,
+                "--input",
+                "capture.heic",
+                "--hdr-profile",
+                "bt2020-pq",
+            ]);
+            let product = match cli.command {
+                RootCommand::Convert(args) => args.product,
+                RootCommand::Batch(args) => args.product,
+                _ => unreachable!(),
+            };
+            assert_eq!(product.request().hdr_profile, HdrExportProfile::Bt2020Pq);
+            for other in [
+                "--oppo-compatible",
+                "--apple-styles",
+                "--apple-portrait",
+                "--apple-cinematic",
+            ] {
+                assert!(Cli::try_parse_from([
+                    "xdremux",
+                    command,
+                    "--input",
+                    "capture.heic",
+                    "--hdr-profile",
+                    "bt2020-hlg",
+                    other
+                ])
+                .is_err());
+            }
+        }
     }
 
     #[test]

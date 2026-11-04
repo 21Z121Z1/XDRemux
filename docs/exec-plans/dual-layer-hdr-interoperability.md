@@ -1,6 +1,6 @@
 # Dual-layer HDR interoperability work plan
 
-This is an implementation plan. It does not enable a new output mode or claim that any new media profile is supported.
+This plan tracks the explicit BT.2020 dual-layer profiles and the remaining export extensions. The supported CLI behavior and its limits are in [the CLI reference](../cli.en.md).
 
 ## Outcome
 
@@ -54,12 +54,12 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 
 ## Implementation slices
 
-- [ ] A. Typed metadata and independent semantic validator, with malformed-input tests. **In progress:** standalone HEIF `tmap` rational parsing and explicit `validate --semantic` inspect the final item bytes and output `colr`; optional extension schemas and pixel reconstruction remain pending.
-- [ ] B. HEIF profile construction and orientation/association regressions.
-- [ ] C. HDR color reconstruction, source preservation, and numerical round-trip tests.
-- [ ] D. Optional static/dynamic HDR and mapping metadata carriers.
+- [x] A. Checked tone-map, static HDR, and registered metadata payloads. Semantic validation reads final bytes and rejects invalid versions, denominators, channel counts, color declarations, lengths, and associations.
+- [x] B. Explicit HEIF PQ and HLG profiles with common coded dimensions and ordered rotation/mirror transforms. The existing compatibility layout remains the default.
+- [x] C. Relative linear BT.2020 reconstruction from final-file decoded resources, independent numeric references, compressed SDR preservation, and failure preservation checks. Display adaptation is separate.
+- [ ] D. Static HDR and registered dynamic carriers are implemented in the Rust assembly API. Dynamic syntax is checked and source bytes are retained. Additional matrix/LUT mappings and application of dynamic display mapping remain unsupported and fail closed where required.
 - [ ] E. Dual-JFIF output with offset and decode tests.
-- [ ] F. Public CLI documentation and platform-specific acceptance evidence.
+- [ ] F. The English and Chinese CLI contracts describe export, semantic validation, decoded reconstruction, and unsupported source combinations. Native/device acceptance remains a separate evidence layer.
 
 ## Acceptance criteria
 
@@ -87,6 +87,8 @@ Use the repository's existing tests, fixture integrity rules, and exact-HEAD ver
 cargo test --locked -p xdremux-metadata -p xdremux-heif -p xdremux-runtime -p xdremux-cli
 cargo clippy --locked --workspace --all-targets -- --deny warnings
 cargo run --locked -p xdremux-cli -- validate output.heic --semantic --json
+cargo run --locked -p xdremux-cli -- convert --input input.heic --output output.heic --hdr-profile bt2020-pq
+cargo run --locked -p xdremux-cli -- validate output.heic --hdr-profile bt2020-pq --decode-hdr --json
 ```
 
-The semantic check is opt-in and reports graph, numeric tone-map metadata, and declared HDR output color properties. It is **not** a decoded HDR pixel comparison, a cross-device recognition test, or a claim of a complete export profile. Existing output and default validation are unchanged.
+The semantic check is opt-in. The explicit profile check also verifies source colorimetry, coded geometry, ordered orientation, and optional HDR carriers. `--decode-hdr` reconstructs relative linear BT.2020 pixels from the final file and reports decode precision and RGB bounds. Missing optional metadata is reported as missing. These checks do not establish dynamic display adaptation or device recognition. JPEG payload codecs do not provide dual-JFIF output. Existing output and default validation retain their current contracts.

@@ -1,6 +1,6 @@
 use libheif_rs::{
-    Channel, ColorSpace, CompressionFormat, EncoderParameterValue, EncoderQuality, HeifContext,
-    Image, ImageHandle, LibHeif, RgbChroma,
+    Channel, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue, EncoderQuality,
+    HeifContext, Image, ImageHandle, LibHeif, RgbChroma,
 };
 use xdremux_engine::{
     CapabilityInventory, GainMapChannels, GainMapCodec, GainMapCodecLayout,
@@ -24,6 +24,94 @@ pub struct LibHeifProvider;
 impl LibHeifProvider {
     pub const fn new() -> Self {
         Self
+    }
+
+    /// Decode a selected item in coded coordinates, retaining 8..16-bit sample
+    /// precision. Color conversion here only undoes the codec's YCbCr packing;
+    /// ICC/gamut/transfer semantics remain with the caller.
+    pub fn decode_coded_item_normalized(
+        &self,
+        source: &[u8],
+        item_id: u32,
+        channels: u8,
+    ) -> Result<crate::NormalizedRaster> {
+        if !matches!(channels, 1 | 3) {
+            return Err(CodecError::invalid(
+                "normalized decode requires one or three channels",
+            ));
+        }
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
+        let mut options = DecodingOptions::new()
+            .ok_or_else(|| CodecError::invalid("cannot allocate HEIF decoding options"))?;
+        options.set_ignore_transformations(true);
+        options.set_convert_hdr_to_8bit(false);
+        options.set_strict_decoding(true);
+        let space = if channels == 1 {
+            ColorSpace::Monochrome
+        } else {
+            ColorSpace::Rgb(RgbChroma::HdrRgbLe)
+        };
+        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+        let image = lib
+            .decode(&handle, space, Some(options))
+            .map_err(CodecError::libheif)?;
+        let plane = if channels == 1 {
+            image.planes().y
+        } else {
+            image.planes().interleaved
+        }
+        .ok_or_else(|| CodecError::invalid("normalized decoder returned no component plane"))?;
+        if !(8..=16).contains(&plane.bits_per_pixel) {
+            return Err(CodecError::invalid(
+                "unsupported normalized decoder precision",
+            ));
+        }
+        let bytes_per_sample = if channels == 3 || plane.storage_bits_per_pixel > 8 {
+            2
+        } else {
+            1
+        };
+        let row_samples = (image.width() as usize)
+            .checked_mul(usize::from(channels))
+            .ok_or_else(|| CodecError::invalid("normalized row size overflows"))?;
+        let count = row_samples
+            .checked_mul(image.height() as usize)
+            .ok_or_else(|| CodecError::invalid("normalized raster size overflows"))?;
+        let maximum = (1_u32 << plane.bits_per_pixel) - 1;
+        let mut samples = Vec::with_capacity(count);
+        for y in 0..image.height() as usize {
+            let start = y
+                .checked_mul(plane.stride)
+                .ok_or_else(|| CodecError::invalid("normalized plane offset overflows"))?;
+            let row_bytes = row_samples
+                .checked_mul(bytes_per_sample)
+                .ok_or_else(|| CodecError::invalid("normalized row byte size overflows"))?;
+            let row = plane
+                .data
+                .get(start..start + row_bytes)
+                .ok_or_else(|| CodecError::invalid("normalized plane is truncated"))?;
+            for x in 0..row_samples {
+                let value = if bytes_per_sample == 1 {
+                    u32::from(row[x])
+                } else {
+                    u32::from(u16::from_le_bytes([row[x * 2], row[x * 2 + 1]]))
+                };
+                if value > maximum {
+                    return Err(CodecError::invalid(
+                        "decoded component exceeds its bit-depth range",
+                    ));
+                }
+                samples.push(value as f32 / maximum as f32);
+            }
+        }
+        Ok(crate::NormalizedRaster {
+            width: image.width(),
+            height: image.height(),
+            channels,
+            bit_depth: plane.bits_per_pixel,
+            samples,
+        })
     }
 
     /// Extract the primary HEVC item and its dimensions from a complete HEIF.
