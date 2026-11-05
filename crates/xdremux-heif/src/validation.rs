@@ -219,6 +219,48 @@ pub fn primary_sdr_color_space(source: &[u8]) -> Result<xdremux_metadata::SdrCol
     primary_color_space(source, &parse_meta_box(source, header)?)
 }
 
+/// Item ID that `pitm` declares as the primary image.
+pub fn primary_image_item_id(source: &[u8]) -> Result<u32> {
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    Ok(parse_meta_box(source, header)?.primary_item_id)
+}
+
+/// Raw ICC profile that describes the primary image, when the source carries one.
+///
+/// The profile is returned only from properties associated with the primary
+/// image tree. Duplicate profiles are ambiguous and rejected.
+pub fn primary_icc_profile(source: &[u8]) -> Result<Option<Vec<u8>>> {
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, header)?;
+    let mut indices = Vec::new();
+    for id in primary_image_items(&meta)? {
+        for (property, _) in item_properties(&meta, id)? {
+            if property.kind == COLR && !indices.contains(&property.index) {
+                indices.push(property.index);
+            }
+        }
+    }
+    let mut profile = None;
+    for index in indices {
+        let property = meta
+            .properties
+            .iter()
+            .find(|p| p.index == index)
+            .ok_or_else(|| invalid("primary color property is missing"))?;
+        let (raw, h) = property_box(source, property)?;
+        let payload = &raw[h.payload_range()];
+        if matches!(payload.get(..4), Some(b"prof" | b"rICC")) {
+            if profile.is_some() {
+                return Err(invalid("duplicate primary ICC profile"));
+            }
+            profile = Some(payload[4..].to_vec());
+        }
+    }
+    Ok(profile)
+}
+
 /// Validate the explicitly selected SDR-base / BT.2020 alternate profile.
 /// Optional static metadata remains optional; absence is returned as absence.
 /// Decoded pixels, dynamic tone mapping and consumer behavior are separate.

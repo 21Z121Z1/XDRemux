@@ -74,6 +74,32 @@ fn app_segment_bytes(segment: &AppSegment<'_>) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Split an ICC profile into APP2 chunk payloads in carrier order.
+///
+/// Each chunk reserves the identifier, its sequence number and the chunk count
+/// inside the 65,533-byte segment limit.
+pub fn split_icc_app2(profile: &[u8]) -> Result<Vec<Vec<u8>>> {
+    const MAX_CHUNK: usize = MAX_APP_SEGMENT_PAYLOAD - ICC_APP2_IDENTIFIER.len() - 2;
+    if profile.is_empty() {
+        return Err(invalid("ICC profile is empty"));
+    }
+    let count = profile.len().div_ceil(MAX_CHUNK);
+    if count > 255 {
+        return Err(invalid("ICC profile needs more than 255 APP2 chunks"));
+    }
+    Ok(profile
+        .chunks(MAX_CHUNK)
+        .enumerate()
+        .map(|(index, chunk)| {
+            let mut payload = ICC_APP2_IDENTIFIER.to_vec();
+            payload.push(u8::try_from(index + 1).unwrap());
+            payload.push(u8::try_from(count).unwrap());
+            payload.extend_from_slice(chunk);
+            payload
+        })
+        .collect())
+}
+
 /// Offset after the leading JFIF and Adobe APP segments.
 fn injection_offset(image: &JpegImage) -> usize {
     let mut offset = image.range.start + 2;

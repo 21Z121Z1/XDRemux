@@ -98,6 +98,14 @@ xdremux convert --input IMG_001.jpg
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
 
+目标扩展名为 `.jpg` 或 `.jpeg` 时，ProXDR 静态照片使用双层 JPEG 容器。基本图像重新编码为 JPEG，并保留源 ICC 配置文件。增强图像保留采样值，ISO 21496-1 APP2 载体照常写入，MPF 索引描述两幅图像。其他扩展名仍输出 HEIF。
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
+```
+
+JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。请求这些组合时，转换会在发布前失败。`batch` 只输出 HEIF。
+
 ### 产品选项
 
 以下选项适用于 `convert` 和 `batch`。

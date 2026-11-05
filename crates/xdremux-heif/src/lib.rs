@@ -35,9 +35,9 @@ pub use texture::{
     TEXTURE_METADATA_URI,
 };
 pub use validation::{
-    primary_sdr_color_space, validate_gain_map_semantics, validate_gain_map_structure,
-    validate_hdr_gain_map_profile, GainMapSemantics, GainMapStructure, HdrOutputColor,
-    HdrProfileSemantics,
+    primary_icc_profile, primary_image_item_id, primary_sdr_color_space,
+    validate_gain_map_semantics, validate_gain_map_structure, validate_hdr_gain_map_profile,
+    GainMapSemantics, GainMapStructure, HdrOutputColor, HdrProfileSemantics,
 };
 
 pub fn assemble_iso_gain_map_heif(

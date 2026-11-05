@@ -12,6 +12,7 @@ mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
 mod hdr_look;
+mod jpeg_export;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
@@ -83,7 +84,7 @@ use xdremux_engine::{
     execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder, ArtifactPublisher,
     ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan, ConversionRequest,
     ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, HdrExportProfile,
-    OperationCapability, RasterDecoder,
+    OperationCapability, OutputContainer, RasterDecoder,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
@@ -672,7 +673,9 @@ impl PortableRuntime {
             jpeg: &self.jpeg,
             heif: &self.heif,
         };
-        let mut validator = IsoGainMapValidator;
+        let mut validator = IsoGainMapValidator {
+            prepared: &prepared,
+        };
         let mut publisher = MemoryPublisher;
         let receipt = execute_conversion(
             &prepared.analysis,
@@ -709,7 +712,9 @@ impl PortableRuntime {
             jpeg: &self.jpeg,
             heif: &self.heif,
         };
-        let mut validator = IsoGainMapValidator;
+        let mut validator = IsoGainMapValidator {
+            prepared: &prepared,
+        };
         let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
         let receipt = execute_conversion(
             &prepared.analysis,
@@ -839,6 +844,27 @@ fn runtime_execution_error(
     RuntimeError::external("conversion execution", error)
 }
 
+/// Float view of the Gain Map operation that both output containers describe.
+fn gain_map_info_floats(prepared: &PreparedProXdr) -> Vec<f64> {
+    match prepared.extracted.mode {
+        ContainerExtractionMode::Uhdr => prepared.extracted.meta_floats.clone(),
+        ContainerExtractionMode::Lhdr => {
+            make_private_gain_map_info_floats(&prepared.scale).to_vec()
+        }
+    }
+}
+
+/// Gain Map operation metadata that a conversion must declare.
+fn planned_gain_map_metadata(
+    prepared: &PreparedProXdr,
+) -> Result<xdremux_metadata::UltraHdrGainMapMetadata> {
+    let floats = gain_map_info_floats(prepared);
+    let tmap = make_apple_tmap_payload(&floats)
+        .map_err(|error| RuntimeError::external("ISO Gain Map tmap", error))?;
+    xdremux_metadata::parse_heif_tmap_metadata(&tmap)
+        .map_err(|error| RuntimeError::external("ISO Gain Map metadata", error))
+}
+
 struct ProXdrArtifactBuilder<'a> {
     source: &'a [u8],
     prepared: &'a PreparedProXdr,
@@ -871,6 +897,9 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             })
             .map_err(|error| RuntimeError::external("private Gain Map JPEG decode", error))?;
         let raster = self.normalized_gain_map_raster(decoded, plan)?;
+        if plan.container == OutputContainer::Jpeg {
+            return self.build_jpeg_artifact(body, &raster);
+        }
         let encoded = self
             .heif
             .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
@@ -879,12 +908,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             ))
             .map_err(|error| RuntimeError::external("HEVC Gain Map encode", error))?;
 
-        let info_floats = match self.prepared.extracted.mode {
-            ContainerExtractionMode::Uhdr => self.prepared.extracted.meta_floats.clone(),
-            ContainerExtractionMode::Lhdr => {
-                make_private_gain_map_info_floats(&self.prepared.scale).to_vec()
-            }
-        };
+        let info_floats = gain_map_info_floats(self.prepared);
         let tmap_payload = make_apple_tmap_payload(&info_floats)
             .map_err(|error| RuntimeError::external("ISO Gain Map tmap", error))?;
         let xmp_payload = make_hdrgm_xmp(&info_floats)
@@ -945,6 +969,52 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
 }
 
 impl ProXdrArtifactBuilder<'_> {
+    /// Build the two-image JPEG from the preserved HEIF body and the decoded
+    /// Gain Map samples.
+    fn build_jpeg_artifact(&self, body: &[u8], raster: &Raster8) -> Result<Vec<u8>> {
+        let geometry = xdremux_heif::primary_coded_geometry(body)
+            .map_err(|error| RuntimeError::external("JPEG output geometry", error))?;
+        if geometry.quarter_turns_ccw != 0 || geometry.mirror_axis.is_some() {
+            return Err(RuntimeError::new(
+                "JPEG output",
+                "JPEG output requires identity orientation; the source declares a rotation or mirror",
+            ));
+        }
+        let metadata = planned_gain_map_metadata(self.prepared)?;
+        let base_icc = xdremux_heif::primary_icc_profile(body)
+            .map_err(|error| RuntimeError::external("JPEG base ICC", error))?;
+        if base_icc.is_none()
+            && xdremux_heif::primary_sdr_color_space(body)
+                .map_err(|error| RuntimeError::external("JPEG base color", error))?
+                != xdremux_metadata::SdrColorSpace::Srgb
+        {
+            return Err(RuntimeError::new(
+                "JPEG output",
+                "a non-sRGB base requires a source ICC profile, which the source does not carry",
+            ));
+        }
+        let exif_tiff = xdremux_format::heif_exif_tiff(body)
+            .map_err(|error| RuntimeError::external("JPEG Exif", error))?;
+        if let Some(tiff) = &exif_tiff {
+            let orientation = xdremux_format::exif::parse_heif_exif_orientation(tiff)
+                .map_err(|error| RuntimeError::external("JPEG Exif orientation", error))?;
+            if orientation != xdremux_format::Orientation::Normal {
+                return Err(RuntimeError::new(
+                    "JPEG output",
+                    "JPEG output requires a normal Exif orientation",
+                ));
+            }
+        }
+        jpeg_export::build_dual_layer_jpeg(
+            self.heif,
+            body,
+            raster,
+            &metadata,
+            base_icc.as_deref(),
+            exif_tiff.as_deref(),
+        )
+    }
+
     fn normalized_gain_map_raster(
         &self,
         decoded: Raster8,
@@ -1072,13 +1142,17 @@ fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
     })
 }
 
-#[derive(Debug, Clone, Copy)]
-struct IsoGainMapValidator;
+struct IsoGainMapValidator<'a> {
+    prepared: &'a PreparedProXdr,
+}
 
-impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
+impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator<'_> {
     type Error = RuntimeError;
 
     fn validate_artifact(&mut self, plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
+        if plan.container == OutputContainer::Jpeg {
+            return validate_dual_layer_jpeg_artifact(self.prepared, artifact);
+        }
         if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
             xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)
                 .map(|_| ())
@@ -1090,6 +1164,84 @@ impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
         }
         verify_published_hdr_metadata(plan, artifact)
     }
+}
+
+/// Compare the numeric Gain Map operation values of two declarations.
+fn same_gain_map_values(
+    observed: &xdremux_metadata::UltraHdrGainMapMetadata,
+    expected: &xdremux_metadata::UltraHdrGainMapMetadata,
+) -> bool {
+    observed.gain_map_min == expected.gain_map_min
+        && observed.gain_map_max == expected.gain_map_max
+        && observed.gamma == expected.gamma
+        && observed.offset_sdr == expected.offset_sdr
+        && observed.offset_hdr == expected.offset_hdr
+        && observed.hdr_capacity_min == expected.hdr_capacity_min
+        && observed.hdr_capacity_max == expected.hdr_capacity_max
+        && observed.channel_count == expected.channel_count
+}
+
+/// Read the published two-image JPEG back: carriers, metadata and both decodes.
+fn validate_dual_layer_jpeg_artifact(prepared: &PreparedProXdr, artifact: &[u8]) -> Result<()> {
+    let index = xdremux_format::dual_jpeg::index_dual_layer_jpeg(artifact)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG validation", error))?;
+    if !index.base_has_iso_declaration || !index.gain_map_has_iso_parameters {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG validation",
+            "the published file does not declare the ISO 21496-1 carriers",
+        ));
+    }
+    let expected = planned_gain_map_metadata(prepared)?;
+    let gain_bytes = artifact
+        .get(index.gain_map.range.clone())
+        .ok_or_else(|| RuntimeError::new("dual-layer JPEG validation", "gain-map range"))?;
+    let observed = xdremux_metadata::parse_ultrahdr_gain_map_metadata(gain_bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG metadata", error))?
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "dual-layer JPEG validation",
+                "the published gain-map image declares no metadata",
+            )
+        })?;
+    if !same_gain_map_values(&observed, &expected) {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG validation",
+            "the published gain-map metadata does not match the source operation",
+        ));
+    }
+    if !observed.use_base_color_space {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG validation",
+            "JPEG output must declare the base application space",
+        ));
+    }
+    let decoder = ZuneJpegProvider::new();
+    decoder
+        .decode_raster(&JpegRasterDecodeRequest {
+            data: artifact
+                .get(index.base.range.clone())
+                .ok_or_else(|| RuntimeError::new("dual-layer JPEG validation", "base image range"))?
+                .to_vec(),
+            format: RasterPixelFormat::Rgb8,
+        })
+        .map_err(|error| RuntimeError::external("dual-layer JPEG base decode", error))?;
+    let gain_format = match index.gain_map.frame.component_count() {
+        1 => RasterPixelFormat::Mono8,
+        3 => RasterPixelFormat::Rgb8,
+        count => {
+            return Err(RuntimeError::new(
+                "dual-layer JPEG validation",
+                format!("the gain-map image has {count} components"),
+            ))
+        }
+    };
+    decoder
+        .decode_raster(&JpegRasterDecodeRequest {
+            data: gain_bytes.to_vec(),
+            format: gain_format,
+        })
+        .map_err(|error| RuntimeError::external("dual-layer JPEG gain-map decode", error))?;
+    Ok(())
 }
 
 /// Read the published bytes back and compare their HDR metadata carriers with
@@ -1264,6 +1416,7 @@ mod tests {
         let plan = ConversionPlan {
             hdr_profile: HdrExportProfile::Compatible,
             output: OutputIntent::Standard,
+            container: OutputContainer::Heif,
             gain_map_target: xdremux_engine::GainMapEncodeProfile {
                 width: 1,
                 height: 1,

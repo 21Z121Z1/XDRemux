@@ -527,6 +527,21 @@ fn run_inspect(
     0
 }
 
+/// Select the output container from the requested file extension.
+///
+/// Every other extension keeps the historical HEIF output, so an existing
+/// command that writes an unusual suffix keeps its behavior.
+fn container_for_output(output: &Path) -> xdremux_engine::OutputContainer {
+    match output.extension().and_then(|value| value.to_str()) {
+        Some(extension)
+            if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") =>
+        {
+            xdremux_engine::OutputContainer::Jpeg
+        }
+        _ => xdremux_engine::OutputContainer::Heif,
+    }
+}
+
 fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf {
     let extension = match format {
         LivePhotoOutput::Pair => "heic",
@@ -731,6 +746,10 @@ fn run_convert(
                 }
             }
             let output = output.unwrap_or_else(|| input.clone());
+            let request = ConversionRequest {
+                container: container_for_output(&output),
+                ..request
+            };
             if apple_portrait {
                 #[cfg(target_os = "macos")]
                 {

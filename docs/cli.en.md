@@ -101,6 +101,14 @@ xdremux convert --input IMG_001.jpg
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
 
+A `.jpg` or `.jpeg` destination selects the two-image JPEG container for a ProXDR still. The primary image is re-encoded as JPEG and keeps the source ICC profile. The gain map keeps its samples and the ISO 21496-1 APP2 carriers. An MPF index describes both images. Every other destination extension keeps HEIF output.
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
+```
+
+JPEG output requires identity orientation and cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources. A conversion that requests one of these fails before publication. `batch` writes HEIF output only.
+
 ### Product options
 
 The following options are available to both `convert` and `batch`.

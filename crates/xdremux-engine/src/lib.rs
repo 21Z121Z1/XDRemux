@@ -137,6 +137,26 @@ impl std::str::FromStr for HdrExportProfile {
     }
 }
 
+/// Output container selected for a conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputContainer {
+    #[default]
+    Heif,
+    /// Two-image JPEG with an MPF index and ISO 21496-1 APP2 carriers.
+    Jpeg,
+}
+
+impl std::str::FromStr for OutputContainer {
+    type Err = &'static str;
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "heif" => Ok(Self::Heif),
+            "jpeg" => Ok(Self::Jpeg),
+            _ => Err("output container must be heif or jpeg"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AppleFeatureRequest {
     pub photographic_styles: bool,
@@ -174,6 +194,7 @@ impl std::str::FromStr for LivePhotoOutput {
 pub struct ConversionRequest {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
+    pub container: OutputContainer,
     pub apple_features: AppleFeatureRequest,
     pub live_photo_output: LivePhotoOutput,
 }
@@ -187,6 +208,7 @@ impl ConversionRequest {
         Self {
             output: OutputIntent::OppoGallery,
             hdr_profile: HdrExportProfile::Compatible,
+            container: OutputContainer::Heif,
             live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
@@ -342,6 +364,7 @@ impl HdrMetadataPlan {
 pub struct ConversionPlan {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
+    pub container: OutputContainer,
     pub gain_map_target: GainMapEncodeProfile,
     pub hdr_metadata: HdrMetadataPlan,
     pub required_capabilities: Vec<OperationCapability>,
@@ -477,6 +500,24 @@ pub fn plan_conversion(
         ));
     }
 
+    if request.container == OutputContainer::Jpeg {
+        if request.hdr_profile != HdrExportProfile::Compatible {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output describes the alternate image from the base colorimetry; explicit BT.2020 profiles apply to HEIF output",
+            ));
+        }
+        if request.requests_oppo_gallery_compatibility() {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output cannot carry the OPPO camera tail",
+            ));
+        }
+        if request.apple_features.any() {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output cannot carry Apple editing resources",
+            ));
+        }
+    }
+
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -517,6 +558,7 @@ pub fn plan_conversion(
     Ok(ConversionPlan {
         output: request.output,
         hdr_profile: request.hdr_profile,
+        container: request.container,
         gain_map_target,
         hdr_metadata,
         required_capabilities,
