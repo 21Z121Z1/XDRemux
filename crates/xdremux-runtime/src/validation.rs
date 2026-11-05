@@ -2,6 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use xdremux_codec::{JpegRasterDecodeRequest, RasterPixelFormat, ZuneJpegProvider};
+use xdremux_engine::RasterDecoder;
+use xdremux_format::dual_jpeg::{index_dual_layer_jpeg, DualLayerJpegIndex};
 use xdremux_format::ChromaSampling;
 use xdremux_heif::{validate_gain_map_semantics, validate_gain_map_structure, HdrOutputColor};
 use xdremux_motion_photo::{apple, companion_video_path, Input, MotionPhoto, ParseOptions};
@@ -136,6 +139,211 @@ fn reconstruct_hdr_pixels(
     Ok((image, base.bit_depth, gain.bit_depth))
 }
 
+/// Decode both images of a two-image JPEG and reconstruct relative linear
+/// BT.2020 RGB with the declared Gain Map operation.
+///
+/// The base is interpreted with the JPEG ICC profile, or sRGB when the file has
+/// none. No display transform is applied.
+pub fn reconstruct_dual_layer_jpeg_hdr(bytes: &[u8]) -> Result<xdremux_hdr::SceneLinearRgb> {
+    let index = index_dual_layer_jpeg(bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG structure", error))?;
+    let decoder = ZuneJpegProvider::new();
+    let base = decoder
+        .decode_raster(&JpegRasterDecodeRequest {
+            data: jpeg_range(bytes, &index.base.range, "primary image")?,
+            format: RasterPixelFormat::Rgb8,
+        })
+        .map_err(|error| RuntimeError::external("dual-layer JPEG base decode", error))?;
+    let gain_bytes = jpeg_range(bytes, &index.gain_map.range, "gain-map image")?;
+    let gain_format = match index.gain_map.frame.component_count() {
+        1 => RasterPixelFormat::Mono8,
+        3 => RasterPixelFormat::Rgb8,
+        count => {
+            return Err(RuntimeError::new(
+                "dual-layer JPEG structure",
+                format!("the gain-map image has {count} components"),
+            ))
+        }
+    };
+    let gain = decoder
+        .decode_raster(&JpegRasterDecodeRequest {
+            data: gain_bytes.clone(),
+            format: gain_format,
+        })
+        .map_err(|error| RuntimeError::external("dual-layer JPEG gain-map decode", error))?;
+    let metadata = xdremux_metadata::parse_ultrahdr_gain_map_metadata(&gain_bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG metadata", error))?
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "dual-layer JPEG metadata",
+                "the gain-map image declares no metadata",
+            )
+        })?;
+    let icc = index
+        .base
+        .icc_profile(bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG ICC", error))?;
+    let base_space = match icc.as_deref() {
+        Some(profile) => xdremux_metadata::identify_sdr_color_space(Some(profile), None)
+            .map_err(|error| RuntimeError::external("dual-layer JPEG ICC", error))?,
+        None => xdremux_metadata::SdrColorSpace::Srgb,
+    };
+
+    let width = usize::try_from(base.width)
+        .map_err(|_| RuntimeError::new("dual-layer JPEG base decode", "width exceeds usize"))?;
+    let height = usize::try_from(base.height)
+        .map_err(|_| RuntimeError::new("dual-layer JPEG base decode", "height exceeds usize"))?;
+    let mut samples = Vec::with_capacity(width * height * 3);
+    for row in 0..height {
+        let start = row
+            .checked_mul(base.bytes_per_row)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG base decode", "row offset"))?;
+        let end = start
+            .checked_add(width * 3)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG base decode", "row end"))?;
+        let slice = base
+            .data
+            .get(start..end)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG base decode", "row samples"))?;
+        for value in slice {
+            samples.push(xdremux_hdr::decode_srgb(f64::from(*value) / 255.0) as f32);
+        }
+    }
+    let gain_channels = match gain.format {
+        RasterPixelFormat::Mono8 => 1usize,
+        RasterPixelFormat::Rgb8 => 3usize,
+    };
+    let gain_width = usize::try_from(gain.width)
+        .map_err(|_| RuntimeError::new("dual-layer JPEG gain-map decode", "width exceeds usize"))?;
+    let gain_height = usize::try_from(gain.height).map_err(|_| {
+        RuntimeError::new("dual-layer JPEG gain-map decode", "height exceeds usize")
+    })?;
+    let mut gain_samples = Vec::with_capacity(gain_width * gain_height * gain_channels);
+    for row in 0..gain_height {
+        let start = row
+            .checked_mul(gain.bytes_per_row)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG gain-map decode", "row offset"))?;
+        let end = start
+            .checked_add(gain_width * gain_channels)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG gain-map decode", "row end"))?;
+        let slice = gain
+            .data
+            .get(start..end)
+            .ok_or_else(|| RuntimeError::new("dual-layer JPEG gain-map decode", "row samples"))?;
+        for value in slice {
+            gain_samples.push(f32::from(*value) / 255.0);
+        }
+    }
+
+    xdremux_hdr::reconstruct_bt2020_hdr(
+        &xdremux_hdr::SceneLinearRgb {
+            width,
+            height,
+            samples,
+        },
+        xdremux_hdr::GainMapSamples {
+            width: gain_width,
+            height: gain_height,
+            channels: gain_channels,
+            data: &gain_samples,
+        },
+        &metadata,
+        base_space,
+    )
+    .map_err(|error| RuntimeError::external("dual-layer JPEG reconstruction", error))
+}
+
+fn jpeg_range(
+    bytes: &[u8],
+    range: &std::ops::Range<usize>,
+    context: &'static str,
+) -> Result<Vec<u8>> {
+    bytes
+        .get(range.clone())
+        .map(|slice| slice.to_vec())
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "dual-layer JPEG structure",
+                format!("{context} is outside the file"),
+            )
+        })
+}
+
+fn decoded_hdr_report(image: &xdremux_hdr::SceneLinearRgb) -> DecodedHdrReport {
+    let mut minimum_rgb = [f32::INFINITY; 3];
+    let mut maximum_rgb = [f32::NEG_INFINITY; 3];
+    for pixel in image.samples.as_chunks::<3>().0 {
+        for channel in 0..3 {
+            minimum_rgb[channel] = minimum_rgb[channel].min(pixel[channel]);
+            maximum_rgb[channel] = maximum_rgb[channel].max(pixel[channel]);
+        }
+    }
+    DecodedHdrReport {
+        width: image.width,
+        height: image.height,
+        base_decode_bit_depth: 8,
+        gain_map_decode_bit_depth: 8,
+        color_space: "linear-bt2020",
+        sample_units: "relative-to-sdr-white",
+        minimum_rgb,
+        maximum_rgb,
+    }
+}
+
+/// Validate a two-image JPEG and optionally decode its reconstructed pixels.
+pub fn validate_dual_layer_jpeg(
+    input: &Path,
+    bytes: &[u8],
+    decode_pixels: bool,
+) -> Result<DualLayerJpegValidationReport> {
+    let index: DualLayerJpegIndex = index_dual_layer_jpeg(bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG structure", error))?;
+    if !index.base_has_iso_declaration {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG structure",
+            "the primary image does not declare ISO 21496-1 metadata",
+        ));
+    }
+    if !index.gain_map_has_iso_parameters {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG structure",
+            "the gain-map image does not carry ISO 21496-1 parameters",
+        ));
+    }
+    let gain_bytes = jpeg_range(bytes, &index.gain_map.range, "gain-map image")?;
+    let metadata = xdremux_metadata::parse_ultrahdr_gain_map_metadata(&gain_bytes)
+        .map_err(|error| RuntimeError::external("dual-layer JPEG metadata", error))?
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "dual-layer JPEG metadata",
+                "the gain-map image declares no metadata",
+            )
+        })?;
+    let decoded_hdr = if decode_pixels {
+        Some(decoded_hdr_report(&reconstruct_dual_layer_jpeg_hdr(bytes)?))
+    } else {
+        None
+    };
+    Ok(DualLayerJpegValidationReport {
+        input: input.to_path_buf(),
+        base_width: index.base.frame.width,
+        base_height: index.base.frame.height,
+        base_components: index.base.frame.component_count(),
+        gain_map_width: index.gain_map.frame.width,
+        gain_map_height: index.gain_map.frame.height,
+        gain_map_components: index.gain_map.frame.component_count(),
+        mp_image_count: index.mp.image_count,
+        base_iso_declaration: index.base_has_iso_declaration,
+        gain_map_iso_parameters: index.gain_map_has_iso_parameters,
+        base_icc_present: index.base_has_icc,
+        parameter_sets: metadata.channel_count,
+        use_base_color_space: metadata.use_base_color_space,
+        base_headroom_stops: metadata.hdr_capacity_min,
+        alternate_headroom_stops: metadata.hdr_capacity_max,
+        decoded_hdr,
+    })
+}
+
 /// Decode the final container and reconstruct its alternate as relative linear
 /// BT.2020 RGB. This does not apply a display OOTF or dynamic tone mapping.
 pub fn reconstruct_hdr_gain_map(
@@ -160,6 +368,7 @@ pub struct LivePhotoValidationReport {
 #[serde(tag = "kind", content = "value", rename_all = "kebab-case")]
 pub enum ValidationReport {
     IsoHdrHeif(IsoHdrValidationReport),
+    DualLayerJpeg(DualLayerJpegValidationReport),
     LivePhoto(LivePhotoValidationReport),
 }
 
@@ -167,9 +376,32 @@ impl ValidationReport {
     pub const fn kind(&self) -> &'static str {
         match self {
             Self::IsoHdrHeif(_) => "iso-hdr-heif",
+            Self::DualLayerJpeg(_) => "dual-layer-jpeg",
             Self::LivePhoto(_) => "live-photo",
         }
     }
+}
+
+/// Structure, carriers and optional reconstructed pixels of a two-image JPEG.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DualLayerJpegValidationReport {
+    pub input: PathBuf,
+    pub base_width: u16,
+    pub base_height: u16,
+    pub base_components: u8,
+    pub gain_map_width: u16,
+    pub gain_map_height: u16,
+    pub gain_map_components: u8,
+    pub mp_image_count: u32,
+    pub base_iso_declaration: bool,
+    pub gain_map_iso_parameters: bool,
+    pub base_icc_present: bool,
+    pub parameter_sets: u8,
+    pub use_base_color_space: bool,
+    pub base_headroom_stops: f64,
+    pub alternate_headroom_stops: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decoded_hdr: Option<DecodedHdrReport>,
 }
 
 fn chroma_sampling_name(value: ChromaSampling) -> &'static str {
@@ -372,12 +604,15 @@ pub fn validate_media_file_with_profile(
 ) -> Result<ValidationReport> {
     if profile != GainMapValidationProfile::Structure
         && !input.extension().is_some_and(|value| {
-            value.eq_ignore_ascii_case("heic") || value.eq_ignore_ascii_case("heif")
+            value.eq_ignore_ascii_case("heic")
+                || value.eq_ignore_ascii_case("heif")
+                || value.eq_ignore_ascii_case("jpg")
+                || value.eq_ignore_ascii_case("jpeg")
         })
     {
         return Err(RuntimeError::new(
             "ISO HDR HEIF semantics",
-            "semantic validation requires a standalone HEIC/HEIF input",
+            "semantic validation requires a standalone HEIC/HEIF or two-image JPEG input",
         ));
     }
     if input
@@ -402,10 +637,25 @@ pub fn validate_media_file_with_profile(
         let image = companion_still_path(input)?;
         return validate_live_photo_pair(input, &image, input, None);
     }
+    if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        if matches!(profile, GainMapValidationProfile::Bt2020 { .. }) {
+            return Err(RuntimeError::new(
+                "dual-layer JPEG validation",
+                "an explicit BT.2020 profile describes HEIF output, not a two-image JPEG",
+            ));
+        }
+        let bytes = read_file(input, "dual-layer JPEG read")?;
+        let decode_pixels = profile == GainMapValidationProfile::Semantics;
+        return Ok(ValidationReport::DualLayerJpeg(validate_dual_layer_jpeg(
+            input,
+            &bytes,
+            decode_pixels,
+        )?));
+    }
     if !extension.eq_ignore_ascii_case("heic") && !extension.eq_ignore_ascii_case("heif") {
         return Err(RuntimeError::new(
             "media validation",
-            "validate currently accepts ISO HDR HEIC/HEIF or a Live Photo HEIC/HEIF/MOV pair",
+            "validate currently accepts ISO HDR HEIC/HEIF, a two-image JPEG, or a Live Photo HEIC/HEIF/MOV pair",
         ));
     }
 

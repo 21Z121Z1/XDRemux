@@ -249,9 +249,13 @@ xdremux validate output.mov --json
 xdremux validate capture.pvt --json
 ```
 
-The positional `INPUT` is required. Plain validation recognizes supported ISO HDR HEIF, either member of a Live Photo pair, or a three-member PVT directory. It checks the corresponding media, pairing, and timing contract.
+The positional `INPUT` is required. Plain validation recognizes supported ISO HDR HEIF, a two-image JPEG, either member of a Live Photo pair, or a three-member PVT directory. It checks the corresponding media, pairing, and timing contract.
 
-`--semantic` additionally checks the final HEIF's numeric tone-map metadata and declared alternate color encoding. It rejects contradictory metadata and image channel counts. `--hdr-profile bt2020-pq` or `bt2020-hlg` also checks the selected color encoding, source colorimetry, coded dimensions, ordered orientation properties, and any supported HDR metadata carriers. These options apply to standalone HEIF files.
+A two-image JPEG is checked for two complete images, an MPF index that reaches both real image boundaries, the primary ISO declaration, and the gain-map ISO parameters. The report gives both image geometries, the parameter-set count, and the declared headrooms.
+
+`--semantic` additionally checks the final HEIF's numeric tone-map metadata and declared alternate color encoding. It rejects contradictory metadata and image channel counts. `--hdr-profile bt2020-pq` or `bt2020-hlg` also checks the selected color encoding, source colorimetry, coded dimensions, ordered orientation properties, and any supported HDR metadata carriers. `--hdr-profile` applies to standalone HEIF files.
+
+`--semantic` on a two-image JPEG decodes both images and reports the reconstructed relative linear BT.2020 range. `--hdr-profile` and `--decode-hdr` apply to standalone HEIF files only.
 
 `--decode-hdr` requires `--hdr-profile`. It decodes the final base and Gain Map without reducing component precision to eight bits. The decoder keeps coded coordinates. Reconstruction inverts Gain Map gamma before co-sited bilinear interpolation, applies gains and offsets in the declared application primaries, and converts to linear BT.2020. The JSON report gives actual decode precision and minimum and maximum relative RGB values. Negative gamut-conversion values are retained.
 

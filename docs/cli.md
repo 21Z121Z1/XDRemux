@@ -246,9 +246,13 @@ xdremux validate output.mov --json
 xdremux validate capture.pvt --json
 ```
 
-位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
+位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、双层 JPEG、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
 
-`--semantic` 额外检查最终 HEIF 中的数值色调映射元数据和替代图像色彩编码声明，并拒绝矛盾的元数据与图像通道数。`--hdr-profile bt2020-pq` 或 `bt2020-hlg` 还检查所选色彩编码、源色彩信息、编码尺寸、方向属性顺序，以及存在的受支持 HDR 元数据载荷。这些选项适用于独立 HEIF 文件。
+双层 JPEG 验证检查两幅完整图像、指向两幅真实图像边界的 MPF 索引、基本图像的 ISO 声明，以及增强图像的 ISO 参数。报告给出两幅图像的几何、参数组数量和声明的档位。
+
+`--semantic` 额外检查最终 HEIF 中的数值色调映射元数据和替代图像色彩编码声明，并拒绝矛盾的元数据与图像通道数。`--hdr-profile bt2020-pq` 或 `bt2020-hlg` 还检查所选色彩编码、源色彩信息、编码尺寸、方向属性顺序，以及存在的受支持 HDR 元数据载荷。`--hdr-profile` 适用于独立 HEIF 文件。
+
+对双层 JPEG 使用 `--semantic` 会解码两幅图像并报告相对线性 BT.2020 重建范围。`--hdr-profile` 与 `--decode-hdr` 仅适用于独立 HEIF 文件。
 
 `--decode-hdr` 需要 `--hdr-profile`。它从最终文件解码基础图像与 Gain Map，保留分量精度，不降低至八位。解码器保留编码坐标。重建先对 Gain Map 反伽马，再做共位双线性插值，在声明的应用色域中处理增益与偏移量，最后转换至线性 BT.2020。JSON 报告实际解码精度及相对 RGB 的最小值和最大值，并保留色域转换产生的负分量。
 

@@ -102,3 +102,56 @@ fn a_jpeg_destination_refuses_an_explicit_bt2020_profile() {
     );
     fs::remove_dir_all(work).ok();
 }
+
+#[test]
+fn validate_reports_a_published_two_image_jpeg() {
+    let work = unique_dir();
+    fs::create_dir_all(&work).expect("temporary directory");
+    let input = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
+    let output = work.join("converted.jpg");
+    let (code, _, stderr) = convert(&input, &output, &[]);
+    assert_eq!(code, 0, "conversion failed: {stderr}");
+
+    let run_validate = |extra: &[&str]| {
+        let mut args = vec![
+            OsString::from("validate"),
+            path_arg(&output),
+            OsString::from("--json"),
+        ];
+        args.extend(extra.iter().map(OsString::from));
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let code = xdremux_cli::run_from(args, &mut stdout, &mut stderr);
+        (
+            code,
+            String::from_utf8(stdout).expect("validation JSON must be UTF-8"),
+            String::from_utf8_lossy(&stderr).into_owned(),
+        )
+    };
+
+    let (code, stdout, stderr) = run_validate(&[]);
+    assert_eq!(code, 0, "validation failed: {stderr}");
+    let document: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
+    assert_eq!(document["valid"], true);
+    assert_eq!(document["kind"], "dual-layer-jpeg");
+    assert_eq!(document["details"]["value"]["mp_image_count"], 2);
+    assert_eq!(document["details"]["value"]["base_iso_declaration"], true);
+    assert_eq!(
+        document["details"]["value"]["gain_map_iso_parameters"],
+        true
+    );
+    assert_eq!(document["details"]["value"]["base_icc_present"], true);
+    assert!(document["details"]["value"].get("decoded_hdr").is_none());
+
+    let (code, stdout, stderr) = run_validate(&["--semantic"]);
+    assert_eq!(code, 0, "semantic validation failed: {stderr}");
+    let document: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
+    let decoded = &document["details"]["value"]["decoded_hdr"];
+    assert!(
+        decoded.is_object(),
+        "semantic validation must decode pixels"
+    );
+    assert_eq!(decoded["color_space"], "linear-bt2020");
+
+    fs::remove_dir_all(work).ok();
+}

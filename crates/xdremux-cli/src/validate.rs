@@ -146,6 +146,92 @@ fn write_human(
             }
             Ok(())
         }
+        ValidationReport::DualLayerJpeg(value) => {
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "valid: dual-layer-jpeg",
+                    "验证通过：dual-layer-jpeg"
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(language, "input: {}", "输入：{}", value.input.display())
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "base: {}x{} components={}",
+                    "基本图像：{}x{} 分量数={}",
+                    value.base_width,
+                    value.base_height,
+                    value.base_components
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "gain-map: {}x{} components={}",
+                    "增强图像：{}x{} 分量数={}",
+                    value.gain_map_width,
+                    value.gain_map_height,
+                    value.gain_map_components
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(language, "images: {}", "图像数：{}", value.mp_image_count)
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "metadata: parameter-sets={} base-space={} base-stops={} alternate-stops={}",
+                    "元数据：参数组={} 基础色域={} 基础档位={} 增强档位={}",
+                    value.parameter_sets,
+                    value.use_base_color_space,
+                    value.base_headroom_stops,
+                    value.alternate_headroom_stops
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "carriers: iso-declaration={} iso-parameters={} base-icc={}",
+                    "载体：ISO 声明={} ISO 参数={} 基本图像 ICC={}",
+                    value.base_iso_declaration,
+                    value.gain_map_iso_parameters,
+                    value.base_icc_present
+                )
+            )?;
+            if let Some(decoded) = &value.decoded_hdr {
+                writeln!(
+                    output,
+                    "{}",
+                    message!(
+                        language,
+                        "decoded-hdr: {}x{} linear-bt2020 min={:?} max={:?}",
+                        "HDR 重建：{}x{} linear-bt2020 最小值={:?} 最大值={:?}",
+                        decoded.width,
+                        decoded.height,
+                        decoded.minimum_rgb,
+                        decoded.maximum_rgb
+                    )
+                )?;
+            }
+            Ok(())
+        }
         ValidationReport::LivePhoto(value) => {
             writeln!(
                 output,
