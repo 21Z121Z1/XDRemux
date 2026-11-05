@@ -1,8 +1,9 @@
 //! HEIF base plus Gain Map to a two-image JPEG.
 //!
-//! The primary image is re-encoded as JPEG and the Gain Map keeps its decoded
-//! samples. The ISO 21496-1 APP2 carriers and the MPF index describe the pair;
-//! the base ICC profile is preserved so the SDR image keeps its colorimetry.
+//! Both images are re-encoded as eight-bit JPEG. The Gain Map retains its
+//! dimensions and declared operation, not exact decoded sample values. The ISO
+//! 21496-1 APP2 carriers and the MPF index describe the pair; the base ICC
+//! profile is preserved so the SDR image keeps its colorimetry.
 use xdremux_codec::{LibHeifProvider, Raster8, RasterPixelFormat};
 use xdremux_format::dual_jpeg::{
     assemble_dual_layer_jpeg, split_icc_app2, AppSegment, DualLayerJpegAssembly,
@@ -60,7 +61,10 @@ fn packed_samples(raster: &Raster8) -> Result<Vec<u8>> {
         .ok_or_else(|| RuntimeError::new("JPEG encode", "row length overflows"))?;
     let height = usize::try_from(raster.height)
         .map_err(|_| RuntimeError::new("JPEG encode", "height exceeds usize"))?;
-    let mut packed = Vec::with_capacity(row_bytes * height);
+    let capacity = row_bytes
+        .checked_mul(height)
+        .ok_or_else(|| RuntimeError::new("JPEG encode", "raster byte count overflows"))?;
+    let mut packed = Vec::with_capacity(capacity);
     for row in 0..height {
         let start = row
             .checked_mul(raster.bytes_per_row)
@@ -224,4 +228,21 @@ pub(crate) fn build_dual_layer_jpeg(
         gain_segments: &gain_app,
     })
     .map_err(|error| external("dual-layer JPEG assembly", error))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packing_refuses_unrepresentable_dimensions_without_panicking() {
+        let raster = Raster8 {
+            width: u32::MAX,
+            height: u32::MAX,
+            bytes_per_row: usize::MAX,
+            format: RasterPixelFormat::Rgb8,
+            data: Vec::new(),
+        };
+        assert!(packed_samples(&raster).is_err());
+    }
 }

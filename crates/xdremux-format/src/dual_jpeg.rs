@@ -428,6 +428,12 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
                     "primary ISO APP2 must declare only the four-byte version",
                 ));
             }
+            if u16::from_be_bytes([payload[0], payload[1]]) != 0 {
+                return Err(invalid("unsupported primary ISO APP2 minimum version"));
+            }
+            if iso_declaration {
+                return Err(invalid("primary image has duplicate ISO APP2 declarations"));
+            }
             iso_declaration = true;
         } else if payload.starts_with(ICC_APP2_IDENTIFIER) {
             icc = true;
@@ -469,6 +475,9 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
                 return Err(invalid(
                     "gain-map ISO APP2 must carry parameters after its version",
                 ));
+            }
+            if gain_iso {
+                return Err(invalid("gain-map image has duplicate ISO APP2 parameters"));
             }
             gain_iso = true;
         } else if payload.starts_with(ICC_APP2_IDENTIFIER) {
@@ -929,6 +938,60 @@ mod tests {
         let index = index_dual_layer_jpeg(&registered_bytes).unwrap();
         assert_eq!(index.registered_offsets, Some(offsets));
         assert_eq!(index.registered_app8_start.unwrap() + offsets.raw as usize, index.gain_map.range.start);
+    }
+
+    #[test]
+    fn index_rejects_unsupported_or_duplicate_iso_app2_declarations() {
+        let base = jpeg(true, &[0x11]);
+        let gain = jpeg(true, &[0x22]);
+        let base_iso = iso_base();
+        let gain_iso = iso_gain();
+        let primary = [AppSegment {
+            marker: 0xe2,
+            payload: &base_iso,
+        }];
+        let secondary = [AppSegment {
+            marker: 0xe2,
+            payload: &gain_iso,
+        }];
+        let bytes = assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+            base: &base,
+            gain_map: &gain,
+            base_segments: &primary,
+            gain_segments: &secondary,
+        })
+        .unwrap();
+        let index = index_dual_layer_jpeg(&bytes).unwrap();
+        let primary_version = index
+            .base
+            .segments
+            .iter()
+            .find(|segment| {
+                segment.marker == 0xe2
+                    && bytes[segment.payload.clone()]
+                        .starts_with(ISO_GAIN_MAP_APP2_IDENTIFIER)
+            })
+            .unwrap()
+            .payload
+            .start
+            + ISO_GAIN_MAP_APP2_IDENTIFIER.len();
+        let mut unsupported = bytes.clone();
+        unsupported[primary_version + 1] = 1;
+        assert!(index_dual_layer_jpeg(&unsupported).is_err());
+
+        for (primary_segments, gain_segments) in [
+            (vec![primary[0], primary[0]], vec![secondary[0]]),
+            (vec![primary[0]], vec![secondary[0], secondary[0]]),
+        ] {
+            let duplicate = assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+                base: &base,
+                gain_map: &gain,
+                base_segments: &primary_segments,
+                gain_segments: &gain_segments,
+            })
+            .unwrap();
+            assert!(index_dual_layer_jpeg(&duplicate).is_err());
+        }
     }
 
     #[test]
