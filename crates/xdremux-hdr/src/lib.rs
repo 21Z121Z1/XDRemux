@@ -1,8 +1,15 @@
 #![forbid(unsafe_code)]
 
+mod additional_mapping;
 mod display_family;
 mod display_methods;
+mod display_target;
 mod dual_layer;
+pub use additional_mapping::{AdditionalMapping, DomainPolicy, RgbLut3d, MAX_LUT_EDGE};
+pub use display_target::{
+    calibrate_relative_linear, encode_pq_nits, relative_linear_to_pq, AbsoluteDisplayTarget,
+    CalibrationReport, PQ_PEAK_NITS,
+};
 pub use dual_layer::{
     decode_hlg, decode_pq, decode_srgb, encode_hlg, encode_pq, reconstruct_bt2020_hdr,
     sdr_linear_to_bt2020, GainMapSamples,
