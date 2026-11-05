@@ -25,7 +25,10 @@ pub(crate) fn read_registered_jpeg_carriers(
             .filter(|segment| segment.marker == 0xe8)
             .map(|segment| {
                 bytes.get(segment.payload.clone()).ok_or_else(|| {
-                    RuntimeError::new("registered JPEG metadata", "APP8 payload is outside the image")
+                    RuntimeError::new(
+                        "registered JPEG metadata",
+                        "APP8 payload is outside the image",
+                    )
                 })
             })
             .collect::<Result<Vec<_>>>()
@@ -49,7 +52,10 @@ pub(crate) fn read_registered_jpeg_carriers(
         let declared = xdremux_metadata::RegisteredJpegBaseDeclaration::parse_app8_payload(payload)
             .map_err(|error| RuntimeError::external("registered JPEG base declaration", error))?;
         let offsets = index.registered_offsets.ok_or_else(|| {
-            RuntimeError::new("registered JPEG metadata", "registered APP8 offset is unavailable")
+            RuntimeError::new(
+                "registered JPEG metadata",
+                "registered APP8 offset is unavailable",
+            )
         })?;
         if declared.image_count != 2 || declared.offsets != vec![(offsets.raw, offsets.reduced)] {
             return Err(RuntimeError::new(
@@ -67,11 +73,19 @@ pub(crate) fn read_registered_jpeg_carriers(
             "enhanced registered metadata has no base declaration",
         ));
     }
+    if base_present && gain.is_empty() {
+        return Err(RuntimeError::new(
+            "registered JPEG metadata",
+            "registered base declaration has no enhanced APP8 payload",
+        ));
+    }
     let enhanced = gain
         .first()
         .map(|payload| {
             xdremux_metadata::RegisteredHdrMetadata::parse_app8_payload(payload)
-                .map_err(|error| RuntimeError::external("registered JPEG enhanced metadata", error))
+                .map_err(|error| {
+                    RuntimeError::external("registered JPEG enhanced metadata", error)
+                })
         })
         .transpose()?;
     Ok((base_present, enhanced))

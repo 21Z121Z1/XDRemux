@@ -108,7 +108,7 @@ JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、
 
 文件若带有标准双层 HEIF 图但没有厂商扩展块，会通过标准图路径读取。这包括较早的 XDRemux HEIF 输出，以及其他生产者生成的 ISO 21496-1 文件。压缩基础图像与源色调映射载荷保留原始字节，增强图像重新编码。请选择与源编码一致的 `--hdr-profile bt2020-pq` 或 `bt2020-hlg`：默认的 `compatible` 布局声明 BT.2020 PQ，并拒绝声明其他编码的源文件。`--oppo-compatible` 需要 ProXDR 源文件。
 
-`--jpeg-registered-metadata` 为双层 JPEG 添加注册 APP8 载体。基本图像声明图像数量以及指向增强图像的两个偏移。只有当源文件声明注册元数据时，增强图像才携带该元数据。简化视图偏移遵循本仓库记录的规则，尚未与独立生产者核对。
+`--jpeg-registered-metadata` 为双层 JPEG 添加成对的注册 APP8 载体。基本图像声明图像数量以及指向增强图像的两个偏移，增强图像携带源文件中的注册元数据。若源文件未提供增强注册元数据，转换会拒绝。简化视图偏移遵循本仓库记录的规则，尚未与独立生产者核对。
 
 ```bash
 xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
@@ -123,7 +123,7 @@ xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile 
 | `--live-photo-output pair\|pvt` | 默认为 `pair`。选择 Live Photo 文件对或 PVT 目录，其他资产保留原有格式。 |
 | `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | 默认为 `compatible`。为 ProXDR 静态照片显式选择 BT.2020 替代图像编码。Motion Photo 项拒绝显式 BT.2020 配置。 |
 | `--oppo-compatible` | 为 ProXDR 静态照片请求 OPPO 相册兼容输出。Motion Photo 项拒绝此请求。 |
-| `--jpeg-registered-metadata` | 在双层 JPEG 中写入注册 APP8 声明。需要 `.jpg` 或 `.jpeg` 目标。简化视图偏移尚未由独立生产者样本确认。 |
+| `--jpeg-registered-metadata` | 在双层 JPEG 中写入成对的注册 APP8 载体。需要源文件注册元数据及 `.jpg` 或 `.jpeg` 目标。简化视图偏移尚未由独立生产者样本确认。 |
 | `--apple-portrait` | 请求完整 Apple 人像资源集，包括 Vision 语义资源。 |
 | `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
 | `--apple-styles` | 在 macOS 27 上生成摄影风格和推理得到的纹理风格，需要支持的 ProXDR 源数据。 |

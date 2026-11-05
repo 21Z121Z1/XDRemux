@@ -162,25 +162,21 @@ fn validate_reports_a_published_two_image_jpeg() {
 }
 
 #[test]
-fn the_registered_flag_writes_a_base_declaration() {
+fn the_registered_flag_refuses_a_source_without_registered_metadata() {
     let work = unique_dir();
     fs::create_dir_all(&work).expect("temporary directory");
     let input = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
     let output = work.join("registered.jpg");
 
     let (code, _, stderr) = convert(&input, &output, &["--jpeg-registered-metadata"]);
-    assert_eq!(code, 0, "registered conversion failed: {stderr}");
-    let bytes = fs::read(&output).expect("the CLI must publish the JPEG");
-    let index = index_dual_layer_jpeg(&bytes).expect("published file must index");
-    let offsets = index
-        .registered_offsets
-        .expect("the published file must declare registered offsets");
-    assert!(offsets.raw > offsets.reduced);
-    assert_eq!(
-        index
-            .registered_app8_start
-            .map(|start| start + offsets.raw as usize),
-        Some(index.base.range.end)
+    assert_eq!(code, 1, "registered conversion must refuse missing metadata");
+    assert!(
+        !output.exists(),
+        "an incomplete registered pair must not be published"
+    );
+    assert!(
+        stderr.contains("the source has no registered enhanced metadata"),
+        "{stderr}"
     );
     fs::remove_dir_all(work).ok();
 }

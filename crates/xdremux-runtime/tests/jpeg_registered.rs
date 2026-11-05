@@ -286,17 +286,17 @@ fn validation_rejects_corrupt_enhanced_registered_metadata() {
 }
 
 #[test]
-fn a_source_without_registered_metadata_writes_only_the_declaration() {
+fn a_source_without_registered_metadata_refuses_an_incomplete_registered_pair() {
     let source = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
     let runtime = PortableRuntime::new();
-    let receipt = runtime
+    let error = runtime
         .convert_proxdr_bytes(&source, jpeg_request(true), |_| {})
-        .expect("registered JPEG conversion must succeed");
-    let index = index_dual_layer_jpeg(&receipt.bytes).unwrap();
-    assert!(index.registered_offsets.is_some());
+        .expect_err("a registered JPEG needs an enhanced APP8 record");
     assert!(
-        !index.gain_map_has_registered_payload,
-        "the source declares no registered metadata, so none may appear"
+        error
+            .to_string()
+            .contains("the source has no registered enhanced metadata to preserve"),
+        "{error}"
     );
 }
 

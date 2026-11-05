@@ -256,10 +256,13 @@ pub fn registered_app8_offsets(
     let image_one = build_image(&image, base, &segments)?;
     let image_two = build_image(&gain_image, gain_map, gain_segments)?;
     let indexed = single_image(&image_one, "planned primary image")?;
-    let planned_start = base_segments.iter().try_fold(injection_offset(&image), |start, segment| {
-        start.checked_add(app_segment_bytes(segment)?.len())
-            .ok_or_else(|| invalid("registered APP8 planned position overflows"))
-    })?;
+    let planned_start = base_segments
+        .iter()
+        .try_fold(injection_offset(&image), |start, segment| {
+            start
+                .checked_add(app_segment_bytes(segment)?.len())
+                .ok_or_else(|| invalid("registered APP8 planned position overflows"))
+        })?;
     let declaration = indexed
         .segments
         .iter()
@@ -937,7 +940,10 @@ mod tests {
         .unwrap();
         let index = index_dual_layer_jpeg(&registered_bytes).unwrap();
         assert_eq!(index.registered_offsets, Some(offsets));
-        assert_eq!(index.registered_app8_start.unwrap() + offsets.raw as usize, index.gain_map.range.start);
+        assert_eq!(
+            index.registered_app8_start.unwrap() + offsets.raw as usize,
+            index.gain_map.range.start
+        );
     }
 
     #[test]

@@ -87,7 +87,7 @@ These values describe one fixed encoding configuration. They are not a general q
 - A JPEG destination requires identity orientation and a normal Exif orientation.
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
-- The registered JPEG APP8 carrier is written only on request (`--jpeg-registered-metadata`). The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
+- The registered JPEG APP8 pair is written only on request (`--jpeg-registered-metadata`) and only when the source supplies enhanced registered metadata. A source without it is refused, rather than publishing a base declaration with no enhanced record. The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
 - The Gain Map encoder currently accepts eight-bit rasters; higher-bit-depth sources are quantized before encoding. Geometry and metadata preservation do not guarantee sample-exact preservation.
 - Additional matrix and three-dimensional LUT mappings are refused in a conversion. The executor has an explicit contract, but the file payload layout is unresolved, so no mapping is read from a file.
 - No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.

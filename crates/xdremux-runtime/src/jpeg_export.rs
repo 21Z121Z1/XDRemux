@@ -103,8 +103,8 @@ fn eight_bit_samples(raster: &xdremux_codec::NormalizedRaster) -> Result<Vec<u8>
 
 /// Registered APP8 carriers to add to a two-image JPEG.
 pub(crate) struct RegisteredJpegCarriers<'a> {
-    /// Enhanced APP8 payload when the source declares registered metadata.
-    pub enhanced: Option<&'a [u8]>,
+    /// Enhanced APP8 payload from the source's registered metadata.
+    pub enhanced: &'a [u8],
 }
 
 /// Build a two-image JPEG from a preserved HEIF body and its Gain Map samples.
@@ -201,9 +201,7 @@ pub(crate) fn build_dual_layer_jpeg(
             .to_app8_payload()
             .map_err(|error| external("registered APP8 declaration", error))?;
         base_segments.push((0xe8, payload));
-        if let Some(enhanced) = registered.enhanced {
-            gain_segments.push((0xe8, enhanced.to_vec()));
-        }
+        gain_segments.push((0xe8, registered.enhanced.to_vec()));
     }
 
     let base_app = base_segments

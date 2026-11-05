@@ -111,7 +111,7 @@ JPEG output requires identity orientation and cannot carry an explicit BT.2020 p
 
 A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. The compressed base and the source tone-map payload keep their bytes, and the Gain Map is re-encoded. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. `--oppo-compatible` requires a ProXDR source.
 
-`--jpeg-registered-metadata` adds the registered APP8 carriers to the two-image JPEG. The base image declares the image count and two offsets to the enhanced image. The enhanced image carries the registered metadata only when the source declares it. The reduced-view offset follows the documented rule and is not yet confirmed against an independent producer.
+`--jpeg-registered-metadata` adds paired registered APP8 carriers to the two-image JPEG. The base image declares the image count and two offsets to the enhanced image; the enhanced image carries the source registered metadata. Sources without registered enhanced metadata are refused. The reduced-view offset follows the documented rule and is not yet confirmed against an independent producer.
 
 ```bash
 xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
@@ -126,7 +126,7 @@ The following options are available to both `convert` and `batch`.
 | `--live-photo-output pair\|pvt` | Default `pair`. Selects a Live Photo file pair or PVT directory. Other assets keep their normal format. |
 | `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | Default `compatible`. Selects an explicit BT.2020 alternate encoding for ProXDR stills. Motion Photo items reject explicit BT.2020 profiles. |
 | `--oppo-compatible` | Requests OPPO Gallery output for a ProXDR still. Motion Photo items reject this request. |
-| `--jpeg-registered-metadata` | Writes the registered APP8 declaration into a two-image JPEG. Requires a `.jpg` or `.jpeg` destination. The reduced-view offset is not yet confirmed by an independent producer sample. |
+| `--jpeg-registered-metadata` | Writes paired registered APP8 carriers into a two-image JPEG. Requires source registered metadata and a `.jpg` or `.jpeg` destination. The reduced-view offset is not yet confirmed by an independent producer sample. |
 | `--apple-portrait` | Requests the complete Apple Portrait resource set, including Vision semantics. |
 | `--apple-portrait-oppo` | Uses OPPO depth and available masks. Requires macOS ImageIO and Core Image. Effects are reduced. |
 | `--apple-styles` | Generates Photographic Styles and inferred Texture Styles on macOS 27. Requires supported ProXDR source data. |

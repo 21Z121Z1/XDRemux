@@ -1044,21 +1044,26 @@ fn build_jpeg_artifact(
             ));
         }
     }
-    let enhanced = plan
-        .hdr_metadata
-        .registered_metadata
-        .as_ref()
-        .map(|registered| {
-            registered
+    let enhanced = if plan.registered_jpeg_metadata {
+        Some(
+            plan.hdr_metadata
+                .registered_metadata
+                .as_ref()
+                .ok_or_else(|| {
+                    RuntimeError::new(
+                        "registered APP8 payload",
+                        "the source has no registered enhanced metadata to preserve",
+                    )
+                })?
                 .to_app8_payload()
-                .map_err(|error| RuntimeError::external("registered APP8 payload", error))
-        })
-        .transpose()?;
-    let registered = plan
-        .registered_jpeg_metadata
-        .then_some(jpeg_export::RegisteredJpegCarriers {
-            enhanced: enhanced.as_deref(),
-        });
+                .map_err(|error| RuntimeError::external("registered APP8 payload", error))?,
+        )
+    } else {
+        None
+    };
+    let registered = enhanced
+        .as_deref()
+        .map(|enhanced| jpeg_export::RegisteredJpegCarriers { enhanced });
     jpeg_export::build_dual_layer_jpeg(
         heif,
         body,
