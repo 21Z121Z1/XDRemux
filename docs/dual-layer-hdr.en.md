@@ -28,12 +28,12 @@ A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dua
 ## Source facts the conversion keeps
 
 - The compressed SDR base keeps its bytes on both HEIF paths. A JPEG destination decodes it and re-encodes it.
-- The Gain Map is re-encoded. Its decoded samples and geometry are preserved.
+- The Gain Map keeps its geometry and declared operation, but its pixels are decoded, quantized to eight bits per component, and re-encoded. The resulting samples are not bit-exact, particularly for sources above eight bits.
 - The gain-map operation metadata is preserved. A standalone ISO source keeps its exact tone-map payload bytes. A ProXDR source keeps the operation its vendor float view declares.
 - `mdcv`, `clli`, and registered `it35` carriers are copied only when the source associates them with the derived HDR image. Two carriers that declare the same value must agree. An absent value stays absent.
 - A JPEG destination keeps the base ICC profile and the Exif payload.
 
-The conversion re-reads the published bytes before publication. It checks the structure, the carriers, the declared profile, and both image decodes.
+The conversion re-reads the published bytes before publication. It checks the structure, the carriers (including actual opt-in APP8 declaration offsets and enhanced payload), the declared profile, and both image decodes.
 
 ## Mapping and luminance executors
 
@@ -53,6 +53,7 @@ Run the focused checks from the repository root:
 cargo test -p xdremux-runtime --test hdr_metadata_wiring
 cargo test -p xdremux-runtime --test jpeg_export
 cargo test -p xdremux-runtime --test jpeg_validation
+cargo test -p xdremux-runtime --test jpeg_registered
 cargo test -p xdremux-runtime --test iso_heif_source
 cargo test -p xdremux-cli --test jpeg_output
 cargo test -p xdremux-cli --test iso_heif_source
@@ -87,6 +88,7 @@ These values describe one fixed encoding configuration. They are not a general q
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
 - The registered JPEG APP8 carrier is written only on request (`--jpeg-registered-metadata`). The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
+- The Gain Map encoder currently accepts eight-bit rasters; higher-bit-depth sources are quantized before encoding. Geometry and metadata preservation do not guarantee sample-exact preservation.
 - Additional matrix and three-dimensional LUT mappings are refused in a conversion. The executor has an explicit contract, but the file payload layout is unresolved, so no mapping is read from a file.
 - No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.
 

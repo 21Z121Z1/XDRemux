@@ -28,12 +28,12 @@ Motion Photo 走 Live Photo 路径。普通单幅 JPEG 不是双层源文件。
 ## 转换保留的源信息
 
 - 两条 HEIF 路径都保留压缩 SDR 基础图像的字节。JPEG 目标会解码后重新编码。
-- 增强图像重新编码，保留解码采样与几何。
+- 增益图保留几何尺寸和声明的处理参数，但像素会先解码、量化至每分量 8 位，再重新编码。输出采样不保证逐值相等；高于 8 位的源文件尤其会损失精度。
 - 增益映射处理元数据保留。独立 ISO 源保留原始色调映射载荷字节。ProXDR 源保留其厂商浮点视图声明的处理方式。
 - 只有当源文件把 `mdcv`、`clli` 和注册 `it35` 载体关联到派生 HDR 图像时才复制。两类载体声明同一数值时必须一致。缺失的数值保持缺失。
 - JPEG 目标保留基础图像 ICC 配置文件与 Exif 载荷。
 
-转换在发布前重新读取输出字节，检查结构、载体、声明配置，并解码两幅图像。
+转换在发布前重新读取输出字节，检查结构、载体（包括显式启用的 APP8 声明实际偏移和增强载荷）、声明配置，并解码两幅图像。
 
 ## 映射与亮度执行器
 
@@ -53,6 +53,7 @@ Motion Photo 走 Live Photo 路径。普通单幅 JPEG 不是双层源文件。
 cargo test -p xdremux-runtime --test hdr_metadata_wiring
 cargo test -p xdremux-runtime --test jpeg_export
 cargo test -p xdremux-runtime --test jpeg_validation
+cargo test -p xdremux-runtime --test jpeg_registered
 cargo test -p xdremux-runtime --test iso_heif_source
 cargo test -p xdremux-cli --test jpeg_output
 cargo test -p xdremux-cli --test iso_heif_source
@@ -87,6 +88,7 @@ xdremux validate output.jpg --semantic --json
 - JPEG 目标要求增益处理在基础应用色域中进行。声明替代色域的源文件会被拒绝。
 - JPEG 目标不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。
 - 注册 JPEG APP8 载体只在显式请求时写入（`--jpeg-registered-metadata`）。简化视图偏移遵循仓库记录的规则，尚未由独立生产者样本确认。
+- 增益图编码器目前接收 8 位光栅。更高位深的源文件会在编码前量化；保留几何与元数据并不意味着采样精确不变。
 - 转换中拒绝额外矩阵与三维 LUT 映射。执行器有明确契约，但文件载荷布局尚未确定，因此不会从文件读取映射。
 - 本页不记录设备证据。图库识别、Photos 编辑与显示行为不在这些检查范围内。
 

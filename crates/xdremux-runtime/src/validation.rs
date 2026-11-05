@@ -5,11 +5,77 @@ use serde::Serialize;
 use xdremux_codec::{JpegRasterDecodeRequest, RasterPixelFormat, ZuneJpegProvider};
 use xdremux_engine::RasterDecoder;
 use xdremux_format::dual_jpeg::{index_dual_layer_jpeg, DualLayerJpegIndex};
+use xdremux_format::jpeg::JpegImage;
 use xdremux_format::ChromaSampling;
 use xdremux_heif::{validate_gain_map_semantics, validate_gain_map_structure, HdrOutputColor};
 use xdremux_motion_photo::{apple, companion_video_path, Input, MotionPhoto, ParseOptions};
 
 use crate::{Result, RuntimeError};
+
+/// Check actual registered APP8 bytes against the indexed image boundaries.
+/// Other APP8 namespaces are not registered metadata and are left alone.
+pub(crate) fn read_registered_jpeg_carriers(
+    bytes: &[u8],
+    index: &DualLayerJpegIndex,
+) -> Result<(bool, Option<xdremux_metadata::RegisteredHdrMetadata>)> {
+    fn carriers<'a>(image: &JpegImage, bytes: &'a [u8]) -> Result<Vec<&'a [u8]>> {
+        image
+            .segments
+            .iter()
+            .filter(|segment| segment.marker == 0xe8)
+            .map(|segment| {
+                bytes.get(segment.payload.clone()).ok_or_else(|| {
+                    RuntimeError::new("registered JPEG metadata", "APP8 payload is outside the image")
+                })
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(|segments| {
+                segments
+                    .into_iter()
+                    .filter(|payload| payload.starts_with(b"ITUT35"))
+                    .collect()
+            })
+    }
+
+    let base = carriers(&index.base, bytes)?;
+    let gain = carriers(&index.gain_map, bytes)?;
+    if base.len() > 1 || gain.len() > 1 {
+        return Err(RuntimeError::new(
+            "registered JPEG metadata",
+            "duplicate registered APP8 declarations",
+        ));
+    }
+    let base_present = if let Some(payload) = base.first() {
+        let declared = xdremux_metadata::RegisteredJpegBaseDeclaration::parse_app8_payload(payload)
+            .map_err(|error| RuntimeError::external("registered JPEG base declaration", error))?;
+        let offsets = index.registered_offsets.ok_or_else(|| {
+            RuntimeError::new("registered JPEG metadata", "registered APP8 offset is unavailable")
+        })?;
+        if declared.image_count != 2 || declared.offsets != vec![(offsets.raw, offsets.reduced)] {
+            return Err(RuntimeError::new(
+                "registered JPEG metadata",
+                "registered APP8 offsets do not match the published image boundaries",
+            ));
+        }
+        true
+    } else {
+        false
+    };
+    if !base_present && !gain.is_empty() {
+        return Err(RuntimeError::new(
+            "registered JPEG metadata",
+            "enhanced registered metadata has no base declaration",
+        ));
+    }
+    let enhanced = gain
+        .first()
+        .map(|payload| {
+            xdremux_metadata::RegisteredHdrMetadata::parse_app8_payload(payload)
+                .map_err(|error| RuntimeError::external("registered JPEG enhanced metadata", error))
+        })
+        .transpose()?;
+    Ok((base_present, enhanced))
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct IsoHdrValidationReport {
@@ -298,6 +364,7 @@ pub fn validate_dual_layer_jpeg(
 ) -> Result<DualLayerJpegValidationReport> {
     let index: DualLayerJpegIndex = index_dual_layer_jpeg(bytes)
         .map_err(|error| RuntimeError::external("dual-layer JPEG structure", error))?;
+    read_registered_jpeg_carriers(bytes, &index)?;
     if !index.base_has_iso_declaration {
         return Err(RuntimeError::new(
             "dual-layer JPEG structure",

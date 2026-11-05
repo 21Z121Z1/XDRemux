@@ -2,7 +2,7 @@
 //! offsets that reach the real image boundary, and the enhanced payload must
 //! match the source-declared registered metadata.
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use xdremux_codec::{GainMapTileEncodeRequest, LibHeifProvider, Raster8, RasterPixelFormat};
 use xdremux_engine::{
@@ -19,7 +19,7 @@ use xdremux_metadata::{
     registered_jpeg_base_payload_len, ContentLightLevel, DynamicHdrMetadata, HdrStaticMetadata,
     HdrTransfer, MasteringDisplay, RegisteredHdrMetadata, RegisteredJpegBaseDeclaration,
 };
-use xdremux_runtime::PortableRuntime;
+use xdremux_runtime::{validate_dual_layer_jpeg, PortableRuntime};
 
 const APPLE_TMAP_HEX: &str = concat!(
     "000000000040000000000000000100933a9300400000000000000000000100",
@@ -232,6 +232,57 @@ fn a_registered_declaration_reaches_the_published_jpeg_with_consistent_offsets()
         RegisteredHdrMetadata::parse_app8_payload(&receipt.bytes[enhanced.payload.clone()])
             .expect("the enhanced payload must parse");
     assert_eq!(observed, expected_registered());
+}
+
+#[test]
+fn validation_rejects_registered_offsets_that_disagree_with_the_file() {
+    let source = iso_source_with_registered_metadata();
+    let receipt = PortableRuntime::new()
+        .convert_iso_heif_bytes(&source, jpeg_request(true), |_| {})
+        .unwrap();
+    let index = index_dual_layer_jpeg(&receipt.bytes).unwrap();
+    let app8 = index
+        .base
+        .segments
+        .iter()
+        .find(|segment| {
+            segment.marker == 0xe8
+                && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
+        })
+        .unwrap();
+    let mut modified = receipt.bytes.clone();
+    // The first serialized raw offset starts after the 16-byte header.
+    let offset_end = app8.payload.start + 20;
+    modified[offset_end - 1] ^= 1;
+    // A corrupted APP8 declaration does not invalidate MPF or ISO APP2.
+    assert!(index_dual_layer_jpeg(&modified).is_ok());
+    let error = validate_dual_layer_jpeg(Path::new("bad-offset.jpg"), &modified, false)
+        .expect_err("validation must inspect the serialized APP8 offsets");
+    assert!(error.to_string().contains("offsets do not match"), "{error}");
+}
+
+#[test]
+fn validation_rejects_corrupt_enhanced_registered_metadata() {
+    let source = iso_source_with_registered_metadata();
+    let receipt = PortableRuntime::new()
+        .convert_iso_heif_bytes(&source, jpeg_request(true), |_| {})
+        .unwrap();
+    let index = index_dual_layer_jpeg(&receipt.bytes).unwrap();
+    let app8 = index
+        .gain_map
+        .segments
+        .iter()
+        .find(|segment| {
+            segment.marker == 0xe8
+                && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
+        })
+        .unwrap();
+    let mut modified = receipt.bytes.clone();
+    modified[app8.payload.start + 6] ^= 1;
+    assert!(index_dual_layer_jpeg(&modified).is_ok());
+    let error = validate_dual_layer_jpeg(Path::new("bad-enhanced.jpg"), &modified, false)
+        .expect_err("validation must parse the enhanced APP8 payload");
+    assert!(error.to_string().contains("registered JPEG enhanced metadata"), "{error}");
 }
 
 #[test]

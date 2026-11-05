@@ -256,10 +256,14 @@ pub fn registered_app8_offsets(
     let image_one = build_image(&image, base, &segments)?;
     let image_two = build_image(&gain_image, gain_map, gain_segments)?;
     let indexed = single_image(&image_one, "planned primary image")?;
+    let planned_start = base_segments.iter().try_fold(injection_offset(&image), |start, segment| {
+        start.checked_add(app_segment_bytes(segment)?.len())
+            .ok_or_else(|| invalid("registered APP8 planned position overflows"))
+    })?;
     let declaration = indexed
         .segments
         .iter()
-        .find(|segment| segment.marker == 0xe8)
+        .find(|segment| segment.marker == 0xe8 && segment.range.start == planned_start)
         .ok_or_else(|| invalid("planned primary image lost its registered APP8 segment"))?;
     let start = declaration.range.start;
     let raw = image_one
@@ -453,7 +457,6 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
 
     let mut gain_iso = false;
     let mut gain_icc = false;
-    let mut gain_registered = false;
     for segment in &gain_map.segments {
         if segment.marker != 0xe2 {
             continue;
@@ -472,13 +475,7 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
             gain_icc = true;
         }
     }
-    if gain_map
-        .segments
-        .iter()
-        .any(|segment| segment.marker == 0xe8)
-    {
-        gain_registered = true;
-    }
+    let gain_registered = registered_app8_start(&gain_map, data).is_some();
 
     let offsets = registered_offsets(&base, data, tiff_start);
     let app8_start = registered_app8_start(&base, data);
@@ -501,7 +498,12 @@ fn registered_app8_start(image: &JpegImage, data: &[u8]) -> Option<usize> {
     image
         .segments
         .iter()
-        .find(|segment| segment.marker == 0xe8 && data.get(segment.payload.clone()).is_some())
+        .find(|segment| {
+            segment.marker == 0xe8
+                && data
+                    .get(segment.payload.clone())
+                    .is_some_and(|payload| payload.starts_with(b"ITUT35"))
+        })
         .map(|segment| segment.range.start)
 }
 
@@ -824,7 +826,7 @@ mod tests {
 
         // Assemble with the real declaration in the planned position.
         let mut declaration = vec![0xee; payload_len];
-        declaration[0] = b'I';
+        declaration[..6].copy_from_slice(b"ITUT35");
         let base_segments = [
             AppSegment {
                 marker: 0xe2,
@@ -856,6 +858,77 @@ mod tests {
             "the raw offset must reach the second Start Of Image"
         );
         assert!(!index.gain_map_has_registered_payload);
+    }
+
+    #[test]
+    fn unrelated_app8_is_not_a_registered_carrier_or_a_planned_declaration() {
+        let mut base = jpeg(true, &[0x11]);
+        let unrelated = segment(0xe8, b"other APP8 data");
+        let jfif_end = single_image(&base, "base").unwrap().segments[1].range.end;
+        base.splice(jfif_end..jfif_end, unrelated);
+        let mut gain = jpeg(true, &[0x22]);
+        let unrelated = segment(0xe8, b"other APP8 data");
+        let jfif_end = single_image(&gain, "gain").unwrap().segments[1].range.end;
+        gain.splice(jfif_end..jfif_end, unrelated);
+
+        let iso = iso_base();
+        let gain_iso = iso_gain();
+        let base_segments = [
+            AppSegment {
+                marker: 0xe8,
+                payload: b"other injected APP8",
+            },
+            AppSegment {
+                marker: 0xe2,
+                payload: &iso,
+            },
+        ];
+        let gain_segments = [AppSegment {
+            marker: 0xe2,
+            payload: &gain_iso,
+        }];
+        let bytes = assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+            base: &base,
+            gain_map: &gain,
+            base_segments: &base_segments,
+            gain_segments: &gain_segments,
+        })
+        .unwrap();
+        let index = index_dual_layer_jpeg(&bytes).unwrap();
+        assert_eq!(index.registered_app8_start, None);
+        assert_eq!(index.registered_offsets, None);
+        assert!(!index.gain_map_has_registered_payload);
+
+        // The offset planner must locate the newly injected declaration,
+        // even when an unrelated APP8 already appears in the source.
+        let offsets = registered_app8_offsets(
+            &base,
+            &gain,
+            &base_segments,
+            &gain_segments,
+            24,
+        )
+        .unwrap();
+        let mut registered = vec![0u8; 24];
+        registered[..6].copy_from_slice(b"ITUT35");
+        let registered_segments = [
+            base_segments[0],
+            base_segments[1],
+            AppSegment {
+                marker: 0xe8,
+                payload: &registered,
+            },
+        ];
+        let registered_bytes = assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+            base: &base,
+            gain_map: &gain,
+            base_segments: &registered_segments,
+            gain_segments: &gain_segments,
+        })
+        .unwrap();
+        let index = index_dual_layer_jpeg(&registered_bytes).unwrap();
+        assert_eq!(index.registered_offsets, Some(offsets));
+        assert_eq!(index.registered_app8_start.unwrap() + offsets.raw as usize, index.gain_map.range.start);
     }
 
     #[test]

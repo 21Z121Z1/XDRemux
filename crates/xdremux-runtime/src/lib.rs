@@ -1479,7 +1479,7 @@ impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
                     "the conversion has no planned Gain Map operation",
                 )
             })?;
-            return validate_dual_layer_jpeg_artifact(expected, artifact);
+            return validate_dual_layer_jpeg_artifact(expected, plan, artifact);
         }
         if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
             xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)
@@ -1512,6 +1512,7 @@ fn same_gain_map_values(
 /// Read the published two-image JPEG back: carriers, metadata and both decodes.
 fn validate_dual_layer_jpeg_artifact(
     expected: &xdremux_metadata::UltraHdrGainMapMetadata,
+    plan: &ConversionPlan,
     artifact: &[u8],
 ) -> Result<()> {
     let index = xdremux_format::dual_jpeg::index_dual_layer_jpeg(artifact)
@@ -1520,6 +1521,24 @@ fn validate_dual_layer_jpeg_artifact(
         return Err(RuntimeError::new(
             "dual-layer JPEG validation",
             "the published file does not declare the ISO 21496-1 carriers",
+        ));
+    }
+    let (registered_base, registered_enhanced) =
+        validation::read_registered_jpeg_carriers(artifact, &index)?;
+    if registered_base != plan.registered_jpeg_metadata {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG validation",
+            "the registered APP8 base declaration disagrees with the conversion plan",
+        ));
+    }
+    let expected_enhanced = plan
+        .registered_jpeg_metadata
+        .then_some(plan.hdr_metadata.registered_metadata.clone())
+        .flatten();
+    if registered_enhanced != expected_enhanced {
+        return Err(RuntimeError::new(
+            "dual-layer JPEG validation",
+            "the registered APP8 enhanced metadata does not match the source",
         ));
     }
     let gain_bytes = artifact
