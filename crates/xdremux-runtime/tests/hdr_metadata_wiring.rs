@@ -317,13 +317,15 @@ fn a_conflicting_source_does_not_replace_an_existing_output() {
         .expect("the authored source declares a mastering display");
     source[position + 4 + 16 + 3] ^= 0x40;
 
+    static UNIQUE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let work = std::env::temp_dir().join(format!(
-        "xdremux-hdr-metadata-{}-{}",
+        "xdremux-hdr-metadata-{}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_nanos()
+            .as_nanos(),
+        UNIQUE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     fs::create_dir_all(&work).unwrap();
     let output = work.join("output.heic");

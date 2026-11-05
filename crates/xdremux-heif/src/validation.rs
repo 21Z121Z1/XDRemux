@@ -219,6 +219,24 @@ pub fn primary_sdr_color_space(source: &[u8]) -> Result<xdremux_metadata::SdrCol
     primary_color_space(source, &parse_meta_box(source, header)?)
 }
 
+/// Tone-map payload of the derived HDR image.
+///
+/// The payload carries the gain-map operation parameters. A caller that
+/// re-muxes an existing dual-layer file must write these bytes instead of
+/// regenerating them from floats.
+pub fn derived_tmap_payload(source: &[u8]) -> Result<Vec<u8>> {
+    let semantics = validate_gain_map_semantics(source)?;
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, header)?;
+    let index = validate_meta_integrity(source, &meta)?;
+    let location = index
+        .locations
+        .get(&semantics.structure.tmap_item_id)
+        .ok_or_else(|| invalid("derived HDR item has no location"))?;
+    item_payload(source, meta.idat.as_ref(), location)
+}
+
 /// Item ID that `pitm` declares as the primary image.
 pub fn primary_image_item_id(source: &[u8]) -> Result<u32> {
     let top = scan_top_level_boxes(source)?;

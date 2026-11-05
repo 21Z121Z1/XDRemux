@@ -178,6 +178,18 @@ pub struct PreparedProXdr {
     pub hdr_metadata: xdremux_heif::SourceHdrMetadata,
 }
 
+/// Source facts of a standalone ISO dual-layer HEIF.
+///
+/// This source keeps its own compressed base and tone-map payload. It has no
+/// vendor extension block, so no OPPO tail is written for it.
+#[derive(Debug, Clone)]
+pub struct PreparedIsoHeif {
+    pub semantics: xdremux_heif::GainMapSemantics,
+    /// Source tone-map payload; the gain-map operation keeps its exact bytes.
+    pub tmap_payload: Vec<u8>,
+    pub hdr_metadata: xdremux_heif::SourceHdrMetadata,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ByteConversionReceipt {
     pub plan: ConversionPlan,
@@ -675,7 +687,7 @@ impl PortableRuntime {
             heif: &self.heif,
         };
         let mut validator = IsoGainMapValidator {
-            prepared: &prepared,
+            prepared: Some(&prepared),
         };
         let mut publisher = MemoryPublisher;
         let receipt = execute_conversion(
@@ -714,11 +726,88 @@ impl PortableRuntime {
             heif: &self.heif,
         };
         let mut validator = IsoGainMapValidator {
-            prepared: &prepared,
+            prepared: Some(&prepared),
         };
         let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
         let receipt = execute_conversion(
             &prepared.analysis,
+            request,
+            &capabilities,
+            &mut builder,
+            &mut validator,
+            &mut publisher,
+            observe,
+        )
+        .map_err(runtime_execution_error)?;
+        Ok(FileConversionReceipt {
+            plan: receipt.plan,
+            output: receipt.published,
+        })
+    }
+
+    /// Convert a standalone ISO dual-layer HEIF in memory.
+    ///
+    /// The compressed base is preserved. The Gain Map is re-encoded and the
+    /// source tone-map payload keeps its exact bytes.
+    pub fn convert_iso_heif_bytes<Observe>(
+        &self,
+        source: &[u8],
+        request: ConversionRequest,
+        observe: Observe,
+    ) -> Result<ByteConversionReceipt>
+    where
+        Observe: FnMut(ExecutionStage),
+    {
+        let prepared = analyze_iso_heif(source)?;
+        let analysis = iso_heif_analysis(&prepared)?;
+        let capabilities = self.capability_inventory()?;
+        let mut builder = IsoHeifArtifactBuilder {
+            source,
+            prepared: &prepared,
+            heif: &self.heif,
+        };
+        let mut validator = IsoGainMapValidator { prepared: None };
+        let mut publisher = MemoryPublisher;
+        let receipt = execute_conversion(
+            &analysis,
+            request,
+            &capabilities,
+            &mut builder,
+            &mut validator,
+            &mut publisher,
+            observe,
+        )
+        .map_err(runtime_execution_error)?;
+        Ok(ByteConversionReceipt {
+            plan: receipt.plan,
+            bytes: receipt.published,
+        })
+    }
+
+    /// Convert a standalone ISO dual-layer HEIF to a file.
+    pub fn convert_iso_heif_file<Observe>(
+        &self,
+        source: &[u8],
+        output: impl AsRef<Path>,
+        request: ConversionRequest,
+        observe: Observe,
+    ) -> Result<FileConversionReceipt>
+    where
+        Observe: FnMut(ExecutionStage),
+    {
+        validate_still_output_path(output.as_ref())?;
+        let prepared = analyze_iso_heif(source)?;
+        let analysis = iso_heif_analysis(&prepared)?;
+        let capabilities = self.capability_inventory()?;
+        let mut builder = IsoHeifArtifactBuilder {
+            source,
+            prepared: &prepared,
+            heif: &self.heif,
+        };
+        let mut validator = IsoGainMapValidator { prepared: None };
+        let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
+        let receipt = execute_conversion(
+            &analysis,
             request,
             &capabilities,
             &mut builder,
@@ -832,6 +921,48 @@ pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
     })
 }
 
+/// Read the facts of a standalone ISO dual-layer HEIF.
+///
+/// The file must carry a canonical `tmap` graph that describes the primary
+/// image. Vendor extension bytes stay opaque and are preserved by assembly.
+pub fn analyze_iso_heif(source: &[u8]) -> Result<PreparedIsoHeif> {
+    let semantics = xdremux_heif::validate_gain_map_semantics(source)
+        .map_err(|error| RuntimeError::external("ISO HDR HEIF analysis", error))?;
+    let tmap_payload = xdremux_heif::derived_tmap_payload(source)
+        .map_err(|error| RuntimeError::external("ISO HDR HEIF tone map", error))?;
+    let hdr_metadata = xdremux_heif::extract_hdr_metadata(source)
+        .map_err(|error| RuntimeError::external("ISO HDR HEIF metadata", error))?;
+    Ok(PreparedIsoHeif {
+        semantics,
+        tmap_payload,
+        hdr_metadata,
+    })
+}
+
+fn iso_heif_analysis(prepared: &PreparedIsoHeif) -> Result<ConversionAnalysis> {
+    let structure = &prepared.semantics.structure;
+    let configuration = xdremux_format::HevcDecoderConfigurationProfile {
+        general_profile_idc: structure.general_profile_idc,
+        chroma_sampling: structure.chroma_sampling,
+        luma_bit_depth: structure.luma_bit_depth,
+        chroma_bit_depth: structure.chroma_bit_depth,
+    };
+    let gain_map = xdremux_engine::gain_map_source_profile_from_hevc(
+        structure.width,
+        structure.height,
+        structure.channel_count,
+        configuration,
+    )
+    .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map profile", error))?;
+    Ok(ConversionAnalysis {
+        gain_map,
+        hdr_metadata: xdremux_engine::SourceHdrMetadataFacts {
+            static_metadata: prepared.hdr_metadata.static_metadata.clone(),
+            registered_metadata: prepared.hdr_metadata.registered_metadata.clone(),
+        },
+    })
+}
+
 fn hdr_extraction_mode(mode: ContainerExtractionMode) -> HdrExtractionMode {
     match mode {
         ContainerExtractionMode::Lhdr => HdrExtractionMode::Lhdr,
@@ -864,6 +995,188 @@ fn planned_gain_map_metadata(
         .map_err(|error| RuntimeError::external("ISO Gain Map tmap", error))?;
     xdremux_metadata::parse_heif_tmap_metadata(&tmap)
         .map_err(|error| RuntimeError::external("ISO Gain Map metadata", error))
+}
+
+/// Assemble an ISO gain-map HEIF from encoded Gain Map tiles.
+///
+/// The caller keeps the source body, the tone-map payload and the XMP payload;
+/// this function owns only the container assembly.
+fn assemble_heif(
+    body: &[u8],
+    encoded: &xdremux_codec::EncodedGainMapTiles,
+    tmap_payload: &[u8],
+    xmp_payload: &[u8],
+    plan: &ConversionPlan,
+) -> Result<Vec<u8>> {
+    let tiles = encoded
+        .tiles
+        .iter()
+        .map(|tile| GainMapTile {
+            payload: &tile.payload,
+            width: tile.width,
+            height: tile.height,
+        })
+        .collect::<Vec<_>>();
+    let gain_map = DirectHevcGainMap {
+        gain_map_width: encoded.gain_map_width,
+        gain_map_height: encoded.gain_map_height,
+        tile_width: encoded.tile_width,
+        tile_height: encoded.tile_height,
+        tiles: &tiles,
+        hvcc: &encoded.hvcc,
+        profile: HeifGainMapEncodeProfile {
+            channels: match encoded.profile.channels {
+                GainMapChannels::Mono => HeifGainMapChannels::Mono,
+                GainMapChannels::Rgb => HeifGainMapChannels::Rgb,
+            },
+            chroma: encoded.profile.layout.chroma,
+            luma_bit_depth: encoded.profile.layout.luma_bit_depth,
+            chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
+        },
+    };
+    let hdr_metadata =
+        (!plan.hdr_metadata.is_empty()).then_some(xdremux_heif::HdrMetadataAssembly {
+            static_metadata: &plan.hdr_metadata.static_metadata,
+            registered_metadata: plan.hdr_metadata.registered_metadata.as_ref(),
+        });
+    assemble_iso_gain_map_heif(
+        body,
+        &IsoGainMapAssembly {
+            profile: hdr_profile_transfer(plan.hdr_profile)
+                .map(|transfer| xdremux_heif::HdrGainMapProfile { transfer }),
+            alternate_icc: None,
+            gain_map,
+            tmap_payload,
+            xmp_payload,
+            hdr_metadata,
+        },
+    )
+    .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))
+}
+
+/// Convert a decoded Gain Map back to the eight-bit raster that the tile
+/// encoder accepts. The decoder already normalized by the actual bit depth.
+fn normalized_raster_to_raster8(raster: &xdremux_codec::NormalizedRaster) -> Result<Raster8> {
+    let channels = match raster.channels {
+        1 => 1usize,
+        3 => 3usize,
+        count => {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF Gain Map decode",
+                format!("the Gain Map decodes to {count} components"),
+            ))
+        }
+    };
+    let width = usize::try_from(raster.width)
+        .map_err(|_| RuntimeError::new("ISO HDR HEIF Gain Map decode", "width exceeds usize"))?;
+    let height = usize::try_from(raster.height)
+        .map_err(|_| RuntimeError::new("ISO HDR HEIF Gain Map decode", "height exceeds usize"))?;
+    let row_bytes = width
+        .checked_mul(channels)
+        .ok_or_else(|| RuntimeError::new("ISO HDR HEIF Gain Map decode", "row length overflows"))?;
+    let expected = row_bytes.checked_mul(height).ok_or_else(|| {
+        RuntimeError::new("ISO HDR HEIF Gain Map decode", "sample count overflows")
+    })?;
+    if raster.samples.len() != expected {
+        return Err(RuntimeError::new(
+            "ISO HDR HEIF Gain Map decode",
+            "decoded samples do not match the Gain Map geometry",
+        ));
+    }
+    let mut data = Vec::with_capacity(expected);
+    for value in &raster.samples {
+        if !value.is_finite() {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF Gain Map decode",
+                "the Gain Map contains a non-finite sample",
+            ));
+        }
+        data.push((value.clamp(0.0, 1.0) * 255.0).round() as u8);
+    }
+    Raster8::new(
+        raster.width,
+        raster.height,
+        row_bytes,
+        match channels {
+            1 => RasterPixelFormat::Mono8,
+            _ => RasterPixelFormat::Rgb8,
+        },
+        data,
+    )
+    .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map raster", error))
+}
+
+struct IsoHeifArtifactBuilder<'a> {
+    source: &'a [u8],
+    prepared: &'a PreparedIsoHeif,
+    heif: &'a LibHeifProvider,
+}
+
+impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
+    type Artifact = Vec<u8>;
+    type Error = RuntimeError;
+
+    fn build_artifact(&mut self, plan: &ConversionPlan) -> Result<Self::Artifact> {
+        if plan.container == OutputContainer::Jpeg {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF conversion",
+                "JPEG output currently requires a ProXDR source",
+            ));
+        }
+        if plan.output == xdremux_engine::OutputIntent::OppoGallery {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF conversion",
+                "OPPO Gallery compatibility requires a ProXDR source",
+            ));
+        }
+        // The compatible layout declares BT.2020 PQ. A source that declares a
+        // different alternate encoding must select a matching profile instead
+        // of being relabeled.
+        let compatible_output = xdremux_heif::HdrOutputColor::Nclx {
+            primaries: 9,
+            transfer: 16,
+            matrix: 9,
+            full_range: true,
+        };
+        if plan.hdr_profile == HdrExportProfile::Compatible
+            && self.prepared.semantics.output_color != compatible_output
+        {
+            return Err(RuntimeError::new(
+                "ISO HDR HEIF conversion",
+                "the compatible layout declares BT.2020 PQ; select --hdr-profile bt2020-pq or bt2020-hlg for this source",
+            ));
+        }
+        let structure = &self.prepared.semantics.structure;
+        let decoded = self
+            .heif
+            .decode_coded_item_normalized(
+                self.source,
+                structure.gain_map_item_id,
+                structure.channel_count,
+            )
+            .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map decode", error))?;
+        let raster = normalized_raster_to_raster8(&decoded)?;
+        let encoded = self
+            .heif
+            .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
+                raster,
+                plan.gain_map_target,
+            ))
+            .map_err(|error| RuntimeError::external("HEVC Gain Map encode", error))?;
+        let xmp_payload = self
+            .prepared
+            .semantics
+            .metadata
+            .to_hdrgm_xmp()
+            .map_err(|error| RuntimeError::external("ISO Gain Map XMP", error))?;
+        assemble_heif(
+            self.source,
+            &encoded,
+            &self.prepared.tmap_payload,
+            &xmp_payload,
+            plan,
+        )
+    }
 }
 
 struct ProXdrArtifactBuilder<'a> {
@@ -919,50 +1232,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             self.source,
             self.prepared.extracted.manifest_info.extension_start,
         )?;
-        let tiles = encoded
-            .tiles
-            .iter()
-            .map(|tile| GainMapTile {
-                payload: &tile.payload,
-                width: tile.width,
-                height: tile.height,
-            })
-            .collect::<Vec<_>>();
-        let gain_map = DirectHevcGainMap {
-            gain_map_width: encoded.gain_map_width,
-            gain_map_height: encoded.gain_map_height,
-            tile_width: encoded.tile_width,
-            tile_height: encoded.tile_height,
-            tiles: &tiles,
-            hvcc: &encoded.hvcc,
-            profile: HeifGainMapEncodeProfile {
-                channels: match encoded.profile.channels {
-                    GainMapChannels::Mono => HeifGainMapChannels::Mono,
-                    GainMapChannels::Rgb => HeifGainMapChannels::Rgb,
-                },
-                chroma: encoded.profile.layout.chroma,
-                luma_bit_depth: encoded.profile.layout.luma_bit_depth,
-                chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
-            },
-        };
-        let hdr_metadata =
-            (!plan.hdr_metadata.is_empty()).then_some(xdremux_heif::HdrMetadataAssembly {
-                static_metadata: &plan.hdr_metadata.static_metadata,
-                registered_metadata: plan.hdr_metadata.registered_metadata.as_ref(),
-            });
-        let mut output = assemble_iso_gain_map_heif(
-            body,
-            &IsoGainMapAssembly {
-                profile: transfer.map(|transfer| xdremux_heif::HdrGainMapProfile { transfer }),
-                alternate_icc: None,
-                gain_map,
-                tmap_payload: &tmap_payload,
-                xmp_payload: &xmp_payload,
-                hdr_metadata,
-            },
-        )
-        .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))?;
-
+        let mut output = assemble_heif(body, &encoded, &tmap_payload, &xmp_payload, plan)?;
         let tail = oppo_tail::build_tail(self.source, &self.prepared.extracted, plan.output)?;
         output.extend_from_slice(&tail);
         Ok(output)
@@ -1144,7 +1414,8 @@ fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
 }
 
 struct IsoGainMapValidator<'a> {
-    prepared: &'a PreparedProXdr,
+    /// ProXDR source facts, when the conversion starts from a vendor container.
+    prepared: Option<&'a PreparedProXdr>,
 }
 
 impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator<'_> {
@@ -1152,7 +1423,13 @@ impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator<'_> {
 
     fn validate_artifact(&mut self, plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
         if plan.container == OutputContainer::Jpeg {
-            return validate_dual_layer_jpeg_artifact(self.prepared, artifact);
+            let prepared = self.prepared.ok_or_else(|| {
+                RuntimeError::new(
+                    "dual-layer JPEG validation",
+                    "JPEG output requires a ProXDR source",
+                )
+            })?;
+            return validate_dual_layer_jpeg_artifact(prepared, artifact);
         }
         if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
             xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)

@@ -15,11 +15,16 @@ fn fixture(path: &str) -> PathBuf {
 }
 
 fn unique_dir() -> PathBuf {
+    static UNIQUE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time must be after epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("xdremux-cli-jpeg-{}-{stamp}", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "xdremux-cli-jpeg-{}-{stamp}-{}",
+        std::process::id(),
+        UNIQUE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ))
 }
 
 fn path_arg(path: &Path) -> OsString {

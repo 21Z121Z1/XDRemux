@@ -109,6 +109,12 @@ xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
 
 JPEG output requires identity orientation and cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources. A conversion that requests one of these fails before publication. `batch` writes HEIF output only.
 
+A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. The compressed base and the source tone-map payload keep their bytes, and the Gain Map is re-encoded. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. JPEG output and `--oppo-compatible` require a ProXDR source.
+
+```bash
+xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
+```
+
 ### Product options
 
 The following options are available to both `convert` and `batch`.

@@ -527,6 +527,77 @@ fn run_inspect(
     0
 }
 
+/// Convert a standalone ISO dual-layer HEIF through the standard graph path.
+fn convert_iso_heif(
+    language: Language,
+    source: &[u8],
+    input: &Path,
+    output: Option<&PathBuf>,
+    request: ConversionRequest,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
+    let output = output.cloned().unwrap_or_else(|| input.to_path_buf());
+    let request = ConversionRequest {
+        container: container_for_output(&output),
+        ..request
+    };
+    let runtime = PortableRuntime::new();
+    let receipt = match runtime.convert_iso_heif_file(source, &output, request, |_| {}) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
+            return 1;
+        }
+    };
+    let printed = if output == input {
+        writeln!(
+            stdout,
+            "{}",
+            message!(
+                language,
+                "converted: {} (in place)",
+                "已转换：{}（原地替换）",
+                input.display()
+            )
+        )
+    } else {
+        writeln!(
+            stdout,
+            "{}",
+            message!(
+                language,
+                "converted: {} -> {}",
+                "已转换：{} -> {}",
+                input.display(),
+                output.display()
+            )
+        )
+    };
+    if let Some(line) = hdr_metadata_report(language, &receipt.plan.hdr_metadata) {
+        let _ = writeln!(stdout, "{line}");
+    }
+    match printed {
+        Ok(()) => 0,
+        Err(error) => {
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(
+                    language,
+                    "error: could not write output: {error}",
+                    "错误：无法写入输出：{error}"
+                )
+            );
+            1
+        }
+    }
+}
+
 /// Select the output container from the requested file extension.
 ///
 /// Every other extension keeps the historical HEIF output, so an existing
@@ -668,6 +739,19 @@ fn run_convert(
     let asset = match probe_bytes(&source) {
         Ok(value) => value,
         Err(error) => {
+            // A standalone ISO dual-layer HEIF has no vendor extension block,
+            // so vendor detection fails before the standard graph is tried.
+            if xdremux_runtime::analyze_iso_heif(&source).is_ok() {
+                return convert_iso_heif(
+                    language,
+                    &source,
+                    &input,
+                    output.as_ref(),
+                    request,
+                    stdout,
+                    stderr,
+                );
+            }
             let _ = writeln!(
                 stderr,
                 "{}",

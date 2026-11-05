@@ -20,13 +20,15 @@ fn fixture(path: &str) -> Vec<u8> {
 }
 
 fn unique_dir() -> PathBuf {
+    static UNIQUE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
     let directory = std::env::temp_dir().join(format!(
-        "xdremux-jpeg-validation-{}-{stamp}",
-        std::process::id()
+        "xdremux-jpeg-validation-{}-{stamp}-{}",
+        std::process::id(),
+        UNIQUE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     fs::create_dir_all(&directory).unwrap();
     directory
