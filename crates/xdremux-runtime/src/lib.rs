@@ -1010,6 +1010,7 @@ fn build_jpeg_artifact(
     body: &[u8],
     raster: &Raster8,
     metadata: &xdremux_metadata::UltraHdrGainMapMetadata,
+    plan: &ConversionPlan,
 ) -> Result<Vec<u8>> {
     let geometry = xdremux_heif::primary_coded_geometry(body)
         .map_err(|error| RuntimeError::external("JPEG output geometry", error))?;
@@ -1043,6 +1044,21 @@ fn build_jpeg_artifact(
             ));
         }
     }
+    let enhanced = plan
+        .hdr_metadata
+        .registered_metadata
+        .as_ref()
+        .map(|registered| {
+            registered
+                .to_app8_payload()
+                .map_err(|error| RuntimeError::external("registered APP8 payload", error))
+        })
+        .transpose()?;
+    let registered = plan
+        .registered_jpeg_metadata
+        .then_some(jpeg_export::RegisteredJpegCarriers {
+            enhanced: enhanced.as_deref(),
+        });
     jpeg_export::build_dual_layer_jpeg(
         heif,
         body,
@@ -1050,6 +1066,7 @@ fn build_jpeg_artifact(
         metadata,
         base_icc.as_deref(),
         exif_tiff.as_deref(),
+        registered.as_ref(),
     )
 }
 
@@ -1203,6 +1220,7 @@ impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
                 self.source,
                 &raster,
                 &self.prepared.semantics.metadata,
+                plan,
             );
         }
         // The compatible layout declares BT.2020 PQ. A source that declares a
@@ -1278,7 +1296,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             .map_err(|error| RuntimeError::external("private Gain Map JPEG decode", error))?;
         let raster = self.normalized_gain_map_raster(decoded, plan)?;
         if plan.container == OutputContainer::Jpeg {
-            return self.build_jpeg_artifact(body, &raster);
+            return self.build_jpeg_artifact(body, &raster, plan);
         }
         let encoded = self
             .heif
@@ -1308,9 +1326,14 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
 impl ProXdrArtifactBuilder<'_> {
     /// Build the two-image JPEG from the preserved HEIF body and the decoded
     /// Gain Map samples.
-    fn build_jpeg_artifact(&self, body: &[u8], raster: &Raster8) -> Result<Vec<u8>> {
+    fn build_jpeg_artifact(
+        &self,
+        body: &[u8],
+        raster: &Raster8,
+        plan: &ConversionPlan,
+    ) -> Result<Vec<u8>> {
         let metadata = planned_gain_map_metadata(self.prepared)?;
-        build_jpeg_artifact(self.heif, body, raster, &metadata)
+        build_jpeg_artifact(self.heif, body, raster, &metadata, plan)
     }
 
     fn normalized_gain_map_raster(
@@ -1724,6 +1747,7 @@ mod tests {
             hdr_profile: HdrExportProfile::Compatible,
             output: OutputIntent::Standard,
             container: OutputContainer::Heif,
+            registered_jpeg_metadata: false,
             gain_map_target: xdremux_engine::GainMapEncodeProfile {
                 width: 1,
                 height: 1,

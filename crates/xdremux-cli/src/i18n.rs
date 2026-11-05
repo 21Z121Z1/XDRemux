@@ -136,6 +136,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         (_, "hdr_profile") => "显式选择 ProXDR 静态照片的 HDR 配置；compatible 保留默认布局。",
         (_, "json") => "输出一个稳定的 JSON 回执，而不是终端进度信息。",
         (_, "oppo_compatible") => "转换 ProXDR 静态照片时保留 OPPO 相册兼容性。",
+        (_, "jpeg_registered_metadata") => {
+            "在双层 JPEG 中写入注册 APP8 声明；简化视图偏移尚未经独立样本确认。"
+        }
         (_, "live_photo_output") => {
             "实况照片封装：pair（默认文件对）或 pvt 目录包；其他资源保持原格式。"
         }

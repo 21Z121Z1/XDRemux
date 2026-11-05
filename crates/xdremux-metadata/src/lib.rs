@@ -6,7 +6,10 @@ mod hdr;
 mod icc;
 mod registered_hdr;
 pub use hdr::{ContentLightLevel, HdrStaticMetadata, HdrTransfer, MasteringDisplay};
-pub use registered_hdr::{DynamicHdrMetadata, RegisteredHdrMetadata};
+pub use registered_hdr::{
+    registered_jpeg_base_payload_len, DynamicHdrMetadata, RegisteredHdrMetadata,
+    RegisteredJpegBaseDeclaration,
+};
 mod scene_gain_map;
 pub use scene_gain_map::{
     make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity,

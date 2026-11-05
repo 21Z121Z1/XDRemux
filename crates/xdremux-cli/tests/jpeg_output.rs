@@ -160,3 +160,44 @@ fn validate_reports_a_published_two_image_jpeg() {
 
     fs::remove_dir_all(work).ok();
 }
+
+#[test]
+fn the_registered_flag_writes_a_base_declaration() {
+    let work = unique_dir();
+    fs::create_dir_all(&work).expect("temporary directory");
+    let input = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
+    let output = work.join("registered.jpg");
+
+    let (code, _, stderr) = convert(&input, &output, &["--jpeg-registered-metadata"]);
+    assert_eq!(code, 0, "registered conversion failed: {stderr}");
+    let bytes = fs::read(&output).expect("the CLI must publish the JPEG");
+    let index = index_dual_layer_jpeg(&bytes).expect("published file must index");
+    let offsets = index
+        .registered_offsets
+        .expect("the published file must declare registered offsets");
+    assert!(offsets.raw > offsets.reduced);
+    assert_eq!(
+        index
+            .registered_app8_start
+            .map(|start| start + offsets.raw as usize),
+        Some(index.base.range.end)
+    );
+    fs::remove_dir_all(work).ok();
+}
+
+#[test]
+fn the_registered_flag_requires_the_jpeg_container() {
+    let work = unique_dir();
+    fs::create_dir_all(&work).expect("temporary directory");
+    let input = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
+    let output = work.join("registered.heic");
+
+    let (code, _, stderr) = convert(&input, &output, &["--jpeg-registered-metadata"]);
+    assert_eq!(code, 1, "the HEIF container must refuse the flag");
+    assert!(
+        stderr.contains("registered APP8 metadata applies to the two-image JPEG container"),
+        "{stderr}"
+    );
+    assert!(!output.exists());
+    fs::remove_dir_all(work).ok();
+}

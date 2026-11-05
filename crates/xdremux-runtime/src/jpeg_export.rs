@@ -97,6 +97,12 @@ fn eight_bit_samples(raster: &xdremux_codec::NormalizedRaster) -> Result<Vec<u8>
     Ok(samples)
 }
 
+/// Registered APP8 carriers to add to a two-image JPEG.
+pub(crate) struct RegisteredJpegCarriers<'a> {
+    /// Enhanced APP8 payload when the source declares registered metadata.
+    pub enhanced: Option<&'a [u8]>,
+}
+
 /// Build a two-image JPEG from a preserved HEIF body and its Gain Map samples.
 pub(crate) fn build_dual_layer_jpeg(
     heif: &LibHeifProvider,
@@ -105,6 +111,7 @@ pub(crate) fn build_dual_layer_jpeg(
     metadata: &UltraHdrGainMapMetadata,
     base_icc: Option<&[u8]>,
     exif_tiff: Option<&[u8]>,
+    registered: Option<&RegisteredJpegCarriers<'_>>,
 ) -> Result<Vec<u8>> {
     let primary_item = xdremux_heif::primary_image_item_id(body)
         .map_err(|error| external("JPEG primary item", error))?;
@@ -124,7 +131,7 @@ pub(crate) fn build_dual_layer_jpeg(
         &packed_samples(gain_map)?,
     )?;
 
-    let mut base_segments = Vec::new();
+    let mut base_segments: Vec<(u8, Vec<u8>)> = Vec::new();
     if let Some(tiff) = exif_tiff {
         let mut payload = b"Exif\0\0".to_vec();
         payload.extend_from_slice(tiff);
@@ -134,18 +141,18 @@ pub(crate) fn build_dual_layer_jpeg(
                 "the source Exif payload exceeds one APP1 segment",
             ));
         }
-        base_segments.push(payload);
+        base_segments.push((0xe1, payload));
     }
     if let Some(profile) = base_icc {
         for payload in split_icc_app2(profile).map_err(|error| external("JPEG base ICC", error))? {
-            base_segments.push(payload);
+            base_segments.push((0xe2, payload));
         }
     }
     // The primary image declares only the four-byte version; the parameters
     // stay with the gain-map image.
     let mut declaration = ISO_GAIN_MAP_APP2_IDENTIFIER.to_vec();
     declaration.extend_from_slice(&xdremux_metadata::iso_gain_map_base_app2_payload());
-    base_segments.push(declaration);
+    base_segments.push((0xe2, declaration));
 
     // No alternate ICC is written, so the application primaries are the base
     // primaries even when the source flag was zero.
@@ -154,24 +161,61 @@ pub(crate) fn build_dual_layer_jpeg(
         .map_err(|error| external("JPEG ISO gain-map metadata", error))?;
     let mut gain_payload = ISO_GAIN_MAP_APP2_IDENTIFIER.to_vec();
     gain_payload.extend_from_slice(&parameters);
+    let mut gain_segments: Vec<(u8, Vec<u8>)> = vec![(0xe2, gain_payload)];
+
+    if let Some(registered) = registered {
+        // The declaration is the last primary-image carrier, so its offsets
+        // can be computed from the segment list that precedes it.
+        let base_app = base_segments
+            .iter()
+            .map(|(marker, payload)| AppSegment {
+                marker: *marker,
+                payload,
+            })
+            .collect::<Vec<_>>();
+        let gain_app = gain_segments
+            .iter()
+            .map(|(marker, payload)| AppSegment {
+                marker: *marker,
+                payload,
+            })
+            .collect::<Vec<_>>();
+        let payload_len = xdremux_metadata::registered_jpeg_base_payload_len(2);
+        let offsets = xdremux_format::dual_jpeg::registered_app8_offsets(
+            &base_jpeg,
+            &gain_jpeg,
+            &base_app,
+            &gain_app,
+            payload_len,
+        )
+        .map_err(|error| external("registered APP8 offsets", error))?;
+        let declaration = xdremux_metadata::RegisteredJpegBaseDeclaration {
+            image_count: 2,
+            offsets: vec![(offsets.raw, offsets.reduced)],
+        };
+        let payload = declaration
+            .to_app8_payload()
+            .map_err(|error| external("registered APP8 declaration", error))?;
+        base_segments.push((0xe8, payload));
+        if let Some(enhanced) = registered.enhanced {
+            gain_segments.push((0xe8, enhanced.to_vec()));
+        }
+    }
 
     let base_app = base_segments
         .iter()
-        .enumerate()
-        .map(|(index, payload)| AppSegment {
-            // Exif is the only APP1 segment; every other carrier is APP2.
-            marker: if index == 0 && exif_tiff.is_some() {
-                0xe1
-            } else {
-                0xe2
-            },
+        .map(|(marker, payload)| AppSegment {
+            marker: *marker,
             payload,
         })
         .collect::<Vec<_>>();
-    let gain_app = [AppSegment {
-        marker: 0xe2,
-        payload: &gain_payload,
-    }];
+    let gain_app = gain_segments
+        .iter()
+        .map(|(marker, payload)| AppSegment {
+            marker: *marker,
+            payload,
+        })
+        .collect::<Vec<_>>();
 
     assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
         base: &base_jpeg,

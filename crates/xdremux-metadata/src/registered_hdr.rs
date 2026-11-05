@@ -97,6 +97,109 @@ impl DynamicHdrMetadata {
     }
 }
 
+/// Registered JPEG base-image declaration.
+///
+/// The base image declares the image count and, for each additional image, two
+/// offsets to the enhanced image. The first offset is measured from the
+/// declaration's APP8 marker in the file. The second is measured in a view
+/// without APP segments other than the JFIF one.
+///
+/// The second offset's coordinate rule is implemented as documented here and
+/// is not yet confirmed by an independent producer sample. A caller that needs
+/// external interoperability must treat it as unverified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredJpegBaseDeclaration {
+    pub image_count: u8,
+    /// `(raw offset, offset without non-JFIF APP segments)` for each additional
+    /// image, in image order.
+    pub offsets: Vec<(u32, u32)>,
+}
+
+/// `ITUT35` identity followed by the T.35 codes and the base image type.
+const APP8_BASE_HEADER: [u8; 12] = [b'I', b'T', b'U', b'T', b'3', b'5', 0x26, 0, 4, 0, 7, 1];
+const APP8_BASE_TYPE: u32 = 0x0100_0000;
+
+/// Payload length of a base declaration for `image_count` images.
+pub const fn registered_jpeg_base_payload_len(image_count: u8) -> usize {
+    // Identity, country code, two provider codes, image count, image type and
+    // one offset pair for every additional image.
+    12 + 4 + 8 * image_count.saturating_sub(1) as usize
+}
+
+impl RegisteredJpegBaseDeclaration {
+    pub fn validate(&self) -> Result<()> {
+        if !(2..=8).contains(&self.image_count) {
+            return Err(invalid("a base declaration describes two to eight images"));
+        }
+        if self.offsets.len() != usize::from(self.image_count) - 1 {
+            return Err(invalid(
+                "base declaration offsets disagree with the image count",
+            ));
+        }
+        for (raw, virtual_offset) in &self.offsets {
+            if *raw == 0 || *virtual_offset == 0 {
+                return Err(invalid("base declaration offsets must be non-zero"));
+            }
+            if virtual_offset > raw {
+                return Err(invalid(
+                    "the reduced-view offset cannot exceed the raw offset",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// APP8 payload, excluding the JPEG marker and length word.
+    pub fn to_app8_payload(&self) -> Result<Vec<u8>> {
+        self.validate()?;
+        let mut payload = APP8_BASE_HEADER.to_vec();
+        payload[11] = self.image_count;
+        payload.extend_from_slice(&APP8_BASE_TYPE.to_be_bytes());
+        for (raw, virtual_offset) in &self.offsets {
+            payload.extend_from_slice(&raw.to_be_bytes());
+            payload.extend_from_slice(&virtual_offset.to_be_bytes());
+        }
+        Self::parse_app8_payload(&payload)?;
+        Ok(payload)
+    }
+
+    /// Read a base declaration and reject an enhanced or extended payload.
+    pub fn parse_app8_payload(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < 16 || bytes.get(..6) != Some(b"ITUT35") {
+            return Err(invalid("missing registered APP8 identity"));
+        }
+        let image_count = bytes[11];
+        if bytes[..11] != APP8_BASE_HEADER[..11] || image_count < 2 {
+            return Err(invalid("unsupported registered APP8 base identity"));
+        }
+        let kind = u32::from_be_bytes(bytes[12..16].try_into().unwrap());
+        if kind != APP8_BASE_TYPE {
+            return Err(invalid(
+                "registered APP8 payload is not a base image declaration",
+            ));
+        }
+        let expected = registered_jpeg_base_payload_len(image_count);
+        if bytes.len() != expected {
+            return Err(invalid(
+                "registered APP8 base declaration length disagrees with its image count",
+            ));
+        }
+        let mut offsets = Vec::with_capacity(usize::from(image_count) - 1);
+        for pair in bytes[16..].as_chunks::<8>().0 {
+            offsets.push((
+                u32::from_be_bytes(pair[..4].try_into().unwrap()),
+                u32::from_be_bytes(pair[4..].try_into().unwrap()),
+            ));
+        }
+        let declaration = Self {
+            image_count,
+            offsets,
+        };
+        declaration.validate()?;
+        Ok(declaration)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisteredHdrMetadata {
     pub static_metadata: Option<(MasteringDisplay, ContentLightLevel)>,
@@ -234,6 +337,57 @@ impl RegisteredHdrMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jpeg_base_declaration_roundtrips_and_rejects_other_payloads() {
+        let declaration = RegisteredJpegBaseDeclaration {
+            image_count: 2,
+            offsets: vec![(1_234_567, 1_233_000)],
+        };
+        let payload = declaration.to_app8_payload().unwrap();
+        assert_eq!(
+            payload.len(),
+            registered_jpeg_base_payload_len(2),
+            "two images declare one offset pair"
+        );
+        assert_eq!(&payload[..6], b"ITUT35");
+        assert_eq!(payload[6], 0x26);
+        assert_eq!(&payload[12..16], &0x0100_0000_u32.to_be_bytes());
+        assert_eq!(
+            RegisteredJpegBaseDeclaration::parse_app8_payload(&payload).unwrap(),
+            declaration
+        );
+
+        // The enhanced payload of the same carrier is not a base declaration.
+        let registered = RegisteredHdrMetadata {
+            static_metadata: None,
+            dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+        };
+        let enhanced = registered.to_app8_payload().unwrap();
+        assert!(RegisteredJpegBaseDeclaration::parse_app8_payload(&enhanced).is_err());
+
+        // A zero, reversed, or miscounted offset is refused.
+        for offsets in [vec![(0, 0)], vec![(10, 20)], vec![(10, 5), (20, 15)]] {
+            assert!(RegisteredJpegBaseDeclaration {
+                image_count: 2,
+                offsets,
+            }
+            .to_app8_payload()
+            .is_err());
+        }
+        assert!(RegisteredJpegBaseDeclaration {
+            image_count: 1,
+            offsets: Vec::new(),
+        }
+        .to_app8_payload()
+        .is_err());
+        for end in 0..payload.len() {
+            assert!(
+                RegisteredJpegBaseDeclaration::parse_app8_payload(&payload[..end]).is_err(),
+                "truncated at {end}"
+            );
+        }
+    }
 
     #[test]
     fn carriers_preserve_checked_source_metadata_and_reject_bad_lengths() {

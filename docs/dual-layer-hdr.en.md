@@ -35,6 +35,16 @@ A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dua
 
 The conversion re-reads the published bytes before publication. It checks the structure, the carriers, the declared profile, and both image decodes.
 
+## Mapping and luminance executors
+
+Two pure executors are available to code that already holds typed inputs. Neither one reads a file.
+
+`AdditionalMapping` applies a three-by-three matrix and then an optional three-dimensional LUT. The matrix runs first in `f64` and keeps negative intermediate values. Each component is then normalized by the LUT domain. Nodes are stored with the first component fastest, and the eight nodes of the containing cell are weighted by their fractional parts. A value outside the domain is rejected by default, or clamped when the caller selects that policy. The fixed vectors cover neutral white, a non-neutral color, the red-fastest axis order, an interior sample of a three-node edge, and a non-unit domain.
+
+`AbsoluteDisplayTarget` gives relative linear `1.0` a luminance through a caller-declared reference white. A component above the peak or below the black level is clamped and counted. `relative_linear_to_pq` encodes the calibrated luminance as PQ. Fixed vectors cover 100, 203, 1,000, and 10,000 cd/m².
+
+Neither executor changes a conversion on its own. A mapping payload is not parsed from a file, and a display target is not read from a device.
+
 ## Verification
 
 Run the focused checks from the repository root:
@@ -70,14 +80,14 @@ These values describe one fixed encoding configuration. They are not a general q
 
 ## Limits and open items
 
-- The reconstruction output is relative linear BT.2020. No conversion establishes absolute luminance, a reference white, or a target display.
+- The reconstruction output is relative linear BT.2020. The absolute-luminance executor needs a caller-declared reference white; no conversion supplies one.
 - PQ and HLG tags declare an encoding. They do not prove display adaptation, tone mapping, or device presentation.
 - Dynamic metadata is retained with syntax checks only. Its display mapping is not implemented.
 - A JPEG destination requires identity orientation and a normal Exif orientation.
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
-- The registered JPEG APP8 carrier is not written. The second offset field needs an independent producer sample before a writer can be correct.
-- Additional matrix and three-dimensional LUT mappings are refused. Their payload layout, node order, and interpolation contract are unresolved.
+- The registered JPEG APP8 carrier is written only on request (`--jpeg-registered-metadata`). The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
+- Additional matrix and three-dimensional LUT mappings are refused in a conversion. The executor has an explicit contract, but the file payload layout is unresolved, so no mapping is read from a file.
 - No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.
 
 ## Code ownership

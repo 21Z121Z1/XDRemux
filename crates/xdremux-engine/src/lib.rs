@@ -195,6 +195,10 @@ pub struct ConversionRequest {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
     pub container: OutputContainer,
+    /// Write the registered APP8 declaration into a two-image JPEG. The second
+    /// offset's coordinate rule is not yet confirmed by an independent
+    /// producer sample, so this stays opt-in.
+    pub registered_jpeg_metadata: bool,
     pub apple_features: AppleFeatureRequest,
     pub live_photo_output: LivePhotoOutput,
 }
@@ -209,6 +213,7 @@ impl ConversionRequest {
             output: OutputIntent::OppoGallery,
             hdr_profile: HdrExportProfile::Compatible,
             container: OutputContainer::Heif,
+            registered_jpeg_metadata: false,
             live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
@@ -365,6 +370,7 @@ pub struct ConversionPlan {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
     pub container: OutputContainer,
+    pub registered_jpeg_metadata: bool,
     pub gain_map_target: GainMapEncodeProfile,
     pub hdr_metadata: HdrMetadataPlan,
     pub required_capabilities: Vec<OperationCapability>,
@@ -500,6 +506,11 @@ pub fn plan_conversion(
         ));
     }
 
+    if request.registered_jpeg_metadata && request.container != OutputContainer::Jpeg {
+        return Err(PlannerError::IncompatibleProductIntents(
+            "registered APP8 metadata applies to the two-image JPEG container",
+        ));
+    }
     if request.container == OutputContainer::Jpeg {
         if request.hdr_profile != HdrExportProfile::Compatible {
             return Err(PlannerError::IncompatibleProductIntents(
@@ -559,6 +570,7 @@ pub fn plan_conversion(
         output: request.output,
         hdr_profile: request.hdr_profile,
         container: request.container,
+        registered_jpeg_metadata: request.registered_jpeg_metadata,
         gain_map_target,
         hdr_metadata,
         required_capabilities,

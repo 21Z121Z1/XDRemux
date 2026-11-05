@@ -82,6 +82,12 @@ struct ProductConversionArgs {
     /// Live Photo container: pair (default) or pvt directory; other assets keep their format.
     #[arg(long, default_value = "pair", value_name = "pair|pvt")]
     live_photo_output: LivePhotoOutput,
+    /// Write the registered APP8 declaration into a two-image JPEG.
+    ///
+    /// The reduced-view offset is not yet confirmed by an independent producer
+    /// sample, so this stays opt-in.
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
+    jpeg_registered_metadata: bool,
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
     #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
     oppo_compatible: bool,
@@ -138,6 +144,7 @@ impl ProductConversionArgs {
         };
         request.live_photo_output = self.live_photo_output;
         request.hdr_profile = self.hdr_profile;
+        request.registered_jpeg_metadata = self.jpeg_registered_metadata;
         request
     }
 

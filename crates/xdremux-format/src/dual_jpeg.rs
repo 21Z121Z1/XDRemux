@@ -52,6 +52,11 @@ pub struct DualLayerJpegIndex {
     pub gain_map_has_iso_parameters: bool,
     pub base_has_icc: bool,
     pub gain_map_has_icc: bool,
+    /// Registered base declaration offsets, when the file carries one.
+    pub registered_offsets: Option<RegisteredApp8Offsets>,
+    /// Offset of the registered declaration's APP8 marker.
+    pub registered_app8_start: Option<usize>,
+    pub gain_map_has_registered_payload: bool,
 }
 
 fn app_segment_bytes(segment: &AppSegment<'_>) -> Result<Vec<u8>> {
@@ -203,6 +208,81 @@ pub fn strip_assembly_owned_segments(data: &[u8]) -> Result<Vec<u8>> {
         return Err(invalid("stripping changed the image structure"));
     }
     Ok(output)
+}
+
+/// Offsets that a registered base declaration must contain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RegisteredApp8Offsets {
+    /// Distance from the declaration's APP8 marker to the second image.
+    pub raw: u32,
+    /// The same distance in a view without APP segments other than JFIF.
+    pub reduced: u32,
+}
+
+/// Compute the registered base-declaration offsets for a planned assembly.
+///
+/// The declaration is expected as the last injected primary-image segment and
+/// carries `base_app8_payload_len` payload bytes. The reduced offset removes
+/// every APP segment other than APP0 that lies between the declaration and the
+/// second image, including the declaration itself. This rule is implemented
+/// here and is not yet confirmed by an independent producer sample.
+pub fn registered_app8_offsets(
+    base: &[u8],
+    gain_map: &[u8],
+    base_segments: &[AppSegment<'_>],
+    gain_segments: &[AppSegment<'_>],
+    base_app8_payload_len: usize,
+) -> Result<RegisteredApp8Offsets> {
+    if base_app8_payload_len == 0 || base_app8_payload_len > MAX_APP_SEGMENT_PAYLOAD {
+        return Err(invalid(
+            "registered APP8 payload length is not representable",
+        ));
+    }
+    let placeholder_payload = vec![0u8; base_app8_payload_len];
+    let mpf_payload = vec![0u8; mp_index_payload_len(2)?];
+    let mut segments = base_segments.to_vec();
+    segments.push(AppSegment {
+        marker: 0xe8,
+        payload: &placeholder_payload,
+    });
+    // The assembler adds the MPF index after the injected segments, so the
+    // planned layout must include it.
+    segments.push(AppSegment {
+        marker: 0xe2,
+        payload: &mpf_payload,
+    });
+    let image = single_image(base, "primary image")?;
+    let gain_image = single_image(gain_map, "gain-map image")?;
+    let image_one = build_image(&image, base, &segments)?;
+    let image_two = build_image(&gain_image, gain_map, gain_segments)?;
+    let indexed = single_image(&image_one, "planned primary image")?;
+    let declaration = indexed
+        .segments
+        .iter()
+        .find(|segment| segment.marker == 0xe8)
+        .ok_or_else(|| invalid("planned primary image lost its registered APP8 segment"))?;
+    let start = declaration.range.start;
+    let raw = image_one
+        .len()
+        .checked_sub(start)
+        .ok_or_else(|| invalid("registered APP8 offset underflows"))?;
+    let removed = indexed
+        .segments
+        .iter()
+        .filter(|segment| (0xe1..=0xef).contains(&segment.marker) && segment.range.start >= start)
+        .try_fold(0usize, |total, segment| {
+            total.checked_add(segment.range.len())
+        })
+        .ok_or_else(|| invalid("registered APP8 reduced offset overflows"))?;
+    let reduced = raw
+        .checked_sub(removed)
+        .ok_or_else(|| invalid("registered APP8 reduced offset underflows"))?;
+    let _ = image_two.len();
+    Ok(RegisteredApp8Offsets {
+        raw: u32::try_from(raw).map_err(|_| invalid("registered APP8 offset exceeds u32"))?,
+        reduced: u32::try_from(reduced)
+            .map_err(|_| invalid("registered APP8 reduced offset exceeds u32"))?,
+    })
 }
 
 /// Assemble a primary image and a gain-map image into one two-image JPEG.
@@ -373,6 +453,7 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
 
     let mut gain_iso = false;
     let mut gain_icc = false;
+    let mut gain_registered = false;
     for segment in &gain_map.segments {
         if segment.marker != 0xe2 {
             continue;
@@ -391,7 +472,16 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
             gain_icc = true;
         }
     }
+    if gain_map
+        .segments
+        .iter()
+        .any(|segment| segment.marker == 0xe8)
+    {
+        gain_registered = true;
+    }
 
+    let offsets = registered_offsets(&base, data, tiff_start);
+    let app8_start = registered_app8_start(&base, data);
     Ok(DualLayerJpegIndex {
         base,
         gain_map,
@@ -401,6 +491,37 @@ pub fn index_dual_layer_jpeg(data: &[u8]) -> Result<DualLayerJpegIndex> {
         gain_map_has_iso_parameters: gain_iso,
         base_has_icc: icc,
         gain_map_has_icc: gain_icc,
+        registered_offsets: offsets,
+        registered_app8_start: app8_start,
+        gain_map_has_registered_payload: gain_registered,
+    })
+}
+
+fn registered_app8_start(image: &JpegImage, data: &[u8]) -> Option<usize> {
+    image
+        .segments
+        .iter()
+        .find(|segment| segment.marker == 0xe8 && data.get(segment.payload.clone()).is_some())
+        .map(|segment| segment.range.start)
+}
+
+fn registered_offsets(
+    base: &JpegImage,
+    data: &[u8],
+    _tiff_start: usize,
+) -> Option<RegisteredApp8Offsets> {
+    let start = registered_app8_start(base, data)?;
+    let removed = base
+        .segments
+        .iter()
+        .filter(|segment| (0xe1..=0xef).contains(&segment.marker) && segment.range.start >= start)
+        .map(|segment| segment.range.len())
+        .sum::<usize>();
+    let raw = base.range.end.checked_sub(start)?;
+    let reduced = raw.checked_sub(removed)?;
+    Some(RegisteredApp8Offsets {
+        raw: u32::try_from(raw).ok()?,
+        reduced: u32::try_from(reduced).ok()?,
     })
 }
 
@@ -672,6 +793,69 @@ mod tests {
         // Entropy-coded data survives unchanged.
         let scan_end = image.scans[0].range.end;
         assert_eq!(stripped[scan_end - 4..scan_end], [0x11, 0xff, 0x00, 0x22]);
+    }
+
+    #[test]
+    fn registered_offsets_account_for_the_carriers_between_the_declaration_and_the_second_image() {
+        let base = jpeg(true, &[0x11]);
+        let gain = jpeg(true, &[0x22]);
+        let iso = iso_base();
+        let profile = icc(b"profile");
+        let base_segments = [
+            AppSegment {
+                marker: 0xe2,
+                payload: &profile,
+            },
+            AppSegment {
+                marker: 0xe2,
+                payload: &iso,
+            },
+        ];
+        let gain_iso = iso_gain();
+        let gain_segments = [AppSegment {
+            marker: 0xe2,
+            payload: &gain_iso,
+        }];
+        let payload_len = 24;
+        let offsets =
+            registered_app8_offsets(&base, &gain, &base_segments, &gain_segments, payload_len)
+                .unwrap();
+        assert!(offsets.raw > offsets.reduced);
+
+        // Assemble with the real declaration in the planned position.
+        let mut declaration = vec![0xee; payload_len];
+        declaration[0] = b'I';
+        let base_segments = [
+            AppSegment {
+                marker: 0xe2,
+                payload: &profile,
+            },
+            AppSegment {
+                marker: 0xe2,
+                payload: &iso,
+            },
+            AppSegment {
+                marker: 0xe8,
+                payload: &declaration,
+            },
+        ];
+        let bytes = assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+            base: &base,
+            gain_map: &gain,
+            base_segments: &base_segments,
+            gain_segments: &gain_segments,
+        })
+        .unwrap();
+        let index = index_dual_layer_jpeg(&bytes).unwrap();
+        assert_eq!(index.registered_offsets, Some(offsets));
+        assert_eq!(
+            index
+                .registered_app8_start
+                .map(|start| start + offsets.raw as usize),
+            Some(index.base.range.end),
+            "the raw offset must reach the second Start Of Image"
+        );
+        assert!(!index.gain_map_has_registered_payload);
     }
 
     #[test]
