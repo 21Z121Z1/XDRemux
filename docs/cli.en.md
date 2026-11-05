@@ -129,7 +129,9 @@ xdremux convert --input IMG_001.heic --output IMG_001_pq.heic --hdr-profile bt20
 xdremux convert --input IMG_001.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
 ```
 
-The CLI does not synthesize mastering, content light, or dynamic metadata. The Rust HEIF assembly API accepts checked `mdcv`, `clli`, and registered `it35` metadata from a caller that has source data. Registered static data must agree with the derived item's properties. Dynamic payloads receive syntax checks and retain their bytes. Applying dynamic display mapping is outside this exporter. The JPEG APP8 payload codec does not provide a dual-JFIF writer.
+A conversion carries the HDR metadata that its source declares for the derived HDR image. The exporter reads `mdcv`, `clli`, and registered `it35` carriers only when the source associates them with the derived `tmap` item. A carrier that describes another image is reported as not applicable and is not copied. The published file declares exactly the retained carriers. The conversion re-reads them from the final bytes before publication. Static values that both carrier kinds declare must agree. A disagreement fails the conversion. Values are copied, not regenerated. A missing value stays missing.
+
+Dynamic payloads receive syntax checks and retain their bytes. Applying dynamic display mapping is outside this exporter. The JPEG APP8 payload codec does not provide a dual-JFIF writer.
 
 ### PVT directory output
 

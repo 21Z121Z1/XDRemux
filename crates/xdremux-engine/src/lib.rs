@@ -289,6 +289,53 @@ impl GainMapEncoderCapabilities {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionAnalysis {
     pub gain_map: GainMapSourceProfile,
+    /// HDR metadata the source declares for the image that will be
+    /// reconstructed. Absent fields stay absent.
+    pub hdr_metadata: SourceHdrMetadataFacts,
+}
+
+/// Checked HDR metadata facts read from the source container.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceHdrMetadataFacts {
+    pub static_metadata: xdremux_metadata::HdrStaticMetadata,
+    pub registered_metadata: Option<xdremux_metadata::RegisteredHdrMetadata>,
+}
+
+impl SourceHdrMetadataFacts {
+    pub fn is_empty(&self) -> bool {
+        self.static_metadata.is_empty() && self.registered_metadata.is_none()
+    }
+}
+
+/// Which image the planned HDR metadata describes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum HdrMetadataOrigin {
+    /// The source declared no HDR metadata for the reconstructed image.
+    #[default]
+    Absent,
+    /// The source declared the metadata for the image this conversion
+    /// reconstructs. Values are copied, not regenerated.
+    Source,
+}
+
+/// HDR metadata carriers the output must declare for its derived HDR image.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HdrMetadataPlan {
+    pub static_metadata: xdremux_metadata::HdrStaticMetadata,
+    pub registered_metadata: Option<xdremux_metadata::RegisteredHdrMetadata>,
+    pub origin: HdrMetadataOrigin,
+}
+
+impl HdrMetadataPlan {
+    pub fn is_empty(&self) -> bool {
+        self.static_metadata.is_empty() && self.registered_metadata.is_none()
+    }
+
+    pub fn carries_dynamic_metadata(&self) -> bool {
+        self.registered_metadata
+            .as_ref()
+            .is_some_and(|m| m.dynamic_metadata.is_some())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -296,6 +343,7 @@ pub struct ConversionPlan {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
     pub gain_map_target: GainMapEncodeProfile,
+    pub hdr_metadata: HdrMetadataPlan,
     pub required_capabilities: Vec<OperationCapability>,
 }
 
@@ -452,10 +500,25 @@ pub fn plan_conversion(
         return Err(PlannerError::MissingOperationCapabilities(missing));
     }
 
+    // The conversion reconstructs the same alternate image: the compressed base
+    // is preserved and the Gain Map keeps its declared parameters. Source
+    // metadata therefore keeps describing the output. Values are copied, never
+    // regenerated, and absence stays absence.
+    let hdr_metadata = HdrMetadataPlan {
+        static_metadata: analysis.hdr_metadata.static_metadata.clone(),
+        registered_metadata: analysis.hdr_metadata.registered_metadata.clone(),
+        origin: if analysis.hdr_metadata.is_empty() {
+            HdrMetadataOrigin::Absent
+        } else {
+            HdrMetadataOrigin::Source
+        },
+    };
+
     Ok(ConversionPlan {
         output: request.output,
         hdr_profile: request.hdr_profile,
         gain_map_target,
+        hdr_metadata,
         required_capabilities,
     })
 }
@@ -587,6 +650,7 @@ mod tests {
         ]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
 
         for apple_features in [
@@ -670,6 +734,7 @@ mod tests {
             CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
 
         assert_eq!(
@@ -692,6 +757,7 @@ mod tests {
         assert!(request.apple_features.any());
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let capabilities = capability_inventory([layout(ChromaSampling::Yuv444, 8)]);
         assert_eq!(
@@ -708,6 +774,7 @@ mod tests {
         let capabilities = capability_inventory([target]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let request = ConversionRequest {
             apple_features: AppleFeatureRequest {
@@ -730,6 +797,7 @@ mod tests {
     fn plan_contains_only_execution_relevant_decisions() {
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let request = ConversionRequest {
             apple_features: AppleFeatureRequest {

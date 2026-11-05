@@ -171,6 +171,9 @@ pub struct PreparedProXdr {
     pub analysis: ConversionAnalysis,
     pub extracted: ExtractedLhdr,
     pub scale: ResolvedScale,
+    /// HDR metadata the source declares for its derived HDR image, with the
+    /// carriers that supplied each value.
+    pub hdr_metadata: xdremux_heif::SourceHdrMetadata,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -805,11 +808,21 @@ pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
         .map_err(|error| RuntimeError::external("Gain Map source profile", error))?;
     let scale = resolve(&extracted.meta_floats, hdr_extraction_mode(extracted.mode))
         .map_err(|error| RuntimeError::external("HDR scale resolution", error))?;
-    let analysis = ConversionAnalysis { gain_map };
+    let body = standard_heif_body(source, extracted.manifest_info.extension_start)?;
+    let hdr_metadata = xdremux_heif::extract_hdr_metadata(body)
+        .map_err(|error| RuntimeError::external("source HDR metadata", error))?;
+    let analysis = ConversionAnalysis {
+        gain_map,
+        hdr_metadata: xdremux_engine::SourceHdrMetadataFacts {
+            static_metadata: hdr_metadata.static_metadata.clone(),
+            registered_metadata: hdr_metadata.registered_metadata.clone(),
+        },
+    };
     Ok(PreparedProXdr {
         analysis,
         extracted,
         scale,
+        hdr_metadata,
     })
 }
 
@@ -907,19 +920,20 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
                 chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
             },
         };
-        let static_metadata = xdremux_metadata::HdrStaticMetadata::default();
+        let hdr_metadata =
+            (!plan.hdr_metadata.is_empty()).then_some(xdremux_heif::HdrMetadataAssembly {
+                static_metadata: &plan.hdr_metadata.static_metadata,
+                registered_metadata: plan.hdr_metadata.registered_metadata.as_ref(),
+            });
         let mut output = assemble_iso_gain_map_heif(
             body,
             &IsoGainMapAssembly {
-                profile: transfer.map(|transfer| xdremux_heif::HdrGainMapProfile {
-                    transfer,
-                    static_metadata: &static_metadata,
-                    registered_metadata: None,
-                }),
+                profile: transfer.map(|transfer| xdremux_heif::HdrGainMapProfile { transfer }),
                 alternate_icc: None,
                 gain_map,
                 tmap_payload: &tmap_payload,
                 xmp_payload: &xmp_payload,
+                hdr_metadata,
             },
         )
         .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))?;
@@ -1068,13 +1082,35 @@ impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
         if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
             xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)
                 .map(|_| ())
-                .map_err(|e| RuntimeError::external("HDR profile validation", e))
+                .map_err(|e| RuntimeError::external("HDR profile validation", e))?;
         } else {
             validate_gain_map_structure(artifact)
                 .map(|_| ())
-                .map_err(|error| RuntimeError::external("ISO Gain Map validation", error))
+                .map_err(|error| RuntimeError::external("ISO Gain Map validation", error))?;
         }
+        verify_published_hdr_metadata(plan, artifact)
     }
+}
+
+/// Read the published bytes back and compare their HDR metadata carriers with
+/// the plan. A carrier the plan does not declare must not appear, and a
+/// declared value must survive unchanged.
+fn verify_published_hdr_metadata(plan: &ConversionPlan, artifact: &[u8]) -> Result<()> {
+    let observed = xdremux_heif::extract_hdr_metadata(artifact)
+        .map_err(|error| RuntimeError::external("published HDR metadata readback", error))?;
+    if observed.static_metadata != plan.hdr_metadata.static_metadata {
+        return Err(RuntimeError::new(
+            "published HDR metadata readback",
+            "static HDR metadata in the published file does not match the conversion plan",
+        ));
+    }
+    if observed.registered_metadata != plan.hdr_metadata.registered_metadata {
+        return Err(RuntimeError::new(
+            "published HDR metadata readback",
+            "registered HDR metadata in the published file does not match the conversion plan",
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1238,6 +1274,7 @@ mod tests {
                     chroma_bit_depth: 8,
                 },
             },
+            hdr_metadata: xdremux_engine::HdrMetadataPlan::default(),
             required_capabilities: Vec::new(),
         };
         publisher.publish_artifact(&plan, b"new".to_vec()).unwrap();

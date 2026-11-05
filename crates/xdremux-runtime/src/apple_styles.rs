@@ -1680,6 +1680,7 @@ mod tests {
                     },
                     tmap_payload: &tmap,
                     xmp_payload: &xmp,
+                    hdr_metadata: None,
                 },
             )
             .unwrap();

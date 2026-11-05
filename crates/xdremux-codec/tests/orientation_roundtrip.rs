@@ -119,6 +119,7 @@ fn assemble(
         &IsoGainMapAssembly {
             profile: None,
             alternate_icc: None,
+            hdr_metadata: None,
             gain_map: DirectHevcGainMap {
                 gain_map_width: width,
                 gain_map_height: height,

@@ -98,7 +98,8 @@ fn decode_hex(value: &str) -> Vec<u8> {
 fn assemble_and_validate(
     source: &[u8],
     encoded: &xdremux_codec::EncodedGainMapTiles,
-    profile: Option<xdremux_heif::HdrGainMapProfile<'_>>,
+    profile: Option<xdremux_heif::HdrGainMapProfile>,
+    hdr_metadata: Option<xdremux_heif::HdrMetadataAssembly<'_>>,
 ) -> Vec<u8> {
     let tiles: Vec<GainMapTile<'_>> = encoded
         .tiles
@@ -120,6 +121,7 @@ fn assemble_and_validate(
         &IsoGainMapAssembly {
             profile,
             alternate_icc: None,
+            hdr_metadata,
             gain_map: DirectHevcGainMap {
                 gain_map_width: encoded.gain_map_width,
                 gain_map_height: encoded.gain_map_height,
@@ -178,7 +180,7 @@ fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_in
         let encoded = provider
             .encode_gain_map_tiles(&request)
             .unwrap_or_else(|error| panic!("libheif {chroma:?} encode failed: {error}"));
-        let output = assemble_and_validate(&source, &encoded, None);
+        let output = assemble_and_validate(&source, &encoded, None, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         assert_eq!(structure.width, width);
         assert_eq!(structure.height, height);
@@ -231,6 +233,8 @@ fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
         &encoded,
         Some(xdremux_heif::HdrGainMapProfile {
             transfer: HdrTransfer::Pq,
+        }),
+        Some(xdremux_heif::HdrMetadataAssembly {
             static_metadata: &static_metadata,
             registered_metadata: Some(&registered),
         }),
@@ -301,7 +305,7 @@ fn gain_map_matrix_range_and_rgb_codes_agree_after_assembly() {
         request.tile_size = 256;
         request.quality = 100;
         let encoded = provider.encode_gain_map_tiles(&request).unwrap();
-        let output = assemble_and_validate(&source, &encoded, None);
+        let output = assemble_and_validate(&source, &encoded, None, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         let top = scan_top_level_boxes(&output).unwrap();
         let meta =

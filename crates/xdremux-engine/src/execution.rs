@@ -161,6 +161,7 @@ mod tests {
 
     fn analysis() -> ConversionAnalysis {
         ConversionAnalysis {
+            hdr_metadata: crate::SourceHdrMetadataFacts::default(),
             gain_map: GainMapSourceProfile {
                 width: 64,
                 height: 32,

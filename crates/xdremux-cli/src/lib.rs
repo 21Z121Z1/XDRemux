@@ -284,6 +284,38 @@ fn write_clap_error(
     code
 }
 
+/// Describe the HDR metadata the conversion carried from the source.
+///
+/// Values are reported as preserved source facts. Dynamic metadata is retained
+/// with syntax checks only; its display mapping is a separate capability.
+fn hdr_metadata_report(
+    language: Language,
+    metadata: &xdremux_engine::HdrMetadataPlan,
+) -> Option<String> {
+    if metadata.is_empty() {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if metadata.static_metadata.mastering_display.is_some() {
+        parts.push("mastering display");
+    }
+    if metadata.static_metadata.content_light_level.is_some() {
+        parts.push("content light level");
+    }
+    if metadata.carries_dynamic_metadata() {
+        parts.push("dynamic metadata (syntax-checked, display mapping not applied)");
+    }
+    if parts.is_empty() {
+        parts.push("registered metadata");
+    }
+    Some(message!(
+        language,
+        "HDR metadata preserved from source: {}",
+        "已保留源文件 HDR 元数据：{}",
+        parts.join(", ")
+    ))
+}
+
 fn parse_cli_language(
     args: impl IntoIterator<Item = OsString>,
     language: Language,
@@ -820,15 +852,18 @@ fn run_convert(
                     return 1;
                 }
             } else {
-                if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
-                    let _ = writeln!(
-                        stderr,
-                        "{}",
-                        message!(language, "error: {error}", "错误：{error}")
-                    );
-                    return 1;
-                }
-                if output == input {
+                let receipt = match runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
+                    Ok(receipt) => receipt,
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        return 1;
+                    }
+                };
+                let printed = if output == input {
                     writeln!(
                         stdout,
                         "{}",
@@ -851,7 +886,11 @@ fn run_convert(
                             output.display()
                         )
                     )
+                };
+                if let Some(line) = hdr_metadata_report(language, &receipt.plan.hdr_metadata) {
+                    let _ = writeln!(stdout, "{line}");
                 }
+                printed
             }
         }
     };

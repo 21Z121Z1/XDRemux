@@ -438,7 +438,11 @@ fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
 }
 
-fn one_top_level<'a>(boxes: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&'a BoxHeader> {
+pub(crate) fn one_top_level<'a>(
+    boxes: &'a [BoxHeader],
+    kind: FourCC,
+    context: &str,
+) -> Result<&'a BoxHeader> {
     let mut matches = boxes.iter().filter(|header| header.kind == kind);
     let Some(first) = matches.next() else {
         return Err(invalid(format!("{context} is missing")));
@@ -703,14 +707,17 @@ fn associated_property<'a>(
     Ok(property)
 }
 
-struct MetaIndex<'a> {
-    items: HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
-    locations: HashMap<u32, &'a IlocEntry>,
-    ipma_by_item: HashMap<u32, &'a IpmaEntry>,
-    properties: HashMap<u32, &'a PropertyInfo>,
+pub(crate) struct MetaIndex<'a> {
+    pub(crate) items: HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
+    pub(crate) locations: HashMap<u32, &'a IlocEntry>,
+    pub(crate) ipma_by_item: HashMap<u32, &'a IpmaEntry>,
+    pub(crate) properties: HashMap<u32, &'a PropertyInfo>,
 }
 
-fn validate_meta_integrity<'a>(source: &[u8], meta: &'a ParsedMeta) -> Result<MetaIndex<'a>> {
+pub(crate) fn validate_meta_integrity<'a>(
+    source: &[u8],
+    meta: &'a ParsedMeta,
+) -> Result<MetaIndex<'a>> {
     let mut items = HashMap::new();
     for item in &meta.iinf.entries {
         if items.insert(item.item_id, item).is_some() {
