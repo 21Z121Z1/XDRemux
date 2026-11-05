@@ -113,3 +113,26 @@ fn a_non_pq_iso_source_needs_a_matching_profile() {
 
     fs::remove_dir_all(work).ok();
 }
+
+#[test]
+fn a_published_iso_heif_converts_to_a_two_image_jpeg() {
+    let work = unique_dir();
+    let input = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
+    let pq = work.join("pq.heic");
+    let jpeg = work.join("output.jpg");
+
+    let (code, _, stderr) = convert(&input, &pq, &["--hdr-profile", "bt2020-pq"]);
+    assert_eq!(code, 0, "PQ conversion failed: {stderr}");
+
+    let (code, stdout, stderr) = convert(&pq, &jpeg, &[]);
+    assert_eq!(
+        code, 0,
+        "an ISO source must convert to a two-image JPEG: {stderr}"
+    );
+    assert!(stdout.contains("converted:"), "{stdout}");
+    let bytes = fs::read(&jpeg).expect("the CLI must publish the JPEG");
+    xdremux_format::dual_jpeg::index_dual_layer_jpeg(&bytes)
+        .expect("published file must be a two-image JPEG");
+
+    fs::remove_dir_all(work).ok();
+}

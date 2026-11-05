@@ -687,7 +687,7 @@ impl PortableRuntime {
             heif: &self.heif,
         };
         let mut validator = IsoGainMapValidator {
-            prepared: Some(&prepared),
+            expected_gain_map: Some(planned_gain_map_metadata(&prepared)?),
         };
         let mut publisher = MemoryPublisher;
         let receipt = execute_conversion(
@@ -726,7 +726,7 @@ impl PortableRuntime {
             heif: &self.heif,
         };
         let mut validator = IsoGainMapValidator {
-            prepared: Some(&prepared),
+            expected_gain_map: Some(planned_gain_map_metadata(&prepared)?),
         };
         let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
         let receipt = execute_conversion(
@@ -766,7 +766,9 @@ impl PortableRuntime {
             prepared: &prepared,
             heif: &self.heif,
         };
-        let mut validator = IsoGainMapValidator { prepared: None };
+        let mut validator = IsoGainMapValidator {
+            expected_gain_map: Some(prepared.semantics.metadata.clone()),
+        };
         let mut publisher = MemoryPublisher;
         let receipt = execute_conversion(
             &analysis,
@@ -804,7 +806,9 @@ impl PortableRuntime {
             prepared: &prepared,
             heif: &self.heif,
         };
-        let mut validator = IsoGainMapValidator { prepared: None };
+        let mut validator = IsoGainMapValidator {
+            expected_gain_map: Some(prepared.semantics.metadata.clone()),
+        };
         let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
         let receipt = execute_conversion(
             &analysis,
@@ -997,6 +1001,58 @@ fn planned_gain_map_metadata(
         .map_err(|error| RuntimeError::external("ISO Gain Map metadata", error))
 }
 
+/// Build a two-image JPEG from a preserved HEIF body and Gain Map samples.
+///
+/// The base image keeps its ICC profile and Exif payload. Orientation must be
+/// identity so the single Exif payload stays true for both images.
+fn build_jpeg_artifact(
+    heif: &LibHeifProvider,
+    body: &[u8],
+    raster: &Raster8,
+    metadata: &xdremux_metadata::UltraHdrGainMapMetadata,
+) -> Result<Vec<u8>> {
+    let geometry = xdremux_heif::primary_coded_geometry(body)
+        .map_err(|error| RuntimeError::external("JPEG output geometry", error))?;
+    if geometry.quarter_turns_ccw != 0 || geometry.mirror_axis.is_some() {
+        return Err(RuntimeError::new(
+            "JPEG output",
+            "JPEG output requires identity orientation; the source declares a rotation or mirror",
+        ));
+    }
+    let base_icc = xdremux_heif::primary_icc_profile(body)
+        .map_err(|error| RuntimeError::external("JPEG base ICC", error))?;
+    if base_icc.is_none()
+        && xdremux_heif::primary_sdr_color_space(body)
+            .map_err(|error| RuntimeError::external("JPEG base color", error))?
+            != xdremux_metadata::SdrColorSpace::Srgb
+    {
+        return Err(RuntimeError::new(
+            "JPEG output",
+            "a non-sRGB base requires a source ICC profile, which the source does not carry",
+        ));
+    }
+    let exif_tiff = xdremux_format::heif_exif_tiff(body)
+        .map_err(|error| RuntimeError::external("JPEG Exif", error))?;
+    if let Some(tiff) = &exif_tiff {
+        let orientation = xdremux_format::exif::parse_heif_exif_orientation(tiff)
+            .map_err(|error| RuntimeError::external("JPEG Exif orientation", error))?;
+        if orientation != xdremux_format::Orientation::Normal {
+            return Err(RuntimeError::new(
+                "JPEG output",
+                "JPEG output requires a normal Exif orientation",
+            ));
+        }
+    }
+    jpeg_export::build_dual_layer_jpeg(
+        heif,
+        body,
+        raster,
+        metadata,
+        base_icc.as_deref(),
+        exif_tiff.as_deref(),
+    )
+}
+
 /// Assemble an ISO gain-map HEIF from encoded Gain Map tiles.
 ///
 /// The caller keeps the source body, the tone-map payload and the XMP payload;
@@ -1117,17 +1173,37 @@ impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
     type Error = RuntimeError;
 
     fn build_artifact(&mut self, plan: &ConversionPlan) -> Result<Self::Artifact> {
-        if plan.container == OutputContainer::Jpeg {
-            return Err(RuntimeError::new(
-                "ISO HDR HEIF conversion",
-                "JPEG output currently requires a ProXDR source",
-            ));
-        }
         if plan.output == xdremux_engine::OutputIntent::OppoGallery {
             return Err(RuntimeError::new(
                 "ISO HDR HEIF conversion",
                 "OPPO Gallery compatibility requires a ProXDR source",
             ));
+        }
+        let structure = &self.prepared.semantics.structure;
+        let decoded = self
+            .heif
+            .decode_coded_item_normalized(
+                self.source,
+                structure.gain_map_item_id,
+                structure.channel_count,
+            )
+            .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map decode", error))?;
+        let raster = normalized_raster_to_raster8(&decoded)?;
+        if plan.container == OutputContainer::Jpeg {
+            // A two-image JPEG has no alternate ICC, so the gain operation must
+            // already run in the base application space.
+            if !self.prepared.semantics.metadata.use_base_color_space {
+                return Err(RuntimeError::new(
+                    "ISO HDR HEIF conversion",
+                    "JPEG output cannot declare the source's alternate application space",
+                ));
+            }
+            return build_jpeg_artifact(
+                self.heif,
+                self.source,
+                &raster,
+                &self.prepared.semantics.metadata,
+            );
         }
         // The compatible layout declares BT.2020 PQ. A source that declares a
         // different alternate encoding must select a matching profile instead
@@ -1146,16 +1222,6 @@ impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
                 "the compatible layout declares BT.2020 PQ; select --hdr-profile bt2020-pq or bt2020-hlg for this source",
             ));
         }
-        let structure = &self.prepared.semantics.structure;
-        let decoded = self
-            .heif
-            .decode_coded_item_normalized(
-                self.source,
-                structure.gain_map_item_id,
-                structure.channel_count,
-            )
-            .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map decode", error))?;
-        let raster = normalized_raster_to_raster8(&decoded)?;
         let encoded = self
             .heif
             .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
@@ -1243,47 +1309,8 @@ impl ProXdrArtifactBuilder<'_> {
     /// Build the two-image JPEG from the preserved HEIF body and the decoded
     /// Gain Map samples.
     fn build_jpeg_artifact(&self, body: &[u8], raster: &Raster8) -> Result<Vec<u8>> {
-        let geometry = xdremux_heif::primary_coded_geometry(body)
-            .map_err(|error| RuntimeError::external("JPEG output geometry", error))?;
-        if geometry.quarter_turns_ccw != 0 || geometry.mirror_axis.is_some() {
-            return Err(RuntimeError::new(
-                "JPEG output",
-                "JPEG output requires identity orientation; the source declares a rotation or mirror",
-            ));
-        }
         let metadata = planned_gain_map_metadata(self.prepared)?;
-        let base_icc = xdremux_heif::primary_icc_profile(body)
-            .map_err(|error| RuntimeError::external("JPEG base ICC", error))?;
-        if base_icc.is_none()
-            && xdremux_heif::primary_sdr_color_space(body)
-                .map_err(|error| RuntimeError::external("JPEG base color", error))?
-                != xdremux_metadata::SdrColorSpace::Srgb
-        {
-            return Err(RuntimeError::new(
-                "JPEG output",
-                "a non-sRGB base requires a source ICC profile, which the source does not carry",
-            ));
-        }
-        let exif_tiff = xdremux_format::heif_exif_tiff(body)
-            .map_err(|error| RuntimeError::external("JPEG Exif", error))?;
-        if let Some(tiff) = &exif_tiff {
-            let orientation = xdremux_format::exif::parse_heif_exif_orientation(tiff)
-                .map_err(|error| RuntimeError::external("JPEG Exif orientation", error))?;
-            if orientation != xdremux_format::Orientation::Normal {
-                return Err(RuntimeError::new(
-                    "JPEG output",
-                    "JPEG output requires a normal Exif orientation",
-                ));
-            }
-        }
-        jpeg_export::build_dual_layer_jpeg(
-            self.heif,
-            body,
-            raster,
-            &metadata,
-            base_icc.as_deref(),
-            exif_tiff.as_deref(),
-        )
+        build_jpeg_artifact(self.heif, body, raster, &metadata)
     }
 
     fn normalized_gain_map_raster(
@@ -1413,23 +1440,23 @@ fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
     })
 }
 
-struct IsoGainMapValidator<'a> {
-    /// ProXDR source facts, when the conversion starts from a vendor container.
-    prepared: Option<&'a PreparedProXdr>,
+struct IsoGainMapValidator {
+    /// Gain Map operation the published file must declare.
+    expected_gain_map: Option<xdremux_metadata::UltraHdrGainMapMetadata>,
 }
 
-impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator<'_> {
+impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
     type Error = RuntimeError;
 
     fn validate_artifact(&mut self, plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
         if plan.container == OutputContainer::Jpeg {
-            let prepared = self.prepared.ok_or_else(|| {
+            let expected = self.expected_gain_map.as_ref().ok_or_else(|| {
                 RuntimeError::new(
                     "dual-layer JPEG validation",
-                    "JPEG output requires a ProXDR source",
+                    "the conversion has no planned Gain Map operation",
                 )
             })?;
-            return validate_dual_layer_jpeg_artifact(prepared, artifact);
+            return validate_dual_layer_jpeg_artifact(expected, artifact);
         }
         if let Some(transfer) = hdr_profile_transfer(plan.hdr_profile) {
             xdremux_heif::validate_hdr_gain_map_profile(artifact, transfer)
@@ -1460,7 +1487,10 @@ fn same_gain_map_values(
 }
 
 /// Read the published two-image JPEG back: carriers, metadata and both decodes.
-fn validate_dual_layer_jpeg_artifact(prepared: &PreparedProXdr, artifact: &[u8]) -> Result<()> {
+fn validate_dual_layer_jpeg_artifact(
+    expected: &xdremux_metadata::UltraHdrGainMapMetadata,
+    artifact: &[u8],
+) -> Result<()> {
     let index = xdremux_format::dual_jpeg::index_dual_layer_jpeg(artifact)
         .map_err(|error| RuntimeError::external("dual-layer JPEG validation", error))?;
     if !index.base_has_iso_declaration || !index.gain_map_has_iso_parameters {
@@ -1469,7 +1499,6 @@ fn validate_dual_layer_jpeg_artifact(prepared: &PreparedProXdr, artifact: &[u8])
             "the published file does not declare the ISO 21496-1 carriers",
         ));
     }
-    let expected = planned_gain_map_metadata(prepared)?;
     let gain_bytes = artifact
         .get(index.gain_map.range.clone())
         .ok_or_else(|| RuntimeError::new("dual-layer JPEG validation", "gain-map range"))?;
@@ -1481,7 +1510,7 @@ fn validate_dual_layer_jpeg_artifact(prepared: &PreparedProXdr, artifact: &[u8])
                 "the published gain-map image declares no metadata",
             )
         })?;
-    if !same_gain_map_values(&observed, &expected) {
+    if !same_gain_map_values(&observed, expected) {
         return Err(RuntimeError::new(
             "dual-layer JPEG validation",
             "the published gain-map metadata does not match the source operation",

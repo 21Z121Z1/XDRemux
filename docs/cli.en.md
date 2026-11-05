@@ -101,7 +101,7 @@ xdremux convert --input IMG_001.jpg
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
 
-A `.jpg` or `.jpeg` destination selects the two-image JPEG container for a ProXDR still. The primary image is re-encoded as JPEG and keeps the source ICC profile. The gain map keeps its samples and the ISO 21496-1 APP2 carriers. An MPF index describes both images. Every other destination extension keeps HEIF output.
+A `.jpg` or `.jpeg` destination selects the two-image JPEG container. The primary image is re-encoded as JPEG and keeps the source ICC profile. The gain map keeps its samples and the ISO 21496-1 APP2 carriers. An MPF index describes both images. Every other destination extension keeps HEIF output.
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
@@ -109,7 +109,7 @@ xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
 
 JPEG output requires identity orientation and cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources. A conversion that requests one of these fails before publication. `batch` writes HEIF output only.
 
-A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. The compressed base and the source tone-map payload keep their bytes, and the Gain Map is re-encoded. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. JPEG output and `--oppo-compatible` require a ProXDR source.
+A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. The compressed base and the source tone-map payload keep their bytes, and the Gain Map is re-encoded. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. `--oppo-compatible` requires a ProXDR source.
 
 ```bash
 xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg

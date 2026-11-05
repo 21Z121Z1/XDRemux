@@ -87,13 +87,13 @@ fn the_compatible_layout_is_refused_for_a_non_pq_source() {
 }
 
 #[test]
-fn jpeg_output_from_an_iso_source_is_refused() {
+fn jpeg_output_from_an_iso_source_publishes_a_two_image_jpeg() {
     let source = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
     let runtime = PortableRuntime::new();
     let pq = runtime
         .convert_proxdr_bytes(&source, request(HdrExportProfile::Bt2020Pq), |_| {})
         .expect("ProXDR to PQ conversion must succeed");
-    let error = runtime
+    let jpeg = runtime
         .convert_iso_heif_bytes(
             &pq.bytes,
             ConversionRequest {
@@ -102,13 +102,18 @@ fn jpeg_output_from_an_iso_source_is_refused() {
             },
             |_| {},
         )
-        .expect_err("JPEG output from an ISO source is not supported yet");
-    assert!(
-        error
-            .to_string()
-            .contains("JPEG output currently requires a ProXDR source"),
-        "unexpected error: {error}"
-    );
+        .expect("an ISO source must convert to a two-image JPEG");
+    let index = xdremux_format::dual_jpeg::index_dual_layer_jpeg(&jpeg.bytes)
+        .expect("published file must be a two-image JPEG");
+    assert!(index.base_has_iso_declaration);
+    assert!(index.gain_map_has_iso_parameters);
+    assert!(index.base_has_icc, "the Display P3 base must keep its ICC");
+    let observed = xdremux_metadata::parse_ultrahdr_gain_map_metadata(
+        &jpeg.bytes[index.gain_map.range.clone()],
+    )
+    .expect("published metadata must parse")
+    .expect("published gain map must declare metadata");
+    assert!(observed.use_base_color_space);
 }
 
 #[test]
