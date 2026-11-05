@@ -32,5 +32,6 @@ pub use oppo::{
 };
 pub use oppo_heif::{oppo_tag_flags_in_heif, patch_oppo_user_comment_in_heif};
 pub use ultrahdr_jpeg::{
-    parse_heif_tmap_metadata, parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata,
+    iso_gain_map_base_app2_payload, parse_heif_tmap_metadata, parse_ultrahdr_gain_map_metadata,
+    UltraHdrGainMapMetadata,
 };
