@@ -256,13 +256,14 @@ pub fn registered_app8_offsets(
     let image_one = build_image(&image, base, &segments)?;
     let image_two = build_image(&gain_image, gain_map, gain_segments)?;
     let indexed = single_image(&image_one, "planned primary image")?;
-    let planned_start = base_segments
-        .iter()
-        .try_fold(injection_offset(&image), |start, segment| {
-            start
-                .checked_add(app_segment_bytes(segment)?.len())
-                .ok_or_else(|| invalid("registered APP8 planned position overflows"))
-        })?;
+    let planned_start =
+        base_segments
+            .iter()
+            .try_fold(injection_offset(&image), |start, segment| {
+                start
+                    .checked_add(app_segment_bytes(segment)?.len())
+                    .ok_or_else(|| invalid("registered APP8 planned position overflows"))
+            })?;
     let declaration = indexed
         .segments
         .iter()
@@ -913,14 +914,8 @@ mod tests {
 
         // The offset planner must locate the newly injected declaration,
         // even when an unrelated APP8 already appears in the source.
-        let offsets = registered_app8_offsets(
-            &base,
-            &gain,
-            &base_segments,
-            &gain_segments,
-            24,
-        )
-        .unwrap();
+        let offsets =
+            registered_app8_offsets(&base, &gain, &base_segments, &gain_segments, 24).unwrap();
         let mut registered = vec![0u8; 24];
         registered[..6].copy_from_slice(b"ITUT35");
         let registered_segments = [
@@ -974,8 +969,7 @@ mod tests {
             .iter()
             .find(|segment| {
                 segment.marker == 0xe2
-                    && bytes[segment.payload.clone()]
-                        .starts_with(ISO_GAIN_MAP_APP2_IDENTIFIER)
+                    && bytes[segment.payload.clone()].starts_with(ISO_GAIN_MAP_APP2_IDENTIFIER)
             })
             .unwrap()
             .payload

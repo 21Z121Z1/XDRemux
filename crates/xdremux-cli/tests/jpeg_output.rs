@@ -169,7 +169,10 @@ fn the_registered_flag_refuses_a_source_without_registered_metadata() {
     let output = work.join("registered.jpg");
 
     let (code, _, stderr) = convert(&input, &output, &["--jpeg-registered-metadata"]);
-    assert_eq!(code, 1, "registered conversion must refuse missing metadata");
+    assert_eq!(
+        code, 1,
+        "registered conversion must refuse missing metadata"
+    );
     assert!(
         !output.exists(),
         "an incomplete registered pair must not be published"

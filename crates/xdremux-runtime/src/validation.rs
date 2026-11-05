@@ -83,9 +83,7 @@ pub(crate) fn read_registered_jpeg_carriers(
         .first()
         .map(|payload| {
             xdremux_metadata::RegisteredHdrMetadata::parse_app8_payload(payload)
-                .map_err(|error| {
-                    RuntimeError::external("registered JPEG enhanced metadata", error)
-                })
+                .map_err(|error| RuntimeError::external("registered JPEG enhanced metadata", error))
         })
         .transpose()?;
     Ok((base_present, enhanced))

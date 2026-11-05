@@ -246,8 +246,7 @@ fn validation_rejects_registered_offsets_that_disagree_with_the_file() {
         .segments
         .iter()
         .find(|segment| {
-            segment.marker == 0xe8
-                && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
+            segment.marker == 0xe8 && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
         })
         .unwrap();
     let mut modified = receipt.bytes.clone();
@@ -258,7 +257,10 @@ fn validation_rejects_registered_offsets_that_disagree_with_the_file() {
     assert!(index_dual_layer_jpeg(&modified).is_ok());
     let error = validate_dual_layer_jpeg(Path::new("bad-offset.jpg"), &modified, false)
         .expect_err("validation must inspect the serialized APP8 offsets");
-    assert!(error.to_string().contains("offsets do not match"), "{error}");
+    assert!(
+        error.to_string().contains("offsets do not match"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -273,8 +275,7 @@ fn validation_rejects_corrupt_enhanced_registered_metadata() {
         .segments
         .iter()
         .find(|segment| {
-            segment.marker == 0xe8
-                && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
+            segment.marker == 0xe8 && receipt.bytes[segment.payload.clone()].starts_with(b"ITUT35")
         })
         .unwrap();
     let mut modified = receipt.bytes.clone();
@@ -282,7 +283,12 @@ fn validation_rejects_corrupt_enhanced_registered_metadata() {
     assert!(index_dual_layer_jpeg(&modified).is_ok());
     let error = validate_dual_layer_jpeg(Path::new("bad-enhanced.jpg"), &modified, false)
         .expect_err("validation must parse the enhanced APP8 payload");
-    assert!(error.to_string().contains("registered JPEG enhanced metadata"), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("registered JPEG enhanced metadata"),
+        "{error}"
+    );
 }
 
 #[test]
