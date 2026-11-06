@@ -16,9 +16,13 @@ xdremux-runtime = { path = "../xdremux-runtime" }
 xdremux-source = { path = "../xdremux-source" }
 
 [dev-dependencies]
+jpeg-encoder = "=0.7.1"
 tempfile = "=3.27.0"
+xdremux-codec = { path = "../xdremux-codec" }
+xdremux-container = { path = "../xdremux-container" }
 xdremux-format = { path = "../xdremux-format" }
 xdremux-heif = { path = "../xdremux-heif" }
+xdremux-metadata = { path = "../xdremux-metadata" }
 xdremux-motion-photo = { path = "../xdremux-motion-photo" }
 
 [lints]

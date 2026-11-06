@@ -98,7 +98,8 @@ fn decode_hex(value: &str) -> Vec<u8> {
 fn assemble_and_validate(
     source: &[u8],
     encoded: &xdremux_codec::EncodedGainMapTiles,
-    profile: Option<xdremux_heif::HdrGainMapProfile<'_>>,
+    profile: Option<xdremux_heif::HdrGainMapProfile>,
+    hdr_metadata: Option<xdremux_heif::HdrMetadataAssembly<'_>>,
 ) -> Vec<u8> {
     let tiles: Vec<GainMapTile<'_>> = encoded
         .tiles
@@ -120,6 +121,7 @@ fn assemble_and_validate(
         &IsoGainMapAssembly {
             profile,
             alternate_icc: None,
+            hdr_metadata,
             gain_map: DirectHevcGainMap {
                 gain_map_width: encoded.gain_map_width,
                 gain_map_height: encoded.gain_map_height,
@@ -178,7 +180,7 @@ fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_in
         let encoded = provider
             .encode_gain_map_tiles(&request)
             .unwrap_or_else(|error| panic!("libheif {chroma:?} encode failed: {error}"));
-        let output = assemble_and_validate(&source, &encoded, None);
+        let output = assemble_and_validate(&source, &encoded, None, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         assert_eq!(structure.width, width);
         assert_eq!(structure.height, height);
@@ -199,7 +201,7 @@ fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
     };
     use xdremux_metadata::{
         ContentLightLevel, DynamicHdrMetadata, HdrStaticMetadata, HdrTransfer, MasteringDisplay,
-        RegisteredHdrMetadata,
+        RegisteredHdrMetadata, RegisteredMappingExtension,
     };
     let source = fs::read(source_fixture()).unwrap();
     let encoded = LibHeifProvider::new()
@@ -222,15 +224,31 @@ fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
         mastering_display: Some(mastering.clone()),
         content_light_level: Some(light),
     };
+    let mut matrix_and_lut = vec![16_u8];
+    for sample in 0..17 {
+        let half = if matches!(sample, 0 | 4 | 8) {
+            0x3c00_u16
+        } else {
+            0
+        };
+        matrix_and_lut.extend_from_slice(&half.to_be_bytes());
+    }
+    let mut mapping_bytes = Vec::new();
+    mapping_bytes.extend_from_slice(&(matrix_and_lut.len() as u16).to_be_bytes());
+    mapping_bytes.extend_from_slice(&matrix_and_lut);
+    mapping_bytes.extend_from_slice(&0_u16.to_be_bytes());
     let registered = RegisteredHdrMetadata {
         static_metadata: Some((mastering, light)),
         dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+        mapping_extension: Some(RegisteredMappingExtension::parse(&mapping_bytes).unwrap()),
     };
     let output = assemble_and_validate(
         &source,
         &encoded,
         Some(xdremux_heif::HdrGainMapProfile {
             transfer: HdrTransfer::Pq,
+        }),
+        Some(xdremux_heif::HdrMetadataAssembly {
             static_metadata: &static_metadata,
             registered_metadata: Some(&registered),
         }),
@@ -301,7 +319,7 @@ fn gain_map_matrix_range_and_rgb_codes_agree_after_assembly() {
         request.tile_size = 256;
         request.quality = 100;
         let encoded = provider.encode_gain_map_tiles(&request).unwrap();
-        let output = assemble_and_validate(&source, &encoded, None);
+        let output = assemble_and_validate(&source, &encoded, None, None);
         let structure = validate_gain_map_structure(&output).unwrap();
         let top = scan_top_level_boxes(&output).unwrap();
         let meta =

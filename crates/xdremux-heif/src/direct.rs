@@ -1407,6 +1407,7 @@ mod tests {
                     gain_map: gain,
                     tmap_payload: &[0; 4],
                     xmp_payload: b"xmp",
+                    hdr_metadata: None,
                 },
             )
             .unwrap();

@@ -19,6 +19,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [架构说明](architecture.md) | 实现模块和媒体约定。 |
+| [双层 HDR 转换](dual-layer-hdr.md) | 支持的源文件与输出、保留的源信息、未完成事项。 |
 | [开发与构建](development.md) | Rust 工作区、Apple 适配器、App 和打包。 |
 | [测试政策](quality/testing.md) | 必需证据及各类测试的证明边界。 |
 | [回归与样本检查](quality/evals.md) | 可复用检查和真实文件验证。 |

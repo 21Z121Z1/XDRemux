@@ -42,12 +42,21 @@ pub struct IsoGainMapAssembly<'a> {
     /// image uses BT.2020 PQ; gain application primaries remain in tmap.
     pub alternate_icc: Option<&'a [u8]>,
     /// Explicit BT.2020 profile. None retains the existing consumer layout.
-    pub profile: Option<HdrGainMapProfile<'a>>,
+    pub profile: Option<HdrGainMapProfile>,
+    /// Checked HDR metadata that describes the derived HDR image. Carriers are
+    /// independent of the color profile: a compatible layout can still declare
+    /// the source's mastering display and content light level.
+    pub hdr_metadata: Option<HdrMetadataAssembly<'a>>,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct HdrGainMapProfile<'a> {
+pub struct HdrGainMapProfile {
     pub transfer: HdrTransfer,
+}
+
+/// HDR metadata carriers to write for the derived HDR image.
+#[derive(Debug, Clone, Copy)]
+pub struct HdrMetadataAssembly<'a> {
     pub static_metadata: &'a HdrStaticMetadata,
     pub registered_metadata: Option<&'a xdremux_metadata::RegisteredHdrMetadata>,
 }
@@ -145,14 +154,15 @@ fn canonical_gain_map_graph_ids(meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
         }
     }
 
+    // Descriptive items that describe the replaced derived HDR image must be
+    // replaced too. Keeping them would leave a second XMP or registered
+    // metadata item pointing at an image that no longer exists.
     for item in &meta.iinf.entries {
-        if item.item_type == Some(MIME)
-            && iref.entries.iter().any(|reference| {
-                reference.kind == CDSC
-                    && reference.from_item_id == item.item_id
-                    && reference.to_item_ids.contains(&tmap_id)
-            })
-        {
+        if iref.entries.iter().any(|reference| {
+            reference.kind == CDSC
+                && reference.from_item_id == item.item_id
+                && reference.to_item_ids.contains(&tmap_id)
+        }) {
             removed.insert(item.item_id);
         }
     }
@@ -384,15 +394,27 @@ fn build_ftyp(source: &[u8], ftyp: &BoxHeader) -> Result<Vec<u8>> {
     Ok(make_box(FTYP, &output_payload)?)
 }
 
+/// Optional derived-image declarations written into the property container.
+#[derive(Debug, Clone, Copy, Default)]
+struct IprpOptions<'a> {
+    alternate_icc: Option<&'a [u8]>,
+    profile: Option<HdrGainMapProfile>,
+    hdr_metadata: Option<HdrMetadataAssembly<'a>>,
+}
+
 fn build_iprp(
     source: &[u8],
     iprp_header: &BoxHeader,
     meta: &ParsedMeta,
     gain: &DirectHevcGainMap<'_>,
     graph: AssemblyGraph<'_>,
-    alternate_icc: Option<&[u8]>,
-    profile: Option<HdrGainMapProfile<'_>>,
+    options: IprpOptions<'_>,
 ) -> Result<Vec<u8>> {
+    let IprpOptions {
+        alternate_icc,
+        profile,
+        hdr_metadata,
+    } = options;
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
     let mut ipco_payload = Vec::new();
@@ -500,12 +522,12 @@ fn build_iprp(
         &make_tmap_pixi_box()?,
     )?;
     let mut hdr_static_properties = Vec::new();
-    if let Some(profile) = profile {
-        profile
+    if let Some(metadata) = hdr_metadata {
+        metadata
             .static_metadata
             .validate()
             .map_err(|e| invalid(e.to_string()))?;
-        if let Some(mastering) = &profile.static_metadata.mastering_display {
+        if let Some(mastering) = &metadata.static_metadata.mastering_display {
             let payload = mastering
                 .to_mdcv_payload()
                 .map_err(|e| invalid(e.to_string()))?;
@@ -515,7 +537,7 @@ fn build_iprp(
                 &make_box(FourCC::new(*b"mdcv"), &payload)?,
             )?);
         }
-        if let Some(light) = profile.static_metadata.content_light_level {
+        if let Some(light) = metadata.static_metadata.content_light_level {
             let payload = light
                 .to_clli_payload()
                 .map_err(|e| invalid(e.to_string()))?;
@@ -1257,8 +1279,8 @@ pub fn assemble_iso_gain_map_heif(
     let tmap_id = allocate()?;
     let xmp_id = allocate()?;
     let extension_payload = assembly
-        .profile
-        .and_then(|p| p.registered_metadata)
+        .hdr_metadata
+        .and_then(|m| m.registered_metadata)
         .map(|m| m.to_it35_payload().map_err(|e| invalid(e.to_string())))
         .transpose()?;
     let extension_id = if extension_payload.is_some() {
@@ -1286,8 +1308,11 @@ pub fn assemble_iso_gain_map_heif(
         &meta,
         gain,
         graph,
-        assembly.alternate_icc,
-        assembly.profile,
+        IprpOptions {
+            alternate_icc: assembly.alternate_icc,
+            profile: assembly.profile,
+            hdr_metadata: assembly.hdr_metadata,
+        },
     )?;
     let iref = build_iref(&meta, graph)?;
 
@@ -1554,7 +1579,7 @@ mod tests {
             },
             removed: &BTreeSet::new(),
         };
-        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, None, None).unwrap();
+        let bytes = build_iprp(&source, iprp, &meta, &gain, graph, IprpOptions::default()).unwrap();
         let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
         let children = parse_boxes(&bytes, root.payload_range()).unwrap();
         let props = parse_ipco_properties(&bytes, &root).unwrap();
@@ -1597,7 +1622,6 @@ mod tests {
                 .find(|e| e.item_id == meta.primary_item_id)
                 .unwrap()
         );
-        let static_metadata = HdrStaticMetadata::default();
         for turns in [Some(0), Some(1), Some(2), Some(3), None] {
             for axis in [None, Some(0), Some(1)] {
                 for before in [false, true] {
@@ -1652,12 +1676,12 @@ mod tests {
                         &meta,
                         &gain,
                         graph,
-                        None,
-                        Some(HdrGainMapProfile {
-                            transfer: HdrTransfer::Pq,
-                            static_metadata: &static_metadata,
-                            registered_metadata: None,
-                        }),
+                        IprpOptions {
+                            profile: Some(HdrGainMapProfile {
+                                transfer: HdrTransfer::Pq,
+                            }),
+                            ..IprpOptions::default()
+                        },
                     )
                     .unwrap();
                     let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
@@ -1749,6 +1773,7 @@ mod tests {
                 gain_map: gain,
                 tmap_payload: &[],
                 xmp_payload: b"xmp",
+                hdr_metadata: None,
             },
         )
         .is_err());

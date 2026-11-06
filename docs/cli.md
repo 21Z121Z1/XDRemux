@@ -98,6 +98,22 @@ xdremux convert --input IMG_001.jpg
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
 
+目标扩展名为 `.jpg` 或 `.jpeg` 时，使用双层 JPEG 容器。基本图像重新编码为 JPEG，并保留源 ICC 配置文件。增强图像保留尺寸和操作元数据，但会量化至 8 位并重新编码，解码采样不保证精确不变。ISO 21496-1 APP2 载体保留操作参数，MPF 索引描述两幅图像。其他扩展名仍输出 HEIF。
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
+```
+
+JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。请求这些组合时，转换会在发布前失败。`batch` 只输出 HEIF。
+
+文件若带有标准双层 HEIF 图但没有厂商扩展块，会通过标准图路径读取。这包括较早的 XDRemux HEIF 输出，以及其他生产者生成的 ISO 21496-1 文件。输出 HEIF 时，压缩基础图像、源色调映射载荷与压缩增益图分块保留字节和精度，包括 10 位及 12 位 HEVC 源。重封装要求分块尺寸一致、hvcC 配置一致、压缩色彩声明相容，且保留方向变换顺序。无法保真的布局会被拒绝。请选择与源编码一致的 `--hdr-profile bt2020-pq` 或 `bt2020-hlg`：默认的 `compatible` 布局声明 BT.2020 PQ，并拒绝声明其他编码的源文件。`--oppo-compatible` 需要 ProXDR 源文件。
+
+`--jpeg-registered-metadata` 为双层 JPEG 添加成对的注册 APP8 载体。基本图像声明图像数量以及指向增强图像的两个偏移，增强图像携带源文件中的注册元数据。若源文件未提供增强注册元数据，转换会拒绝。简化视图偏移遵循本仓库记录的规则，尚未与独立生产者核对。
+
+```bash
+xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
+```
+
 ### 产品选项
 
 以下选项适用于 `convert` 和 `batch`。
@@ -107,6 +123,7 @@ xdremux convert --input IMG_001.jpg
 | `--live-photo-output pair\|pvt` | 默认为 `pair`。选择 Live Photo 文件对或 PVT 目录，其他资产保留原有格式。 |
 | `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | 默认为 `compatible`。为 ProXDR 静态照片显式选择 BT.2020 替代图像编码。Motion Photo 项拒绝显式 BT.2020 配置。 |
 | `--oppo-compatible` | 为 ProXDR 静态照片请求 OPPO 相册兼容输出。Motion Photo 项拒绝此请求。 |
+| `--jpeg-registered-metadata` | 在双层 JPEG 中写入成对的注册 APP8 载体。需要源文件注册元数据及 `.jpg` 或 `.jpeg` 目标。简化视图偏移尚未由独立生产者样本确认。 |
 | `--apple-portrait` | 请求完整 Apple 人像资源集，包括 Vision 语义资源。 |
 | `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
 | `--apple-styles` | 在 macOS 27 上生成摄影风格和推理得到的纹理风格，需要支持的 ProXDR 源数据。 |
@@ -117,7 +134,7 @@ xdremux convert --input IMG_001.jpg
 
 `--oppo-compatible`、`--apple-portrait`、`--apple-portrait-oppo`、`--apple-styles` 和 `--apple-cinematic` 相互排斥。功能失败后不会静默切换模式。发布输出前，必须具备所需源数据和原生能力。
 
-显式 `--hdr-profile` 选项不能与上述兼容性或 Apple 编辑选项组合。BT.2020 配置接受经验证采用 sRGB 或 Display P3 色域、sRGB 传递函数的 SDR 基础图像。导出器检查 ICC 变换及并存的色彩声明。不支持的色彩编码、裁剪几何、非方形像素，以及不支持的额外矩阵或 LUT 映射，会在发布前失败。
+显式 `--hdr-profile` 选项不能与上述兼容性或 Apple 编辑选项组合。BT.2020 配置接受经验证采用 sRGB 或 Display P3 色域、sRGB 传递函数的 SDR 基础图像。导出器检查 ICC 变换及并存的色彩声明。不支持的色彩编码、裁剪几何与非方形像素会在发布前失败。注册矩阵与 LUT 扩展数据会经过校验并保留，但不会应用到重建像素。
 
 BT.2020 配置保留 SDR 压缩资源及其色彩数据。基础图像、Gain Map 和 HDR 派生图像使用相同顺序的旋转与镜像变换。派生图像采用基础图像的编码尺寸，并声明 BT.2020 与 PQ 或 HLG。Gain Map 的压缩色彩属性独立保留。`compatible` 继续选择现有相机或显示兼容布局。
 
@@ -126,7 +143,9 @@ xdremux convert --input IMG_001.heic --output IMG_001_pq.heic --hdr-profile bt20
 xdremux convert --input IMG_001.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
 ```
 
-CLI 不生成推测的母版、内容亮度或动态元数据。Rust HEIF 组装 API 接受调用方基于源数据提供的、经过检查的 `mdcv`、`clli` 和注册 `it35` 元数据。注册载荷中的静态数据必须与派生图像属性一致。动态载荷接受语法检查，并保留原始字节。动态显示映射不属于此导出器的处理范围。JPEG APP8 载荷编解码器不提供双 JFIF 写入器。
+转换会保留源文件为派生 HDR 图像声明的 HDR 元数据。只有当源文件把这些载体关联到派生 `tmap` 项时，导出器才读取 `mdcv`、`clli` 和注册 `it35`。描述其他图像的载体按不适用报告，不会复制。发布文件只声明实际保留的载体。转换会在发布前从最终字节重新读回这些载体。两类载体同时声明的静态值必须一致。不一致会使转换失败。数值只做复制，不重新生成。缺失值保持缺失。
+
+动态载荷接受语法检查，并保留原始字节。动态显示映射不属于此导出器的处理范围。JPEG APP8 载荷编解码器不提供双 JFIF 写入器。
 
 ### PVT 目录输出
 
@@ -236,9 +255,13 @@ xdremux validate output.mov --json
 xdremux validate capture.pvt --json
 ```
 
-位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
+位置参数 `INPUT` 必填。普通验证识别支持的 ISO HDR HEIF、双层 JPEG、Live Photo 任一成员或包含三个成员的 PVT 目录，检查对应的媒体、配对和时间约定。
 
-`--semantic` 额外检查最终 HEIF 中的数值色调映射元数据和替代图像色彩编码声明，并拒绝矛盾的元数据与图像通道数。`--hdr-profile bt2020-pq` 或 `bt2020-hlg` 还检查所选色彩编码、源色彩信息、编码尺寸、方向属性顺序，以及存在的受支持 HDR 元数据载荷。这些选项适用于独立 HEIF 文件。
+双层 JPEG 验证检查两幅完整图像、指向两幅真实图像边界的 MPF 索引、基本图像的 ISO 声明，以及增强图像的 ISO 参数。报告给出两幅图像的几何、参数组数量和声明的档位。
+
+`--semantic` 额外检查最终 HEIF 中的数值色调映射元数据和替代图像色彩编码声明，并拒绝矛盾的元数据与图像通道数。`--hdr-profile bt2020-pq` 或 `bt2020-hlg` 还检查所选色彩编码、源色彩信息、编码尺寸、方向属性顺序，以及存在的受支持 HDR 元数据载荷。`--hdr-profile` 适用于独立 HEIF 文件。
+
+对双层 JPEG 使用 `--semantic` 会解码两幅图像并报告相对线性 BT.2020 重建范围。`--hdr-profile` 与 `--decode-hdr` 仅适用于独立 HEIF 文件。
 
 `--decode-hdr` 需要 `--hdr-profile`。它从最终文件解码基础图像与 Gain Map，保留分量精度，不降低至八位。解码器保留编码坐标。重建先对 Gain Map 反伽马，再做共位双线性插值，在声明的应用色域中处理增益与偏移量，最后转换至线性 BT.2020。JSON 报告实际解码精度及相对 RGB 的最小值和最大值，并保留色域转换产生的负分量。
 

@@ -133,6 +133,42 @@ impl HdrStaticMetadata {
         }
         Ok(())
     }
+
+    /// True when neither component is declared. An absent component stays
+    /// absent; a zero content light level is a declared value, not absence.
+    pub fn is_empty(&self) -> bool {
+        self.mastering_display.is_none() && self.content_light_level.is_none()
+    }
+
+    /// Combine two declarations that describe the same HDR image.
+    ///
+    /// A component declared by only one carrier is kept. A component declared
+    /// by both carriers must be equal; disagreement is a conflict and never
+    /// resolved by preferring one carrier.
+    pub fn merge(&self, other: &Self) -> Result<Self> {
+        let mastering_display = match (&self.mastering_display, &other.mastering_display) {
+            (Some(a), Some(b)) if a != b => {
+                return Err(invalid(
+                    "carriers declare different mastering display colour volumes",
+                ))
+            }
+            (Some(value), _) | (_, Some(value)) => Some(value.clone()),
+            (None, None) => None,
+        };
+        let content_light_level = match (self.content_light_level, other.content_light_level) {
+            (Some(a), Some(b)) if a != b => {
+                return Err(invalid("carriers declare different content light levels"))
+            }
+            (Some(value), _) | (_, Some(value)) => Some(value),
+            (None, None) => None,
+        };
+        let merged = Self {
+            mastering_display,
+            content_light_level,
+        };
+        merged.validate()?;
+        Ok(merged)
+    }
 }
 
 #[cfg(test)]
@@ -176,5 +212,50 @@ mod tests {
         .validate()
         .is_err());
         assert!(ContentLightLevel::from_clli_payload(&[0; 5]).is_err());
+    }
+
+    #[test]
+    fn carrier_merge_keeps_partial_declarations_and_rejects_conflicts() {
+        let mastering = MasteringDisplay {
+            primaries: [[8500, 39850], [6550, 2300], [35400, 14600]],
+            white_point: [15635, 16450],
+            maximum_luminance: 10_000_000,
+            minimum_luminance: 50,
+        };
+        let light = ContentLightLevel {
+            maximum_content_light_level: 1000,
+            maximum_frame_average_light_level: 400,
+        };
+        let only_mastering = HdrStaticMetadata {
+            mastering_display: Some(mastering.clone()),
+            content_light_level: None,
+        };
+        let only_light = HdrStaticMetadata {
+            mastering_display: None,
+            content_light_level: Some(light),
+        };
+        assert!(!only_mastering.is_empty());
+        assert!(HdrStaticMetadata::default().is_empty());
+        let merged = only_mastering.merge(&only_light).unwrap();
+        assert_eq!(merged.mastering_display, Some(mastering.clone()));
+        assert_eq!(merged.content_light_level, Some(light));
+        assert_eq!(only_light.merge(&only_mastering).unwrap(), merged);
+
+        let conflicting = HdrStaticMetadata {
+            mastering_display: Some(MasteringDisplay {
+                maximum_luminance: 4_000_000,
+                ..mastering
+            }),
+            content_light_level: Some(light),
+        };
+        assert!(only_mastering.merge(&conflicting).is_err());
+        let conflicting_light = HdrStaticMetadata {
+            mastering_display: None,
+            content_light_level: Some(ContentLightLevel {
+                maximum_content_light_level: 600,
+                ..light
+            }),
+        };
+        assert!(only_light.merge(&conflicting_light).is_err());
     }
 }

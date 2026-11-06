@@ -881,11 +881,15 @@ name = "xdremux-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "jpeg-encoder",
  "serde_json",
  "tempfile",
+ "xdremux-codec",
+ "xdremux-container",
  "xdremux-engine",
  "xdremux-format",
  "xdremux-heif",
+ "xdremux-metadata",
  "xdremux-motion-photo",
  "xdremux-runtime",
  "xdremux-source",
@@ -919,6 +923,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "xdremux-format",
+ "xdremux-metadata",
 ]
 
 [[package]]

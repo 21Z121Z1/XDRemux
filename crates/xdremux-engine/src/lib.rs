@@ -137,6 +137,26 @@ impl std::str::FromStr for HdrExportProfile {
     }
 }
 
+/// Output container selected for a conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputContainer {
+    #[default]
+    Heif,
+    /// Two-image JPEG with an MPF index and ISO 21496-1 APP2 carriers.
+    Jpeg,
+}
+
+impl std::str::FromStr for OutputContainer {
+    type Err = &'static str;
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "heif" => Ok(Self::Heif),
+            "jpeg" => Ok(Self::Jpeg),
+            _ => Err("output container must be heif or jpeg"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AppleFeatureRequest {
     pub photographic_styles: bool,
@@ -174,6 +194,11 @@ impl std::str::FromStr for LivePhotoOutput {
 pub struct ConversionRequest {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
+    pub container: OutputContainer,
+    /// Write the registered APP8 declaration into a two-image JPEG. The second
+    /// offset's coordinate rule is not yet confirmed by an independent
+    /// producer sample, so this stays opt-in.
+    pub registered_jpeg_metadata: bool,
     pub apple_features: AppleFeatureRequest,
     pub live_photo_output: LivePhotoOutput,
 }
@@ -187,6 +212,8 @@ impl ConversionRequest {
         Self {
             output: OutputIntent::OppoGallery,
             hdr_profile: HdrExportProfile::Compatible,
+            container: OutputContainer::Heif,
+            registered_jpeg_metadata: false,
             live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
@@ -289,13 +316,63 @@ impl GainMapEncoderCapabilities {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionAnalysis {
     pub gain_map: GainMapSourceProfile,
+    /// HDR metadata the source declares for the image that will be
+    /// reconstructed. Absent fields stay absent.
+    pub hdr_metadata: SourceHdrMetadataFacts,
+}
+
+/// Checked HDR metadata facts read from the source container.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceHdrMetadataFacts {
+    pub static_metadata: xdremux_metadata::HdrStaticMetadata,
+    pub registered_metadata: Option<xdremux_metadata::RegisteredHdrMetadata>,
+}
+
+impl SourceHdrMetadataFacts {
+    pub fn is_empty(&self) -> bool {
+        self.static_metadata.is_empty() && self.registered_metadata.is_none()
+    }
+}
+
+/// Which image the planned HDR metadata describes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum HdrMetadataOrigin {
+    /// The source declared no HDR metadata for the reconstructed image.
+    #[default]
+    Absent,
+    /// The source declared the metadata for the image this conversion
+    /// reconstructs. Values are copied, not regenerated.
+    Source,
+}
+
+/// HDR metadata carriers the output must declare for its derived HDR image.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HdrMetadataPlan {
+    pub static_metadata: xdremux_metadata::HdrStaticMetadata,
+    pub registered_metadata: Option<xdremux_metadata::RegisteredHdrMetadata>,
+    pub origin: HdrMetadataOrigin,
+}
+
+impl HdrMetadataPlan {
+    pub fn is_empty(&self) -> bool {
+        self.static_metadata.is_empty() && self.registered_metadata.is_none()
+    }
+
+    pub fn carries_dynamic_metadata(&self) -> bool {
+        self.registered_metadata
+            .as_ref()
+            .is_some_and(|m| m.dynamic_metadata.is_some())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionPlan {
     pub output: OutputIntent,
     pub hdr_profile: HdrExportProfile,
+    pub container: OutputContainer,
+    pub registered_jpeg_metadata: bool,
     pub gain_map_target: GainMapEncodeProfile,
+    pub hdr_metadata: HdrMetadataPlan,
     pub required_capabilities: Vec<OperationCapability>,
 }
 
@@ -429,17 +506,77 @@ pub fn plan_conversion(
         ));
     }
 
-    let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
-    let gain_map_target = resolve_product_gain_map_encode_profile(
-        analysis.gain_map,
-        request.output,
-        &gain_map_encoder,
-    )?;
+    if request.registered_jpeg_metadata && request.container != OutputContainer::Jpeg {
+        return Err(PlannerError::IncompatibleProductIntents(
+            "registered APP8 metadata applies to the two-image JPEG container",
+        ));
+    }
+    if request.container == OutputContainer::Jpeg {
+        if request.hdr_profile != HdrExportProfile::Compatible {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output describes the alternate image from the base colorimetry; explicit BT.2020 profiles apply to HEIF output",
+            ));
+        }
+        if request.requests_oppo_gallery_compatibility() {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output cannot carry the OPPO camera tail",
+            ));
+        }
+        if request.apple_features.any() {
+            return Err(PlannerError::IncompatibleProductIntents(
+                "JPEG output cannot carry Apple editing resources",
+            ));
+        }
+    }
 
-    let mut required_capabilities = vec![
-        OperationCapability::RasterDecoder(analysis.gain_map.storage.codec),
-        OperationCapability::GainMapTileEncoder(gain_map_target.layout),
-    ];
+    let preserve_hevc = analysis.gain_map.storage.codec == GainMapCodec::Hevc
+        && request.container == OutputContainer::Heif
+        && request.output == OutputIntent::Standard
+        && !request.apple_features.any();
+    let gain_map_target = if request.container == OutputContainer::Jpeg {
+        validate_source_profile(analysis.gain_map)?;
+        GainMapEncodeProfile {
+            width: analysis.gain_map.width,
+            height: analysis.gain_map.height,
+            channels: analysis.gain_map.channels,
+            layout: GainMapCodecLayout {
+                chroma: if analysis.gain_map.channels == GainMapChannels::Mono {
+                    ChromaSampling::Mono400
+                } else {
+                    ChromaSampling::Yuv444
+                },
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
+        }
+    } else if preserve_hevc {
+        validate_source_profile(analysis.gain_map)?;
+        GainMapEncodeProfile {
+            width: analysis.gain_map.width,
+            height: analysis.gain_map.height,
+            channels: analysis.gain_map.channels,
+            layout: requested_layout(analysis.gain_map),
+        }
+    } else {
+        resolve_product_gain_map_encode_profile(
+            analysis.gain_map,
+            request.output,
+            &capabilities.gain_map_encoder_capabilities(),
+        )?
+    };
+
+    let mut required_capabilities = vec![OperationCapability::RasterDecoder(
+        analysis.gain_map.storage.codec,
+    )];
+    if request.container == OutputContainer::Jpeg {
+        if analysis.gain_map.storage.codec != GainMapCodec::Hevc {
+            required_capabilities.push(OperationCapability::RasterDecoder(GainMapCodec::Hevc));
+        }
+    } else if !preserve_hevc {
+        required_capabilities.push(OperationCapability::GainMapTileEncoder(
+            gain_map_target.layout,
+        ));
+    }
     if request.apple_features.photographic_styles {
         required_capabilities.push(OperationCapability::PhotographicStylesAdapter);
     }
@@ -452,10 +589,27 @@ pub fn plan_conversion(
         return Err(PlannerError::MissingOperationCapabilities(missing));
     }
 
+    // The conversion reconstructs the same alternate image: the compressed base
+    // is preserved and the Gain Map keeps its declared parameters. Source
+    // metadata therefore keeps describing the output. Values are copied, never
+    // regenerated, and absence stays absence.
+    let hdr_metadata = HdrMetadataPlan {
+        static_metadata: analysis.hdr_metadata.static_metadata.clone(),
+        registered_metadata: analysis.hdr_metadata.registered_metadata.clone(),
+        origin: if analysis.hdr_metadata.is_empty() {
+            HdrMetadataOrigin::Absent
+        } else {
+            HdrMetadataOrigin::Source
+        },
+    };
+
     Ok(ConversionPlan {
         output: request.output,
         hdr_profile: request.hdr_profile,
+        container: request.container,
+        registered_jpeg_metadata: request.registered_jpeg_metadata,
         gain_map_target,
+        hdr_metadata,
         required_capabilities,
     })
 }
@@ -463,6 +617,52 @@ pub fn plan_conversion(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn existing_hevc_gain_maps_do_not_need_an_encoder_or_lose_precision() {
+        for depth in [8, 10, 12] {
+            let analysis = ConversionAnalysis {
+                gain_map: GainMapSourceProfile {
+                    width: 960,
+                    height: 720,
+                    channels: GainMapChannels::Rgb,
+                    storage: GainMapStorageProfile {
+                        codec: GainMapCodec::Hevc,
+                        chroma: Some(ChromaSampling::Yuv420),
+                        luma_bit_depth: depth,
+                        chroma_bit_depth: depth,
+                    },
+                },
+                hdr_metadata: SourceHdrMetadataFacts::default(),
+            };
+            let plan = plan_conversion(
+                &analysis,
+                ConversionRequest::default(),
+                &CapabilityInventory::new([OperationCapability::RasterDecoder(GainMapCodec::Hevc)]),
+            )
+            .expect("remuxing an existing HEVC resource does not require encoding");
+            assert_eq!(plan.gain_map_target.layout.chroma, ChromaSampling::Yuv420);
+            assert_eq!(plan.gain_map_target.layout.luma_bit_depth, depth);
+            assert!(!plan
+                .required_capabilities
+                .iter()
+                .any(|operation| matches!(operation, OperationCapability::GainMapTileEncoder(_))));
+            let jpeg = plan_conversion(
+                &analysis,
+                ConversionRequest {
+                    container: OutputContainer::Jpeg,
+                    ..ConversionRequest::default()
+                },
+                &CapabilityInventory::new([OperationCapability::RasterDecoder(GainMapCodec::Hevc)]),
+            )
+            .unwrap();
+            assert_eq!(jpeg.gain_map_target.layout.luma_bit_depth, 8);
+            assert_eq!(
+                jpeg.required_capabilities,
+                vec![OperationCapability::RasterDecoder(GainMapCodec::Hevc)]
+            );
+        }
+    }
 
     fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
         GainMapCodecLayout {
@@ -587,6 +787,7 @@ mod tests {
         ]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
 
         for apple_features in [
@@ -670,6 +871,7 @@ mod tests {
             CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
 
         assert_eq!(
@@ -692,6 +894,7 @@ mod tests {
         assert!(request.apple_features.any());
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let capabilities = capability_inventory([layout(ChromaSampling::Yuv444, 8)]);
         assert_eq!(
@@ -708,6 +911,7 @@ mod tests {
         let capabilities = capability_inventory([target]);
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let request = ConversionRequest {
             apple_features: AppleFeatureRequest {
@@ -730,6 +934,7 @@ mod tests {
     fn plan_contains_only_execution_relevant_decisions() {
         let analysis = ConversionAnalysis {
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+            hdr_metadata: SourceHdrMetadataFacts::default(),
         };
         let request = ConversionRequest {
             apple_features: AppleFeatureRequest {

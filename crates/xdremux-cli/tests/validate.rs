@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use xdremux_engine::ConversionRequest;
@@ -17,15 +16,11 @@ fn motion_photo_fixture() -> PathBuf {
         .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg")
 }
 
-fn unique_dir() -> PathBuf {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time must be after epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!(
-        "xdremux-cli-validate-{}-{stamp}",
-        std::process::id()
-    ))
+fn unique_dir() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .prefix("xdremux-cli-validate-")
+        .tempdir()
+        .unwrap()
 }
 
 fn validate_json(input: &Path) -> (u8, Value, Vec<u8>) {
@@ -45,10 +40,9 @@ fn validate_json(input: &Path) -> (u8, Value, Vec<u8>) {
 #[test]
 fn explicit_hdr_profile_runs_through_convert_and_final_file_validation() {
     let root = unique_dir();
-    fs::create_dir_all(&root).unwrap();
     let input = proxdr_fixture();
     let original = fs::read(&input).unwrap();
-    let output = root.join("hlg.heic");
+    let output = root.path().join("hlg.heic");
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = xdremux_cli::run_from(
@@ -127,17 +121,16 @@ fn explicit_hdr_profile_runs_through_convert_and_final_file_validation() {
         };
         fs::write(evidence.join("cli-hlg-geometry.json"),serde_json::to_vec_pretty(&serde_json::json!({"primary_coded_width":geometry.width,"primary_coded_height":geometry.height,"primary_display_width":dw,"primary_display_height":dh,"quarter_turns_ccw":geometry.quarter_turns_ccw,"gain_coded_width":gain.width,"gain_coded_height":gain.height,"gain_display_width":gw,"gain_display_height":gh})).unwrap()).unwrap();
     }
-    fs::remove_dir_all(root).unwrap();
+    root.close().unwrap();
 }
 
 #[test]
 fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
     let root = unique_dir();
-    fs::create_dir_all(&root).unwrap();
     let runtime = PortableRuntime::new();
 
     let source = fs::read(proxdr_fixture()).unwrap();
-    let iso_output = root.join("iso.heic");
+    let iso_output = root.path().join("iso.heic");
     runtime
         .convert_proxdr_file(&source, &iso_output, ConversionRequest::default(), |_| {})
         .unwrap();
@@ -153,7 +146,7 @@ fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
         .is_some_and(|tiles| !tiles.is_empty()));
 
     let motion_source = fs::read(motion_photo_fixture()).unwrap();
-    let live_still = root.join("live.heic");
+    let live_still = root.path().join("live.heic");
     let live = runtime
         .convert_motion_photo_file(&motion_source, motion_photo_fixture(), &live_still)
         .unwrap();
@@ -176,7 +169,7 @@ fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
         live.content_identifier
     );
 
-    let invalid = root.join("invalid.heic");
+    let invalid = root.path().join("invalid.heic");
     fs::write(&invalid, [0_u8; 32]).unwrap();
     let (code, report, stderr) = validate_json(&invalid);
     assert_eq!(code, 1);
@@ -188,5 +181,5 @@ fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
         .as_str()
         .is_some_and(|value| !value.is_empty()));
 
-    fs::remove_dir_all(root).unwrap();
+    root.close().unwrap();
 }

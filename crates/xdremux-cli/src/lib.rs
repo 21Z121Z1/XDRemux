@@ -82,6 +82,12 @@ struct ProductConversionArgs {
     /// Live Photo container: pair (default) or pvt directory; other assets keep their format.
     #[arg(long, default_value = "pair", value_name = "pair|pvt")]
     live_photo_output: LivePhotoOutput,
+    /// Write the registered APP8 declaration into a two-image JPEG.
+    ///
+    /// The reduced-view offset is not yet confirmed by an independent producer
+    /// sample, so this stays opt-in.
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
+    jpeg_registered_metadata: bool,
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
     #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
     oppo_compatible: bool,
@@ -138,6 +144,7 @@ impl ProductConversionArgs {
         };
         request.live_photo_output = self.live_photo_output;
         request.hdr_profile = self.hdr_profile;
+        request.registered_jpeg_metadata = self.jpeg_registered_metadata;
         request
     }
 
@@ -282,6 +289,38 @@ fn write_clap_error(
         return 1;
     }
     code
+}
+
+/// Describe the HDR metadata the conversion carried from the source.
+///
+/// Values are reported as preserved source facts. Dynamic metadata is retained
+/// with syntax checks only; its display mapping is a separate capability.
+fn hdr_metadata_report(
+    language: Language,
+    metadata: &xdremux_engine::HdrMetadataPlan,
+) -> Option<String> {
+    if metadata.is_empty() {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if metadata.static_metadata.mastering_display.is_some() {
+        parts.push("mastering display");
+    }
+    if metadata.static_metadata.content_light_level.is_some() {
+        parts.push("content light level");
+    }
+    if metadata.carries_dynamic_metadata() {
+        parts.push("dynamic metadata (syntax-checked, display mapping not applied)");
+    }
+    if parts.is_empty() {
+        parts.push("registered metadata");
+    }
+    Some(message!(
+        language,
+        "HDR metadata preserved from source: {}",
+        "已保留源文件 HDR 元数据：{}",
+        parts.join(", ")
+    ))
 }
 
 fn parse_cli_language(
@@ -495,6 +534,92 @@ fn run_inspect(
     0
 }
 
+/// Convert a standalone ISO dual-layer HEIF through the standard graph path.
+fn convert_iso_heif(
+    language: Language,
+    source: &[u8],
+    input: &Path,
+    output: Option<&PathBuf>,
+    request: ConversionRequest,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
+    let output = output.cloned().unwrap_or_else(|| input.to_path_buf());
+    let request = ConversionRequest {
+        container: container_for_output(&output),
+        ..request
+    };
+    let runtime = PortableRuntime::new();
+    let receipt = match runtime.convert_iso_heif_file(source, &output, request, |_| {}) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
+            return 1;
+        }
+    };
+    let printed = if output == input {
+        writeln!(
+            stdout,
+            "{}",
+            message!(
+                language,
+                "converted: {} (in place)",
+                "已转换：{}（原地替换）",
+                input.display()
+            )
+        )
+    } else {
+        writeln!(
+            stdout,
+            "{}",
+            message!(
+                language,
+                "converted: {} -> {}",
+                "已转换：{} -> {}",
+                input.display(),
+                output.display()
+            )
+        )
+    };
+    if let Some(line) = hdr_metadata_report(language, &receipt.plan.hdr_metadata) {
+        let _ = writeln!(stdout, "{line}");
+    }
+    match printed {
+        Ok(()) => 0,
+        Err(error) => {
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(
+                    language,
+                    "error: could not write output: {error}",
+                    "错误：无法写入输出：{error}"
+                )
+            );
+            1
+        }
+    }
+}
+
+/// Select the output container from the requested file extension.
+///
+/// Every other extension keeps the historical HEIF output, so an existing
+/// command that writes an unusual suffix keeps its behavior.
+fn container_for_output(output: &Path) -> xdremux_engine::OutputContainer {
+    match output.extension().and_then(|value| value.to_str()) {
+        Some(extension)
+            if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") =>
+        {
+            xdremux_engine::OutputContainer::Jpeg
+        }
+        _ => xdremux_engine::OutputContainer::Heif,
+    }
+}
+
 fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf {
     let extension = match format {
         LivePhotoOutput::Pair => "heic",
@@ -621,6 +746,19 @@ fn run_convert(
     let asset = match probe_bytes(&source) {
         Ok(value) => value,
         Err(error) => {
+            // A standalone ISO dual-layer HEIF has no vendor extension block,
+            // so vendor detection fails before the standard graph is tried.
+            if xdremux_runtime::analyze_iso_heif(&source).is_ok() {
+                return convert_iso_heif(
+                    language,
+                    &source,
+                    &input,
+                    output.as_ref(),
+                    request,
+                    stdout,
+                    stderr,
+                );
+            }
             let _ = writeln!(
                 stderr,
                 "{}",
@@ -699,6 +837,10 @@ fn run_convert(
                 }
             }
             let output = output.unwrap_or_else(|| input.clone());
+            let request = ConversionRequest {
+                container: container_for_output(&output),
+                ..request
+            };
             if apple_portrait {
                 #[cfg(target_os = "macos")]
                 {
@@ -820,15 +962,18 @@ fn run_convert(
                     return 1;
                 }
             } else {
-                if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
-                    let _ = writeln!(
-                        stderr,
-                        "{}",
-                        message!(language, "error: {error}", "错误：{error}")
-                    );
-                    return 1;
-                }
-                if output == input {
+                let receipt = match runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
+                    Ok(receipt) => receipt,
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        return 1;
+                    }
+                };
+                let printed = if output == input {
                     writeln!(
                         stdout,
                         "{}",
@@ -851,7 +996,11 @@ fn run_convert(
                             output.display()
                         )
                     )
+                };
+                if let Some(line) = hdr_metadata_report(language, &receipt.plan.hdr_metadata) {
+                    let _ = writeln!(stdout, "{line}");
                 }
+                printed
             }
         }
     };

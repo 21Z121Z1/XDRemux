@@ -101,6 +101,22 @@ xdremux convert --input IMG_001.jpg
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
 
+A `.jpg` or `.jpeg` destination selects the two-image JPEG container. The primary image is re-encoded as JPEG and keeps the source ICC profile. The Gain Map keeps its dimensions and operation metadata but is quantized to eight bits and re-encoded; its decoded samples are not preserved exactly. ISO 21496-1 APP2 carriers retain the operation parameters. An MPF index describes both images. Every other destination extension keeps HEIF output.
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
+```
+
+JPEG output requires identity orientation and cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources. A conversion that requests one of these fails before publication. `batch` writes HEIF output only.
+
+A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. For HEIF output, the compressed base, source tone-map payload, and compressed Gain Map tiles keep their bytes and precision, including 10- and 12-bit HEVC sources. Remux requires uniform tiles, identical hvcC configuration, compatible compression colour declarations, and preserved ordered orientation. A layout the remux cannot preserve is refused. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. `--oppo-compatible` requires a ProXDR source.
+
+`--jpeg-registered-metadata` adds paired registered APP8 carriers to the two-image JPEG. The base image declares the image count and two offsets to the enhanced image; the enhanced image carries the source registered metadata. Sources without registered enhanced metadata are refused. The reduced-view offset follows the documented rule and is not yet confirmed against an independent producer.
+
+```bash
+xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
+```
+
 ### Product options
 
 The following options are available to both `convert` and `batch`.
@@ -110,6 +126,7 @@ The following options are available to both `convert` and `batch`.
 | `--live-photo-output pair\|pvt` | Default `pair`. Selects a Live Photo file pair or PVT directory. Other assets keep their normal format. |
 | `--hdr-profile compatible\|bt2020-pq\|bt2020-hlg` | Default `compatible`. Selects an explicit BT.2020 alternate encoding for ProXDR stills. Motion Photo items reject explicit BT.2020 profiles. |
 | `--oppo-compatible` | Requests OPPO Gallery output for a ProXDR still. Motion Photo items reject this request. |
+| `--jpeg-registered-metadata` | Writes paired registered APP8 carriers into a two-image JPEG. Requires source registered metadata and a `.jpg` or `.jpeg` destination. The reduced-view offset is not yet confirmed by an independent producer sample. |
 | `--apple-portrait` | Requests the complete Apple Portrait resource set, including Vision semantics. |
 | `--apple-portrait-oppo` | Uses OPPO depth and available masks. Requires macOS ImageIO and Core Image. Effects are reduced. |
 | `--apple-styles` | Generates Photographic Styles and inferred Texture Styles on macOS 27. Requires supported ProXDR source data. |
@@ -120,7 +137,7 @@ The following options are available to both `convert` and `batch`.
 
 `--oppo-compatible`, `--apple-portrait`, `--apple-portrait-oppo`, `--apple-styles`, and `--apple-cinematic` are mutually exclusive. A failed feature does not silently switch to another profile. Required source data or native capabilities must exist before the program publishes output.
 
-An explicit `--hdr-profile` option cannot be combined with these compatibility or Apple editing options. The BT.2020 profiles admit SDR bases with verified sRGB or Display P3 colorimetry and the sRGB transfer function. The exporter checks ICC transforms and coexisting color declarations. Unsupported color encodings, cropped geometry, non-square pixels, and unsupported additional matrix or LUT mappings fail before publication.
+An explicit `--hdr-profile` option cannot be combined with these compatibility or Apple editing options. The BT.2020 profiles admit SDR bases with verified sRGB or Display P3 colorimetry and the sRGB transfer function. The exporter checks ICC transforms and coexisting color declarations. Unsupported color encodings, cropped geometry, and non-square pixels fail before publication. Registered matrix/LUT extension data is validated and preserved, but is not applied to the reconstructed pixels.
 
 The BT.2020 profiles preserve the compressed SDR resources and their color data. The base, Gain Map, and derived HDR item share the same ordered rotation and mirror transforms. The derived item uses the base's coded dimensions and declares BT.2020 with PQ or HLG. Its Gain Map compression color property remains separate. An existing camera or display compatibility layout remains selected by `compatible`.
 
@@ -129,7 +146,9 @@ xdremux convert --input IMG_001.heic --output IMG_001_pq.heic --hdr-profile bt20
 xdremux convert --input IMG_001.heic --output IMG_001_hlg.heic --hdr-profile bt2020-hlg
 ```
 
-The CLI does not synthesize mastering, content light, or dynamic metadata. The Rust HEIF assembly API accepts checked `mdcv`, `clli`, and registered `it35` metadata from a caller that has source data. Registered static data must agree with the derived item's properties. Dynamic payloads receive syntax checks and retain their bytes. Applying dynamic display mapping is outside this exporter. The JPEG APP8 payload codec does not provide a dual-JFIF writer.
+A conversion carries the HDR metadata that its source declares for the derived HDR image. The exporter reads `mdcv`, `clli`, and registered `it35` carriers only when the source associates them with the derived `tmap` item. A carrier that describes another image is reported as not applicable and is not copied. The published file declares exactly the retained carriers. The conversion re-reads them from the final bytes before publication. Static values that both carrier kinds declare must agree. A disagreement fails the conversion. Values are copied, not regenerated. A missing value stays missing.
+
+Dynamic payloads receive syntax checks and retain their bytes. Applying dynamic display mapping is outside this exporter. The JPEG APP8 payload codec does not provide a dual-JFIF writer.
 
 ### PVT directory output
 
@@ -239,9 +258,13 @@ xdremux validate output.mov --json
 xdremux validate capture.pvt --json
 ```
 
-The positional `INPUT` is required. Plain validation recognizes supported ISO HDR HEIF, either member of a Live Photo pair, or a three-member PVT directory. It checks the corresponding media, pairing, and timing contract.
+The positional `INPUT` is required. Plain validation recognizes supported ISO HDR HEIF, a two-image JPEG, either member of a Live Photo pair, or a three-member PVT directory. It checks the corresponding media, pairing, and timing contract.
 
-`--semantic` additionally checks the final HEIF's numeric tone-map metadata and declared alternate color encoding. It rejects contradictory metadata and image channel counts. `--hdr-profile bt2020-pq` or `bt2020-hlg` also checks the selected color encoding, source colorimetry, coded dimensions, ordered orientation properties, and any supported HDR metadata carriers. These options apply to standalone HEIF files.
+A two-image JPEG is checked for two complete images, an MPF index that reaches both real image boundaries, the primary ISO declaration, and the gain-map ISO parameters. The report gives both image geometries, the parameter-set count, and the declared headrooms.
+
+`--semantic` additionally checks the final HEIF's numeric tone-map metadata and declared alternate color encoding. It rejects contradictory metadata and image channel counts. `--hdr-profile bt2020-pq` or `bt2020-hlg` also checks the selected color encoding, source colorimetry, coded dimensions, ordered orientation properties, and any supported HDR metadata carriers. `--hdr-profile` applies to standalone HEIF files.
+
+`--semantic` on a two-image JPEG decodes both images and reports the reconstructed relative linear BT.2020 range. `--hdr-profile` and `--decode-hdr` apply to standalone HEIF files only.
 
 `--decode-hdr` requires `--hdr-profile`. It decodes the final base and Gain Map without reducing component precision to eight bits. The decoder keeps coded coordinates. Reconstruction inverts Gain Map gamma before co-sited bilinear interpolation, applies gains and offsets in the declared application primaries, and converts to linear BT.2020. The JSON report gives actual decode precision and minimum and maximum relative RGB values. Negative gamut-conversion values are retained.
 

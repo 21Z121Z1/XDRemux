@@ -12,6 +12,7 @@ CANONICAL_BILINGUAL_PAIRS = (
     ("docs/styles-reconstruction.en.md", "docs/styles-reconstruction.md"),
     ("docs/apple-features.en.md", "docs/apple-features.md"),
     ("docs/development.en.md", "docs/development.md"),
+    ("docs/dual-layer-hdr.en.md", "docs/dual-layer-hdr.md"),
     ("docs/architecture.en.md", "docs/architecture.md"),
     ("scripts/README.en.md", "scripts/README.md"),
     ("docs/supported-devices.en.md", "docs/supported-devices.md"),

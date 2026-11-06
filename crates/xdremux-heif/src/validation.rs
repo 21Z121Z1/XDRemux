@@ -40,6 +40,137 @@ pub struct GainMapStructure {
     pub general_profile_idc: u8,
 }
 
+/// Compressed resources of a validated Gain Map, in grid image order.
+/// The configuration and payloads must travel together during a remux.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GainMapHevcResources {
+    pub width: u32,
+    pub height: u32,
+    pub rows: u32,
+    pub columns: u32,
+    pub tile_width: u32,
+    pub tile_height: u32,
+    pub hvcc: Vec<u8>,
+    pub tiles: Vec<Vec<u8>>,
+    pub profile: crate::GainMapEncodeProfile,
+    pub gain_map_orientation: Vec<(FourCC, u8)>,
+    pub alternate_orientation: Vec<(FourCC, u8)>,
+}
+
+/// Extract without decoding or reducing component precision. The existing
+/// assembler uses one hvcC and full-range BT.601 Gain Map coding, so reject
+/// heterogeneous configurations or contradictory compression colour tags.
+pub fn extract_gain_map_hevc_resources(source: &[u8]) -> Result<GainMapHevcResources> {
+    let structure = validate_gain_map_structure(source)?;
+    let top = scan_top_level_boxes(source)?;
+    let meta = parse_meta_box(source, one_top_level(&top.boxes, META, "meta")?)?;
+    let index = validate_meta_integrity(source, &meta)?;
+    let mut hvcc = None;
+    let mut dimensions = None;
+    let mut tiles = Vec::with_capacity(structure.tile_item_ids.len());
+    let orientation = |id| -> Result<Vec<(FourCC, u8)>> {
+        let mut seen = HashSet::new();
+        let mut result = Vec::new();
+        for (property, _) in item_properties(&meta, id)? {
+            let limit = match property.kind.as_bytes() {
+                b"irot" => 3,
+                b"imir" => 1,
+                _ => continue,
+            };
+            let (raw, header) = property_box(source, property)?;
+            let bytes = &raw[header.payload_range()];
+            if bytes.len() != 1 || bytes[0] > limit || !seen.insert(property.kind) {
+                return Err(invalid("invalid or duplicate Gain Map orientation"));
+            }
+            // Absent rotation and an explicit zero rotation are equivalent.
+            if property.kind.as_bytes() != b"irot" || bytes[0] != 0 {
+                result.push((property.kind, bytes[0]));
+            }
+        }
+        Ok(result)
+    };
+    let mut gain_color_present = false;
+    for id in std::iter::once(&structure.gain_map_item_id).chain(&structure.tile_item_ids) {
+        for (property, _) in item_properties(&meta, *id)? {
+            if matches!(property.kind.as_bytes(), b"clap" | b"pasp")
+                || (*id != structure.gain_map_item_id
+                    && matches!(property.kind.as_bytes(), b"irot" | b"imir"))
+            {
+                return Err(invalid(
+                    "Gain Map remux cannot discard crop, aspect, or tile-local transforms",
+                ));
+            }
+            if property.kind == COLR {
+                gain_color_present |= *id == structure.gain_map_item_id;
+                let (raw, header) = property_box(source, property)?;
+                if &raw[header.payload_range()] != b"nclx\0\x02\0\x02\0\x06\x80" {
+                    return Err(invalid(
+                        "Gain Map remux requires full-range BT.601 compression colour encoding",
+                    ));
+                }
+            }
+        }
+    }
+    if structure.channel_count == 3 && !gain_color_present {
+        return Err(invalid(
+            "RGB Gain Map remux requires an explicit compression colour declaration",
+        ));
+    }
+    for id in &structure.tile_item_ids {
+        let property = associated_property(*id, HVCC, &index.ipma_by_item, &index.properties)?;
+        let (raw, header) = property_box(source, property)?;
+        let configuration = &raw[header.payload_range()];
+        if hvcc
+            .as_deref()
+            .is_some_and(|previous| previous != configuration)
+        {
+            return Err(invalid(
+                "Gain Map tiles have different hvcC configuration bytes",
+            ));
+        }
+        hvcc.get_or_insert_with(|| configuration.to_vec());
+        let geometry = parse_ispe(
+            source,
+            associated_property(*id, ISPE, &index.ipma_by_item, &index.properties)?,
+        )?;
+        if dimensions.is_some_and(|previous| previous != geometry) {
+            return Err(invalid(
+                "Gain Map remux requires uniform coded tile dimensions",
+            ));
+        }
+        dimensions = Some(geometry);
+        let location = index
+            .locations
+            .get(id)
+            .ok_or_else(|| invalid("Gain Map tile has no location"))?;
+        tiles.push(item_payload(source, meta.idat.as_ref(), location)?);
+    }
+    let (tile_width, tile_height) =
+        dimensions.ok_or_else(|| invalid("Gain Map has no coded tiles"))?;
+    Ok(GainMapHevcResources {
+        width: structure.width,
+        height: structure.height,
+        rows: structure.rows,
+        columns: structure.columns,
+        tile_width,
+        tile_height,
+        hvcc: hvcc.ok_or_else(|| invalid("Gain Map has no hvcC configuration"))?,
+        tiles,
+        profile: crate::GainMapEncodeProfile {
+            channels: if structure.channel_count == 1 {
+                crate::GainMapChannels::Mono
+            } else {
+                crate::GainMapChannels::Rgb
+            },
+            chroma: structure.chroma_sampling,
+            luma_bit_depth: structure.luma_bit_depth,
+            chroma_bit_depth: structure.chroma_bit_depth,
+        },
+        gain_map_orientation: orientation(structure.gain_map_item_id)?,
+        alternate_orientation: orientation(structure.tmap_item_id)?,
+    })
+}
+
 /// Observed metadata and output colorimetry from a complete HEIF gain-map graph.
 /// Pixel decoding and platform recognition are separate verification gates.
 #[derive(Debug, Clone, PartialEq)]
@@ -217,6 +348,66 @@ pub fn primary_sdr_color_space(source: &[u8]) -> Result<xdremux_metadata::SdrCol
     let top = scan_top_level_boxes(source)?;
     let header = one_top_level(&top.boxes, META, "meta")?;
     primary_color_space(source, &parse_meta_box(source, header)?)
+}
+
+/// Tone-map payload of the derived HDR image.
+///
+/// The payload carries the gain-map operation parameters. A caller that
+/// re-muxes an existing dual-layer file must write these bytes instead of
+/// regenerating them from floats.
+pub fn derived_tmap_payload(source: &[u8]) -> Result<Vec<u8>> {
+    let semantics = validate_gain_map_semantics(source)?;
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, header)?;
+    let index = validate_meta_integrity(source, &meta)?;
+    let location = index
+        .locations
+        .get(&semantics.structure.tmap_item_id)
+        .ok_or_else(|| invalid("derived HDR item has no location"))?;
+    item_payload(source, meta.idat.as_ref(), location)
+}
+
+/// Item ID that `pitm` declares as the primary image.
+pub fn primary_image_item_id(source: &[u8]) -> Result<u32> {
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    Ok(parse_meta_box(source, header)?.primary_item_id)
+}
+
+/// Raw ICC profile that describes the primary image, when the source carries one.
+///
+/// The profile is returned only from properties associated with the primary
+/// image tree. Duplicate profiles are ambiguous and rejected.
+pub fn primary_icc_profile(source: &[u8]) -> Result<Option<Vec<u8>>> {
+    let top = scan_top_level_boxes(source)?;
+    let header = one_top_level(&top.boxes, META, "meta")?;
+    let meta = parse_meta_box(source, header)?;
+    let mut indices = Vec::new();
+    for id in primary_image_items(&meta)? {
+        for (property, _) in item_properties(&meta, id)? {
+            if property.kind == COLR && !indices.contains(&property.index) {
+                indices.push(property.index);
+            }
+        }
+    }
+    let mut profile = None;
+    for index in indices {
+        let property = meta
+            .properties
+            .iter()
+            .find(|p| p.index == index)
+            .ok_or_else(|| invalid("primary color property is missing"))?;
+        let (raw, h) = property_box(source, property)?;
+        let payload = &raw[h.payload_range()];
+        if matches!(payload.get(..4), Some(b"prof" | b"rICC")) {
+            if profile.is_some() {
+                return Err(invalid("duplicate primary ICC profile"));
+            }
+            profile = Some(payload[4..].to_vec());
+        }
+    }
+    Ok(profile)
 }
 
 /// Validate the explicitly selected SDR-base / BT.2020 alternate profile.
@@ -438,7 +629,11 @@ fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
 }
 
-fn one_top_level<'a>(boxes: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&'a BoxHeader> {
+pub(crate) fn one_top_level<'a>(
+    boxes: &'a [BoxHeader],
+    kind: FourCC,
+    context: &str,
+) -> Result<&'a BoxHeader> {
     let mut matches = boxes.iter().filter(|header| header.kind == kind);
     let Some(first) = matches.next() else {
         return Err(invalid(format!("{context} is missing")));
@@ -703,14 +898,17 @@ fn associated_property<'a>(
     Ok(property)
 }
 
-struct MetaIndex<'a> {
-    items: HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
-    locations: HashMap<u32, &'a IlocEntry>,
-    ipma_by_item: HashMap<u32, &'a IpmaEntry>,
-    properties: HashMap<u32, &'a PropertyInfo>,
+pub(crate) struct MetaIndex<'a> {
+    pub(crate) items: HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
+    pub(crate) locations: HashMap<u32, &'a IlocEntry>,
+    pub(crate) ipma_by_item: HashMap<u32, &'a IpmaEntry>,
+    pub(crate) properties: HashMap<u32, &'a PropertyInfo>,
 }
 
-fn validate_meta_integrity<'a>(source: &[u8], meta: &'a ParsedMeta) -> Result<MetaIndex<'a>> {
+pub(crate) fn validate_meta_integrity<'a>(
+    source: &[u8],
+    meta: &'a ParsedMeta,
+) -> Result<MetaIndex<'a>> {
     let mut items = HashMap::new();
     for item in &meta.iinf.entries {
         if items.insert(item.item_id, item).is_some() {

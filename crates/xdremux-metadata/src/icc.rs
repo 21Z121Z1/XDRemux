@@ -282,6 +282,25 @@ impl SdrColorSpace {
     }
 }
 
+/// Resolve application primaries from a validated alternate ICC. Transfer
+/// curves describe the alternate encoding, not the linear gain operation.
+pub fn iso_alternate_colour_primaries(profile: &[u8], alternate_is_hdr: bool) -> Result<u16> {
+    validate_iso_alternate_icc(profile, alternate_is_hdr)?;
+    let parsed = ColorProfile::new_from_slice(profile)
+        .map_err(|e| invalid(&format!("cannot read alternate ICC: {e}")))?;
+    if let Some(cicp) = parsed.cicp {
+        match cicp.color_primaries {
+            CicpColorPrimaries::Bt709 => return Ok(1),
+            CicpColorPrimaries::Bt2020 => return Ok(9),
+            CicpColorPrimaries::Smpte432 => return Ok(12),
+            _ => {}
+        }
+    }
+    // An unspecified primary code does not establish BT.2020. Admit only a
+    // profile whose actual transform matches a supported SDR encoding.
+    identify_sdr_color_space(Some(profile), None).map(SdrColorSpace::primaries)
+}
+
 /// Resolve an executable SDR encoding and check any coexisting ICC/nclx
 /// declarations. Unknown encodings are rejected, never replaced with sRGB.
 pub fn identify_sdr_color_space(
@@ -418,6 +437,16 @@ mod tests {
             let bytes = encode_aligned(&p);
             validate_iso_alternate_icc(&bytes, true)
                 .unwrap_or_else(|e| panic!("{:?}: {e}", p.cicp));
+            let expected = match p.cicp.as_ref().unwrap().color_primaries {
+                CicpColorPrimaries::Bt709 => 1,
+                CicpColorPrimaries::Bt2020 => 9,
+                CicpColorPrimaries::Smpte432 => 12,
+                other => panic!("unexpected primary {other:?}"),
+            };
+            assert_eq!(
+                iso_alternate_colour_primaries(&bytes, true).unwrap(),
+                expected
+            );
             // Correct curves with conflicting primaries and correct primaries
             // with conflicting transfer must each fail, independently.
             let mut conflicting = p.clone();
