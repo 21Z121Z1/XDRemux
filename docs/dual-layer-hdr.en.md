@@ -28,12 +28,15 @@ A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dua
 ## Source facts the conversion keeps
 
 - The compressed SDR base keeps its bytes on both HEIF paths. A JPEG destination decodes it and re-encodes it.
-- The Gain Map keeps its geometry and declared operation, but its pixels are decoded, quantized to eight bits per component, and re-encoded. The resulting samples are not bit-exact, particularly for sources above eight bits.
+- A standalone ISO HEIF converted to HEIF retains the Gain Map's compressed tiles, hvcC bytes, tile order, sampling, bit depth, and dimensions. The final file is checked against those source resources. Generated 10- and 12-bit HEVC vectors exercise this path without reducing precision or requiring a Gain Map encoder.
+- ProXDR conversion and a JPEG destination use the existing eight-bit Gain Map encoder. JPEG output re-encodes both images; those samples are not bit-exact.
 - The gain-map operation metadata is preserved. A standalone ISO source keeps its exact tone-map payload bytes. A ProXDR source keeps the operation its vendor float view declares.
 - `mdcv`, `clli`, and registered `it35` carriers are copied only when the source associates them with the derived HDR image. Two carriers that declare the same value must agree. An absent value stays absent. Optional registered matrix/3D LUT extension bytes are decoded with bounds checks and retained exactly.
 - A JPEG destination keeps the base ICC profile and the Exif payload.
 
-The conversion re-reads the published bytes before publication. It checks the structure, the carriers (including actual opt-in APP8 declaration offsets and enhanced payload), the declared profile, and both image decodes.
+The conversion re-reads the published bytes before publication. It checks the structure, the carriers (including actual opt-in APP8 declaration offsets and enhanced payload), and the declared profile. JPEG output must decode both images. HEIF remux compares every compressed Gain Map resource without decoding or re-encoding it; pixel decoding is a separate validation operation.
+
+For JPEG reconstruction, a missing alternate ICC selects the base application primaries even when `use_base_colour_space` is zero. A present alternate ICC is validated. When selected for application, its supported BT.709, Display P3 D65, or BT.2020 primaries govern the linear gain operation before conversion to BT.2020. No colour space is inferred from the Gain Map compression matrix.
 
 ## Mapping and luminance executors
 
@@ -45,6 +48,10 @@ Two pure executors are available to code that already holds typed inputs. Neithe
 
 Neither executor changes a conversion on its own. The registered file mapping extension is decoded and preserved, but cannot be passed directly to `AdditionalMapping`: its scalar LUT payload does not declare the vector-channel and domain semantics required by that executor. A display target is not read from a device.
 
+An enabled registered base or combined mapping therefore stops file pixel reconstruction. Structural validation and HEIF remux can preserve it. JPEG export requires `--jpeg-registered-metadata` when dropping the carrier would drop an enabled mapping. JSON validation reports base mapping, combined mapping, dynamic metadata, and display adaptation separately; `parsed-not-applied` does not establish rendered-pixel support.
+
+`DynamicHdrMetadata::from_parts` packs caller-supplied statistics, up to two display-target sets, base curves, spline pieces, and saturation gains. It checks each field's bit width and conditional presence. This provides checked authoring without generating measurements or tone-mapping parameters.
+
 ## Verification
 
 Run the focused checks from the repository root:
@@ -55,6 +62,7 @@ cargo test -p xdremux-runtime --test jpeg_export
 cargo test -p xdremux-runtime --test jpeg_validation
 cargo test -p xdremux-runtime --test jpeg_registered
 cargo test -p xdremux-runtime --test iso_heif_source
+cargo test -p xdremux-runtime --test hevc_gain_map_preservation
 cargo test -p xdremux-cli --test jpeg_output
 cargo test -p xdremux-cli --test iso_heif_source
 cargo test -p xdremux-codec --test dual_jpeg
@@ -75,7 +83,7 @@ Measured limits for the current encoding configuration:
 | --- | --- | --- |
 | JPEG base re-encode drift from the source base | below 2 of 255 | below 24 of 255 |
 | JPEG export against the HEIF export of the same source | 0.19 percent relative | 1.3 percent at the 99th percentile |
-| Profile change through the ISO graph path | 0.000002 absolute | 0.003 absolute |
+| HEIF profile change through compressed Gain Map remux | 0 | 0 |
 
 These values describe one fixed encoding configuration. They are not a general quality guarantee.
 
@@ -88,7 +96,8 @@ These values describe one fixed encoding configuration. They are not a general q
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
 - The registered JPEG APP8 pair is written only on request (`--jpeg-registered-metadata`) and only when the source supplies enhanced registered metadata. A source without it is refused, rather than publishing a base declaration with no enhanced record. The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
-- The Gain Map encoder currently accepts eight-bit rasters; higher-bit-depth sources are quantized before encoding. Geometry and metadata preservation do not guarantee sample-exact preservation.
+- The Gain Map encoder currently accepts eight-bit rasters. A standalone HEVC Gain Map uses compressed-resource remux for HEIF output, including higher precision; a JPEG destination explicitly selects eight-bit quantization and uses the JPEG encoder without requiring a HEVC Gain Map encoder. Generated mono and RGB 10/12-bit sources cover both destinations.
+- HEIF remux currently requires uniform coded tile dimensions, identical hvcC bytes, and compatible full-range BT.601 Gain Map compression declarations. Other layouts fail rather than being reinterpreted. Changing alternate application primaries requires a verified pixel/mapping conversion and is refused by this remux path.
 - Registered matrix/3D LUT sections can be read from and round-tripped through HEIF `it35` and JPEG APP8. Precision, finite values, sizes, and cube dimensions are validated. Their rendering semantics are not established, so the conversion preserves them without applying them to pixels; no implicit RGB-vector interpretation or LUT domain is invented.
 - No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.
 

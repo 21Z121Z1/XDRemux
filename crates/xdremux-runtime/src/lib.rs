@@ -60,7 +60,7 @@ pub use validation::{
     reconstruct_dual_layer_jpeg_hdr, reconstruct_hdr_gain_map, validate_dual_layer_jpeg,
     validate_media_file, validate_media_file_with_profile, DualLayerJpegValidationReport,
     GainMapValidationProfile, IsoHdrSemanticsReport, IsoHdrValidationReport,
-    LivePhotoValidationReport, ValidationReport,
+    LivePhotoValidationReport, RegisteredHdrProcessingReport, ValidationReport,
 };
 pub use xdremux_heif::PhotographicStylesAssembly;
 
@@ -1012,6 +1012,15 @@ fn build_jpeg_artifact(
     metadata: &xdremux_metadata::UltraHdrGainMapMetadata,
     plan: &ConversionPlan,
 ) -> Result<Vec<u8>> {
+    if !plan.registered_jpeg_metadata
+        && plan
+            .hdr_metadata
+            .registered_metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.has_enabled_mapping())
+    {
+        return Err(RuntimeError::new("JPEG output", "enabled source mappings require --jpeg-registered-metadata so their rendering instructions are retained"));
+    }
     let geometry = xdremux_heif::primary_coded_geometry(body)
         .map_err(|error| RuntimeError::external("JPEG output geometry", error))?;
     if geometry.quarter_turns_ccw != 0 || geometry.mirror_axis.is_some() {
@@ -1112,6 +1121,16 @@ fn assemble_heif(
             chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
         },
     };
+    assemble_direct_heif(body, gain_map, tmap_payload, xmp_payload, plan)
+}
+
+fn assemble_direct_heif(
+    body: &[u8],
+    gain_map: DirectHevcGainMap<'_>,
+    tmap_payload: &[u8],
+    xmp_payload: &[u8],
+    plan: &ConversionPlan,
+) -> Result<Vec<u8>> {
     let hdr_metadata =
         (!plan.hdr_metadata.is_empty()).then_some(xdremux_heif::HdrMetadataAssembly {
             static_metadata: &plan.hdr_metadata.static_metadata,
@@ -1201,17 +1220,17 @@ impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
                 "OPPO Gallery compatibility requires a ProXDR source",
             ));
         }
-        let structure = &self.prepared.semantics.structure;
-        let decoded = self
-            .heif
-            .decode_coded_item_normalized(
-                self.source,
-                structure.gain_map_item_id,
-                structure.channel_count,
-            )
-            .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map decode", error))?;
-        let raster = normalized_raster_to_raster8(&decoded)?;
         if plan.container == OutputContainer::Jpeg {
+            let structure = &self.prepared.semantics.structure;
+            let decoded = self
+                .heif
+                .decode_coded_item_normalized(
+                    self.source,
+                    structure.gain_map_item_id,
+                    structure.channel_count,
+                )
+                .map_err(|error| RuntimeError::external("ISO HDR HEIF Gain Map decode", error))?;
+            let raster = normalized_raster_to_raster8(&decoded)?;
             // A two-image JPEG has no alternate ICC, so the gain operation must
             // already run in the base application space.
             if !self.prepared.semantics.metadata.use_base_color_space {
@@ -1245,26 +1264,62 @@ impl ArtifactBuilder for IsoHeifArtifactBuilder<'_> {
                 "the compatible layout declares BT.2020 PQ; select --hdr-profile bt2020-pq or bt2020-hlg for this source",
             ));
         }
-        let encoded = self
-            .heif
-            .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
-                raster,
-                plan.gain_map_target,
-            ))
-            .map_err(|error| RuntimeError::external("HEVC Gain Map encode", error))?;
+        if (!self.prepared.semantics.metadata.use_base_color_space
+            || self
+                .prepared
+                .hdr_metadata
+                .registered_metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.has_enabled_mapping()))
+            && !matches!(
+                self.prepared.semantics.output_color,
+                xdremux_heif::HdrOutputColor::Nclx { primaries: 9, .. }
+            )
+        {
+            return Err(RuntimeError::new("ISO HDR HEIF conversion", "a BT.2020 output cannot relabel the source's alternate Gain Map application primaries"));
+        }
+        let resources = xdremux_heif::extract_gain_map_hevc_resources(self.source)
+            .map_err(|error| RuntimeError::external("HEVC Gain Map resource extraction", error))?;
+        let tiles = resources
+            .tiles
+            .iter()
+            .map(|payload| GainMapTile {
+                payload,
+                width: resources.tile_width,
+                height: resources.tile_height,
+            })
+            .collect::<Vec<_>>();
+        let gain_map = DirectHevcGainMap {
+            gain_map_width: resources.width,
+            gain_map_height: resources.height,
+            tile_width: resources.tile_width,
+            tile_height: resources.tile_height,
+            tiles: &tiles,
+            hvcc: &resources.hvcc,
+            profile: resources.profile,
+        };
         let xmp_payload = self
             .prepared
             .semantics
             .metadata
             .to_hdrgm_xmp()
             .map_err(|error| RuntimeError::external("ISO Gain Map XMP", error))?;
-        assemble_heif(
+        let output = assemble_direct_heif(
             self.source,
-            &encoded,
+            gain_map,
             &self.prepared.tmap_payload,
             &xmp_payload,
             plan,
-        )
+        )?;
+        let published = xdremux_heif::extract_gain_map_hevc_resources(&output)
+            .map_err(|error| RuntimeError::external("HEVC Gain Map resource readback", error))?;
+        if published != resources {
+            return Err(RuntimeError::new(
+                "HEVC Gain Map preservation",
+                "the final file changed the source compressed Gain Map resources",
+            ));
+        }
+        Ok(output)
     }
 }
 

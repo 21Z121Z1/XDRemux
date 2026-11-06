@@ -12,6 +12,75 @@ pub struct GainMapSamples<'a> {
     pub data: &'a [f32],
 }
 
+/// Supported D65 linear working spaces. Gain Map compression colour tags do
+/// not select this space; it comes from the base/alternate image binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinearRgbPrimaries {
+    Bt709,
+    DisplayP3,
+    Bt2020,
+}
+
+impl From<SdrColorSpace> for LinearRgbPrimaries {
+    fn from(space: SdrColorSpace) -> Self {
+        match space {
+            SdrColorSpace::Srgb => Self::Bt709,
+            SdrColorSpace::DisplayP3 => Self::DisplayP3,
+        }
+    }
+}
+
+impl LinearRgbPrimaries {
+    fn to_bt2020(self, rgb: [f64; 3]) -> [f64; 3] {
+        match self {
+            Self::Bt709 => sdr_linear_to_bt2020(rgb, SdrColorSpace::Srgb),
+            Self::DisplayP3 => sdr_linear_to_bt2020(rgb, SdrColorSpace::DisplayP3),
+            Self::Bt2020 => rgb,
+        }
+    }
+
+    fn convert_from_bt2020(self, rgb: [f64; 3]) -> [f64; 3] {
+        let matrix = match self {
+            Self::Bt2020 => return rgb,
+            Self::Bt709 => [
+                [
+                    1.6604910021084345,
+                    -0.5876411387885495,
+                    -0.072_849_863_319_885,
+                ],
+                [
+                    -0.1245504745215907,
+                    1.1328998971259598,
+                    -0.00834942260436948,
+                ],
+                [
+                    -0.01815076335490524,
+                    -0.1005788980080074,
+                    1.1187296613629127,
+                ],
+            ],
+            Self::DisplayP3 => [
+                [
+                    1.3435782525843323,
+                    -0.2821796705261357,
+                    -0.06139858205819629,
+                ],
+                [
+                    -0.06529745278911953,
+                    1.0757879158485744,
+                    -0.010490463059454953,
+                ],
+                [
+                    0.0028217872617009505,
+                    -0.019598494524494057,
+                    1.0167767072627931,
+                ],
+            ],
+        };
+        matrix.map(|row| row.into_iter().zip(rgb).map(|(a, b)| a * b).sum())
+    }
+}
+
 /// D65 matrices derived from the primary chromaticities, without gamut clipping.
 pub fn sdr_linear_to_bt2020(rgb: [f64; 3], space: SdrColorSpace) -> [f64; 3] {
     let matrix = match space {
@@ -84,6 +153,28 @@ pub fn reconstruct_bt2020_hdr(
     metadata: &UltraHdrGainMapMetadata,
     base_space: SdrColorSpace,
 ) -> Result<SceneLinearRgb> {
+    reconstruct_bt2020_hdr_in_space(
+        base,
+        gain,
+        metadata,
+        base_space,
+        if metadata.use_base_color_space {
+            base_space.into()
+        } else {
+            LinearRgbPrimaries::Bt2020
+        },
+    )
+}
+
+/// Reconstruct with application primaries already resolved by the container
+/// reader, including the JPEG rule that a missing alternate ICC uses the base.
+pub fn reconstruct_bt2020_hdr_in_space(
+    base: &SceneLinearRgb,
+    gain: GainMapSamples<'_>,
+    metadata: &UltraHdrGainMapMetadata,
+    base_space: SdrColorSpace,
+    application_primaries: LinearRgbPrimaries,
+) -> Result<SceneLinearRgb> {
     crate::scene_linear::validate_linear(base)?;
     let expected = gain
         .width
@@ -122,8 +213,9 @@ pub fn reconstruct_bt2020_hdr(
         for x in 0..base.width {
             let i = (y * base.width + x) * 3;
             let mut pixel = std::array::from_fn(|c| f64::from(base.samples[i + c]));
-            if !metadata.use_base_color_space {
-                pixel = sdr_linear_to_bt2020(pixel, base_space);
+            if application_primaries != LinearRgbPrimaries::from(base_space) {
+                pixel = application_primaries
+                    .convert_from_bt2020(sdr_linear_to_bt2020(pixel, base_space));
             }
             for (c, value) in pixel.iter_mut().enumerate() {
                 let m = if metadata.channel_count == 1 { 0 } else { c };
@@ -131,9 +223,7 @@ pub fn reconstruct_bt2020_hdr(
                 *value = (*value + metadata.offset_sdr[m]) * (weight * log_gain).exp2()
                     - metadata.offset_hdr[m];
             }
-            if metadata.use_base_color_space {
-                pixel = sdr_linear_to_bt2020(pixel, base_space);
-            }
+            pixel = application_primaries.to_bt2020(pixel);
             for value in pixel {
                 let value = value as f32;
                 if !value.is_finite() {
@@ -346,5 +436,49 @@ mod tests {
             assert!(encode_hlg(x).is_err());
             assert!(decode_hlg(x).is_err());
         }
+    }
+
+    #[test]
+    fn application_gamut_conversion_preserves_extended_components() {
+        for space in [
+            LinearRgbPrimaries::Bt709,
+            LinearRgbPrimaries::DisplayP3,
+            LinearRgbPrimaries::Bt2020,
+        ] {
+            for rgb in [[1.0; 3], [-0.25, 2.0, 0.4], [0.0, 0.0, 0.0]] {
+                let actual = space.convert_from_bt2020(space.to_bt2020(rgb));
+                assert!(actual
+                    .into_iter()
+                    .zip(rgb)
+                    .all(|(a, b)| (a - b).abs() < 3e-14));
+            }
+        }
+        let base = SceneLinearRgb {
+            width: 1,
+            height: 1,
+            samples: vec![0.5, 0.25, 0.125],
+        };
+        let gain = GainMapSamples {
+            width: 1,
+            height: 1,
+            channels: 3,
+            data: &[0.0, 0.25, 1.0],
+        };
+        let actual = reconstruct_bt2020_hdr_in_space(
+            &base,
+            gain,
+            &metadata(),
+            SdrColorSpace::Srgb,
+            LinearRgbPrimaries::DisplayP3,
+        )
+        .unwrap();
+        // Independent NumPy chromaticity-matrix calculation: change sRGB to
+        // P3, apply gains [0.5, 2, 8] and offsets there, then change to BT.2020.
+        let expected = [0.330191872416722, 0.5266848543593263, 1.2219111855804998];
+        assert!(actual
+            .samples
+            .iter()
+            .zip(expected)
+            .all(|(a, b)| (f64::from(*a) - b).abs() < 1e-7));
     }
 }

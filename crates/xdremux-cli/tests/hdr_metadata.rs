@@ -273,5 +273,22 @@ fn convert_reports_preserved_hdr_metadata_and_publishes_it() {
         Some(content_light())
     );
     assert!(observed.has_dynamic_metadata());
+    let mut json = Vec::new();
+    let code = xdremux_cli::run_from(
+        [
+            OsString::from("validate"),
+            output.as_os_str().to_owned(),
+            OsString::from("--semantic"),
+            OsString::from("--json"),
+        ],
+        &mut json,
+        &mut stderr,
+    );
+    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&stderr));
+    let report: serde_json::Value = serde_json::from_slice(&json).unwrap();
+    let registered = &report["details"]["value"]["semantics"]["registered_metadata"];
+    assert_eq!(registered["dynamic_metadata"], "syntax-checked");
+    assert_eq!(registered["display_adaptation"], "not-applied");
+    assert_eq!(registered["base_mapping"], "not-present");
     fs::remove_dir_all(work).ok();
 }

@@ -167,29 +167,23 @@ impl LibHeifProvider {
 
     pub fn capability_inventory(&self) -> Result<CapabilityInventory> {
         let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        if lib
-            .encoder_descriptors(1, Some(CompressionFormat::Hevc), None)
-            .is_empty()
-        {
-            return Err(CodecError::unsupported(
-                "libheif has no HEVC encoder plugin available",
-            ));
-        }
-        if lib
+        let mut operations = Vec::new();
+        if !lib
             .decoder_descriptors(1, Some(CompressionFormat::Hevc))
             .is_empty()
         {
-            return Err(CodecError::unsupported(
-                "libheif has no HEVC decoder plugin available",
-            ));
+            operations.push(OperationCapability::RasterDecoder(GainMapCodec::Hevc));
         }
-
-        let mut operations = vec![OperationCapability::RasterDecoder(GainMapCodec::Hevc)];
-        operations.extend(
-            Self::verified_encoder_layouts()
-                .into_iter()
-                .map(OperationCapability::GainMapTileEncoder),
-        );
+        if !lib
+            .encoder_descriptors(1, Some(CompressionFormat::Hevc), None)
+            .is_empty()
+        {
+            operations.extend(
+                Self::verified_encoder_layouts()
+                    .into_iter()
+                    .map(OperationCapability::GainMapTileEncoder),
+            );
+        }
         Ok(CapabilityInventory::new(operations))
     }
 

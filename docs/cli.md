@@ -98,7 +98,7 @@ xdremux convert --input IMG_001.jpg
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
 
-目标扩展名为 `.jpg` 或 `.jpeg` 时，使用双层 JPEG 容器。基本图像重新编码为 JPEG，并保留源 ICC 配置文件。增强图像保留采样值，ISO 21496-1 APP2 载体照常写入，MPF 索引描述两幅图像。其他扩展名仍输出 HEIF。
+目标扩展名为 `.jpg` 或 `.jpeg` 时，使用双层 JPEG 容器。基本图像重新编码为 JPEG，并保留源 ICC 配置文件。增强图像保留尺寸和操作元数据，但会量化至 8 位并重新编码，解码采样不保证精确不变。ISO 21496-1 APP2 载体保留操作参数，MPF 索引描述两幅图像。其他扩展名仍输出 HEIF。
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
@@ -106,7 +106,7 @@ xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
 
 JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。请求这些组合时，转换会在发布前失败。`batch` 只输出 HEIF。
 
-文件若带有标准双层 HEIF 图但没有厂商扩展块，会通过标准图路径读取。这包括较早的 XDRemux HEIF 输出，以及其他生产者生成的 ISO 21496-1 文件。压缩基础图像与源色调映射载荷保留原始字节，增强图像重新编码。请选择与源编码一致的 `--hdr-profile bt2020-pq` 或 `bt2020-hlg`：默认的 `compatible` 布局声明 BT.2020 PQ，并拒绝声明其他编码的源文件。`--oppo-compatible` 需要 ProXDR 源文件。
+文件若带有标准双层 HEIF 图但没有厂商扩展块，会通过标准图路径读取。这包括较早的 XDRemux HEIF 输出，以及其他生产者生成的 ISO 21496-1 文件。输出 HEIF 时，压缩基础图像、源色调映射载荷与压缩增益图分块保留字节和精度，包括 10 位及 12 位 HEVC 源。重封装要求分块尺寸一致、hvcC 配置一致、压缩色彩声明相容，且保留方向变换顺序。无法保真的布局会被拒绝。请选择与源编码一致的 `--hdr-profile bt2020-pq` 或 `bt2020-hlg`：默认的 `compatible` 布局声明 BT.2020 PQ，并拒绝声明其他编码的源文件。`--oppo-compatible` 需要 ProXDR 源文件。
 
 `--jpeg-registered-metadata` 为双层 JPEG 添加成对的注册 APP8 载体。基本图像声明图像数量以及指向增强图像的两个偏移，增强图像携带源文件中的注册元数据。若源文件未提供增强注册元数据，转换会拒绝。简化视图偏移遵循本仓库记录的规则，尚未与独立生产者核对。
 

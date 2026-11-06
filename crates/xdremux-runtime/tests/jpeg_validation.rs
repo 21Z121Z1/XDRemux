@@ -136,3 +136,60 @@ fn a_plain_single_image_jpeg_is_not_reported_as_dual_layer() {
     assert!(validate_media_file_with_profile(&path, GainMapValidationProfile::Structure).is_err());
     fs::remove_dir_all(work).ok();
 }
+
+#[test]
+fn an_absent_alternate_icc_keeps_gains_in_the_base_primaries_for_either_flag() {
+    use xdremux_format::dual_jpeg::{
+        assemble_dual_layer_jpeg, AppSegment, DualLayerJpegAssembly, ISO_GAIN_MAP_APP2_IDENTIFIER,
+    };
+    let encode = |pixels: &[u8]| {
+        let mut bytes = Vec::new();
+        jpeg_encoder::Encoder::new(&mut bytes, 100)
+            .encode(pixels, 1, 1, jpeg_encoder::ColorType::Rgb)
+            .unwrap();
+        bytes
+    };
+    let base = encode(&[128, 64, 32]);
+    let gain = encode(&[0, 128, 255]);
+    let info = [
+        1.0, 1.0, 1.0, 1.0, 8.0, 8.0, 8.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 8.0,
+    ];
+    let tmap = xdremux_metadata::make_apple_tmap_payload(&info).unwrap();
+    let metadata = xdremux_metadata::parse_heif_tmap_metadata(&tmap).unwrap();
+    let mut base_iso = ISO_GAIN_MAP_APP2_IDENTIFIER.to_vec();
+    base_iso.extend([0; 4]);
+    let assemble = |use_base, invalid_icc| {
+        let mut gain_iso = ISO_GAIN_MAP_APP2_IDENTIFIER.to_vec();
+        gain_iso.extend(metadata.to_iso_app2_payload(use_base).unwrap());
+        let mut gain_segments = vec![AppSegment {
+            marker: 0xe2,
+            payload: &gain_iso,
+        }];
+        let icc = b"ICC_PROFILE\0\x01\x01broken ICC";
+        if invalid_icc {
+            gain_segments.push(AppSegment {
+                marker: 0xe2,
+                payload: icc,
+            });
+        }
+        assemble_dual_layer_jpeg(&DualLayerJpegAssembly {
+            base: &base,
+            gain_map: &gain,
+            base_segments: &[AppSegment {
+                marker: 0xe2,
+                payload: &base_iso,
+            }],
+            gain_segments: &gain_segments,
+        })
+        .unwrap()
+    };
+    let with = reconstruct_dual_layer_jpeg_hdr(&assemble(true, false)).unwrap();
+    let without = reconstruct_dual_layer_jpeg_hdr(&assemble(false, false)).unwrap();
+    assert_eq!(
+        with.samples, without.samples,
+        "absence of alternate ICC makes the flag immaterial"
+    );
+    for use_base in [true, false] {
+        assert!(reconstruct_dual_layer_jpeg_hdr(&assemble(use_base, true)).is_err());
+    }
+}

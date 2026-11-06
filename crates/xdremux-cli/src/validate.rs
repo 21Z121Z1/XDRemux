@@ -128,6 +128,9 @@ fn write_human(
                         message!(language, "hdr-profile: {}", "HDR 配置：{}", profile)
                     )?;
                 }
+                if let Some(registered) = &semantics.registered_metadata {
+                    write_registered(language, registered, output)?;
+                }
                 if let Some(decoded) = &semantics.decoded_hdr {
                     writeln!(
                         output,
@@ -215,6 +218,9 @@ fn write_human(
                     value.base_icc_present
                 )
             )?;
+            if let Some(registered) = &value.registered_metadata {
+                write_registered(language, registered, output)?;
+            }
             if let Some(decoded) = &value.decoded_hdr {
                 writeln!(
                     output,
@@ -275,6 +281,26 @@ fn write_human(
             )
         }
     }
+}
+
+fn write_registered(
+    language: Language,
+    report: &xdremux_runtime::RegisteredHdrProcessingReport,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    writeln!(
+        output,
+        "{}",
+        message!(
+            language,
+            "registered-hdr: dynamic={} base-mapping={} combined-mapping={} display-adaptation={}",
+            "注册 HDR：动态元数据={} 基本图像映射={} 合成图像映射={} 显示适配={}",
+            report.dynamic_metadata,
+            report.base_mapping,
+            report.combined_mapping,
+            report.display_adaptation
+        )
+    )
 }
 
 fn write_json(value: &serde_json::Value, output: &mut impl Write) -> io::Result<()> {

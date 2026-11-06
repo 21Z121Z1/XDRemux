@@ -101,7 +101,7 @@ xdremux convert --input IMG_001.jpg
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
 
-A `.jpg` or `.jpeg` destination selects the two-image JPEG container. The primary image is re-encoded as JPEG and keeps the source ICC profile. The gain map keeps its samples and the ISO 21496-1 APP2 carriers. An MPF index describes both images. Every other destination extension keeps HEIF output.
+A `.jpg` or `.jpeg` destination selects the two-image JPEG container. The primary image is re-encoded as JPEG and keeps the source ICC profile. The Gain Map keeps its dimensions and operation metadata but is quantized to eight bits and re-encoded; its decoded samples are not preserved exactly. ISO 21496-1 APP2 carriers retain the operation parameters. An MPF index describes both images. Every other destination extension keeps HEIF output.
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
@@ -109,7 +109,7 @@ xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
 
 JPEG output requires identity orientation and cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources. A conversion that requests one of these fails before publication. `batch` writes HEIF output only.
 
-A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. The compressed base and the source tone-map payload keep their bytes, and the Gain Map is re-encoded. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. `--oppo-compatible` requires a ProXDR source.
+A file that carries a standard dual-layer HEIF graph but no vendor extension block is read through the standard graph path. This covers an earlier XDRemux HEIF output and an ISO 21496-1 file from another producer. For HEIF output, the compressed base, source tone-map payload, and compressed Gain Map tiles keep their bytes and precision, including 10- and 12-bit HEVC sources. Remux requires uniform tiles, identical hvcC configuration, compatible compression colour declarations, and preserved ordered orientation. A layout the remux cannot preserve is refused. Select `--hdr-profile bt2020-pq` or `bt2020-hlg` to match the source encoding: the default `compatible` layout declares BT.2020 PQ and refuses a source that declares another encoding. `--oppo-compatible` requires a ProXDR source.
 
 `--jpeg-registered-metadata` adds paired registered APP8 carriers to the two-image JPEG. The base image declares the image count and two offsets to the enhanced image; the enhanced image carries the source registered metadata. Sources without registered enhanced metadata are refused. The reduced-view offset follows the documented rule and is not yet confirmed against an independent producer.
 

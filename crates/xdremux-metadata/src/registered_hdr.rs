@@ -84,6 +84,85 @@ impl Bits<'_> {
 }
 
 impl DynamicHdrMetadata {
+    /// Construct packed metadata from source- or caller-supplied encoded
+    /// fields. No measurements, curve parameters, or display target are inferred.
+    pub fn from_parts(
+        statistics: DynamicHdrStatistics,
+        tone_mappings: Vec<DynamicHdrToneMapping>,
+        saturation_gains: Vec<u8>,
+    ) -> Result<Self> {
+        if tone_mappings.len() > 2 || saturation_gains.len() > 7 {
+            return Err(invalid("too many dynamic target sets or saturation gains"));
+        }
+        let mut packed = PackedBits::default();
+        packed.write(1, 8)?;
+        for value in [
+            statistics.minimum_maxrgb_pq,
+            statistics.average_maxrgb_pq,
+            statistics.variance_maxrgb_pq,
+            statistics.maximum_maxrgb_pq,
+        ] {
+            packed.write(u32::from(value), 12)?;
+        }
+        packed.write(u32::from(!tone_mappings.is_empty()), 1)?;
+        if !tone_mappings.is_empty() {
+            packed.write((tone_mappings.len() - 1) as u32, 1)?;
+        }
+        for target in &tone_mappings {
+            packed.write(u32::from(target.target_maximum_luminance_pq), 12)?;
+            packed.write(u32::from(target.base.is_some()), 1)?;
+            if let Some(base) = target.base {
+                for (value, width) in [
+                    (u32::from(base.m_p), 14),
+                    (u32::from(base.m_m), 6),
+                    (u32::from(base.m_a), 10),
+                    (u32::from(base.m_n), 6),
+                    (u32::from(base.m_b), 10),
+                    (u32::from(base.k1), 2),
+                    (u32::from(base.k2), 2),
+                    (u32::from(base.k3), 4),
+                    (u32::from(base.delta_mode), 3),
+                    (u32::from(base.delta), 7),
+                ] {
+                    packed.write(value, width)?;
+                }
+            }
+            if target.splines.len() > 2 {
+                return Err(invalid("too many dynamic spline pieces"));
+            }
+            packed.write(u32::from(!target.splines.is_empty()), 1)?;
+            if !target.splines.is_empty() {
+                packed.write((target.splines.len() - 1) as u32, 1)?;
+            }
+            for spline in &target.splines {
+                packed.write(u32::from(spline.threshold_mode), 2)?;
+                let needs_mb = matches!(spline.threshold_mode, 0 | 2);
+                if needs_mb != spline.threshold_mb.is_some() {
+                    return Err(invalid("spline threshold MB disagrees with its mode"));
+                }
+                if let Some(mb) = spline.threshold_mb {
+                    packed.write(u32::from(mb), 8)?;
+                }
+                for (value, width) in [
+                    (u32::from(spline.threshold), 12),
+                    (u32::from(spline.delta1), 10),
+                    (u32::from(spline.delta2), 10),
+                    (u32::from(spline.strength), 8),
+                ] {
+                    packed.write(value, width)?;
+                }
+            }
+        }
+        packed.write(u32::from(!saturation_gains.is_empty()), 1)?;
+        if !saturation_gains.is_empty() {
+            packed.write(saturation_gains.len() as u32, 3)?;
+            for gain in &saturation_gains {
+                packed.write(u32::from(*gain), 8)?;
+            }
+        }
+        Self::parse(&packed.bytes)
+    }
+
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.is_empty() || bytes.len() > u16::MAX as usize {
             return Err(invalid("invalid dynamic metadata length"));
@@ -186,6 +265,29 @@ impl DynamicHdrMetadata {
 
     pub fn saturation_gains(&self) -> &[u8] {
         &self.saturation_gains
+    }
+}
+
+#[derive(Default)]
+struct PackedBits {
+    bytes: Vec<u8>,
+    length: usize,
+}
+
+impl PackedBits {
+    fn write(&mut self, value: u32, width: usize) -> Result<()> {
+        if value >= 1 << width {
+            return Err(invalid("dynamic field exceeds its packed bit width"));
+        }
+        for shift in (0..width).rev() {
+            if self.length.is_multiple_of(8) {
+                self.bytes.push(0);
+            }
+            let index = self.length / 8;
+            self.bytes[index] |= (((value >> shift) & 1) as u8) << (7 - self.length % 8);
+            self.length += 1;
+        }
+        Ok(())
     }
 }
 
@@ -322,6 +424,14 @@ impl<'a> Cursor<'a> {
 }
 
 impl RegisteredHdrMetadata {
+    pub fn has_enabled_mapping(&self) -> bool {
+        self.mapping_extension.as_ref().is_some_and(|extension| {
+            [&extension.base, &extension.combined]
+                .into_iter()
+                .any(|mapping| matches!(mapping, Some(crate::RegisteredMapping::Lut(_))))
+        })
+    }
+
     pub fn parse_it35(bytes: &[u8]) -> Result<Self> {
         let mut cursor = Cursor { bytes, position: 0 };
         if cursor.take(6)? != PREFIX {
@@ -498,6 +608,16 @@ mod tests {
         let dynamic = DynamicHdrMetadata::parse(&packed).unwrap();
         assert_eq!(dynamic.as_bytes(), packed);
         assert_eq!(
+            DynamicHdrMetadata::from_parts(
+                dynamic.statistics(),
+                dynamic.tone_mappings().to_vec(),
+                dynamic.saturation_gains().to_vec()
+            )
+            .unwrap()
+            .as_bytes(),
+            packed
+        );
+        assert_eq!(
             dynamic.statistics(),
             DynamicHdrStatistics {
                 minimum_maxrgb_pq: 10,
@@ -534,6 +654,93 @@ mod tests {
         if pos % 8 != 0 {
             assert!(DynamicHdrMetadata::parse(&bad_padding).is_err());
         }
+    }
+
+    #[test]
+    fn dynamic_construction_covers_optional_modes_and_refuses_overflow() {
+        let stats = DynamicHdrStatistics {
+            minimum_maxrgb_pq: 1,
+            average_maxrgb_pq: 2048,
+            variance_maxrgb_pq: 1023,
+            maximum_maxrgb_pq: 4095,
+        };
+        let base = DynamicHdrBaseParameters {
+            m_p: 16383,
+            m_m: 63,
+            m_a: 1023,
+            m_n: 63,
+            m_b: 1023,
+            k1: 3,
+            k2: 3,
+            k3: 15,
+            delta_mode: 7,
+            delta: 127,
+        };
+        for mode in 0..4 {
+            let spline = DynamicHdrSpline {
+                threshold_mode: mode,
+                threshold_mb: if mode % 2 == 0 { Some(255) } else { None },
+                threshold: 4095,
+                delta1: 1023,
+                delta2: 1023,
+                strength: 255,
+            };
+            for with_base in [false, true] {
+                for count in 0..=2 {
+                    let target = DynamicHdrToneMapping {
+                        target_maximum_luminance_pq: 4095,
+                        base: with_base.then_some(base),
+                        splines: vec![spline; count],
+                    };
+                    let targets = vec![target; 2];
+                    let parsed = DynamicHdrMetadata::from_parts(
+                        stats,
+                        targets.clone(),
+                        vec![0, 1, 64, 128, 200, 254, 255],
+                    )
+                    .unwrap();
+                    assert_eq!(parsed.tone_mappings(), targets);
+                    assert_eq!(parsed.statistics(), stats);
+                    for end in 0..parsed.as_bytes().len() {
+                        assert!(DynamicHdrMetadata::parse(&parsed.as_bytes()[..end]).is_err());
+                    }
+                }
+            }
+        }
+        let minimal = DynamicHdrMetadata::from_parts(
+            DynamicHdrStatistics {
+                minimum_maxrgb_pq: 0,
+                average_maxrgb_pq: 0,
+                variance_maxrgb_pq: 0,
+                maximum_maxrgb_pq: 0,
+            },
+            vec![],
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(minimal.as_bytes(), &[1, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(DynamicHdrMetadata::from_parts(
+            DynamicHdrStatistics {
+                maximum_maxrgb_pq: 4096,
+                ..stats
+            },
+            vec![],
+            vec![]
+        )
+        .is_err());
+        assert!(DynamicHdrMetadata::from_parts(stats, vec![], vec![0; 8]).is_err());
+        let invalid = DynamicHdrToneMapping {
+            target_maximum_luminance_pq: 4096,
+            base: None,
+            splines: vec![],
+        };
+        assert!(DynamicHdrMetadata::from_parts(stats, vec![invalid], vec![]).is_err());
+        let invalid = DynamicHdrToneMapping {
+            target_maximum_luminance_pq: 2048,
+            base: Some(DynamicHdrBaseParameters { m_p: 16384, ..base }),
+            splines: vec![],
+        };
+        assert!(DynamicHdrMetadata::from_parts(stats, vec![invalid], vec![]).is_err());
     }
 
     #[test]

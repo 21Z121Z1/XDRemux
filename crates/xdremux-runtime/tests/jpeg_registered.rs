@@ -102,6 +102,10 @@ fn gain_map_raster(width: u32, height: u32) -> Raster8 {
 
 /// Author a canonical ISO dual-layer HEIF that declares registered metadata.
 fn iso_source_with_registered_metadata() -> Vec<u8> {
+    iso_source_with_metadata(expected_registered())
+}
+
+fn iso_source_with_metadata(registered: RegisteredHdrMetadata) -> Vec<u8> {
     // The vendor body has identity orientation, so the two-image JPEG path
     // accepts it. The vendor extension block is dropped before assembly.
     let vendor = fixture("proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic");
@@ -138,7 +142,6 @@ fn iso_source_with_registered_metadata() -> Vec<u8> {
         mastering_display: Some(mastering()),
         content_light_level: Some(content_light()),
     };
-    let registered = expected_registered();
     assemble_iso_gain_map_heif(
         &base,
         &IsoGainMapAssembly {
@@ -176,6 +179,66 @@ fn jpeg_request(registered: bool) -> ConversionRequest {
         container: OutputContainer::Jpeg,
         registered_jpeg_metadata: registered,
         ..ConversionRequest::default()
+    }
+}
+
+#[test]
+fn pixel_reconstruction_never_silently_ignores_an_enabled_registered_mapping() {
+    use xdremux_metadata::RegisteredMappingExtension;
+    let mut section = vec![32];
+    for value in [1.0_f32, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        .into_iter()
+        .chain([0.5; 8])
+    {
+        section.extend_from_slice(&value.to_be_bytes());
+    }
+    for combined in [false, true] {
+        let mut extension = Vec::new();
+        for raw in if combined {
+            [&[][..], &section]
+        } else {
+            [&section, &[][..]]
+        } {
+            extension.extend_from_slice(&(raw.len() as u16).to_be_bytes());
+            extension.extend_from_slice(raw);
+        }
+        let mut registered = expected_registered();
+        registered.mapping_extension = Some(RegisteredMappingExtension::parse(&extension).unwrap());
+        let source = iso_source_with_metadata(registered);
+        let error = match xdremux_runtime::reconstruct_hdr_gain_map(&source, HdrTransfer::Pq) {
+            Ok(_) => panic!("an enabled unresolved mapping must stop reconstruction"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("registered mapping"), "{error}");
+        let work = tempfile::tempdir().unwrap();
+        let destination = work.path().join("existing.jpg");
+        fs::write(&destination, b"previous output").unwrap();
+        assert!(PortableRuntime::new()
+            .convert_iso_heif_file(&source, &destination, jpeg_request(false), |_| {})
+            .is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"previous output");
+        assert!(
+            PortableRuntime::new()
+                .convert_iso_heif_bytes(&source, jpeg_request(false), |_| {})
+                .is_err(),
+            "JPEG export must not drop an enabled mapping"
+        );
+        let jpeg = PortableRuntime::new()
+            .convert_iso_heif_bytes(&source, jpeg_request(true), |_| {})
+            .unwrap();
+        let report = validate_dual_layer_jpeg(Path::new("mapped.jpg"), &jpeg.bytes, false).unwrap();
+        let registered = report.registered_metadata.unwrap();
+        assert_eq!(
+            if combined {
+                registered.combined_mapping
+            } else {
+                registered.base_mapping
+            },
+            "parsed-not-applied"
+        );
+        assert_eq!(registered.display_adaptation, "not-applied");
+        assert!(validate_dual_layer_jpeg(Path::new("mapped.jpg"), &jpeg.bytes, true).is_err());
+        assert!(xdremux_runtime::reconstruct_dual_layer_jpeg_hdr(&jpeg.bytes).is_err());
     }
 }
 

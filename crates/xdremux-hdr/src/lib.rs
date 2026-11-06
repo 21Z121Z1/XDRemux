@@ -12,7 +12,7 @@ pub use display_target::{
 };
 pub use dual_layer::{
     decode_hlg, decode_pq, decode_srgb, encode_hlg, encode_pq, reconstruct_bt2020_hdr,
-    sdr_linear_to_bt2020, GainMapSamples,
+    reconstruct_bt2020_hdr_in_space, sdr_linear_to_bt2020, GainMapSamples, LinearRgbPrimaries,
 };
 mod edr;
 mod error;

@@ -52,6 +52,14 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 - Build an independent reference reconstruction that reads the final file and compares actual color and luminance against known inputs. Test without deriving expected values from the writer being tested.
 - Distinguish a portable structural pass from Apple ImageIO, Photos, Android Gallery, and physical-display observations.
 
+### 7. Resource preservation and reconstruction admission
+
+- Remux an existing HEVC Gain Map without decoding, quantization, or re-encoding. Retain its coded payloads, configuration, sampling, precision, tile order, and dimensions; verify these against the final file. Keep JPEG export's explicit eight-bit encoding contract.
+- Require a reconstruction request to account for registered base and combined mappings. Preserve unresolved mappings during remux, but refuse pixel reconstruction that would ignore an enabled mapping.
+- Report static metadata, dynamic metadata, and additional mapping coverage independently for HEIF and JPEG. A relative reconstruction does not execute dynamic display adaptation.
+- Complete construction and checked serialization of typed dynamic metadata, including all optional field combinations and packed-byte round trips.
+- Verify focused regressions, full portable checks, final diff, and the existing exact-HEAD CI gate. Keep referenced display-adaptation algorithms and independent producer/device interoperability as explicit gaps until their evidence is available.
+
 ## Implementation slices
 
 - [x] A. Checked tone-map, static HDR, and registered metadata payloads. Semantic validation reads final bytes and rejects invalid versions, denominators, channel counts, color declarations, lengths, and associations.

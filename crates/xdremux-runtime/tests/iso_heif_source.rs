@@ -40,6 +40,20 @@ fn an_iso_source_reconverts_to_another_profile_with_the_same_hdr_image() {
         .convert_iso_heif_bytes(&first.bytes, request(HdrExportProfile::Bt2020Hlg), |_| {})
         .expect("PQ to HLG conversion must succeed");
     assert_eq!(second.plan.hdr_profile, HdrExportProfile::Bt2020Hlg);
+    assert!(
+        xdremux_heif::primary_image_signature(&first.bytes).unwrap()
+            == xdremux_heif::primary_image_signature(&second.bytes).unwrap(),
+        "the compressed SDR base and its colour properties must stay unchanged"
+    );
+    assert_eq!(
+        xdremux_heif::extract_gain_map_hevc_resources(&first.bytes).unwrap(),
+        xdremux_heif::extract_gain_map_hevc_resources(&second.bytes).unwrap(),
+        "profile changes must keep every compressed Gain Map byte and its precision"
+    );
+    assert_eq!(
+        prepared.tmap_payload,
+        analyze_iso_heif(&second.bytes).unwrap().tmap_payload
+    );
 
     // The final file must validate as the selected profile and decode.
     xdremux_heif::validate_hdr_gain_map_profile(&second.bytes, HdrTransfer::Hlg)
@@ -60,8 +74,10 @@ fn an_iso_source_reconverts_to_another_profile_with_the_same_hdr_image() {
     }
     let mean = total / pq.samples.len() as f64;
     eprintln!("iso reconversion: mean-abs={mean:.6} max-abs={maximum:.6}");
-    assert!(mean < 0.002, "mean absolute difference {mean}");
-    assert!(maximum < 0.05, "maximum absolute difference {maximum}");
+    assert_eq!(
+        pq.samples, hlg.samples,
+        "a remux must reconstruct identical samples"
+    );
 }
 
 #[test]

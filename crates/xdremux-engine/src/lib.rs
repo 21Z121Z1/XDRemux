@@ -529,17 +529,54 @@ pub fn plan_conversion(
         }
     }
 
-    let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
-    let gain_map_target = resolve_product_gain_map_encode_profile(
-        analysis.gain_map,
-        request.output,
-        &gain_map_encoder,
-    )?;
+    let preserve_hevc = analysis.gain_map.storage.codec == GainMapCodec::Hevc
+        && request.container == OutputContainer::Heif
+        && request.output == OutputIntent::Standard
+        && !request.apple_features.any();
+    let gain_map_target = if request.container == OutputContainer::Jpeg {
+        validate_source_profile(analysis.gain_map)?;
+        GainMapEncodeProfile {
+            width: analysis.gain_map.width,
+            height: analysis.gain_map.height,
+            channels: analysis.gain_map.channels,
+            layout: GainMapCodecLayout {
+                chroma: if analysis.gain_map.channels == GainMapChannels::Mono {
+                    ChromaSampling::Mono400
+                } else {
+                    ChromaSampling::Yuv444
+                },
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
+        }
+    } else if preserve_hevc {
+        validate_source_profile(analysis.gain_map)?;
+        GainMapEncodeProfile {
+            width: analysis.gain_map.width,
+            height: analysis.gain_map.height,
+            channels: analysis.gain_map.channels,
+            layout: requested_layout(analysis.gain_map),
+        }
+    } else {
+        resolve_product_gain_map_encode_profile(
+            analysis.gain_map,
+            request.output,
+            &capabilities.gain_map_encoder_capabilities(),
+        )?
+    };
 
-    let mut required_capabilities = vec![
-        OperationCapability::RasterDecoder(analysis.gain_map.storage.codec),
-        OperationCapability::GainMapTileEncoder(gain_map_target.layout),
-    ];
+    let mut required_capabilities = vec![OperationCapability::RasterDecoder(
+        analysis.gain_map.storage.codec,
+    )];
+    if request.container == OutputContainer::Jpeg {
+        if analysis.gain_map.storage.codec != GainMapCodec::Hevc {
+            required_capabilities.push(OperationCapability::RasterDecoder(GainMapCodec::Hevc));
+        }
+    } else if !preserve_hevc {
+        required_capabilities.push(OperationCapability::GainMapTileEncoder(
+            gain_map_target.layout,
+        ));
+    }
     if request.apple_features.photographic_styles {
         required_capabilities.push(OperationCapability::PhotographicStylesAdapter);
     }
@@ -580,6 +617,52 @@ pub fn plan_conversion(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn existing_hevc_gain_maps_do_not_need_an_encoder_or_lose_precision() {
+        for depth in [8, 10, 12] {
+            let analysis = ConversionAnalysis {
+                gain_map: GainMapSourceProfile {
+                    width: 960,
+                    height: 720,
+                    channels: GainMapChannels::Rgb,
+                    storage: GainMapStorageProfile {
+                        codec: GainMapCodec::Hevc,
+                        chroma: Some(ChromaSampling::Yuv420),
+                        luma_bit_depth: depth,
+                        chroma_bit_depth: depth,
+                    },
+                },
+                hdr_metadata: SourceHdrMetadataFacts::default(),
+            };
+            let plan = plan_conversion(
+                &analysis,
+                ConversionRequest::default(),
+                &CapabilityInventory::new([OperationCapability::RasterDecoder(GainMapCodec::Hevc)]),
+            )
+            .expect("remuxing an existing HEVC resource does not require encoding");
+            assert_eq!(plan.gain_map_target.layout.chroma, ChromaSampling::Yuv420);
+            assert_eq!(plan.gain_map_target.layout.luma_bit_depth, depth);
+            assert!(!plan
+                .required_capabilities
+                .iter()
+                .any(|operation| matches!(operation, OperationCapability::GainMapTileEncoder(_))));
+            let jpeg = plan_conversion(
+                &analysis,
+                ConversionRequest {
+                    container: OutputContainer::Jpeg,
+                    ..ConversionRequest::default()
+                },
+                &CapabilityInventory::new([OperationCapability::RasterDecoder(GainMapCodec::Hevc)]),
+            )
+            .unwrap();
+            assert_eq!(jpeg.gain_map_target.layout.luma_bit_depth, 8);
+            assert_eq!(
+                jpeg.required_capabilities,
+                vec![OperationCapability::RasterDecoder(GainMapCodec::Hevc)]
+            );
+        }
+    }
 
     fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
         GainMapCodecLayout {
