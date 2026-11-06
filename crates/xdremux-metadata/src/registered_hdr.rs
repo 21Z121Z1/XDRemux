@@ -448,7 +448,7 @@ mod tests {
     fn append_bits(target: &mut Vec<u8>, bit_len: &mut usize, value: u32, width: usize) {
         assert!(width < 32 && value < (1 << width));
         for shift in (0..width).rev() {
-            if *bit_len % 8 == 0 {
+            if (*bit_len).is_multiple_of(8) {
                 target.push(0);
             }
             let last = target.last_mut().unwrap();
@@ -469,8 +469,16 @@ mod tests {
         append_bits(&mut packed, &mut pos, 1024, 12);
         append_bits(&mut packed, &mut pos, 1, 1); // Base curve enabled.
         for (value, width) in [
-            (8192, 14), (15, 6), (500, 10), (4, 6), (200, 10),
-            (2, 2), (1, 2), (9, 4), (3, 3), (64, 7),
+            (8192, 14),
+            (15, 6),
+            (500, 10),
+            (4, 6),
+            (200, 10),
+            (2, 2),
+            (1, 2),
+            (9, 4),
+            (3, 3),
+            (64, 7),
         ] {
             append_bits(&mut packed, &mut pos, value, width);
         }
@@ -489,18 +497,30 @@ mod tests {
 
         let dynamic = DynamicHdrMetadata::parse(&packed).unwrap();
         assert_eq!(dynamic.as_bytes(), packed);
-        assert_eq!(dynamic.statistics(), DynamicHdrStatistics {
-            minimum_maxrgb_pq: 10, average_maxrgb_pq: 20,
-            variance_maxrgb_pq: 4, maximum_maxrgb_pq: 30,
-        });
+        assert_eq!(
+            dynamic.statistics(),
+            DynamicHdrStatistics {
+                minimum_maxrgb_pq: 10,
+                average_maxrgb_pq: 20,
+                variance_maxrgb_pq: 4,
+                maximum_maxrgb_pq: 30,
+            }
+        );
         assert_eq!(dynamic.tone_mappings().len(), 2);
         assert_eq!(dynamic.tone_mappings()[0].target_maximum_luminance_pq, 1024);
         assert_eq!(dynamic.tone_mappings()[0].base.unwrap().m_p, 8192);
         assert_eq!(dynamic.tone_mappings()[0].base.unwrap().delta, 64);
-        assert_eq!(dynamic.tone_mappings()[0].splines, vec![DynamicHdrSpline {
-            threshold_mode: 2, threshold_mb: Some(7), threshold: 100,
-            delta1: 45, delta2: 50, strength: 125,
-        }]);
+        assert_eq!(
+            dynamic.tone_mappings()[0].splines,
+            vec![DynamicHdrSpline {
+                threshold_mode: 2,
+                threshold_mb: Some(7),
+                threshold: 100,
+                delta1: 45,
+                delta2: 50,
+                strength: 125,
+            }]
+        );
         assert_eq!(dynamic.tone_mappings()[1].target_maximum_luminance_pq, 2048);
         assert!(dynamic.tone_mappings()[1].base.is_none());
         assert!(dynamic.tone_mappings()[1].splines.is_empty());
@@ -621,9 +641,7 @@ mod tests {
         extension.extend_from_slice(&0_u16.to_be_bytes());
         let data = RegisteredHdrMetadata {
             static_metadata: None,
-            dynamic_metadata: Some(
-                DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            ),
+            dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
             mapping_extension: Some(RegisteredMappingExtension::parse(&extension).unwrap()),
         };
         let it35 = data.to_it35_payload().unwrap();

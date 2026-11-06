@@ -98,7 +98,11 @@ impl RegisteredMapping {
                 }
                 if exponent == 0 {
                     let value = f32::from(fraction) * 2.0_f32.powi(-24);
-                    if sign { -value } else { value }
+                    if sign {
+                        -value
+                    } else {
+                        value
+                    }
                 } else {
                     let expanded = (u32::from(bits & 0x8000) << 16)
                         | (u32::from(exponent + 112) << 23)
@@ -114,7 +118,7 @@ impl RegisteredMapping {
             values.push(value);
         }
         let mut matrix = [[0.0_f32; 3]; 3];
-        for (row, values) in matrix.iter_mut().zip(values[..9].chunks_exact(3)) {
+        for (row, values) in matrix.iter_mut().zip(values[..9].as_chunks::<3>().0) {
             row.copy_from_slice(values);
         }
         Ok(Self::Lut(RegisteredFloatLut {
@@ -168,7 +172,9 @@ impl RegisteredMappingExtension {
             return Err(invalid("unexpected mapping extension tail"));
         }
         Ok(Self {
-            base: (!base.is_empty()).then(|| RegisteredMapping::parse(base)).transpose()?,
+            base: (!base.is_empty())
+                .then(|| RegisteredMapping::parse(base))
+                .transpose()?,
             combined: (!combined.is_empty())
                 .then(|| RegisteredMapping::parse(combined))
                 .transpose()?,
@@ -230,7 +236,10 @@ mod tests {
         };
         assert_eq!(lut.precision_bits(), 16);
         assert_eq!(lut.edge(), 2);
-        assert_eq!(lut.matrix(), &[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+        assert_eq!(
+            lut.matrix(),
+            &[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        );
         assert_eq!(lut.samples()[0], 2.0_f32.powi(-24));
         assert_eq!(lut.samples()[1], -0.5);
         assert_eq!(parsed.combined, Some(RegisteredMapping::Disabled));

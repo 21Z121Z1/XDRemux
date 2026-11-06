@@ -541,9 +541,7 @@ fn registered_offsets(
     let removed = base
         .segments
         .iter()
-        .filter(|segment| {
-            segment.range.start >= start && excluded_from_reduced_view(segment, data)
-        })
+        .filter(|segment| segment.range.start >= start && excluded_from_reduced_view(segment, data))
         .map(|segment| segment.range.len())
         .sum::<usize>();
     let raw = base.range.end.checked_sub(start)?;
@@ -908,10 +906,7 @@ mod tests {
         let offsets = registered_app8_offsets(&base, &gain, &injected, &[], 24).unwrap();
         let planned_declaration = segment(0xe8, &[0u8; 24]);
         let planned_mpf = segment(0xe2, &vec![0u8; mp_index_payload_len(2).unwrap()]);
-        let excluded = planned_declaration.len()
-            + planned_mpf.len()
-            + exif.len()
-            + jfxx.len();
+        let excluded = planned_declaration.len() + planned_mpf.len() + exif.len() + jfxx.len();
         assert_eq!(offsets.raw as usize - offsets.reduced as usize, excluded);
         assert!(offsets.raw as usize > excluded + another_jfif.len());
     }

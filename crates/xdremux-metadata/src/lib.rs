@@ -12,9 +12,7 @@ pub use registered_hdr::{
     DynamicHdrSpline, DynamicHdrStatistics, DynamicHdrToneMapping, RegisteredHdrMetadata,
     RegisteredJpegBaseDeclaration,
 };
-pub use registered_mapping::{
-    RegisteredFloatLut, RegisteredMapping, RegisteredMappingExtension,
-};
+pub use registered_mapping::{RegisteredFloatLut, RegisteredMapping, RegisteredMappingExtension};
 mod scene_gain_map;
 pub use scene_gain_map::{
     make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity,
