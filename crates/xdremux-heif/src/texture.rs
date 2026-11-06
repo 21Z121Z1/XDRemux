@@ -6,8 +6,8 @@ use xdremux_format::exif::read_item_payload;
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_ipma_box, make_iref_box,
     parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE,
-    IPCO, IPRP, IREF, MDAT, META,
+    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, EXIF, FTYP, IDAT, IINF, ILOC,
+    INFE, IPCO, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{Cursor, Endian, FourCC};
 
@@ -18,6 +18,14 @@ const CDSC: FourCC = FourCC::new(*b"cdsc");
 const DIMG: FourCC = FourCC::new(*b"dimg");
 const URI: FourCC = FourCC::new(*b"uri ");
 const MIME: FourCC = FourCC::new(*b"mime");
+const APPLE_MAKERNOTE_PREFIX: &[u8] = b"Apple iOS\0\0\x01";
+const APPLE_IMAGE_PROCESSING_FLAGS_TAG: u16 = 0x0019;
+const TIFF_TYPE_LONG: u16 = 4;
+const TIFF_TYPE_SIGNED_LONG: u16 = 9;
+const STYLES_IMAGE_PROCESSING_FLAG: u32 = 0x0020_0000;
+const TEXTURE_IMAGE_PROCESSING_FLAG: u32 = 0x0000_2000;
+const TEXTURE_IMAGE_PROCESSING_FLAGS: u32 =
+    STYLES_IMAGE_PROCESSING_FLAG | TEXTURE_IMAGE_PROCESSING_FLAG;
 
 /// A separately encoded native mask. The codec's primary image is not imported.
 #[derive(Debug, Clone, Copy)]
@@ -29,6 +37,337 @@ pub struct TextureStyleMask<'a> {
 
 fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MakerNoteEntry {
+    field_type: u16,
+    item_count: u32,
+    value_offset: usize,
+    value_length: usize,
+}
+
+fn read_u16_at(bytes: &[u8], offset: usize, endian: Endian) -> Result<u16> {
+    let value = bytes
+        .get(offset..offset + 2)
+        .ok_or_else(|| invalid("Apple MakerNote u16 is outside payload"))?;
+    Ok(match endian {
+        Endian::Big => u16::from_be_bytes([value[0], value[1]]),
+        Endian::Little => u16::from_le_bytes([value[0], value[1]]),
+    })
+}
+
+fn read_u32_at(bytes: &[u8], offset: usize, endian: Endian) -> Result<u32> {
+    let value = bytes
+        .get(offset..offset + 4)
+        .ok_or_else(|| invalid("Apple MakerNote u32 is outside payload"))?;
+    Ok(match endian {
+        Endian::Big => u32::from_be_bytes([value[0], value[1], value[2], value[3]]),
+        Endian::Little => u32::from_le_bytes([value[0], value[1], value[2], value[3]]),
+    })
+}
+
+fn write_u16_at(bytes: &mut [u8], offset: usize, value: u16, endian: Endian) -> Result<()> {
+    let destination = bytes
+        .get_mut(offset..offset + 2)
+        .ok_or_else(|| invalid("Apple MakerNote u16 patch is outside payload"))?;
+    match endian {
+        Endian::Big => destination.copy_from_slice(&value.to_be_bytes()),
+        Endian::Little => destination.copy_from_slice(&value.to_le_bytes()),
+    }
+    Ok(())
+}
+
+fn write_u32_at(bytes: &mut [u8], offset: usize, value: u32, endian: Endian) -> Result<()> {
+    let destination = bytes
+        .get_mut(offset..offset + 4)
+        .ok_or_else(|| invalid("Apple MakerNote u32 patch is outside payload"))?;
+    match endian {
+        Endian::Big => destination.copy_from_slice(&value.to_be_bytes()),
+        Endian::Little => destination.copy_from_slice(&value.to_le_bytes()),
+    }
+    Ok(())
+}
+
+fn maker_note_byte_order(note: &[u8]) -> Result<Endian> {
+    if !note.starts_with(APPLE_MAKERNOTE_PREFIX) || note.len() < 20 {
+        return Err(invalid("Texture source has no Apple MakerNote"));
+    }
+    match note.get(12..14) {
+        Some(b"MM") => Ok(Endian::Big),
+        Some(b"II") => Ok(Endian::Little),
+        _ => Err(invalid("Apple MakerNote has no byte order")),
+    }
+}
+
+fn tiff_type_size(field_type: u16) -> Option<usize> {
+    match field_type {
+        1 | 2 | 6 | 7 => Some(1),
+        3 | 8 => Some(2),
+        4 | 9 | 11 => Some(4),
+        5 | 10 | 12 => Some(8),
+        _ => None,
+    }
+}
+
+fn maker_note_entry(note: &[u8], wanted_tag: u16) -> Result<Option<MakerNoteEntry>> {
+    let endian = maker_note_byte_order(note)?;
+    let count = usize::from(read_u16_at(note, 14, endian)?);
+    let table_end = 16usize
+        .checked_add(
+            count
+                .checked_mul(12)
+                .ok_or_else(|| invalid("Apple MakerNote entry table overflows"))?,
+        )
+        .ok_or_else(|| invalid("Apple MakerNote entry table overflows"))?;
+    let next_ifd_end = table_end
+        .checked_add(4)
+        .ok_or_else(|| invalid("Apple MakerNote next-IFD pointer overflows"))?;
+    if next_ifd_end > note.len() {
+        return Err(invalid("Apple MakerNote entry table is truncated"));
+    }
+
+    let mut found = None;
+    for index in 0..count {
+        let entry_offset = 16 + index * 12;
+        let entry = note
+            .get(entry_offset..entry_offset + 12)
+            .ok_or_else(|| invalid("Apple MakerNote entry is truncated"))?;
+        if read_u16_at(entry, 0, endian)? != wanted_tag {
+            continue;
+        }
+        if found.is_some() {
+            return Err(invalid(format!(
+                "Apple MakerNote contains duplicate tag {wanted_tag}"
+            )));
+        }
+        let field_type = read_u16_at(entry, 2, endian)?;
+        let item_count = read_u32_at(entry, 4, endian)?;
+        let element_size = tiff_type_size(field_type).ok_or_else(|| {
+            invalid(format!(
+                "Apple MakerNote tag {wanted_tag} uses unknown TIFF type {field_type}"
+            ))
+        })?;
+        let value_length = usize::try_from(item_count)
+            .ok()
+            .and_then(|value| value.checked_mul(element_size))
+            .ok_or_else(|| invalid("Apple MakerNote value length overflows"))?;
+        let value_offset = if value_length <= 4 {
+            entry_offset + 8
+        } else {
+            usize::try_from(read_u32_at(entry, 8, endian)?)
+                .map_err(|_| invalid("Apple MakerNote value offset exceeds usize"))?
+        };
+        let value_end = value_offset
+            .checked_add(value_length)
+            .ok_or_else(|| invalid("Apple MakerNote value range overflows"))?;
+        if value_end > note.len() {
+            return Err(invalid(format!(
+                "Apple MakerNote tag {wanted_tag} value is outside payload"
+            )));
+        }
+        found = Some(MakerNoteEntry {
+            field_type,
+            item_count,
+            value_offset,
+            value_length,
+        });
+    }
+    Ok(found)
+}
+
+fn rebuild_maker_note_with_image_processing_flags(note: &[u8], flags: u32) -> Result<Vec<u8>> {
+    let endian = maker_note_byte_order(note)?;
+    let count = usize::from(read_u16_at(note, 14, endian)?);
+    let table_end = 16usize
+        .checked_add(
+            count
+                .checked_mul(12)
+                .ok_or_else(|| invalid("Apple MakerNote entry table overflows"))?,
+        )
+        .ok_or_else(|| invalid("Apple MakerNote entry table overflows"))?;
+    let next_ifd_end = table_end
+        .checked_add(4)
+        .ok_or_else(|| invalid("Apple MakerNote next-IFD pointer overflows"))?;
+    let next_ifd = read_u32_at(note, table_end, endian)?;
+    if next_ifd != 0 {
+        return Err(invalid(
+            "Apple MakerNote has a next IFD; refusing to rebuild unknown sub-IFD state",
+        ));
+    }
+    let new_count = count
+        .checked_add(1)
+        .and_then(|value| u16::try_from(value).ok())
+        .ok_or_else(|| invalid("Apple MakerNote entry count exceeds u16"))?;
+    let values_start = next_ifd_end
+        .checked_add(12)
+        .ok_or_else(|| invalid("Apple MakerNote value start overflows"))?;
+
+    let mut records = Vec::with_capacity(usize::from(new_count));
+    for index in 0..count {
+        let entry_offset = 16 + index * 12;
+        let raw = note
+            .get(entry_offset..entry_offset + 12)
+            .ok_or_else(|| invalid("Apple MakerNote entry is truncated"))?;
+        let mut entry = [0_u8; 12];
+        entry.copy_from_slice(raw);
+        let tag = read_u16_at(&entry, 0, endian)?;
+        if tag == APPLE_IMAGE_PROCESSING_FLAGS_TAG {
+            return Err(invalid(
+                "Apple MakerNote already has ImageProcessingFlags tag25",
+            ));
+        }
+        let field_type = read_u16_at(&entry, 2, endian)?;
+        let item_count = read_u32_at(&entry, 4, endian)?;
+        let element_size = tiff_type_size(field_type).ok_or_else(|| {
+            invalid(format!(
+                "Apple MakerNote tag {tag} uses unsupported TIFF type {field_type}"
+            ))
+        })?;
+        let value_length = usize::try_from(item_count)
+            .ok()
+            .and_then(|value| value.checked_mul(element_size))
+            .ok_or_else(|| invalid(format!("Apple MakerNote tag {tag} value length overflows")))?;
+        let value = if value_length <= 4 {
+            entry[8..12].to_vec()
+        } else {
+            let value_offset = usize::try_from(read_u32_at(&entry, 8, endian)?).map_err(|_| {
+                invalid(format!(
+                    "Apple MakerNote tag {tag} value offset exceeds usize"
+                ))
+            })?;
+            let value_end = value_offset.checked_add(value_length).ok_or_else(|| {
+                invalid(format!("Apple MakerNote tag {tag} value range overflows"))
+            })?;
+            note.get(value_offset..value_end)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "Apple MakerNote tag {tag} value is outside payload"
+                    ))
+                })?
+                .to_vec()
+        };
+        records.push((tag, entry, value));
+    }
+
+    let mut new_entry = [0_u8; 12];
+    write_u16_at(&mut new_entry, 0, APPLE_IMAGE_PROCESSING_FLAGS_TAG, endian)?;
+    write_u16_at(&mut new_entry, 2, TIFF_TYPE_SIGNED_LONG, endian)?;
+    write_u32_at(&mut new_entry, 4, 1, endian)?;
+    write_u32_at(&mut new_entry, 8, flags, endian)?;
+    records.push((
+        APPLE_IMAGE_PROCESSING_FLAGS_TAG,
+        new_entry,
+        match endian {
+            Endian::Big => flags.to_be_bytes().to_vec(),
+            Endian::Little => flags.to_le_bytes().to_vec(),
+        },
+    ));
+    records.sort_by_key(|(tag, _, _)| *tag);
+
+    let mut output = note[..14].to_vec();
+    match endian {
+        Endian::Big => output.extend_from_slice(&new_count.to_be_bytes()),
+        Endian::Little => output.extend_from_slice(&new_count.to_le_bytes()),
+    }
+    let mut value_payload = Vec::new();
+    for (_, mut entry, value) in records {
+        if value.len() <= 4 {
+            entry[8..12].fill(0);
+            entry[8..12][..value.len()].copy_from_slice(&value);
+        } else {
+            let value_offset = values_start
+                .checked_add(value_payload.len())
+                .ok_or_else(|| invalid("Apple MakerNote rebuilt value offset overflows"))?;
+            let value_offset = u32::try_from(value_offset)
+                .map_err(|_| invalid("Apple MakerNote rebuilt value offset exceeds u32"))?;
+            write_u32_at(&mut entry, 8, value_offset, endian)?;
+            value_payload.extend_from_slice(&value);
+        }
+        output.extend_from_slice(&entry);
+    }
+    match endian {
+        Endian::Big => output.extend_from_slice(&0u32.to_be_bytes()),
+        Endian::Little => output.extend_from_slice(&0u32.to_le_bytes()),
+    }
+    output.extend_from_slice(&value_payload);
+    Ok(output)
+}
+
+fn apply_image_processing_flags(note: &[u8], flags: u32) -> Result<Vec<u8>> {
+    let endian = maker_note_byte_order(note)?;
+    let Some(entry) = maker_note_entry(note, APPLE_IMAGE_PROCESSING_FLAGS_TAG)? else {
+        return rebuild_maker_note_with_image_processing_flags(note, flags);
+    };
+    if !matches!(entry.field_type, TIFF_TYPE_LONG | TIFF_TYPE_SIGNED_LONG)
+        || entry.item_count != 1
+        || entry.value_length != 4
+    {
+        return Err(invalid(
+            "Apple MakerNote ImageProcessingFlags tag25 is not one 32-bit value",
+        ));
+    }
+    let current = read_u32_at(note, entry.value_offset, endian)?;
+    let mut output = note.to_vec();
+    write_u32_at(&mut output, entry.value_offset, current | flags, endian)?;
+    Ok(output)
+}
+
+fn exif_tiff_start(payload: &[u8]) -> Result<usize> {
+    if payload.starts_with(b"II") || payload.starts_with(b"MM") {
+        return Ok(0);
+    }
+    if payload.len() < 4 {
+        return Err(invalid("Texture Exif item lacks a TIFF offset prefix"));
+    }
+    let offset = usize::try_from(u32::from_be_bytes(
+        payload[..4]
+            .try_into()
+            .map_err(|_| invalid("Texture Exif item has an invalid TIFF offset"))?,
+    ))
+    .map_err(|_| invalid("Texture Exif item TIFF offset exceeds usize"))?;
+    for start in [offset, offset.saturating_add(4)] {
+        if payload
+            .get(start..)
+            .is_some_and(|value| value.starts_with(b"II") || value.starts_with(b"MM"))
+        {
+            return Ok(start);
+        }
+    }
+    Err(invalid("Texture Exif item does not locate a TIFF header"))
+}
+
+fn patch_texture_exif_payload(payload: &[u8]) -> Result<Vec<u8>> {
+    let tiff_start = exif_tiff_start(payload)?;
+    let tiff = &payload[tiff_start..];
+    let note = xdremux_format::exif_makernote(tiff)?
+        .ok_or_else(|| invalid("Texture source Exif has no Apple MakerNote"))?;
+    let patched_note = apply_image_processing_flags(&note, TEXTURE_IMAGE_PROCESSING_FLAGS)?;
+    let patched_tiff = xdremux_format::replace_exif_makernote(Some(tiff), &patched_note)?;
+    let mut output = payload[..tiff_start].to_vec();
+    output.extend_from_slice(&patched_tiff);
+    Ok(output)
+}
+
+fn validate_texture_image_processing_flags(payload: &[u8]) -> Result<()> {
+    let tiff_start = exif_tiff_start(payload)?;
+    let tiff = &payload[tiff_start..];
+    let note = xdremux_format::exif_makernote(tiff)?
+        .ok_or_else(|| invalid("Texture output Exif has no Apple MakerNote"))?;
+    let endian = maker_note_byte_order(&note)?;
+    let entry = maker_note_entry(&note, APPLE_IMAGE_PROCESSING_FLAGS_TAG)?
+        .ok_or_else(|| invalid("Texture output MakerNote has no ImageProcessingFlags tag25"))?;
+    if !matches!(entry.field_type, TIFF_TYPE_LONG | TIFF_TYPE_SIGNED_LONG)
+        || entry.item_count != 1
+        || entry.value_length != 4
+        || read_u32_at(&note, entry.value_offset, endian)? & TEXTURE_IMAGE_PROCESSING_FLAGS
+            != TEXTURE_IMAGE_PROCESSING_FLAGS
+    {
+        return Err(invalid(
+            "Texture output MakerNote lacks required ImageProcessingFlags bits",
+        ));
+    }
+    Ok(())
 }
 
 fn meta(data: &[u8]) -> Result<(Vec<BoxHeader>, BoxHeader, ParsedMeta)> {
@@ -370,8 +709,10 @@ fn codec_graph_error(error: HeifError, data: &[u8], codec: &ParsedMeta) -> HeifE
     ))
 }
 
-/// Copy every source item payload exactly, preserve all original references,
-/// and add a distinct FSINC descriptor for each actual native mask.
+/// Preserve every source item, preserve all original references, and add a
+/// distinct FSINC descriptor for each actual native mask. The active Exif
+/// MakerNote is the sole intentionally mutated payload: its
+/// ImageProcessingFlags are ORed with the Styles and Texture bits.
 pub fn assemble_texture_styles_heif(
     source: &[u8],
     plist: &[u8],
@@ -400,6 +741,8 @@ pub fn assemble_texture_styles_heif(
         .iref
         .as_ref()
         .map_or_else(Vec::new, |r| r.entries.clone());
+    let mut patched_exif = None;
+    let mut exif_seen = false;
     for info in &parsed.iinf.entries {
         if infos
             .insert(info.item_id, source[info.box_range.clone()].to_vec())
@@ -416,10 +759,16 @@ pub fn assemble_texture_styles_heif(
         if location.data_reference_index != 0 || location.construction_method > 1 {
             return Err(invalid("Texture source item is not local"));
         }
-        payloads.insert(
-            info.item_id,
-            read_item_payload(source, location, parsed.idat.as_ref())?,
-        );
+        let mut payload = read_item_payload(source, location, parsed.idat.as_ref())?;
+        if info.item_type == Some(EXIF) {
+            if exif_seen {
+                return Err(invalid("Texture source has multiple Exif items"));
+            }
+            exif_seen = true;
+            payload = patch_texture_exif_payload(&payload)?;
+            patched_exif = Some((info.item_id, payload.clone()));
+        }
+        payloads.insert(info.item_id, payload);
     }
     let mut next = infos
         .keys()
@@ -723,6 +1072,19 @@ pub fn assemble_texture_styles_heif(
     output.extend(make_box(MDAT, &media)?);
     // Independently prove that every original payload survived the relocation.
     let (_, _, result) = meta(&output)?;
+    if let Some((exif_id, _)) = &patched_exif {
+        let location = result
+            .iloc
+            .entries
+            .iter()
+            .find(|entry| entry.item_id == *exif_id)
+            .ok_or_else(|| invalid("Texture output lost its Exif item"))?;
+        validate_texture_image_processing_flags(&read_item_payload(
+            &output,
+            location,
+            result.idat.as_ref(),
+        )?)?;
+    }
     for original in &parsed.iloc.entries {
         let location = result
             .iloc
@@ -730,9 +1092,16 @@ pub fn assemble_texture_styles_heif(
             .iter()
             .find(|e| e.item_id == original.item_id)
             .ok_or_else(|| invalid("Texture output lost source item"))?;
-        if read_item_payload(source, original, parsed.idat.as_ref())?
-            != read_item_payload(&output, location, result.idat.as_ref())?
-        {
+        let actual = read_item_payload(&output, location, result.idat.as_ref())?;
+        if let Some((exif_id, patched)) = &patched_exif {
+            if original.item_id == *exif_id {
+                if actual.as_slice() != patched.as_slice() {
+                    return Err(invalid("Texture assembly changed the patched Exif payload"));
+                }
+                continue;
+            }
+        }
+        if read_item_payload(source, original, parsed.idat.as_ref())? != actual {
             return Err(invalid("Texture assembly changed an original payload"));
         }
     }
@@ -757,6 +1126,15 @@ mod tests {
         roles: &[(u32, &[u8])],
         grid_root: Option<u32>,
         extra: &[IrefEntry],
+    ) -> Vec<u8> {
+        fixture_roles_with_exif(roles, grid_root, extra, None)
+    }
+
+    fn fixture_roles_with_exif(
+        roles: &[(u32, &[u8])],
+        grid_root: Option<u32>,
+        extra: &[IrefEntry],
+        exif: Option<&[u8]>,
     ) -> Vec<u8> {
         let hvc1 = FourCC::new(*b"hvc1");
         let grid = FourCC::new(*b"grid");
@@ -846,6 +1224,9 @@ mod tests {
                 from_item_id: *id,
                 to_item_ids: targets,
             });
+        }
+        if let Some(exif) = exif {
+            items.push((90, EXIF, exif.to_vec()));
         }
         if let Some(root) = grid_root {
             items.iter_mut().find(|(id, _, _)| *id == root).unwrap().2 =
@@ -1298,5 +1679,91 @@ mod tests {
         assert!(
             assemble_texture_styles_heif(&source, b"bplist00new", &[instance, instance]).is_err()
         );
+    }
+
+    fn synthetic_apple_maker_note(flags: Option<u32>) -> Vec<u8> {
+        let tag84 = b"tag84";
+        let count = u16::from(flags.is_some()) + 1;
+        let values_start = 16u32 + u32::from(count) * 12 + 4;
+        let mut entries = Vec::new();
+        if let Some(flags) = flags {
+            let mut entry = [0u8; 12];
+            entry[..2].copy_from_slice(&APPLE_IMAGE_PROCESSING_FLAGS_TAG.to_be_bytes());
+            entry[2..4].copy_from_slice(&TIFF_TYPE_SIGNED_LONG.to_be_bytes());
+            entry[4..8].copy_from_slice(&1u32.to_be_bytes());
+            entry[8..12].copy_from_slice(&flags.to_be_bytes());
+            entries.push(entry);
+        }
+        let mut tag84_entry = [0u8; 12];
+        tag84_entry[..2].copy_from_slice(&0x0054u16.to_be_bytes());
+        tag84_entry[2..4].copy_from_slice(&7u16.to_be_bytes());
+        tag84_entry[4..8].copy_from_slice(&(tag84.len() as u32).to_be_bytes());
+        tag84_entry[8..12].copy_from_slice(&values_start.to_be_bytes());
+        entries.push(tag84_entry);
+        entries.sort_by_key(|entry| u16::from_be_bytes([entry[0], entry[1]]));
+
+        let mut note = APPLE_MAKERNOTE_PREFIX.to_vec();
+        note.extend_from_slice(b"MM");
+        note.extend_from_slice(&count.to_be_bytes());
+        for entry in entries {
+            note.extend_from_slice(&entry);
+        }
+        note.extend_from_slice(&0u32.to_be_bytes());
+        note.extend_from_slice(tag84);
+        note
+    }
+
+    fn synthetic_exif_payload(flags: Option<u32>) -> Vec<u8> {
+        let tiff = xdremux_format::replace_exif_makernote(None, &synthetic_apple_maker_note(flags))
+            .unwrap();
+        let mut payload = 6u32.to_be_bytes().to_vec();
+        payload.extend_from_slice(b"Exif\0\0");
+        payload.extend_from_slice(&tiff);
+        payload
+    }
+
+    fn output_exif_payload(output: &[u8]) -> Vec<u8> {
+        let (_, _, parsed) = meta(output).unwrap();
+        let item = parsed
+            .iinf
+            .entries
+            .iter()
+            .find(|item| item.item_type == Some(EXIF))
+            .unwrap();
+        let location = parsed
+            .iloc
+            .entries
+            .iter()
+            .find(|entry| entry.item_id == item.item_id)
+            .unwrap();
+        read_item_payload(output, location, parsed.idat.as_ref()).unwrap()
+    }
+
+    #[test]
+    fn texture_assembly_sets_image_processing_flags_without_losing_makernote_entries() {
+        for initial in [Some(0x0120_0002), None] {
+            let source =
+                fixture_roles_with_exif(&[], None, &[], Some(&synthetic_exif_payload(initial)));
+            let output = assemble_texture_styles_heif(&source, b"bplist00flags", &[]).unwrap();
+            let payload = output_exif_payload(&output);
+            let start = exif_tiff_start(&payload).unwrap();
+            let note = xdremux_format::exif_makernote(&payload[start..])
+                .unwrap()
+                .unwrap();
+            let endian = maker_note_byte_order(&note).unwrap();
+            let entry = maker_note_entry(&note, APPLE_IMAGE_PROCESSING_FLAGS_TAG)
+                .unwrap()
+                .unwrap();
+            let expected = initial.unwrap_or(0) | TEXTURE_IMAGE_PROCESSING_FLAGS;
+            assert_eq!(
+                read_u32_at(&note, entry.value_offset, endian).unwrap(),
+                expected
+            );
+            let tag84 = maker_note_entry(&note, 0x0054).unwrap().unwrap();
+            assert_eq!(
+                &note[tag84.value_offset..tag84.value_offset + tag84.value_length],
+                b"tag84"
+            );
+        }
     }
 }
