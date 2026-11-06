@@ -747,8 +747,8 @@ impl PortableRuntime {
 
     /// Convert a standalone ISO dual-layer HEIF in memory.
     ///
-    /// The compressed base is preserved. The Gain Map is re-encoded and the
-    /// source tone-map payload keeps its exact bytes.
+    /// HEIF output preserves the compressed base, Gain Map resources and exact
+    /// tone-map payload. A JPEG destination quantizes and re-encodes samples.
     pub fn convert_iso_heif_bytes<Observe>(
         &self,
         source: &[u8],
