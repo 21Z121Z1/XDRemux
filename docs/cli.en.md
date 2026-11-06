@@ -137,7 +137,7 @@ The following options are available to both `convert` and `batch`.
 
 `--oppo-compatible`, `--apple-portrait`, `--apple-portrait-oppo`, `--apple-styles`, and `--apple-cinematic` are mutually exclusive. A failed feature does not silently switch to another profile. Required source data or native capabilities must exist before the program publishes output.
 
-An explicit `--hdr-profile` option cannot be combined with these compatibility or Apple editing options. The BT.2020 profiles admit SDR bases with verified sRGB or Display P3 colorimetry and the sRGB transfer function. The exporter checks ICC transforms and coexisting color declarations. Unsupported color encodings, cropped geometry, non-square pixels, and unsupported additional matrix or LUT mappings fail before publication.
+An explicit `--hdr-profile` option cannot be combined with these compatibility or Apple editing options. The BT.2020 profiles admit SDR bases with verified sRGB or Display P3 colorimetry and the sRGB transfer function. The exporter checks ICC transforms and coexisting color declarations. Unsupported color encodings, cropped geometry, and non-square pixels fail before publication. Registered matrix/LUT extension data is validated and preserved, but is not applied to the reconstructed pixels.
 
 The BT.2020 profiles preserve the compressed SDR resources and their color data. The base, Gain Map, and derived HDR item share the same ordered rotation and mirror transforms. The derived item uses the base's coded dimensions and declares BT.2020 with PQ or HLG. Its Gain Map compression color property remains separate. An existing camera or display compatibility layout remains selected by `compatible`.
 

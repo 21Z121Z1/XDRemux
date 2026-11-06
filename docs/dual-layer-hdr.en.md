@@ -30,7 +30,7 @@ A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dua
 - The compressed SDR base keeps its bytes on both HEIF paths. A JPEG destination decodes it and re-encodes it.
 - The Gain Map keeps its geometry and declared operation, but its pixels are decoded, quantized to eight bits per component, and re-encoded. The resulting samples are not bit-exact, particularly for sources above eight bits.
 - The gain-map operation metadata is preserved. A standalone ISO source keeps its exact tone-map payload bytes. A ProXDR source keeps the operation its vendor float view declares.
-- `mdcv`, `clli`, and registered `it35` carriers are copied only when the source associates them with the derived HDR image. Two carriers that declare the same value must agree. An absent value stays absent.
+- `mdcv`, `clli`, and registered `it35` carriers are copied only when the source associates them with the derived HDR image. Two carriers that declare the same value must agree. An absent value stays absent. Optional registered matrix/3D LUT extension bytes are decoded with bounds checks and retained exactly.
 - A JPEG destination keeps the base ICC profile and the Exif payload.
 
 The conversion re-reads the published bytes before publication. It checks the structure, the carriers (including actual opt-in APP8 declaration offsets and enhanced payload), the declared profile, and both image decodes.
@@ -43,7 +43,7 @@ Two pure executors are available to code that already holds typed inputs. Neithe
 
 `AbsoluteDisplayTarget` gives relative linear `1.0` a luminance through a caller-declared reference white. A component above the peak or below the black level is clamped and counted. `relative_linear_to_pq` encodes the calibrated luminance as PQ. Fixed vectors cover 100, 203, 1,000, and 10,000 cd/m².
 
-Neither executor changes a conversion on its own. A mapping payload is not parsed from a file, and a display target is not read from a device.
+Neither executor changes a conversion on its own. The registered file mapping extension is decoded and preserved, but cannot be passed directly to `AdditionalMapping`: its scalar LUT payload does not declare the vector-channel and domain semantics required by that executor. A display target is not read from a device.
 
 ## Verification
 
@@ -83,13 +83,13 @@ These values describe one fixed encoding configuration. They are not a general q
 
 - The reconstruction output is relative linear BT.2020. The absolute-luminance executor needs a caller-declared reference white; no conversion supplies one.
 - PQ and HLG tags declare an encoding. They do not prove display adaptation, tone mapping, or device presentation.
-- Dynamic metadata is retained with syntax checks only. Its display mapping is not implemented.
+- Dynamic metadata is parsed into PQ-coded content statistics, target-display parameters, optional base-curve and spline fields, and saturation gains. Exact source bytes are retained. Parameter decoding is not display adaptation: the complete target-dependent tone-mapping algorithm is not implemented.
 - A JPEG destination requires identity orientation and a normal Exif orientation.
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
 - The registered JPEG APP8 pair is written only on request (`--jpeg-registered-metadata`) and only when the source supplies enhanced registered metadata. A source without it is refused, rather than publishing a base declaration with no enhanced record. The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
 - The Gain Map encoder currently accepts eight-bit rasters; higher-bit-depth sources are quantized before encoding. Geometry and metadata preservation do not guarantee sample-exact preservation.
-- Additional matrix and three-dimensional LUT mappings are refused in a conversion. The executor has an explicit contract, but the file payload layout is unresolved, so no mapping is read from a file.
+- Registered matrix/3D LUT sections can be read from and round-tripped through HEIF `it35` and JPEG APP8. Precision, finite values, sizes, and cube dimensions are validated. Their rendering semantics are not established, so the conversion preserves them without applying them to pixels; no implicit RGB-vector interpretation or LUT domain is invented.
 - No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.
 
 ## Code ownership

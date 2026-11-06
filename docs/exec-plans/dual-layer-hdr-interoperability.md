@@ -57,9 +57,9 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 - [x] A. Checked tone-map, static HDR, and registered metadata payloads. Semantic validation reads final bytes and rejects invalid versions, denominators, channel counts, color declarations, lengths, and associations.
 - [x] B. Explicit HEIF PQ and HLG profiles with common coded dimensions and ordered rotation/mirror transforms. The existing compatibility layout remains the default.
 - [x] C. Relative linear BT.2020 reconstruction from final-file decoded resources, independent numeric references, compressed SDR preservation, and failure preservation checks. Display adaptation is separate.
-- [ ] D. Static HDR and registered dynamic carriers are implemented in the Rust assembly API. Dynamic syntax is checked and source bytes are retained. Additional matrix/LUT mappings and application of dynamic display mapping remain unsupported and fail closed where required.
-- [ ] E. Dual-JFIF output with offset and decode tests.
-- [ ] F. The English and Chinese CLI contracts describe export, semantic validation, decoded reconstruction, and unsupported source combinations. Native/device acceptance remains a separate evidence layer.
+- [ ] D. Static HDR and registered dynamic carriers round-trip in the Rust assembly API. Encoded dynamic statistics, target parameters, curves, splines, and saturation values are decoded with bounds checks; source bytes are retained. Registered matrix/LUT payloads are decoded and preserved in both HEIF and JPEG. Actual dynamic display adaptation and application of the scalar LUT remain blocked on unambiguous rendering semantics.
+- [x] E. Dual-JFIF output has association, offset, and final-file decode tests. The registered reduced-view offset excludes non-JFIF APP0 as well as APP1–APP15. Independent producer interoperability evidence is still needed.
+- [x] F. The English and Chinese CLI contracts describe export, semantic validation, decoded reconstruction, and unsupported source combinations. Native/device acceptance remains a separate evidence layer.
 
 ## Acceptance criteria
 
@@ -91,4 +91,4 @@ cargo run --locked -p xdremux-cli -- convert --input input.heic --output output.
 cargo run --locked -p xdremux-cli -- validate output.heic --hdr-profile bt2020-pq --decode-hdr --json
 ```
 
-The semantic check is opt-in. The explicit profile check also verifies source colorimetry, coded geometry, ordered orientation, and optional HDR carriers. `--decode-hdr` reconstructs relative linear BT.2020 pixels from the final file and reports decode precision and RGB bounds. Missing optional metadata is reported as missing. These checks do not establish dynamic display adaptation or device recognition. JPEG payload codecs do not provide dual-JFIF output. Existing output and default validation retain their current contracts.
+The semantic check is opt-in. The explicit profile check also verifies source colorimetry, coded geometry, ordered orientation, and optional HDR carriers. `--decode-hdr` reconstructs relative linear BT.2020 pixels from the final file and reports decode precision and RGB bounds. Missing optional metadata is reported as missing. These checks do not establish dynamic display adaptation or device recognition. Dual-JFIF output is available through an explicit JPEG destination. Existing output and default validation retain their current contracts.

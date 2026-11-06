@@ -134,7 +134,7 @@ xdremux convert --input IMG_001_pq.heic --output IMG_001_hlg.heic --hdr-profile 
 
 `--oppo-compatible`、`--apple-portrait`、`--apple-portrait-oppo`、`--apple-styles` 和 `--apple-cinematic` 相互排斥。功能失败后不会静默切换模式。发布输出前，必须具备所需源数据和原生能力。
 
-显式 `--hdr-profile` 选项不能与上述兼容性或 Apple 编辑选项组合。BT.2020 配置接受经验证采用 sRGB 或 Display P3 色域、sRGB 传递函数的 SDR 基础图像。导出器检查 ICC 变换及并存的色彩声明。不支持的色彩编码、裁剪几何、非方形像素，以及不支持的额外矩阵或 LUT 映射，会在发布前失败。
+显式 `--hdr-profile` 选项不能与上述兼容性或 Apple 编辑选项组合。BT.2020 配置接受经验证采用 sRGB 或 Display P3 色域、sRGB 传递函数的 SDR 基础图像。导出器检查 ICC 变换及并存的色彩声明。不支持的色彩编码、裁剪几何与非方形像素会在发布前失败。注册矩阵与 LUT 扩展数据会经过校验并保留，但不会应用到重建像素。
 
 BT.2020 配置保留 SDR 压缩资源及其色彩数据。基础图像、Gain Map 和 HDR 派生图像使用相同顺序的旋转与镜像变换。派生图像采用基础图像的编码尺寸，并声明 BT.2020 与 PQ 或 HLG。Gain Map 的压缩色彩属性独立保留。`compatible` 继续选择现有相机或显示兼容布局。
 

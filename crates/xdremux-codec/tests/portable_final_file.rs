@@ -201,7 +201,7 @@ fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
     };
     use xdremux_metadata::{
         ContentLightLevel, DynamicHdrMetadata, HdrStaticMetadata, HdrTransfer, MasteringDisplay,
-        RegisteredHdrMetadata,
+        RegisteredHdrMetadata, RegisteredMappingExtension,
     };
     let source = fs::read(source_fixture()).unwrap();
     let encoded = LibHeifProvider::new()
@@ -224,9 +224,23 @@ fn explicit_profile_roundtrips_static_and_registered_metadata_in_final_bytes() {
         mastering_display: Some(mastering.clone()),
         content_light_level: Some(light),
     };
+    let mut matrix_and_lut = vec![16_u8];
+    for sample in 0..17 {
+        let half = if matches!(sample, 0 | 4 | 8) {
+            0x3c00_u16
+        } else {
+            0
+        };
+        matrix_and_lut.extend_from_slice(&half.to_be_bytes());
+    }
+    let mut mapping_bytes = Vec::new();
+    mapping_bytes.extend_from_slice(&(matrix_and_lut.len() as u16).to_be_bytes());
+    mapping_bytes.extend_from_slice(&matrix_and_lut);
+    mapping_bytes.extend_from_slice(&0_u16.to_be_bytes());
     let registered = RegisteredHdrMetadata {
         static_metadata: Some((mastering, light)),
         dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+        mapping_extension: Some(RegisteredMappingExtension::parse(&mapping_bytes).unwrap()),
     };
     let output = assemble_and_validate(
         &source,

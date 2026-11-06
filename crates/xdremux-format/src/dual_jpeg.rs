@@ -219,12 +219,22 @@ pub struct RegisteredApp8Offsets {
     pub reduced: u32,
 }
 
+/// A reduced JFIF view retains only APP0 segments with the JFIF identity.
+/// Other APP0 namespaces, such as JFXX, are not JFIF declarations.
+fn excluded_from_reduced_view(segment: &crate::JpegSegment, image: &[u8]) -> bool {
+    (0xe0..=0xef).contains(&segment.marker)
+        && !(segment.marker == 0xe0
+            && image
+                .get(segment.payload.clone())
+                .is_some_and(|payload| payload.starts_with(b"JFIF\0")))
+}
+
 /// Compute the registered base-declaration offsets for a planned assembly.
 ///
 /// The declaration is expected as the last injected primary-image segment and
 /// carries `base_app8_payload_len` payload bytes. The reduced offset removes
-/// every APP segment other than APP0 that lies between the declaration and the
-/// second image, including the declaration itself. This rule is implemented
+/// every non-JFIF APP segment between the declaration and the second image,
+/// including the declaration itself. This rule is implemented
 /// here and is not yet confirmed by an independent producer sample.
 pub fn registered_app8_offsets(
     base: &[u8],
@@ -277,7 +287,9 @@ pub fn registered_app8_offsets(
     let removed = indexed
         .segments
         .iter()
-        .filter(|segment| (0xe1..=0xef).contains(&segment.marker) && segment.range.start >= start)
+        .filter(|segment| {
+            segment.range.start >= start && excluded_from_reduced_view(segment, &image_one)
+        })
         .try_fold(0usize, |total, segment| {
             total.checked_add(segment.range.len())
         })
@@ -529,7 +541,9 @@ fn registered_offsets(
     let removed = base
         .segments
         .iter()
-        .filter(|segment| (0xe1..=0xef).contains(&segment.marker) && segment.range.start >= start)
+        .filter(|segment| {
+            segment.range.start >= start && excluded_from_reduced_view(segment, data)
+        })
         .map(|segment| segment.range.len())
         .sum::<usize>();
     let raw = base.range.end.checked_sub(start)?;
@@ -871,6 +885,35 @@ mod tests {
             "the raw offset must reach the second Start Of Image"
         );
         assert!(!index.gain_map_has_registered_payload);
+    }
+
+    #[test]
+    fn reduced_registered_offset_excludes_non_jfif_app0_but_keeps_jfif() {
+        let mut base = jpeg(true, &[0x11]);
+        let jfif_end = single_image(&base, "base").unwrap().segments[1].range.end;
+        let exif = segment(0xe1, b"Exif\0\0source");
+        let jfxx = segment(0xe0, b"JFXX\0extension");
+        let another_jfif = segment(0xe0, b"JFIF\0retained");
+        let mut source_segments = exif.clone();
+        source_segments.extend_from_slice(&jfxx);
+        source_segments.extend_from_slice(&another_jfif);
+        base.splice(jfif_end..jfif_end, source_segments);
+
+        let gain = jpeg(true, &[0x22]);
+        let iso = iso_base();
+        let injected = [AppSegment {
+            marker: 0xe2,
+            payload: &iso,
+        }];
+        let offsets = registered_app8_offsets(&base, &gain, &injected, &[], 24).unwrap();
+        let planned_declaration = segment(0xe8, &[0u8; 24]);
+        let planned_mpf = segment(0xe2, &vec![0u8; mp_index_payload_len(2).unwrap()]);
+        let excluded = planned_declaration.len()
+            + planned_mpf.len()
+            + exif.len()
+            + jfxx.len();
+        assert_eq!(offsets.raw as usize - offsets.reduced as usize, excluded);
+        assert!(offsets.raw as usize > excluded + another_jfif.len());
     }
 
     #[test]

@@ -64,6 +64,7 @@ fn expected_registered() -> RegisteredHdrMetadata {
     RegisteredHdrMetadata {
         static_metadata: Some((mastering(), content_light())),
         dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+        mapping_extension: None,
     }
 }
 

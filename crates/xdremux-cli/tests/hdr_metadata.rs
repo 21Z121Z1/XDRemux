@@ -168,6 +168,7 @@ fn metadata_bearing_source() -> Vec<u8> {
     let registered = RegisteredHdrMetadata {
         static_metadata: Some((mastering(), content_light())),
         dynamic_metadata: Some(DynamicHdrMetadata::parse(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()),
+        mapping_extension: None,
     };
     let mut body = assemble_iso_gain_map_heif(
         base,

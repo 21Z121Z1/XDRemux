@@ -5,10 +5,15 @@ mod error;
 mod hdr;
 mod icc;
 mod registered_hdr;
+mod registered_mapping;
 pub use hdr::{ContentLightLevel, HdrStaticMetadata, HdrTransfer, MasteringDisplay};
 pub use registered_hdr::{
-    registered_jpeg_base_payload_len, DynamicHdrMetadata, RegisteredHdrMetadata,
+    registered_jpeg_base_payload_len, DynamicHdrBaseParameters, DynamicHdrMetadata,
+    DynamicHdrSpline, DynamicHdrStatistics, DynamicHdrToneMapping, RegisteredHdrMetadata,
     RegisteredJpegBaseDeclaration,
+};
+pub use registered_mapping::{
+    RegisteredFloatLut, RegisteredMapping, RegisteredMappingExtension,
 };
 mod scene_gain_map;
 pub use scene_gain_map::{
