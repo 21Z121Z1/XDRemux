@@ -972,7 +972,6 @@ version = "0.1.0"
 dependencies = [
  "atomic-write-file",
  "jpeg-encoder",
- "libheif-rs",
  "quick-xml",
  "rustix",
  "ruzstd",

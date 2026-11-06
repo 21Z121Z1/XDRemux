@@ -28,8 +28,5 @@ xdremux-source = { path = "../xdremux-source" }
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 rustix = { version = "=1.1.6", features = ["fs", "process"] }
 
-[dev-dependencies]
-libheif-rs = { version = "=3.0.0", default-features = false, features = ["v1_17"] }
-
 [lints]
 workspace = true
