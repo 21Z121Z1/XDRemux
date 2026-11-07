@@ -139,6 +139,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         (_, "live_photo_output") => {
             "实况照片封装：pair（默认文件对）或 pvt 目录包；其他资源保持原格式。"
         }
+        ("convert", "motion_target") => {
+            "实况照片输出目标：Apple 文件对、PVT 或 Google JPEG/HEIC 单文件；Google 路径不隐式转码。"
+        }
         (_, "apple_portrait") => "利用 Vision 语义保留完整的 Apple Portrait 编辑资源。",
         (_, "apple_portrait_oppo") => {
             "使用 OPPO 景深及已有遮罩，不使用 Vision；人像效果受限（macOS）。"
@@ -151,6 +154,7 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         (_, "cinematic_camera_estimate") => "使用绑定源视频的固定视角相机估计；显式焦距优先。",
         (_, "focal_length_35mm") => "覆盖 Cinematic 已记录或自动估计的 35mm 等效焦距。",
         (_, "aperture") => "为 Cinematic 渲染元数据假定拍摄光圈。",
+        ("convert", "output") => "输出 HEIC、MOV 或 Google Motion Photo 文件；Cinematic 默认生成新的 .xdremux.mov 文件。",
         (_, "output") => "输出 HEIC 或 MOV；Cinematic 默认生成新的 .xdremux.mov 文件。",
         (_, "recursive") => "递归查找输入目录；不跟随符号链接。",
         ("categorize", "output_dir") => "按资源类型和拍摄模式分类的根目录。",
