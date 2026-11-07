@@ -158,9 +158,21 @@ fn explicit_apple_pair_and_pvt_targets_reuse_existing_conversion() {
 
     let package = dir.path().join("packaged.pvt");
     let (status, _, error) = run(&input, &package, "apple-pvt");
-    assert_eq!(status, 0, "{error}");
-    assert!(package.join("packaged.heic").is_file());
-    assert!(package.join("packaged.mov").is_file());
+    if cfg!(windows) {
+        // Exclusive PVT directory publication is intentionally unavailable on
+        // Windows. Verify the existing fail-closed product contract instead
+        // of claiming a successful package publication on that platform.
+        assert_eq!(status, 1, "{error}");
+        assert!(
+            error.contains("atomic exclusive PVT directory publication is unavailable"),
+            "{error}"
+        );
+        assert!(!package.exists());
+    } else {
+        assert_eq!(status, 0, "{error}");
+        assert!(package.join("packaged.heic").is_file());
+        assert!(package.join("packaged.mov").is_file());
+    }
 }
 
 #[test]
