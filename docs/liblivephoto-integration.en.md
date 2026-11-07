@@ -86,6 +86,8 @@ The `convert` command may select `google-jpeg` or `google-heic`. Runtime delegat
 
 The default `WritePolicy` rejects unmapped resources. Planning rejects still-container transcoding and timestamps that cannot be represented as exact integer microseconds. After execution, runtime strictly reparses the single output, compares video bytes and presentation time against the source, and requires evidence for still-payload identity. A synced temporary file is published with an exclusive no-clobber operation. This protects existing destination entries; it does not promise power-loss durability or native Android Gallery support.
 
+The separate Apple HEIC+MOV input route uses `Input::ApplePair` (never basename inference), checks identity, and composes `AndroidHeif`. An opt-in `relabel-mp42` policy delegates to LibLivePhoto's in-place `ftyp` rewrite; the runtime independently enforces an exact one-field byte diff, without transcoding. The fail-closed resource audit compares all auxiliary image payloads and Gain Map XMP properties, rejects unmapped or dropped source resources, and exposes every LibLivePhoto disposition in optional CLI JSON. The pinned dependency is now the explicitly reviewed LibLivePhoto commit `9328a0502bb2318b05d255ed83652c7d7c7d3b4c` to use its published conversion-plan relabel API; this is a commit pin, not a new stable release.
+
 ## Verification and evidence limits
 
 The existing parser and payload conformance checks cover the consumer boundary. The real-fixture CLI gate converts and validates all 14 pinned Motion Photo inputs. Runtime tests compare the known source time with the written time and check the conversion report.
@@ -96,7 +98,7 @@ This test does not identify the semantic role of the second video stream or prov
 
 The completion gate binds local checks to the committed `HEAD`. GitHub runs the consumer build and checks in a separate environment. Reader, writer, fixture, CI, and device results must remain separate claims.
 
-The standalone library converter and external-workspace check exercise Android/Apple round trips without the XDRemux product stack. The library compatibility documentation specifies the integer-microsecond restriction for Apple-to-Android output. Original Gallery and Photos acceptance remain independent requirements. The pinned library records [format support](https://github.com/21Z121Z1/LibLivePhoto/blob/a4142f6c104b750736f3ecea8e5d5a66578de5b5/FORMAT_SUPPORT.md) and [vendor fixture evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/a4142f6c104b750736f3ecea8e5d5a66578de5b5/fixtures/vendor/README.md).
+The standalone library converter and external-workspace check exercise Android/Apple round trips without the XDRemux product stack. XDRemux additionally tests Apple HEIC+MOV → Android HEIC → Apple HEIC+MOV → Android HEIC, preserving video media payloads and HEIF auxiliary images. The library compatibility documentation specifies the integer-microsecond restriction for Apple-to-Android output. Original Gallery and Photos acceptance remain independent requirements. The pinned library records [format support](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/FORMAT_SUPPORT.md) and [vendor fixture evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/fixtures/vendor/README.md).
 
 ## Compatibility feature
 

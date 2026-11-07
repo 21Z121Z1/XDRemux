@@ -142,6 +142,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         ("convert", "motion_target") => {
             "实况照片输出目标：Apple 文件对、PVT 或 Google JPEG/HEIC 单文件；Google 路径不隐式转码。"
         }
+        ("convert", "motion_video") => "与输入 HEIC 配对的 Apple Live Photo MOV 文件；仅适用于 google-heic。",
+        ("convert", "motion_video_compat") => "Google 视频容器策略：原样保留，或显式将 ftyp 主品牌改为 mp42；不转码。",
+        ("convert", "motion_report_json") => "向标准输出写入完整的 Google Motion Photo 资源处置和验证 JSON 报告。",
         (_, "apple_portrait") => "利用 Vision 语义保留完整的 Apple Portrait 编辑资源。",
         (_, "apple_portrait_oppo") => {
             "使用 OPPO 景深及已有遮罩，不使用 Vision；人像效果受限（macOS）。"
