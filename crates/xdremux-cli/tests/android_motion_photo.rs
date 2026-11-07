@@ -168,6 +168,21 @@ fn google_output_does_not_replace_existing_file() {
 }
 
 #[test]
+fn google_output_never_creates_a_pvt_package_ancestor() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join("not-created.pvt");
+    let output = package.join("captureMP.jpg");
+    let (status, _, error) = run(
+        &fixture("vivo/android-v1-sdr-01.jpg"),
+        &output,
+        "google-jpeg",
+    );
+    assert_eq!(status, 1);
+    assert!(error.contains("PVT"), "{error}");
+    assert!(!package.exists());
+}
+
+#[test]
 fn google_default_name_is_recognizable_and_skips_collisions() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("capture.jpg");

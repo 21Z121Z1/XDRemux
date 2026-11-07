@@ -36,6 +36,18 @@ pub(crate) fn validate_android_output_path(
 ) -> Result<()> {
     let (_, extension, _) = profile(target)?;
     crate::live_photo_package::validate_output_parent(output)?;
+    if output.parent().is_some_and(|parent| {
+        parent.ancestors().any(|ancestor| {
+            ancestor
+                .extension()
+                .is_some_and(|part| part.eq_ignore_ascii_case("pvt"))
+        })
+    }) {
+        return Err(RuntimeError::new(
+            "Android Motion Photo output",
+            "refusing to write inside a PVT package path",
+        ));
+    }
     let name = output
         .file_name()
         .and_then(|name| name.to_str())
