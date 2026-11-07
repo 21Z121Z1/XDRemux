@@ -15,7 +15,9 @@ use std::path::{Path, PathBuf};
 use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
-use xdremux_engine::{AppleFeatureRequest, ConversionRequest, HdrExportProfile, LivePhotoOutput};
+use xdremux_engine::{
+    AppleFeatureRequest, ConversionRequest, HdrExportProfile, LivePhotoOutput, MotionOutputTarget,
+};
 use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, ApplePortraitSemanticProfile, BatchAssetKind,
     BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
@@ -165,9 +167,16 @@ struct ConvertArgs {
     /// Input ProXDR, Motion Photo, or ordinary video with --apple-cinematic.
     #[arg(long, value_name = "INPUT")]
     input: PathBuf,
-    /// Output HEIC or MOV; Cinematic chooses a new .xdremux.mov file.
+    /// Output HEIC, MOV, or Google Motion Photo JPEG; Cinematic uses .xdremux.mov.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+    /// Motion Photo destination; Google targets produce one file without transcoding.
+    #[arg(
+        long,
+        value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        conflicts_with = "live_photo_output"
+    )]
+    motion_target: Option<MotionOutputTarget>,
     /// Use a source-bound fixed-view camera estimate; explicit --focal-length-35mm takes priority.
     #[arg(long, value_name = "JSON", requires = "apple_cinematic")]
     cinematic_camera_estimate: Option<PathBuf>,
@@ -519,6 +528,31 @@ fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf
     }
 }
 
+fn default_google_motion_output(input: &Path, target: MotionOutputTarget) -> PathBuf {
+    let extension = match target {
+        MotionOutputTarget::GoogleJpeg => "jpg",
+        MotionOutputTarget::GoogleHeic => "heic",
+        _ => unreachable!("Google output naming requires a Google target"),
+    };
+    let stem = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("capture");
+    let stem = stem.strip_suffix("MP").unwrap_or(stem);
+    let mut sequence = 1_u32;
+    loop {
+        let candidate = if sequence == 1 {
+            input.with_file_name(format!("{stem}MP.{extension}"))
+        } else {
+            input.with_file_name(format!("{stem} ({sequence})MP.{extension}"))
+        };
+        if candidate != input && !candidate.exists() {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
     if let Some(raw) = std::env::var_os("XDREMUX_APPLE_ADAPTER") {
@@ -564,6 +598,18 @@ fn run_convert(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-target applies only to Motion Photo inputs",
+                "错误：--motion-target 仅适用于 Motion Photo 输入"
+            )
+        );
+        return 1;
+    }
     if let Err(error) = reject_package_input(&arguments.input) {
         let _ = writeln!(
             stderr,
@@ -594,11 +640,12 @@ fn run_convert(
             stderr,
         );
     }
-    let request = arguments.product.request();
+    let mut request = arguments.product.request();
     let apple_portrait = arguments.product.apple_portrait || arguments.product.apple_portrait_oppo;
     #[cfg(target_os = "macos")]
     let apple_portrait_profile = arguments.product.portrait_profile();
     let apple_styles = arguments.product.apple_styles;
+    let motion_target = arguments.motion_target;
     let input = arguments.input;
     let output = arguments.output;
     let source = match fs::read(&input) {
@@ -635,6 +682,45 @@ fn run_convert(
             if apple_portrait || apple_styles {
                 let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
+            }
+            if let Some(
+                target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
+            ) = motion_target
+            {
+                let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
+                return match runtime
+                    .convert_android_motion_photo_file(&source, &input, &output, target, request)
+                {
+                    Ok(receipt) => match writeln!(
+                        stdout,
+                        "{}",
+                        message!(
+                            language,
+                            "converted: {} -> {}",
+                            "已转换：{} -> {}",
+                            input.display(),
+                            receipt.output.display()
+                        )
+                    ) {
+                        Ok(()) => 0,
+                        Err(_) => 1,
+                    },
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        1
+                    }
+                };
+            }
+            if let Some(target) = motion_target {
+                request.live_photo_output = match target {
+                    MotionOutputTarget::ApplePair => LivePhotoOutput::Pair,
+                    MotionOutputTarget::ApplePvt => LivePhotoOutput::Pvt,
+                    _ => unreachable!(),
+                };
             }
             let output = output
                 .unwrap_or_else(|| default_motion_photo_output(&input, request.live_photo_output));
@@ -688,6 +774,18 @@ fn run_convert(
             }
         }
         SourceAsset::ProXdr { .. } => {
+            if motion_target.is_some() {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(
+                        language,
+                        "error: --motion-target applies only to Motion Photo inputs",
+                        "错误：--motion-target 仅适用于 Motion Photo 输入"
+                    )
+                );
+                return 1;
+            }
             if let Some(path) = &output {
                 if let Err(error) = xdremux_runtime::validate_still_output_path(path) {
                     let _ = writeln!(
