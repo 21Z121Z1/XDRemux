@@ -390,7 +390,7 @@ dependencies = [
 [[package]]
 name = "liblivephoto"
 version = "0.1.0"
-source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=a4142f6c104b750736f3ecea8e5d5a66578de5b5#a4142f6c104b750736f3ecea8e5d5a66578de5b5"
+source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=9328a0502bb2318b05d255ed83652c7d7c7d3b4c#9328a0502bb2318b05d255ed83652c7d7c7d3b4c"
 dependencies = [
  "liblivephoto-format",
  "quick-xml",
@@ -400,7 +400,7 @@ dependencies = [
 [[package]]
 name = "liblivephoto-format"
 version = "0.1.0"
-source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=a4142f6c104b750736f3ecea8e5d5a66578de5b5#a4142f6c104b750736f3ecea8e5d5a66578de5b5"
+source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=9328a0502bb2318b05d255ed83652c7d7c7d3b4c#9328a0502bb2318b05d255ed83652c7d7c7d3b4c"
 
 [[package]]
 name = "linux-raw-sys"

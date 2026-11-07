@@ -107,11 +107,19 @@ The second example requires a supported Motion Photo. The file extension alone d
 ```bash
 xdremux convert --input photo.jpg --motion-target google-jpeg
 xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
+xdremux convert --input apple.heic --motion-video apple.mov --motion-target google-heic --output captureMP.heic --motion-report-json
+xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
 ```
 
 `--motion-target` accepts `apple-pair`, `apple-pvt`, `google-jpeg`, or `google-heic`. It is mutually exclusive with the existing `--live-photo-output` option. Without either option, Apple pair output remains the default. Batch conversion retains its existing Apple behavior.
 
 Google targets use LibLivePhoto's `plan → execute` writer and produce one self-contained file. They retain the source's JPEG or HEIC still encoding, video container bytes, and exact presentation timestamp. The destination filename must end in `MP.jpg`, `MP.jpeg`, or `MP.heic` (matching the selected target). An omitted output name is generated automatically. No still transcode or silent resource drop is performed: unsupported source containers, unrepresentable timestamps, and unmapped vendor resources fail before publication. These writer guarantees do not imply that a particular Android Gallery app has accepted the output.
+
+`--motion-video apple.mov` supplies an actual Apple HEIC+MOV pair as input, checks the embedded Apple pairing identity, and writes Google HEIC without re-encoding either stream. It requires `--motion-target google-heic`. A standalone HEIC is never implicitly paired by filename. The original Apple pair, Apple-to-Apple path, and default batch behavior are unchanged.
+
+`--motion-video-compat` defaults to `preserve`: the video container is copied byte-for-byte. The opt-in `relabel-mp42` mode asks LibLivePhoto to change only the video's `ftyp` major brand to `mp42` if it is neither `qt  ` nor already `mp42`. The runtime checks that the four-byte field is the only changed video byte and that the encoded media payloads remain identical. This is **not** a codec conversion, guaranteed consumer playback, or a general-purpose MOV-to-MP4 remux. Incompatible codecs/tracks require a separate explicit transcode outside this lossless route.
+
+`--motion-report-json` replaces the human-readable success line with JSON containing every source resource's ID, role, type, byte length, all preservation/rewrite dispositions, generated resources, video-brand action, pairing evidence, and strict validation evidence. No source resource may be silently marked dropped/unmapped. Before publication, the runtime compares auxiliary image bytes (including Gain Map images and HEIF items), Gain Map XMP properties, still color/display metadata, exact video bytes or the explicitly allowed brand rewrite, and the exact presentation timestamp. No changes are made to the pixels or existing SDR output path.
 
 ### Product options
 

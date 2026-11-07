@@ -104,11 +104,19 @@ xdremux convert --input IMG_001.jpg
 ```bash
 xdremux convert --input photo.jpg --motion-target google-jpeg
 xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
+xdremux convert --input apple.heic --motion-video apple.mov --motion-target google-heic --output captureMP.heic --motion-report-json
+xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
 ```
 
 `--motion-target` 可选 `apple-pair`、`apple-pvt`、`google-jpeg`、`google-heic`，不能与原有的 `--live-photo-output` 同时使用。两个选项都不指定时，仍然默认输出 Apple 文件对。批处理暂不改变 Apple 输出行为。
 
 Google 目标通过 LibLivePhoto 的 `plan → execute` 写入器输出一个自包含文件。转换保留源 JPEG/HEIC 静态图像编码、视频容器字节和精确呈现时间。输出文件名须以 `MP.jpg`、`MP.jpeg` 或 `MP.heic` 结尾，并与目标类型相符；未指定输出路径时自动生成。不进行隐式转码或丢弃无法映射的资源：静态图像格式不匹配、时间戳无法精确表达、厂商资源无法保留时，发布前直接失败。文件结构通过检查不等于已在特定 Android 相册中通过实机验证。
+
+`--motion-video apple.mov` 显式提供与输入 HEIC 关联的 Apple MOV 文件。程序核验两者的配对标识，再直接封装成 Google HEIC；照片和视频均不重新编码。此选项必须与 `--motion-target google-heic` 一起使用。不会仅凭同名文件自动推断 Apple 配对；原有 Apple 输出和批处理默认行为保持不变。
+
+`--motion-video-compat` 默认为 `preserve`，保留完整视频容器字节。显式选择 `relabel-mp42` 时，仅当视频的 `ftyp` 主品牌既非 `qt  ` 也非 `mp42` 才将该四字节字段改为 `mp42`。运行时逐字节核对除该字段外的容器内容，并核对编码媒体载荷。这不是编解码转码、完整 MOV→MP4 重封装或 Android 相册兼容性保证；无法直接播放的编码或轨道仍需独立、明确的转码流程。
+
+`--motion-report-json` 将普通成功提示替换为 JSON：列出每项源资源的编号、角色、类型、字节长度、全部保留/重写处置、生成资源、视频品牌操作和严格验证证据。任何遗漏或不可映射资源都会阻止发布。发布前还要核对辅助图像（含 Gain Map、HEIF 图像项）的提取字节、Gain Map 的 XMP 属性、静态图像色彩与展示元数据、视频字节或显式品牌改写以及精确呈现时间。现有 SDR 输出路径不受影响。
 
 ### 产品选项
 
