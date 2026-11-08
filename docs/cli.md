@@ -99,22 +99,22 @@ xdremux convert --input IMG_001.jpg
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
 
-### Google Motion Photo 输出（仅 `convert`）
+### Google Motion Photo 输出（`convert` 和 `batch`）
 
 ```bash
 xdremux convert --input photo.jpg --motion-target google-jpeg
 xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
 xdremux convert --input apple.heic --motion-video apple.mov --motion-target google-heic --output captureMP.heic --motion-report-json
-xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
+xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat preserve --motion-report-json
 ```
 
-`--motion-target` 可选 `apple-pair`、`apple-pvt`、`google-jpeg`、`google-heic`，不能与原有的 `--live-photo-output` 同时使用。两个选项都不指定时，仍然默认输出 Apple 文件对。批处理暂不改变 Apple 输出行为。
+`--motion-target` 可选 `apple-pair`、`apple-pvt`、`google-jpeg`、`google-heic`，不能与原有的 `--live-photo-output` 同时使用。两个选项都不指定时，仍然默认输出 Apple 文件对。批处理只有显式指定目标时才改变原有 Apple 输出行为。
 
 Google 目标通过 LibLivePhoto 的 `plan → execute` 写入器输出一个自包含文件。转换保留源 JPEG/HEIC 静态图像编码、视频容器字节和精确呈现时间。输出文件名须以 `MP.jpg`、`MP.jpeg` 或 `MP.heic` 结尾，并与目标类型相符；未指定输出路径时自动生成。不进行隐式转码或丢弃无法映射的资源：静态图像格式不匹配、时间戳无法精确表达、厂商资源无法保留时，发布前直接失败。文件结构通过检查不等于已在特定 Android 相册中通过实机验证。
 
 `--motion-video apple.mov` 显式提供与输入 HEIC 关联的 Apple MOV 文件。程序核验两者的配对标识，再直接封装成 Google HEIC；照片和视频均不重新编码。此选项必须与 `--motion-target google-heic` 一起使用。不会仅凭同名文件自动推断 Apple 配对；原有 Apple 输出和批处理默认行为保持不变。
 
-`--motion-video-compat` 默认为 `preserve`，保留完整视频容器字节。显式选择 `relabel-mp42` 时，仅当视频的 `ftyp` 主品牌既非 `qt  ` 也非 `mp42` 才将该四字节字段改为 `mp42`。运行时逐字节核对除该字段外的容器内容，并核对编码媒体载荷。这不是编解码转码、完整 MOV→MP4 重封装或 Android 相册兼容性保证；无法直接播放的编码或轨道仍需独立、明确的转码流程。
+`--motion-video-compat` 仅接受 `preserve`，也是默认行为。完整视频容器（包括 `ftyp` 品牌）逐字节保留，运行时拒绝任何视频字节或呈现时间改动。该路径不执行视频转码或重封装，因此不能保证不兼容的编码或轨道布局在目标相册中播放。
 
 `--motion-report-json` 将普通成功提示替换为 JSON：列出每项源资源的编号、角色、类型、字节长度、全部保留/重写处置、生成资源、视频品牌操作和严格验证证据。任何遗漏或不可映射资源都会阻止发布。发布前还要核对辅助图像（含 Gain Map、HEIF 图像项）的提取字节、Gain Map 的 XMP 属性、静态图像色彩与展示元数据、视频字节或显式品牌改写以及精确呈现时间。现有 SDR 输出路径不受影响。
 
@@ -200,6 +200,8 @@ OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust �
 
 ```bash
 xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
+xdremux batch --input-dir photo_dump/ --output-dir google/ --motion-target google-jpeg --resume --json
+xdremux batch --input photo.heic --output-dir google/ --motion-target google-heic --motion-video-compat preserve --resume
 ```
 
 至少提供一个 `--input` 或 `--input-dir`，两者都可以重复。目录默认不递归，使用 `--recursive` 才进入子目录。扫描忽略符号链接、隐藏项、PVT 目录及已生成的 `.xdremux` 输出。
@@ -212,20 +214,26 @@ xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
 | `--input-dir DIR` | 添加一个目录，可重复。 |
 | `--recursive` | 默认关闭，启用后进入输入子目录。 |
 | `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
+| `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
+| `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |
 | `--checkpoint FILE` | 指定检查点基础路径，实际文件名追加 `.motion-photo`。 |
-| `--resume` | 来源及输出身份匹配时复用已完成 Live Photo，再重试剩余项。 |
-| `--skip-existing` | 复用已有 Live Photo 输出前执行相同的来源校验。 |
+| `--resume` | 来源及输出身份匹配时复用已完成的 Apple 或 Google Motion Photo，再重试剩余项。 |
+| `--skip-existing` | 复用已有 Motion Photo 输出前执行相同的来源校验。 |
 | `--categorize` | 直接把转换结果发布到分类目录。 |
 | `--json` | 输出一份结构化回执，替代终端文本。 |
 
 [产品选项](#产品选项)同样适用。`--resume` 和 `--skip-existing` 要求同时指定 `--output-dir` 或 `--checkpoint`。未显式指定检查点时，文件位于输出目录中的 `.xdremux-motion-photo-checkpoint.jsonl`。
 
-检查点复用只适用于 Live Photo，不保证跳过任意已有 HDR 或视频输出。`--apple-cinematic` 拒绝 `--resume`、`--skip-existing`、`--checkpoint` 和 `--categorize`。
+检查点复用只适用于 Motion Photo 转换，不保证跳过任意已有 HDR 或视频输出。检查点升级为版本 3，仍可读取旧的 Apple 文件对/PVT 记录。Google 记录包含输出目标、视频策略及完整输出 SHA-256。恢复时核验源大小与摘要、输出路径与摘要以及严格解析结果。变更视频策略后另选文件名；已有输出遭到修改则报错且不覆盖；输出缺失时可沿用记录中的路径重建。`--apple-cinematic` 拒绝 `--resume`、`--skip-existing`、`--checkpoint` 和 `--categorize`。
 
-规划在写入前保留源路径和输出路径，包括每组 Live Photo 的 MOV 路径。其他写入者在规划后创建相同目标时，发布拒绝覆盖。各项分别报告成功或失败；后续失败不使此前成功输出失效。
+Google 目标逐项拒绝 ProXDR 静态照片、JPEG/HEIC 格式不匹配及无法保留厂商资源的输入。当前不支持 `google-avif`，目录扫描也不收集 AVIF。批处理不会根据同名文件推断 Apple HEIC+MOV 配对；须用 `convert --motion-video` 明确提供文件对。
 
-每个新转换的 Live Photo 成功项在 JSON 中报告 `omitted_resource_count`。终端文本报告非零遗漏数。复用不产生新的转换报告，因此该字段为 `null`，不会假定为零。
+规划在写入前保留源路径和输出路径。Apple 文件对还保留 MOV 路径；Google 单文件只保留自身路径。目录重新扫描时忽略已生成的 `*.xdremuxMP.jpg` 和 `*.xdremuxMP.heic`。其他写入者在规划后创建相同目标时，发布拒绝覆盖。各项分别报告成功或失败；后续失败不使此前成功输出失效。
+
+新转换的 Apple Live Photo 在 JSON 中报告 `omitted_resource_count`；Google 输出通过无损资源校验后报告 `0`。终端文本报告非零遗漏数。复用不产生新的转换报告，因此该字段为 `null`，不会假定为零。Google 回执使用 `kind: "motion-photo"`，只列一个输出路径。
+
+可移植测试不能证明原生相册兼容性；宣称 Google Photos、OPPO 相册或三星相册支持前，按 [Android 实机验证矩阵](validation/android-motion-gallery-matrix.md)测试。
 
 ## `categorize`
 

@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{Result, RuntimeError};
 
-pub const MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION: u32 = 2;
+pub const MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
 pub const DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME: &str = ".xdremux-motion-photo-checkpoint.jsonl";
 const SOURCE_HASH_BUFFER_BYTES: usize = 64 * 1024;
 
@@ -29,14 +29,37 @@ struct CheckpointItem {
     source_relative_path: Option<String>,
     #[serde(rename = "outputImagePath", alias = "output_image_path")]
     output_image_path: String,
-    #[serde(rename = "outputVideoPath", alias = "output_video_path")]
-    output_video_path: String,
+    #[serde(
+        rename = "outputVideoPath",
+        alias = "output_video_path",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    output_video_path: Option<String>,
     #[serde(
         rename = "outputPackagePath",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     output_package_path: Option<String>,
+    #[serde(
+        rename = "outputTarget",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    output_target: Option<String>,
+    #[serde(
+        rename = "videoCompatibility",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    video_compatibility: Option<String>,
+    #[serde(
+        rename = "outputSHA256",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    output_sha256: Option<String>,
     status: String,
     #[serde(rename = "inputSize", alias = "input_size", default)]
     input_size: Option<u64>,
@@ -51,12 +74,19 @@ struct CheckpointItem {
 }
 
 impl CheckpointItem {
+    fn route_key(&self) -> String {
+        match &self.output_target {
+            Some(target) => format!(
+                "{target}:{}",
+                self.video_compatibility.as_deref().unwrap_or("preserve")
+            ),
+            None if self.output_package_path.is_some() => "apple-pvt".to_owned(),
+            None => "apple-pair".to_owned(),
+        }
+    }
+
     fn reusable(&self, signature: &SourceSignature) -> bool {
         matches!(self.status.as_str(), "success" | "skipped_existing")
-            && self
-                .asset_identifier
-                .as_deref()
-                .is_some_and(|value| !value.is_empty())
             && self.input_size == Some(signature.size)
             && self.input_sha256.as_deref() == Some(signature.sha256.as_str())
     }
@@ -64,7 +94,7 @@ impl CheckpointItem {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MotionPhotoCheckpoint {
-    items: BTreeMap<String, CheckpointItem>,
+    items: BTreeMap<(String, String), CheckpointItem>,
 }
 
 impl MotionPhotoCheckpoint {
@@ -104,13 +134,36 @@ impl MotionPhotoCheckpoint {
             };
             if item.input_path.is_empty()
                 || item.output_image_path.is_empty()
-                || item.output_video_path.is_empty()
                 || item.input_sha256.as_deref().is_none_or(str::is_empty)
-                || item.asset_identifier.as_deref().is_none_or(str::is_empty)
             {
                 continue;
             }
-            items.insert(item.input_path.clone(), item);
+            let valid = if item.output_target.is_some() {
+                matches!(
+                    item.output_target.as_deref(),
+                    Some("google-jpeg" | "google-heic")
+                ) && item
+                    .output_sha256
+                    .as_deref()
+                    .is_some_and(|sha| sha.len() == 64)
+                    && item.output_video_path.is_none()
+                    && item.output_package_path.is_none()
+            } else {
+                item.output_video_path
+                    .as_deref()
+                    .is_some_and(|v| !v.is_empty())
+                    && item
+                        .asset_identifier
+                        .as_deref()
+                        .is_some_and(|id| !id.is_empty())
+            };
+            // Failed records do not carry output identities, but must still
+            // supersede older successful entries for the same source/route.
+            if !valid && item.status != "failure" {
+                continue;
+            }
+            let key = (item.input_path.clone(), item.route_key());
+            items.insert(key, item);
         }
         Ok(Self { items })
     }
@@ -119,25 +172,62 @@ impl MotionPhotoCheckpoint {
         &self,
         source: &Path,
         signature: &SourceSignature,
+        pvt: bool,
     ) -> Result<Option<ReusableMotionPhoto>> {
         let source = canonical_existing(source)?;
-        let key = path_string(&source);
+        let key = (
+            path_string(&source),
+            if pvt { "apple-pvt" } else { "apple-pair" }.to_owned(),
+        );
         let Some(item) = self.items.get(&key) else {
             return Ok(None);
         };
         if !item.reusable(signature) {
             return Ok(None);
         }
+        let Some(video) = item.output_video_path.as_ref() else {
+            return Ok(None);
+        };
         let Some(asset_identifier) = item.asset_identifier.clone() else {
             return Ok(None);
         };
         Ok(Some(ReusableMotionPhoto {
             image: PathBuf::from(&item.output_image_path),
-            video: PathBuf::from(&item.output_video_path),
+            video: PathBuf::from(video),
             package: item.output_package_path.as_ref().map(PathBuf::from),
             asset_identifier,
         }))
     }
+
+    pub(crate) fn reusable_android_item(
+        &self,
+        source: &Path,
+        signature: &SourceSignature,
+        target: &str,
+        compatibility: &str,
+    ) -> Result<Option<ReusableAndroidMotionPhoto>> {
+        let source = canonical_existing(source)?;
+        let key = (path_string(&source), format!("{target}:{compatibility}"));
+        let Some(item) = self.items.get(&key) else {
+            return Ok(None);
+        };
+        if !item.reusable(signature) {
+            return Ok(None);
+        }
+        let Some(sha256) = item.output_sha256.clone() else {
+            return Ok(None);
+        };
+        Ok(Some(ReusableAndroidMotionPhoto {
+            output: PathBuf::from(&item.output_image_path),
+            sha256,
+        }))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReusableAndroidMotionPhoto {
+    pub output: PathBuf,
+    pub sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -180,6 +270,12 @@ impl CheckpointOutcome<'_> {
 
 pub(crate) struct MotionPhotoCheckpointWriter {
     file: File,
+}
+
+pub(crate) struct AndroidCheckpointIdentity<'a> {
+    pub target: &'a str,
+    pub compatibility: &'a str,
+    pub output_sha256: Option<&'a str>,
 }
 
 impl MotionPhotoCheckpointWriter {
@@ -243,12 +339,15 @@ impl MotionPhotoCheckpointWriter {
             input_path: path_string(&input),
             source_relative_path: None,
             output_image_path: path_string(&output_image),
-            output_video_path: path_string(&output_video),
+            output_video_path: Some(path_string(&output_video)),
             output_package_path: package
                 .map(canonical_or_absolute)
                 .transpose()?
                 .as_deref()
                 .map(path_string),
+            output_target: None,
+            video_compatibility: None,
+            output_sha256: None,
             status: outcome.status().to_owned(),
             input_size: Some(signature.size),
             input_mtime_ns: signature.mtime_ns,
@@ -259,6 +358,37 @@ impl MotionPhotoCheckpointWriter {
         let value = serde_json::to_value(item)
             .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?;
         self.append_json(&value)
+    }
+
+    pub(crate) fn append_android_item(
+        &mut self,
+        source: &Path,
+        output: &Path,
+        signature: &SourceSignature,
+        identity: AndroidCheckpointIdentity<'_>,
+        outcome: CheckpointOutcome<'_>,
+    ) -> Result<()> {
+        let item = CheckpointItem {
+            kind: "item".to_owned(),
+            input_path: path_string(&canonical_existing(source)?),
+            source_relative_path: None,
+            output_image_path: path_string(&canonical_or_absolute(output)?),
+            output_video_path: None,
+            output_package_path: None,
+            output_target: Some(identity.target.to_owned()),
+            video_compatibility: Some(identity.compatibility.to_owned()),
+            output_sha256: identity.output_sha256.map(ToOwned::to_owned),
+            status: outcome.status().to_owned(),
+            input_size: Some(signature.size),
+            input_mtime_ns: signature.mtime_ns,
+            input_sha256: Some(signature.sha256.clone()),
+            asset_identifier: None,
+            error: outcome.error().map(ToOwned::to_owned),
+        };
+        self.append_json(
+            &serde_json::to_value(item)
+                .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?,
+        )
     }
 }
 
@@ -420,7 +550,10 @@ mod tests {
         file.sync_all().unwrap();
 
         let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
-        let prior = loaded.reusable_item(&source, &signature).unwrap().unwrap();
+        let prior = loaded
+            .reusable_item(&source, &signature, false)
+            .unwrap()
+            .unwrap();
         assert_eq!(prior.asset_identifier, "ASSET-ID");
         assert_eq!(prior.image, fs::canonicalize(image).unwrap());
     }
@@ -454,6 +587,47 @@ mod tests {
         let changed_bytes = fs::read(&source).unwrap();
         let changed = source_signature(&source, &changed_bytes).unwrap();
         let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
-        assert!(loaded.reusable_item(&source, &changed).unwrap().is_none());
+        assert!(loaded
+            .reusable_item(&source, &changed, false)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn version_two_apple_records_remain_reusable() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.jpg");
+        let image = root.path().join("legacy.heic");
+        let video = root.path().join("legacy.mov");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&image, b"image").unwrap();
+        fs::write(&video, b"video").unwrap();
+        let signature = source_signature_path(&source).unwrap();
+        let checkpoint = root.path().join("legacy.jsonl");
+        let header = serde_json::json!({"kind":"header", "schemaVersion":2});
+        let item = serde_json::json!({
+            "kind":"item",
+            "inputPath":fs::canonicalize(&source).unwrap().display().to_string(),
+            "outputImagePath":fs::canonicalize(&image).unwrap().display().to_string(),
+            "outputVideoPath":fs::canonicalize(&video).unwrap().display().to_string(),
+            "status":"success",
+            "inputSize":signature.size,
+            "inputSHA256":signature.sha256,
+            "assetIdentifier":"LEGACY-ID",
+        });
+        fs::write(&checkpoint, format!("{header}\n{item}\n")).unwrap();
+        let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
+        assert_eq!(
+            loaded
+                .reusable_item(&source, &signature, false)
+                .unwrap()
+                .unwrap()
+                .asset_identifier,
+            "LEGACY-ID",
+        );
+        assert!(loaded
+            .reusable_item(&source, &signature, true)
+            .unwrap()
+            .is_none());
     }
 }

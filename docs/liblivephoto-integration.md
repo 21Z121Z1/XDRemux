@@ -86,7 +86,7 @@ PVT 不增加另一套 MOV/HEIF 解析器、资产标识符、编码操作或重
 
 默认 `WritePolicy` 拒绝无法映射的资源。规划阶段拒绝静态图像格式转码和不能精确表示为整数微秒的时间戳。执行后，运行时对单文件严格重解析，对比源视频字节与呈现时间，并要求静态图像载荷不变的验证证据。同步写入临时文件后，通过排他、无覆盖操作发布。此机制保护已有目标文件，但不承诺断电后的完整持久性，也不代表已通过 Android 相册实机验证。
 
-新增 Apple HEIC+MOV 输入路径，使用 `Input::ApplePair` 核验配对身份，不根据同名文件推断关联，再输出 Android HEIC。可选 `relabel-mp42` 视频策略直接调用 LibLivePhoto 的 `ftyp` 原地改写接口；运行时独立校验仅主品牌四字节发生变化，不进行视频转码。资源审计逐字节比较全部辅助图像和 Gain Map XMP 属性，拒绝遗漏或丢弃源资源，并可通过 CLI JSON 列出每项处置。依赖锁定在已经检查的 LibLivePhoto 提交 `9328a0502bb2318b05d255ed83652c7d7c7d3b4c`，以使用其转换计划重标接口；这是固定提交，不代表发布了新的稳定版本。
+新增 Apple HEIC+MOV 输入路径，使用 `Input::ApplePair` 核验配对身份，不根据同名文件推断关联，再输出 Android HEIC。视频兼容策略仅保留 `preserve`：运行时要求视频容器逐字节一致，不转码、不改写品牌。资源审计逐字节比较全部辅助图像和 Gain Map XMP 属性，拒绝遗漏或丢弃源资源，并可通过 CLI JSON 列出每项处置。依赖仍锁定在经过检查的 LibLivePhoto 提交 `9328a0502bb2318b05d255ed83652c7d7c7d3b4c`；这是固定提交，不代表发布了新的稳定版本。
 
 ## 验证与证据边界
 
@@ -99,6 +99,8 @@ PVT 不增加另一套 MOV/HEIF 解析器、资产标识符、编码操作或重
 完成检查将本地结果绑定到已提交的 `HEAD`。GitHub 在独立环境中运行调用方构建和检查。读取、写入、样本、CI 和设备结果必须分别描述。
 
 独立库的转换器和外部工作区检查可脱离 XDRemux 产品栈执行 Android/Apple 往返。XDRemux 另验证 Apple HEIC+MOV → Android HEIC → Apple HEIC+MOV → Android HEIC，核验编码视频载荷和 HEIF 辅助图像字节。Apple 转 Android 时的整数微秒限制见库的兼容性文档。原厂相册和 Photos 验收仍是独立要求。固定库版本提供[格式支持说明](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/FORMAT_SUPPORT.md)与[厂商样本证据](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/fixtures/vendor/README.zh-CN.md)。
+
+批处理复用相同的 Google JPEG/HEIC 单文件目标，没有新增写入器。检查点版本 3 区分 Apple 与 Google 路径，并区分视频兼容策略；Google 记录绑定完整输出 SHA-256，而非 Apple 配对标识。恢复前核验输入来源及严格解析后的输出。详见 [CLI 批处理约定](cli.md#batch)和[实机验收矩阵](validation/android-motion-gallery-matrix.md)。缺少证据前不启用三星／厂商原生输出及 AVIF 产品目标。
 
 ## 兼容功能
 

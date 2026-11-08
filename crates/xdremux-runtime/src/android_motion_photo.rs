@@ -186,12 +186,7 @@ fn convert_android_motion_photo(
     photo
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
-    let mut plan = photo.plan(target_profile, WritePolicy::default());
-    if compatibility == MotionVideoCompatibility::RelabelMp42 {
-        plan = plan
-            .relabel_video_major_brand(*b"mp42")
-            .map_err(|error| RuntimeError::external("Android video container policy", error))?;
-    }
+    let plan = photo.plan(target_profile, WritePolicy::default());
     if !plan.can_execute() {
         return Err(RuntimeError::new(
             "Android Motion Photo plan",
@@ -223,23 +218,10 @@ fn convert_android_motion_photo(
     let written_movie = checked
         .motion_video_bytes()
         .map_err(|error| RuntimeError::external("output video", error))?;
-    let expected_movie = expected_video_bytes(original_movie, compatibility)?;
-    let brand_changed = original_movie != expected_movie;
-    if written_movie != expected_movie || photo.presentation_time() != checked.presentation_time() {
+    if written_movie != original_movie || photo.presentation_time() != checked.presentation_time() {
         return Err(RuntimeError::new(
             "Android Motion Photo verification",
-            "video container changed outside the explicitly permitted ftyp major brand, or exact presentation timestamp changed",
-        ));
-    }
-    if brand_changed
-        && xdremux_motion_photo::apple::media_payloads(original_movie)
-            .map_err(|error| RuntimeError::external("original encoded video", error))?
-            != xdremux_motion_photo::apple::media_payloads(written_movie)
-                .map_err(|error| RuntimeError::external("result encoded video", error))?
-    {
-        return Err(RuntimeError::new(
-            "Android Motion Photo verification",
-            "encoded video samples changed",
+            "video container bytes or exact presentation timestamp changed",
         ));
     }
     verify_auxiliary_images(&photo, &checked)?;
@@ -250,15 +232,13 @@ fn convert_android_motion_photo(
             "HDR gain-map XMP properties changed during Motion Photo assembly",
         ));
     }
-    let mut required_evidence = vec![
+    let required_evidence = [
         PreservationEvidence::EncodedStillPayloadsEqual,
         PreservationEvidence::ExactPresentationEqual,
         PreservationEvidence::StillDisplayMetadataEqual,
         PreservationEvidence::StillColorMetadataEqual,
+        PreservationEvidence::VideoContainerBytesEqual,
     ];
-    if !brand_changed {
-        required_evidence.push(PreservationEvidence::VideoContainerBytesEqual);
-    }
     for required in required_evidence {
         if !composed.report.evidence.contains(&required) {
             return Err(RuntimeError::new(
@@ -333,31 +313,8 @@ fn convert_android_motion_photo(
         conversion_report: composed.report,
         resources,
         video_compatibility: compatibility,
-        video_brand_changed: brand_changed,
+        video_brand_changed: false,
     })
-}
-
-fn expected_video_bytes(original: &[u8], policy: MotionVideoCompatibility) -> Result<Vec<u8>> {
-    let mut video = original.to_vec();
-    if policy == MotionVideoCompatibility::Preserve {
-        return Ok(video);
-    }
-    let header = if original.get(..4) == Some(&[0, 0, 0, 1]) {
-        16
-    } else {
-        8
-    };
-    if original.get(4..8) != Some(b"ftyp") || original.len() < header + 8 {
-        return Err(RuntimeError::new(
-            "Android video compatibility",
-            "video lacks a valid ftyp header",
-        ));
-    }
-    let major = &original[header..header + 4];
-    if major != b"qt  " && major != b"mp42" {
-        video[header..header + 4].copy_from_slice(b"mp42");
-    }
-    Ok(video)
 }
 
 fn verify_auxiliary_images(source: &MotionPhoto<'_>, target: &MotionPhoto<'_>) -> Result<()> {
