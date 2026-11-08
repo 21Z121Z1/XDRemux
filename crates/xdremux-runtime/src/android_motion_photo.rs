@@ -10,8 +10,9 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
+use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 use xdremux_motion_photo::{
-    ConversionReport, Disposition, Input, MotionPhoto, ParseOptions, PreservationEvidence,
+    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions, PreservationEvidence,
     ResourceRole, TargetProfile, WritePolicy,
 };
 
@@ -51,6 +52,56 @@ pub struct AndroidMotionResourceAudit {
 pub struct AndroidMotionResourceOperation {
     pub disposition: String,
     pub reason: String,
+}
+
+// Apple timed metadata and Android XMP may express the *same exact instant*
+// with different rational timescales. Structural MediaTime equality rejects
+// that lossless representation change even though the library writer already
+// checks the timestamps with MediaTime::equivalent.
+fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) -> bool {
+    match (source, output) {
+        (Some(a), Some(b)) => a.equivalent(b),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod presentation_time_tests {
+    use super::{same_presentation_time, MediaTime};
+
+    #[test]
+    fn compares_exact_rational_instants_not_timestamp_encoding() {
+        let apple = MediaTime::new(2, 3).unwrap();
+        let android = MediaTime::new(200, 300).unwrap();
+        assert_ne!(apple, android);
+        assert!(same_presentation_time(Some(apple), Some(android)));
+        assert!(!same_presentation_time(
+            Some(apple),
+            Some(MediaTime::new(201, 300).unwrap()),
+        ));
+        assert!(!same_presentation_time(Some(apple), None));
+    }
+}
+
+/// Resolve an automatic Android writer using the actual parsed still span.
+/// This selects a container; it does not transcode still images or video.
+pub fn resolve_motion_output_target(
+    target: MotionOutputTarget,
+    source: &[u8],
+    asset: &SourceAsset,
+) -> Result<MotionOutputTarget> {
+    if target != MotionOutputTarget::GoogleAuto {
+        return Ok(target);
+    }
+    match motion_still_encoding(source, asset) {
+        Some(MotionStillEncoding::Jpeg) => Ok(MotionOutputTarget::GoogleJpeg),
+        Some(MotionStillEncoding::Heic) => Ok(MotionOutputTarget::GoogleHeic),
+        None => Err(RuntimeError::new(
+            "Android Motion Photo target",
+            "automatic target requires a JPEG or HEIC primary still; AVIF and other still formats have no compatible writer",
+        )),
+    }
 }
 
 fn profile(target: MotionOutputTarget) -> Result<(TargetProfile, &'static str, &'static str)> {
@@ -218,10 +269,12 @@ fn convert_android_motion_photo(
     let written_movie = checked
         .motion_video_bytes()
         .map_err(|error| RuntimeError::external("output video", error))?;
-    if written_movie != original_movie || photo.presentation_time() != checked.presentation_time() {
+    if written_movie != original_movie
+        || !same_presentation_time(photo.presentation_time(), checked.presentation_time())
+    {
         return Err(RuntimeError::new(
             "Android Motion Photo verification",
-            "video container bytes or exact presentation timestamp changed",
+            "video container bytes or exact presentation instant changed",
         ));
     }
     verify_auxiliary_images(&photo, &checked)?;

@@ -18,6 +18,7 @@ mod execution;
 mod product_policy;
 mod provisional_guided_filter;
 mod source_profile;
+mod target;
 
 use std::collections::BTreeSet;
 
@@ -98,6 +99,7 @@ pub use execution::{
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
 pub use product_policy::resolve_product_gain_map_encode_profile;
+pub use target::{ConversionTarget, TargetAssetKind, TargetCapabilities};
 pub use provisional_guided_filter::{
     content_headroom_from_linear, encode_display_p3_rgba8, linear_difference, pack_linear_rgba_f16,
     provisional_guided_filter, unpack_linear_rgb_f16, LinearDifference,
@@ -175,6 +177,8 @@ impl std::str::FromStr for LivePhotoOutput {
 pub enum MotionOutputTarget {
     ApplePair,
     ApplePvt,
+    /// Resolve to the matching Google container after inspecting the still bytes.
+    GoogleAuto,
     GoogleJpeg,
     GoogleHeic,
 }

@@ -89,8 +89,17 @@ impl LibHeifProvider {
             .encode_image(&image, &mut encoder, None)
             .map_err(CodecError::libheif)?;
         if let Some(exif) = request.exif_tiff.as_ref() {
+            // HEIF permits an Exif item to start directly at the TIFF header
+            // (offset 0), but Android's ExifInterface expects the JPEG APP1
+            // identifier before the TIFF data. libheif locates the TIFF header
+            // and writes the resulting 6-byte offset into the Exif item.
+            // This keeps the TIFF payload byte-for-byte intact while making
+            // metadata accessible to Android gallery implementations.
+            let mut exif_with_identifier = Vec::with_capacity(exif.len() + 6);
+            exif_with_identifier.extend_from_slice(b"Exif\0\0");
+            exif_with_identifier.extend_from_slice(exif);
             context
-                .add_exif_metadata(&handle, exif)
+                .add_exif_metadata(&handle, &exif_with_identifier)
                 .map_err(CodecError::libheif)?;
         }
         let encoded = context.write_to_bytes().map_err(CodecError::libheif)?;
@@ -204,5 +213,24 @@ mod tests {
             .encode_primary_heif(&request)
             .expect_err("non-TIFF EXIF must fail before encode");
         assert!(error.to_string().contains("TIFF II/MM"));
+    }
+
+    #[test]
+    fn encodes_exif_with_android_readable_identifier_without_changing_tiff() {
+        // Empty TIFF IFD0: little-endian TIFF header, zero entries and no next IFD.
+        let tiff = b"II*\0\x08\0\0\0\0\0\0\0\0\0";
+        let request = PrimaryHeifEncodeRequest::live_photo(raster(), None)
+            .with_exif_tiff(tiff.to_vec());
+        let encoded = LibHeifProvider::new()
+            .encode_primary_heif(&request)
+            .unwrap();
+        let context = HeifContext::read_from_bytes(&encoded).unwrap();
+        let handle = context.primary_image_handle().unwrap();
+        let metadata = handle.all_metadata();
+        assert_eq!(metadata.len(), 1);
+        let mut expected = vec![0, 0, 0, 6];
+        expected.extend_from_slice(b"Exif\0\0");
+        expected.extend_from_slice(tiff);
+        assert_eq!(metadata[0].raw_data, expected);
     }
 }
