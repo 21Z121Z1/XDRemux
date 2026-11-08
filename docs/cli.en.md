@@ -102,7 +102,7 @@ xdremux convert --input IMG_001.jpg
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
 
-### Google Motion Photo output (`convert` only)
+### Google Motion Photo output (`convert` and `batch`)
 
 ```bash
 xdremux convert --input photo.jpg --motion-target google-jpeg
@@ -111,7 +111,7 @@ xdremux convert --input apple.heic --motion-video apple.mov --motion-target goog
 xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
 ```
 
-`--motion-target` accepts `apple-pair`, `apple-pvt`, `google-jpeg`, or `google-heic`. It is mutually exclusive with the existing `--live-photo-output` option. Without either option, Apple pair output remains the default. Batch conversion retains its existing Apple behavior.
+`--motion-target` accepts `apple-pair`, `apple-pvt`, `google-jpeg`, or `google-heic`. It is mutually exclusive with the existing `--live-photo-output` option. Without either option, Apple pair output remains the default. Batch conversion retains its existing Apple behavior unless an explicit `--motion-target` is supplied.
 
 Google targets use LibLivePhoto's `plan → execute` writer and produce one self-contained file. They retain the source's JPEG or HEIC still encoding, video container bytes, and exact presentation timestamp. The destination filename must end in `MP.jpg`, `MP.jpeg`, or `MP.heic` (matching the selected target). An omitted output name is generated automatically. No still transcode or silent resource drop is performed: unsupported source containers, unrepresentable timestamps, and unmapped vendor resources fail before publication. These writer guarantees do not imply that a particular Android Gallery app has accepted the output.
 
@@ -203,6 +203,8 @@ The profile still requires public ImageIO and Core Image APIs on macOS. It is no
 
 ```bash
 xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
+xdremux batch --input-dir photo_dump/ --output-dir google/ --motion-target google-jpeg --resume --json
+xdremux batch --input photo.heic --output-dir google/ --motion-target google-heic --motion-video-compat preserve --resume
 ```
 
 At least one `--input` or `--input-dir` is required. Both can occur more than once. Directory scanning is non-recursive unless `--recursive` is set. Scanning ignores symbolic links, hidden entries, PVT directories, and generated `.xdremux` outputs.
@@ -215,20 +217,26 @@ Normal directory discovery selects HEIC, HEIF, JPG, and JPEG candidates. `--appl
 | `--input-dir DIR` | Adds one directory. Repeatable. |
 | `--recursive` | Disabled by default. Descends into input directories. |
 | `--output-dir DIR` | Without this option, generated outputs are beside their sources with an `.xdremux` suffix. |
+| `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | Motion Photo destination. Default is Apple pair. Google writes one `*.xdremuxMP.jpg` or `*.xdremuxMP.heic` file without transcoding the still image. |
+| `--motion-video-compat preserve\|relabel-mp42` | Google targets only. Default `preserve` copies the video container unchanged. Relabeling is not transcoding. |
 | `--jobs N` | Positive integer. Defaults to available parallelism, capped at `4`, with fallback `1`. |
 | `--checkpoint FILE` | Selects the checkpoint base path. The stored filename appends `.motion-photo`. |
-| `--resume` | Reuses completed Live Photo work only when provenance and output identity match, then retries remaining items. |
-| `--skip-existing` | Applies the same provenance checks before reusing existing Live Photo output. |
+| `--resume` | Reuses completed Apple or Google Motion Photo work only when provenance and output identity match, then retries remaining items. |
+| `--skip-existing` | Applies the same provenance checks before reusing existing Motion Photo output. |
 | `--categorize` | Publishes converted assets directly into classification folders. |
 | `--json` | Writes one structured receipt instead of human output. |
 
 The [product options](#product-options) also apply. `--resume` and `--skip-existing` require `--output-dir` or `--checkpoint`. Without an explicit checkpoint, `--output-dir` stores `.xdremux-motion-photo-checkpoint.jsonl`.
 
-Checkpoint reuse is a Live Photo feature. It is not a general promise to skip any existing HDR or video output. `--apple-cinematic` rejects `--resume`, `--skip-existing`, `--checkpoint`, and `--categorize`.
+Checkpoint reuse is a Motion Photo feature. It is not a general promise to skip any existing HDR or video output. The checkpoint schema is version 3; older Apple pair/PVT records remain readable. Google entries identify the target, video policy, and complete output SHA-256. Resume verifies source size/hash, recorded output path/hash, and strict parsing. A different video policy plans another filename. An existing altered output fails without overwrite; a missing output can be regenerated at its recorded path. `--apple-cinematic` rejects `--resume`, `--skip-existing`, `--checkpoint`, and `--categorize`.
 
-Planning reserves source and output paths before writing starts. Reservations include the MOV companion of each Live Photo. If another writer creates an output after planning, publication refuses to replace that output. Each item has its own success or failure result. Earlier successful outputs remain valid after another item fails.
+Google targets reject ProXDR stills, incompatible JPEG/HEIC source containers, and unmapped vendor resources individually. `google-avif` and AVIF directory discovery are not supported. Batch does not infer an Apple HEIC+MOV pair from adjacent filenames; use `convert --motion-video` to supply an explicit pair.
 
-Each newly converted Live Photo success reports `omitted_resource_count` in JSON. Human output reports a nonzero count. Reuse produces no new conversion report, so the field is `null`, not an assumed zero.
+Planning reserves source and output paths before writing starts. Reservations include the MOV companion of each Apple Live Photo, but only the single file for a Google Motion Photo. Generated `*.xdremuxMP.jpg` and `*.xdremuxMP.heic` files are ignored by subsequent directory scans. If another writer creates an output after planning, publication refuses to replace that output. Each item has its own success or failure result. Earlier successful outputs remain valid after another item fails.
+
+Each newly converted Apple Live Photo success reports `omitted_resource_count` in JSON; Google outputs report `0` after their lossless resource checks. Human output reports a nonzero count. Reuse produces no new conversion report, so the field is `null`, not an assumed zero. Google results use `kind: "motion-photo"` and one output path.
+
+Portable tests do not establish native gallery support. Use the [Android device verification matrix](validation/android-motion-gallery-matrix.en.md) before claiming Google Photos, OPPO Gallery, or Samsung Gallery acceptance.
 
 ## `categorize`
 

@@ -100,6 +100,8 @@ The completion gate binds local checks to the committed `HEAD`. GitHub runs the 
 
 The standalone library converter and external-workspace check exercise Android/Apple round trips without the XDRemux product stack. XDRemux additionally tests Apple HEIC+MOV → Android HEIC → Apple HEIC+MOV → Android HEIC, preserving video media payloads and HEIF auxiliary images. The library compatibility documentation specifies the integer-microsecond restriction for Apple-to-Android output. Original Gallery and Photos acceptance remain independent requirements. The pinned library records [format support](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/FORMAT_SUPPORT.md) and [vendor fixture evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/fixtures/vendor/README.md).
 
+Batch accepts the same Google JPEG/HEIC single-file targets without introducing a second writer. Checkpoint schema 3 separates Apple and Google routes and differentiates video compatibility policies; Google entries bind complete output SHA-256, not an Apple asset identifier. Input source provenance and strict output reparse are required before resuming. See the [CLI batch contract](cli.en.md#batch) and [device acceptance matrix](validation/android-motion-gallery-matrix.en.md). Samsung/vendor-native output and AVIF product targets remain disabled pending evidence.
+
 ## Compatibility feature
 
 `xdremux-compat` provides unstable migration re-exports for existing low-level callers. It is not a stable public API.

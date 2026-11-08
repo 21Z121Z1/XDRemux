@@ -100,6 +100,8 @@ PVT 不增加另一套 MOV/HEIF 解析器、资产标识符、编码操作或重
 
 独立库的转换器和外部工作区检查可脱离 XDRemux 产品栈执行 Android/Apple 往返。XDRemux 另验证 Apple HEIC+MOV → Android HEIC → Apple HEIC+MOV → Android HEIC，核验编码视频载荷和 HEIF 辅助图像字节。Apple 转 Android 时的整数微秒限制见库的兼容性文档。原厂相册和 Photos 验收仍是独立要求。固定库版本提供[格式支持说明](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/FORMAT_SUPPORT.md)与[厂商样本证据](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/fixtures/vendor/README.zh-CN.md)。
 
+批处理复用相同的 Google JPEG/HEIC 单文件目标，没有新增写入器。检查点版本 3 区分 Apple 与 Google 路径，并区分视频兼容策略；Google 记录绑定完整输出 SHA-256，而非 Apple 配对标识。恢复前核验输入来源及严格解析后的输出。详见 [CLI 批处理约定](cli.md#batch)和[实机验收矩阵](validation/android-motion-gallery-matrix.md)。缺少证据前不启用三星／厂商原生输出及 AVIF 产品目标。
+
 ## 兼容功能
 
 `xdremux-compat` 为既有底层调用方提供不稳定的迁移导出，不属于稳定公共 API。

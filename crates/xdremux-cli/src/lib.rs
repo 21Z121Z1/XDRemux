@@ -241,6 +241,16 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
+    /// Motion Photo destination: Apple pair/PVT or one Google JPEG/HEIC file.
+    #[arg(
+        long,
+        value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        conflicts_with = "live_photo_output"
+    )]
+    motion_target: Option<MotionOutputTarget>,
+    /// Preserve video bytes (default), or only relabel a supported ftyp major brand.
+    #[arg(long, value_name = "preserve|relabel-mp42", requires = "motion_target")]
+    motion_video_compat: Option<MotionVideoCompatibility>,
     /// Reuse a completed Live Photo pair only when durable source provenance matches.
     #[arg(long)]
     skip_existing: bool,
@@ -1277,6 +1287,7 @@ fn is_generated_batch_output(path: &Path) -> bool {
     path.file_stem()
         .and_then(OsStr::to_str)
         .is_some_and(|stem| {
+            let stem = stem.strip_suffix("MP").unwrap_or(stem);
             stem.ends_with(".xdremux")
                 || stem.rsplit_once(".xdremux (").is_some_and(|(_, suffix)| {
                     suffix
@@ -1407,6 +1418,7 @@ fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
     match kind {
         BatchAssetKind::ProXdr => "pro-xdr",
         BatchAssetKind::LivePhoto => "live-photo",
+        BatchAssetKind::AndroidMotionPhoto => "motion-photo",
         BatchAssetKind::Cinematic => "cinematic",
     }
 }
@@ -1433,6 +1445,35 @@ fn run_batch(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    if arguments.motion_video_compat.is_some()
+        && !matches!(
+            arguments.motion_target,
+            Some(MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)
+        )
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-video-compat requires a Google Motion Photo target",
+                "错误：--motion-video-compat 需要 Google Motion Photo 输出目标"
+            )
+        );
+        return 2;
+    }
+    if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-target cannot be combined with --apple-cinematic",
+                "错误：--motion-target 不能与 --apple-cinematic 组合"
+            )
+        );
+        return 2;
+    }
     if arguments.product.apple_cinematic
         && (arguments.resume
             || arguments.skip_existing
@@ -1475,7 +1516,13 @@ fn run_batch(
         reuse_existing,
         categorize_output: arguments.categorize,
         cinematic_output: arguments.product.apple_cinematic,
-        live_photo_output: arguments.product.live_photo_output,
+        live_photo_output: match arguments.motion_target {
+            Some(MotionOutputTarget::ApplePvt) => LivePhotoOutput::Pvt,
+            Some(MotionOutputTarget::ApplePair) => LivePhotoOutput::Pair,
+            _ => arguments.product.live_photo_output,
+        },
+        motion_target: arguments.motion_target,
+        motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
@@ -1522,10 +1569,14 @@ fn run_batch(
         reuse_existing,
         jobs: arguments.jobs,
         apple_adapter_executable,
+        motion_target: arguments.motion_target,
+        motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
     };
+    let mut request = arguments.product.request();
+    request.live_photo_output = plan_options.live_photo_output;
     let receipt = runtime.convert_batch_with_options_and_apple_profiles(
         items,
-        arguments.product.request(),
+        request,
         &execution_options,
         arguments.product.portrait_profile(),
         arguments.product.cinematic_options(),
@@ -1997,6 +2048,8 @@ mod tests {
             input_dirs: vec![root.clone()],
             recursive: false,
             output_dir: None,
+            motion_target: None,
+            motion_video_compat: None,
             skip_existing: false,
             resume: false,
             checkpoint: None,
