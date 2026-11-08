@@ -108,6 +108,10 @@ jobs:
       - name: Test portable Rust CLI semantics
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
 
+      - name: Verify Android-compatible HEIF Exif emission
+        if: runner.os == 'Linux'
+        run: cargo test --locked -p xdremux-codec portable::primary_heif::tests::encodes_exif_with_android_readable_identifier_without_changing_tiff
+
       # Temporary public-fixture export for the target-preset device acceptance.
       # Do not run or upload media for unrelated PRs.
       - name: Export destination-target acceptance fixtures
@@ -147,6 +151,15 @@ jobs:
             > "$output/google-heic-report.json"
           "$cli" inspect "$output/vivo-to-googleMP.heic" --json \
             > "$output/google-heic-inspect.json"
+          python3 - "$output/vivo-apple.heic" "$output/vivo-to-googleMP.heic" <<'PY'
+          from pathlib import Path
+          import sys
+
+          for file in sys.argv[1:]:
+              data = Path(file).read_bytes()
+              if b"\x00\x00\x00\x06Exif\x00\x00II*\x00" not in data:
+                  raise SystemExit(f"Android-compatible HEIF Exif item not found: {file}")
+          PY
           sha256sum "$input" > "$output/source-after.sha256"
           sha256sum "$output"/vivo-* > "$output/outputs.sha256"
 
