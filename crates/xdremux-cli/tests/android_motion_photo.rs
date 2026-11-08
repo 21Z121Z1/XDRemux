@@ -327,6 +327,57 @@ fn apple_heic_mov_pair_converts_to_android_heic_without_transcoding() {
 }
 
 #[test]
+fn vivo_jpeg_through_apple_pair_converts_to_google_heic_with_exact_time() {
+    // This real fixture exercises an Apple timed-metadata timescale that is
+    // equivalent to, but not necessarily structurally identical to, Android
+    // XMP's microsecond timestamp. All video bytes must remain unchanged.
+    let dir = tempfile::tempdir().unwrap();
+    let pair = dir.path().join("vivo-apple.heic");
+    let (status, _, error) = run_with_args(vec![
+        "convert".into(),
+        "--input".into(),
+        fixture("vivo/android-v1-sdr-01.jpg").into_os_string(),
+        "--target".into(),
+        "apple".into(),
+        "--output".into(),
+        pair.as_os_str().into(),
+    ]);
+    assert_eq!(status, 0, "{error}");
+    let still = fs::read(&pair).unwrap();
+    let movie = fs::read(pair.with_extension("mov")).unwrap();
+    let apple = MotionPhoto::parse(
+        Input::ApplePair {
+            still: &still,
+            movie: &movie,
+        },
+        ParseOptions::strict(),
+    )
+    .unwrap();
+
+    let output = dir.path().join("vivo-to-googleMP.heic");
+    let (status, _, error) = run_with_args(vec![
+        "convert".into(),
+        "--input".into(),
+        pair.as_os_str().into(),
+        "--motion-video".into(),
+        pair.with_extension("mov").as_os_str().into(),
+        "--target".into(),
+        "google".into(),
+        "--output".into(),
+        output.as_os_str().into(),
+    ]);
+    assert_eq!(status, 0, "{error}");
+    let encoded = fs::read(output).unwrap();
+    let android = MotionPhoto::parse(Input::SingleFile(&encoded), ParseOptions::strict()).unwrap();
+    android.validate().unwrap();
+    assert!(apple
+        .presentation_time()
+        .zip(android.presentation_time())
+        .is_some_and(|(before, after)| before.equivalent(after)));
+    assert_eq!(apple.motion_video_bytes().unwrap(), android.motion_video_bytes().unwrap());
+}
+
+#[test]
 fn ultra_hdr_gain_map_resource_is_byte_identical_after_google_jpeg_conversion() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("xiaomi/android-v1-ultrahdr-01.jpg");
