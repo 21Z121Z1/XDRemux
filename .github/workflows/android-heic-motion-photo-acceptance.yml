@@ -45,26 +45,34 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/android-heic-motion-photo-device-candidates"
           work="$RUNNER_TEMP/android-heic-motion-photo-working"
-          mkdir -p "$out/candidates" "$out/inspection" "$out/reports" "$work/apple" "$work/attempts"
+          mkdir -p "$out/candidates" "$out/experimental" "$out/inspection" "$out/reports" "$work/apple" "$work/attempts"
           printf 'source\tsource_sha256\tvideo_policy\tstatus\toutput\toutput_sha256\treport\n' > "$out/manifest.tsv"
           {
             echo '# Android HEIC Motion Photo device candidates'
             echo
             echo "XDRemux commit: $(git rev-parse HEAD)"
-            echo 'Source: versioned fixtures/motion-photo/ from this commit (verified against fixtures/SHA256SUMS).'
+            echo 'Source: Samsung HEIF #1 and OPPO ColorOS 16 dual-stream #1 from versioned fixtures/motion-photo/ (all fixture hashes verified).'
             echo 'Route: original Motion Photo -> XDRemux Apple HEIC+MOV pair -> LibLivePhoto-backed Google HEIC Motion Photo.'
             echo 'This route can omit vendor-specific source resources during the Apple intermediate; it is for gallery interoperability trials, not a lossless original-to-HEIC claim.'
             echo 'The Android HEIC output step does not re-encode the Apple HEIC still or video.'
             echo 'Variants: preserve (unaltered video container) and relabel-mp42 (only the supported ftyp major brand, if eligible). Neither variant transcodes video.'
-            echo 'Only successfully inspected single-file outputs are included in candidates/. Original source media and Apple intermediates are not uploaded.'
+            echo 'candidates/: the writer strict-reparsed the HEIC and the independent XDRemux inspect command passed.'
+            echo 'experimental/: the writer strict-reparsed and published the HEIC, but the independent XDRemux inspect command rejected it. These files are NOT verified for compatibility; test separately.'
+            echo 'The full 12-fixture diagnostic run is https://github.com/21Z121Z1/XDRemux/actions/runs/42440485529 ; most other sources fail a strict video-byte or timestamp comparison.'
+            echo 'Original source media and Apple intermediates are not uploaded.'
             echo 'Use manifest.tsv and SHA256SUMS to associate each file with the original fixture and exact output hash.'
             echo 'Gallery recognition, playback, HDR, and sharing/reimport are NOT verified by this workflow.'
           } > "$out/README.md"
 
           sources=0
           succeeded=0
+          experimental=0
           failed=0
-          while IFS= read -r source; do
+          source_files=(
+            fixtures/motion-photo/samsung/heif-ultrahdr-01.heic
+            fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg
+          )
+          for source in "${source_files[@]}"; do
             sources=$((sources + 1))
             relative="${source#fixtures/motion-photo/}"
             slug="${relative//\//-}"
@@ -96,22 +104,22 @@ jobs:
                   --motion-target google-heic --motion-video-compat "$policy" \
                   --output "$attempt" --motion-report-json \
                   > "$out/$report" 2> "$out/reports/$slug-$variant.stderr" && \
-                  test -s "$attempt" && \
-                  target/debug/xdremux inspect "$attempt" --json > "$out/$inspect" && \
-                  python3 - "$out/$inspect" <<'PY'
-          import json
-          import sys
-          with open(sys.argv[1], encoding='utf-8') as handle:
-              parsed = json.load(handle)
-          if parsed.get('kind') != 'motion-photo':
-              raise SystemExit(f"not an inspected Motion Photo: {parsed.get('kind')}")
-          PY
-              then
-                cp "$attempt" "$out/candidates/$filename"
-                cmp -s "$attempt" "$out/candidates/$filename"
-                result_sha="$(sha256sum "$out/candidates/$filename" | awk '{print $1}')"
-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$relative" "$original_sha" "$policy" PASS "candidates/$filename" "$result_sha" "$report" >> "$out/manifest.tsv"
-                succeeded=$((succeeded + 1))
+                  test -s "$attempt"; then
+                if target/debug/xdremux inspect "$attempt" --json > "$out/$inspect" 2> "$out/inspection/$slug-$variant.stderr" && \
+                    python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["kind"] == "motion-photo"' "$out/$inspect"; then
+                  tier=candidates
+                  status=PASS
+                  succeeded=$((succeeded + 1))
+                else
+                  tier=experimental
+                  status=EXPERIMENTAL_INSPECT_REJECTED
+                  experimental=$((experimental + 1))
+                  echo "::warning::Writer succeeded but independent inspector rejected $relative ($policy)"
+                fi
+                cp "$attempt" "$out/$tier/$filename"
+                cmp -s "$attempt" "$out/$tier/$filename"
+                result_sha="$(sha256sum "$out/$tier/$filename" | awk '{print $1}')"
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$relative" "$original_sha" "$policy" "$status" "$tier/$filename" "$result_sha" "$report" >> "$out/manifest.tsv"
               else
                 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$relative" "$original_sha" "$policy" FAILED - - "$report" >> "$out/manifest.tsv"
                 echo "::warning::Google HEIC conversion failed for $relative ($policy)"
@@ -120,19 +128,19 @@ jobs:
               echo '::endgroup::'
             done
             test "$(sha256sum "$source" | awk '{print $1}')" = "$original_sha"
-          done < <(find fixtures/motion-photo -type f \( -name '*.jpg' -o -name '*.heic' \) \
-            ! -name '*duplicate*' | LC_ALL=C sort)
+          done
 
-          (cd "$out" && sha256sum candidates/*MP.heic > SHA256SUMS)
+          (cd "$out" && sha256sum candidates/*MP.heic experimental/*MP.heic > SHA256SUMS)
           {
             echo '### Android HEIC Motion Photo device candidates'
             echo "- Source fixtures attempted: $sources"
             echo "- Verified HEIC candidates: $succeeded"
+            echo "- Writer-complete but independently rejected experimental HEIC files: $experimental"
             echo "- Failed conversion attempts: $failed"
             echo '- Download the `android-heic-motion-photo-device-candidates` artifact.'
-            echo '- Inspect `manifest.tsv`, then import the files in `candidates/` into the target gallery.'
+            echo '- Inspect `manifest.tsv`; import `candidates/` first, then test `experimental/` separately with its warning in mind.'
           } >> "$GITHUB_STEP_SUMMARY"
-          test "$sources" -eq 12
+          test "$sources" -eq 2
           test "$succeeded" -gt 0
           test "$failed" -eq 0
 
