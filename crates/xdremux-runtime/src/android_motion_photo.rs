@@ -10,6 +10,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
+use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 use xdremux_motion_photo::{
     ConversionReport, Disposition, Input, MotionPhoto, ParseOptions, PreservationEvidence,
     ResourceRole, TargetProfile, WritePolicy,
@@ -51,6 +52,26 @@ pub struct AndroidMotionResourceAudit {
 pub struct AndroidMotionResourceOperation {
     pub disposition: String,
     pub reason: String,
+}
+
+/// Resolve an automatic Android writer using the actual parsed still span.
+/// This selects a container; it does not transcode still images or video.
+pub fn resolve_motion_output_target(
+    target: MotionOutputTarget,
+    source: &[u8],
+    asset: &SourceAsset,
+) -> Result<MotionOutputTarget> {
+    if target != MotionOutputTarget::GoogleAuto {
+        return Ok(target);
+    }
+    match motion_still_encoding(source, asset) {
+        Some(MotionStillEncoding::Jpeg) => Ok(MotionOutputTarget::GoogleJpeg),
+        Some(MotionStillEncoding::Heic) => Ok(MotionOutputTarget::GoogleHeic),
+        None => Err(RuntimeError::new(
+            "Android Motion Photo target",
+            "automatic target requires a JPEG or HEIC primary still; AVIF and other still formats have no compatible writer",
+        )),
+    }
 }
 
 fn profile(target: MotionOutputTarget) -> Result<(TargetProfile, &'static str, &'static str)> {

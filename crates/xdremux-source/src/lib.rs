@@ -49,6 +49,47 @@ pub enum SourceAsset {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionStillEncoding {
+    Jpeg,
+    Heic,
+}
+
+/// Inspect the already validated primary-still span rather than trusting a
+/// filename extension. AVIF and other BMFF brands are not HEIC writers.
+pub fn motion_still_encoding(data: &[u8], asset: &SourceAsset) -> Option<MotionStillEncoding> {
+    let SourceAsset::MotionPhoto { still, .. } = asset else {
+        return None;
+    };
+    let start = usize::try_from(still.offset).ok()?;
+    let end = start.checked_add(usize::try_from(still.length).ok()?)?;
+    let bytes = data.get(start..end)?;
+    if bytes.starts_with(&[0xff, 0xd8]) {
+        return Some(MotionStillEncoding::Jpeg);
+    }
+    if bytes.get(4..8) != Some(&b"ftyp"[..]) {
+        return None;
+    }
+    let box_size = u32::from_be_bytes(bytes.get(..4)?.try_into().ok()?) as usize;
+    if box_size < 16 || box_size > bytes.len() {
+        return None;
+    }
+    let brands = bytes
+        .get(8..12)
+        .into_iter()
+        .chain(bytes.get(16..box_size)?.chunks_exact(4));
+    if brands.into_iter().any(|brand| {
+        brand == &b"heic"[..]
+            || brand == &b"heix"[..]
+            || brand == &b"hevc"[..]
+            || brand == &b"hevx"[..]
+    }) {
+        Some(MotionStillEncoding::Heic)
+    } else {
+        None
+    }
+}
+
 impl SourceAsset {
     pub const fn kind(&self) -> &'static str {
         match self {
@@ -168,6 +209,35 @@ pub fn inspect_path(path: impl AsRef<Path>) -> Result<SourceInspection> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn motion_still_codec_checks_ftyp_only_and_never_trusts_extension() {
+        let still = SourceAsset::MotionPhoto {
+            source_kind: "androidHeifMotionPhotoV1".to_owned(),
+            still: ByteSpan { offset: 0, length: 0 },
+            video: ByteSpan { offset: 0, length: 0 },
+            presentation_timestamp_us: None,
+            presentation_source: None,
+            stream_count: 1,
+        };
+        let with_length = |data: &[u8]| {
+            let mut asset = still.clone();
+            if let SourceAsset::MotionPhoto { still, .. } = &mut asset {
+                still.length = data.len() as u64;
+            }
+            motion_still_encoding(data, &asset)
+        };
+        assert_eq!(with_length(b"\xff\xd8\xff\xd9"), Some(MotionStillEncoding::Jpeg));
+        assert_eq!(
+            with_length(b"\x00\x00\x00\x14ftypmif1\x00\x00\x00\x00heic"),
+            Some(MotionStillEncoding::Heic)
+        );
+        assert_eq!(
+            with_length(b"\x00\x00\x00\x10ftypavif\x00\x00\x00\x00heic"),
+            None,
+            "heic outside the ftyp box must not be treated as a compatible brand"
+        );
+    }
 
     fn make_box(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {
         let size = u32::try_from(payload.len() + 8).unwrap();
