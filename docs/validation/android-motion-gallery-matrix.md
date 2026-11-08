@@ -40,7 +40,7 @@ xdremux convert --input /tmp/xdremux-gallery-test/apple/samsung.heic \
   --output /tmp/xdremux-gallery-test/heic/samsungMP.heic --motion-report-json
 ```
 
-这份导出文件经过 Apple 文件对中转，不等于 H1 单元测试生成的干净 HEIC。应分别记录输出路径与 SHA-256。若目标相册拒绝原始视频容器，可在新目录中用 `--motion-video-compat relabel-mp42` 重做 J1/J2，并单独记录结果。改写品牌并不能修复不兼容的视频编码或轨道布局。
+这份导出文件经过 Apple 文件对中转，不等于 H1 单元测试生成的干净 HEIC。应分别记录输出路径与 SHA-256。视频容器始终逐字节保留；若目标相册拒绝播放，应记录编码、轨道布局和实机结果，不改写容器品牌。
 
 ## 实机检查项目
 

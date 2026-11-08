@@ -105,7 +105,7 @@ xdremux convert --input IMG_001.jpg
 xdremux convert --input photo.jpg --motion-target google-jpeg
 xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
 xdremux convert --input apple.heic --motion-video apple.mov --motion-target google-heic --output captureMP.heic --motion-report-json
-xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
+xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat preserve --motion-report-json
 ```
 
 `--motion-target` 可选 `apple-pair`、`apple-pvt`、`google-jpeg`、`google-heic`，不能与原有的 `--live-photo-output` 同时使用。两个选项都不指定时，仍然默认输出 Apple 文件对。批处理只有显式指定目标时才改变原有 Apple 输出行为。
@@ -114,7 +114,7 @@ Google 目标通过 LibLivePhoto 的 `plan → execute` 写入器输出一个自
 
 `--motion-video apple.mov` 显式提供与输入 HEIC 关联的 Apple MOV 文件。程序核验两者的配对标识，再直接封装成 Google HEIC；照片和视频均不重新编码。此选项必须与 `--motion-target google-heic` 一起使用。不会仅凭同名文件自动推断 Apple 配对；原有 Apple 输出和批处理默认行为保持不变。
 
-`--motion-video-compat` 默认为 `preserve`，保留完整视频容器字节。显式选择 `relabel-mp42` 时，仅当视频的 `ftyp` 主品牌既非 `qt  ` 也非 `mp42` 才将该四字节字段改为 `mp42`。运行时逐字节核对除该字段外的容器内容，并核对编码媒体载荷。这不是编解码转码、完整 MOV→MP4 重封装或 Android 相册兼容性保证；无法直接播放的编码或轨道仍需独立、明确的转码流程。
+`--motion-video-compat` 仅接受 `preserve`，也是默认行为。完整视频容器（包括 `ftyp` 品牌）逐字节保留，运行时拒绝任何视频字节或呈现时间改动。该路径不执行视频转码或重封装，因此不能保证不兼容的编码或轨道布局在目标相册中播放。
 
 `--motion-report-json` 将普通成功提示替换为 JSON：列出每项源资源的编号、角色、类型、字节长度、全部保留/重写处置、生成资源、视频品牌操作和严格验证证据。任何遗漏或不可映射资源都会阻止发布。发布前还要核对辅助图像（含 Gain Map、HEIF 图像项）的提取字节、Gain Map 的 XMP 属性、静态图像色彩与展示元数据、视频字节或显式品牌改写以及精确呈现时间。现有 SDR 输出路径不受影响。
 
@@ -215,7 +215,7 @@ xdremux batch --input photo.heic --output-dir google/ --motion-target google-hei
 | `--recursive` | 默认关闭，启用后进入输入子目录。 |
 | `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
-| `--motion-video-compat preserve\|relabel-mp42` | 仅 Google 目标。默认 `preserve` 完整保留视频容器；重标品牌不等于转码。 |
+| `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |
 | `--checkpoint FILE` | 指定检查点基础路径，实际文件名追加 `.motion-photo`。 |
 | `--resume` | 来源及输出身份匹配时复用已完成的 Apple 或 Google Motion Photo，再重试剩余项。 |

@@ -227,15 +227,15 @@ fn google_heic_batch_strict_readback_and_route_specific_resume() {
     assert_eq!(code, 0, "{stderr}: {receipt}");
     assert_eq!(receipt["skipped_existing"], 1);
 
-    let mut changed_policy = arguments.clone();
-    changed_policy.extend(["--motion-video-compat".into(), "relabel-mp42".into()]);
-    let (code, receipt, stderr) = run(&changed_policy);
+    let mut explicit_preserve = arguments.clone();
+    explicit_preserve.extend(["--motion-video-compat".into(), "preserve".into()]);
+    let (code, receipt, stderr) = run(&explicit_preserve);
     assert_eq!(code, 0, "{stderr}: {receipt}");
     assert_eq!(
-        receipt["skipped_existing"], 0,
-        "video policy is part of checkpoint identity"
+        receipt["skipped_existing"], 1,
+        "explicit preserve must reuse the same checkpoint identity"
     );
-    assert!(destination.join("sourceMP.xdremux (2)MP.heic").is_file());
+    assert!(!destination.join("sourceMP.xdremux (2)MP.heic").exists());
 }
 
 #[test]
@@ -266,7 +266,7 @@ fn apple_pair_and_google_routes_keep_independent_resume_records() {
 }
 
 #[test]
-fn google_batch_relabel_only_changes_requested_video_brand() {
+fn google_batch_preserves_non_mp42_video_brand() {
     let root = tempfile::tempdir().unwrap();
     let mut source = fs::read(fixture("vivo/android-v1-sdr-01.jpg")).unwrap();
     let ftyp = source.windows(4).rposition(|part| part == b"ftyp").unwrap();
@@ -275,18 +275,15 @@ fn google_batch_relabel_only_changes_requested_video_brand() {
     let input = root.path().join("sourceMP.jpg");
     let destination = root.path().join("out");
     fs::write(&input, &source).unwrap();
-    let mut arguments = args(&input, &destination, "google-jpeg", false);
-    arguments.extend(["--motion-video-compat".into(), "relabel-mp42".into()]);
+    let arguments = args(&input, &destination, "google-jpeg", false);
     let (code, receipt, stderr) = run(&arguments);
     assert_eq!(code, 0, "{stderr}: {receipt}");
     let encoded = fs::read(destination.join("sourceMP.xdremuxMP.jpg")).unwrap();
     let before =
         MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
     let after = MotionPhoto::parse(Input::SingleFile(&encoded), ParseOptions::strict()).unwrap();
-    let mut expected_movie = before.motion_video_bytes().unwrap().to_vec();
-    assert_eq!(&expected_movie[8..12], b"isom");
-    expected_movie[8..12].copy_from_slice(b"mp42");
-    assert_eq!(after.motion_video_bytes().unwrap(), expected_movie);
+    assert_eq!(&before.motion_video_bytes().unwrap()[8..12], b"isom");
+    assert_eq!(after.motion_video_bytes().unwrap(), before.motion_video_bytes().unwrap());
     assert_eq!(before.presentation_time(), after.presentation_time());
 }
 

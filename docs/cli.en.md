@@ -108,7 +108,7 @@ The second example requires a supported Motion Photo. The file extension alone d
 xdremux convert --input photo.jpg --motion-target google-jpeg
 xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
 xdremux convert --input apple.heic --motion-video apple.mov --motion-target google-heic --output captureMP.heic --motion-report-json
-xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat relabel-mp42 --motion-report-json
+xdremux convert --input photo.jpg --motion-target google-jpeg --motion-video-compat preserve --motion-report-json
 ```
 
 `--motion-target` accepts `apple-pair`, `apple-pvt`, `google-jpeg`, or `google-heic`. It is mutually exclusive with the existing `--live-photo-output` option. Without either option, Apple pair output remains the default. Batch conversion retains its existing Apple behavior unless an explicit `--motion-target` is supplied.
@@ -117,7 +117,7 @@ Google targets use LibLivePhoto's `plan → execute` writer and produce one self
 
 `--motion-video apple.mov` supplies an actual Apple HEIC+MOV pair as input, checks the embedded Apple pairing identity, and writes Google HEIC without re-encoding either stream. It requires `--motion-target google-heic`. A standalone HEIC is never implicitly paired by filename. The original Apple pair, Apple-to-Apple path, and default batch behavior are unchanged.
 
-`--motion-video-compat` defaults to `preserve`: the video container is copied byte-for-byte. The opt-in `relabel-mp42` mode asks LibLivePhoto to change only the video's `ftyp` major brand to `mp42` if it is neither `qt  ` nor already `mp42`. The runtime checks that the four-byte field is the only changed video byte and that the encoded media payloads remain identical. This is **not** a codec conversion, guaranteed consumer playback, or a general-purpose MOV-to-MP4 remux. Incompatible codecs/tracks require a separate explicit transcode outside this lossless route.
+`--motion-video-compat` accepts only `preserve`, which is also the default. The original video container, including its `ftyp` brand, is copied byte-for-byte. The runtime rejects any video-byte or presentation-time change. This does not guarantee playback of an unsupported codec or track layout; no video transcode or remux is performed.
 
 `--motion-report-json` replaces the human-readable success line with JSON containing every source resource's ID, role, type, byte length, all preservation/rewrite dispositions, generated resources, video-brand action, pairing evidence, and strict validation evidence. No source resource may be silently marked dropped/unmapped. Before publication, the runtime compares auxiliary image bytes (including Gain Map images and HEIF items), Gain Map XMP properties, still color/display metadata, exact video bytes or the explicitly allowed brand rewrite, and the exact presentation timestamp. No changes are made to the pixels or existing SDR output path.
 
@@ -218,7 +218,7 @@ Normal directory discovery selects HEIC, HEIF, JPG, and JPEG candidates. `--appl
 | `--recursive` | Disabled by default. Descends into input directories. |
 | `--output-dir DIR` | Without this option, generated outputs are beside their sources with an `.xdremux` suffix. |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | Motion Photo destination. Default is Apple pair. Google writes one `*.xdremuxMP.jpg` or `*.xdremuxMP.heic` file without transcoding the still image. |
-| `--motion-video-compat preserve\|relabel-mp42` | Google targets only. Default `preserve` copies the video container unchanged. Relabeling is not transcoding. |
+| `--motion-video-compat preserve` | Google targets only. Optional; `preserve` is the sole mode and is the default. No brand rewrite or transcode. |
 | `--jobs N` | Positive integer. Defaults to available parallelism, capped at `4`, with fallback `1`. |
 | `--checkpoint FILE` | Selects the checkpoint base path. The stored filename appends `.motion-photo`. |
 | `--resume` | Reuses completed Apple or Google Motion Photo work only when provenance and output identity match, then retries remaining items. |

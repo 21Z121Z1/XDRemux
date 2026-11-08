@@ -182,8 +182,8 @@ struct ConvertArgs {
     /// Companion Apple Live Photo MOV (requires --motion-target google-heic).
     #[arg(long, value_name = "MOV", requires = "motion_target")]
     motion_video: Option<PathBuf>,
-    /// No re-encoding; optional explicit ftyp major-brand change to mp42.
-    #[arg(long, value_name = "preserve|relabel-mp42", requires = "motion_target")]
+    /// Preserve all video container bytes (the only supported mode).
+    #[arg(long, value_name = "preserve", requires = "motion_target")]
     motion_video_compat: Option<MotionVideoCompatibility>,
     /// Write a complete Google Motion Photo resource audit as JSON to stdout.
     #[arg(long, requires = "motion_target")]
@@ -248,8 +248,8 @@ struct BatchArgs {
         conflicts_with = "live_photo_output"
     )]
     motion_target: Option<MotionOutputTarget>,
-    /// Preserve video bytes (default), or only relabel a supported ftyp major brand.
-    #[arg(long, value_name = "preserve|relabel-mp42", requires = "motion_target")]
+    /// Preserve all video container bytes (the only supported mode).
+    #[arg(long, value_name = "preserve", requires = "motion_target")]
     motion_video_compat: Option<MotionVideoCompatibility>,
     /// Reuse a completed Live Photo pair only when durable source provenance matches.
     #[arg(long)]
@@ -658,7 +658,6 @@ fn emit_android_motion_receipt(
             "target": format!("{:?}", receipt.conversion_report.target),
             "video_container_policy": match receipt.video_compatibility {
                 MotionVideoCompatibility::Preserve => "preserve",
-                MotionVideoCompatibility::RelabelMp42 => "relabel-mp42",
             },
             "video_brand_changed": receipt.video_brand_changed,
             "resources": resources,

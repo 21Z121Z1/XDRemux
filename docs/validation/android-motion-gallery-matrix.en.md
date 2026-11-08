@@ -40,7 +40,7 @@ xdremux convert --input /tmp/xdremux-gallery-test/apple/samsung.heic \
   --output /tmp/xdremux-gallery-test/heic/samsungMP.heic --motion-report-json
 ```
 
-This exported sample follows an Apple-pair intermediate, unlike the synthetic H1 unit test. Record which route was used, and retain both the source and final SHA-256. Run J1/J2 again with `--motion-video-compat relabel-mp42` in a separate directory if a consumer rejects the unchanged container; do not imply that a brand change repairs an incompatible codec or track layout.
+This exported sample follows an Apple-pair intermediate, unlike the synthetic H1 unit test. Record which route was used, and retain both the source and final SHA-256. The video container is always preserved byte-for-byte; if a consumer rejects it, record the codec, track layout, and device result rather than rewriting its brand.
 
 ## Device observations
 

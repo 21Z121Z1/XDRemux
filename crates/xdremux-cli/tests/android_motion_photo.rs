@@ -371,11 +371,10 @@ fn ultra_hdr_gain_map_resource_is_byte_identical_after_google_jpeg_conversion() 
 }
 
 #[test]
-fn explicit_mp42_relabel_changes_only_ftyp_brand_and_keeps_encoded_video() {
+fn non_mp42_video_brand_is_preserved_byte_for_byte() {
     let dir = tempfile::tempdir().unwrap();
-    // Force a non-mp42 major brand while preserving the actual sample tracks.
-    // The unmodified Vivo fixture already uses mp42, so it cannot exercise
-    // the opt-in rewrite branch by itself.
+    // The Vivo source uses mp42. Change only its major brand to show that
+    // preservation does not depend on the video's ftyp brand.
     let mut source = fs::read(fixture("vivo/android-v1-sdr-01.jpg")).unwrap();
     let ftyp = source
         .windows(4)
@@ -385,7 +384,7 @@ fn explicit_mp42_relabel_changes_only_ftyp_brand_and_keeps_encoded_video() {
     source[ftyp + 4..ftyp + 8].copy_from_slice(b"isom");
     let input = dir.path().join("sourceMP.jpg");
     fs::write(&input, &source).unwrap();
-    let output = dir.path().join("mp42MP.jpg");
+    let output = dir.path().join("preservedMP.jpg");
     let (status, stdout, error) = run_with_args(vec![
         "convert".into(),
         "--input".into(),
@@ -395,7 +394,7 @@ fn explicit_mp42_relabel_changes_only_ftyp_brand_and_keeps_encoded_video() {
         "--motion-target".into(),
         "google-jpeg".into(),
         "--motion-video-compat".into(),
-        "relabel-mp42".into(),
+        "preserve".into(),
         "--motion-report-json".into(),
     ]);
     assert_eq!(status, 0, "{error}");
@@ -405,33 +404,40 @@ fn explicit_mp42_relabel_changes_only_ftyp_brand_and_keeps_encoded_video() {
     let after = MotionPhoto::parse(Input::SingleFile(&encoded), ParseOptions::strict()).unwrap();
     let video_before = before.motion_video_bytes().unwrap();
     let video_after = after.motion_video_bytes().unwrap();
-    let mut expected = video_before.to_vec();
-    assert_eq!(&expected[8..12], b"isom");
-    expected[8..12].copy_from_slice(b"mp42");
-    assert_eq!(expected, video_after);
+    assert_eq!(&video_before[8..12], b"isom");
+    assert_eq!(video_before, video_after);
     assert_eq!(
         xdremux_motion_photo::apple::media_payloads(before.motion_video_bytes().unwrap()).unwrap(),
         xdremux_motion_photo::apple::media_payloads(after.motion_video_bytes().unwrap()).unwrap()
     );
     let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(report["video_container_policy"], "relabel-mp42");
-    assert_eq!(report["video_brand_changed"], true);
-    assert!(report["resources"]
+    assert_eq!(report["video_container_policy"], "preserve");
+    assert_eq!(report["video_brand_changed"], false);
+    assert!(report["evidence"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|resource| {
-            resource["operations"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|operation| {
-                    operation["disposition"] == "Rewritten"
-                        && operation["reason"]
-                            .as_str()
-                            .is_some_and(|r| r.contains("mp42"))
-                })
-        }));
+        .any(|item| item.as_str() == Some("VideoContainerBytesEqual")));
+}
+
+#[test]
+fn video_brand_relabel_option_is_rejected_before_writing() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = dir.path().join("rejectedMP.jpg");
+    let (status, _, error) = run_with_args(vec![
+        "convert".into(),
+        "--input".into(),
+        fixture("vivo/android-v1-sdr-01.jpg").into_os_string(),
+        "--output".into(),
+        output.as_os_str().into(),
+        "--motion-target".into(),
+        "google-jpeg".into(),
+        "--motion-video-compat".into(),
+        "relabel-mp42".into(),
+    ]);
+    assert_eq!(status, 2, "{error}");
+    assert!(error.contains("relabel-mp42"), "{error}");
+    assert!(!output.exists());
 }
 
 #[test]

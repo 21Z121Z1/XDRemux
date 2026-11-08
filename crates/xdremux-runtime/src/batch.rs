@@ -279,7 +279,6 @@ fn google_target_name(target: MotionOutputTarget) -> &'static str {
 fn video_compatibility_name(policy: MotionVideoCompatibility) -> &'static str {
     match policy {
         MotionVideoCompatibility::Preserve => "preserve",
-        MotionVideoCompatibility::RelabelMp42 => "relabel-mp42",
     }
 }
 
