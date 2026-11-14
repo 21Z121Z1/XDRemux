@@ -98,7 +98,9 @@ impl VendorMetadataCarry {
                     "that MediaExtra path is one old-version scheme; it does not require a sidecar or a device-database row from this target",
                     "application/livePhoto-meta is absent on sdr-01 and present on sdr-02, so it is kept only when already present",
                     "the repeated sample live-photo token and EStream digest are not synthesized",
-                    "hash, firstFrame, and version for a source that is not already this single-file layout are not established; a newer gallery line has not been compared",
+                    "a JPEG from another source is written as JPEG plus the preserved MP4, with MotionPhoto=1, Padding=0, and ExtInfo before the video",
+                    "imageTime is the 30 fps frame nearest to the source presentation time; the sample frame numbers are not copied",
+                    "hash, firstFrame, version, and the watermark stream are not created; 10.0.10.42 is a Y04s/W20 package and Path.D is not device-verified",
                     "gallery playback is not device-verified",
                 ],
             },
@@ -213,6 +215,42 @@ pub(crate) fn carry_vendor_metadata(
         exif_identifier_present: exif_identifier_present(output),
         video_byte_length: u64::try_from(video_len).unwrap_or(u64::MAX),
     })
+}
+
+const VIVO_CAMERA: &str = "http://ns.vivo.com/photos/1.0/camera/";
+
+/// Copy VCamera attributes already on the source. `VMotionPhotoVersion=1` is the
+/// muxer default when the source has none. Source and media-kit values are not
+/// invented.
+pub(crate) fn write_vivo_camera_reference(
+    marker_source: &[u8],
+    output: &mut Vec<u8>,
+    video_len: usize,
+) -> Result<Vec<String>> {
+    let mut attributes = Vec::new();
+    if let Some(packet) = xmp_packet_containing(marker_source, VIVO_CAMERA.as_bytes()) {
+        let text = std::str::from_utf8(packet).map_err(|_| {
+            RuntimeError::new("vivo Motion Photo", "source VCamera XMP is not UTF-8")
+        })?;
+        attributes = vendor_attributes(text, VIVO_CAMERA)?;
+    }
+    if !attributes
+        .iter()
+        .any(|attribute| attribute.local == "VMotionPhotoVersion")
+    {
+        attributes.push(VendorAttribute {
+            prefix: "VCamera".to_owned(),
+            local: "VMotionPhotoVersion".to_owned(),
+            value: "1".to_owned(),
+        });
+    }
+    match splice_vendor_attributes(output, VIVO_CAMERA, &attributes, video_len)? {
+        SpliceOutcome::Inserted(names) => Ok(names),
+        SpliceOutcome::HeifItemCannotGrow => Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the JPEG XMP packet cannot hold the VCamera reference",
+        )),
+    }
 }
 
 fn xmp_packet_containing<'a>(bytes: &'a [u8], needle: &[u8]) -> Option<&'a [u8]> {

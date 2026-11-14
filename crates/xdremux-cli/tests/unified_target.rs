@@ -374,14 +374,102 @@ fn vivo_target_preserves_a_source_that_already_has_both_uuid_boxes() {
 }
 
 #[test]
-fn vivo_target_does_not_invent_a_layout_for_another_vendor() {
+fn vivo_target_writes_a_combined_jpeg_for_oppo_and_google_sources() {
     let dir = tempfile::tempdir().unwrap();
-    let input = fixture("oppo/coloros15-ultrahdr-01.jpg");
+    for name in [
+        "oppo/coloros15-ultrahdr-01.jpg",
+        "xiaomi/android-v1-ultrahdr-01.jpg",
+    ] {
+        let input = fixture(name);
+        let output = dir.path().join(format!("{}MP.jpg", name.replace('/', "-")));
+        let (code, stdout, stderr) = run(vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            "vivo".into(),
+            "--motion-report-json".into(),
+        ]);
+        assert_eq!(code, 0, "{name}: {stderr} {stdout}");
+        let source = fs::read(&input).unwrap();
+        let photo =
+            MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+        let video = photo.motion_video_bytes().unwrap();
+        let bytes = fs::read(&output).unwrap();
+        assert!(bytes.ends_with(video), "{name}");
+        assert_eq!(
+            bytes
+                .windows(video.len())
+                .filter(|window| *window == video)
+                .count(),
+            1,
+            "{name}"
+        );
+        let start = bytes.len() - video.len();
+        assert_eq!(&bytes[start + 4..start + 8], b"ftyp", "{name}");
+        let prefix = &bytes[..start];
+        assert!(prefix
+            .windows(b"motionphoto00010000000000000".len())
+            .any(|w| w == b"motionphoto00010000000000000"));
+        assert!(prefix
+            .windows(b"com.android.camera.imageTime".len())
+            .any(|w| w == b"com.android.camera.imageTime"));
+        assert!(
+            prefix
+                .windows(b"MotionPhoto=\"1\"".len())
+                .any(|w| w == b"MotionPhoto=\"1\"")
+                || prefix
+                    .windows(b"MotionPhoto='1'".len())
+                    .any(|w| w == b"MotionPhoto='1'")
+        );
+        assert!(prefix
+            .windows(b"Padding=\"0\"".len())
+            .any(|w| w == b"Padding=\"0\""));
+        assert!(prefix
+            .windows(b"VCamera:VMotionPhotoVersion=\"1\"".len())
+            .any(|w| w == b"VCamera:VMotionPhotoVersion=\"1\""));
+        assert!(
+            !prefix
+                .windows(b"vivoMediaEStream".len())
+                .any(|w| w == b"vivoMediaEStream"),
+            "{name}"
+        );
+        assert!(
+            !prefix
+                .windows(b"firstFrame".len())
+                .any(|w| w == b"firstFrame"),
+            "{name}"
+        );
+        let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(report["container"], "vivo-combined-jpeg-mp4");
+        assert_eq!(report["native_vendor_claim"], false);
+        assert_eq!(report["motion_video_copies"], 1);
+        let notes = report["not_carried"].to_string();
+        assert!(notes.contains("imageTime"), "{name} {notes}");
+        if source
+            .windows(b"hdr-gain-map".len())
+            .any(|w| w == b"hdr-gain-map")
+        {
+            assert!(
+                bytes
+                    .windows(b"hdr-gain-map".len())
+                    .any(|w| w == b"hdr-gain-map"),
+                "{name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn vivo_heic_source_stops_before_still_reencode() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
     let output = dir.path().join("vivoMP.jpg");
     let (code, _, stderr) = convert(&input, &output, "vivo");
     assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("vivoMediaEStream"), "{stderr}");
-    assert!(!stderr.contains("motionphoto0001"), "{stderr}");
+    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
     assert!(!output.exists());
 }
 

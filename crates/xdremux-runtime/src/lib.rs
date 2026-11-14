@@ -24,6 +24,7 @@ mod style_reconstruction;
 mod system_heif_hdr;
 mod validation;
 mod vendor_motion_metadata;
+mod vivo_combined;
 #[cfg(target_os = "macos")]
 pub use style_reconstruction::{reconstruct_styles_hdr, reconstruct_styles_hdr_with_display};
 

@@ -101,8 +101,8 @@ pub fn resolve_motion_output_target(
 
 /// Resolve an automatic Android writer for one destination.
 ///
-/// OPPO 25.17.35 `isOlivePhoto` accepts `image/jpeg` only, so a HEIC source is
-/// planned as JPEG. That plan does not itself re-encode the still.
+/// OPPO olive and vivo combined playback are JPEG containers, so a HEIC source
+/// is planned as JPEG. That plan does not itself re-encode the still.
 pub fn resolve_motion_output_target_for(
     target: MotionOutputTarget,
     source: &[u8],
@@ -112,7 +112,7 @@ pub fn resolve_motion_output_target_for(
     if target != MotionOutputTarget::GoogleAuto {
         return Ok(target);
     }
-    if destination == Some("oppo") {
+    if destination == Some("oppo") || destination == Some("vivo") {
         return match motion_still_encoding(source, asset) {
             Some(MotionStillEncoding::Jpeg | MotionStillEncoding::Heic) => {
                 Ok(MotionOutputTarget::GoogleJpeg)
@@ -278,7 +278,16 @@ fn convert_android_motion_photo(
         return Err(oppo_jpeg_route_blocked(&photo));
     }
     if carry.destination == "vivo" {
-        return publish_preserved_vivo_source(marker_source, &photo, output, compatibility, carry);
+        if vivo_native_single_file(&photo) {
+            return publish_preserved_vivo_source(
+                marker_source,
+                &photo,
+                output,
+                compatibility,
+                carry,
+            );
+        }
+        return publish_vivo_combined(marker_source, &photo, output, compatibility, carry);
     }
     if carry.destination == "huawei" {
         return publish_huawei_live_photo(marker_source, &photo, output, compatibility, carry);
@@ -586,6 +595,208 @@ fn publish_huawei_live_photo(
         video_brand_changed: false,
         vendor_metadata,
     })
+}
+
+fn vivo_native_single_file(photo: &MotionPhoto<'_>) -> bool {
+    photo.asset().sources.len() == 1
+        && photo.still().mime == "image/jpeg"
+        && photo
+            .vivo_media_extensions()
+            .ok()
+            .flatten()
+            .is_some_and(|extensions| {
+                extensions.stream_box_extent.is_some() && extensions.footer.is_some()
+            })
+}
+
+fn publish_vivo_combined(
+    marker_source: &[u8],
+    photo: &MotionPhoto<'_>,
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    if photo.asset().sources.len() != 1 || photo.still().mime != "image/jpeg" {
+        return Err(vivo_still_reencode_blocked(photo));
+    }
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo video", error))?;
+    let mut compose_carry = carry;
+    compose_carry.leave_out_unmapped = true;
+    let (plan, omitted_unmapped) =
+        plan_public_motion(photo, TargetProfile::AndroidJpeg, compose_carry)?;
+    let composed = plan
+        .execute()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo execution", error))?;
+    if composed.files.len() != 1 || !composed.files[0].bytes.ends_with(video) {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the public JPEG writer did not keep the source video as one suffix",
+        ));
+    }
+    let mut bytes = composed.files[0].bytes.clone();
+    let carried = crate::vendor_motion_metadata::write_vivo_camera_reference(
+        marker_source,
+        &mut bytes,
+        video.len(),
+    )?;
+    if !bytes.ends_with(video) {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "adding the VCamera reference moved the preserved video",
+        ));
+    }
+    let (presentation_us, remainder) = match photo.presentation_time() {
+        Some(time) => crate::vivo_combined::presentation_us(time.value, time.timescale)?,
+        None => (0, 0),
+    };
+    let cover = crate::vivo_combined::cover_from_presentation_us(presentation_us)?;
+    let video_start =
+        crate::vivo_combined::insert_extinfo_before_video(&mut bytes, video, cover.image_time)?;
+    if video_start + 8 > bytes.len() || &bytes[video_start + 4..video_start + 8] != b"ftyp" {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "file size minus the video length does not land on ftyp",
+        ));
+    }
+    if bytes.len() - video.len() != video_start {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "Padding 0 requires videoStart = file size - Item:Length",
+        ));
+    }
+    let checked = MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict())
+        .map_err(|error| RuntimeError::external("vivo Motion Photo readback", error))?;
+    let checked_video = checked
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo readback video", error))?;
+    if checked_video != video
+        || hdr_gain_map_xmp_signature(photo)? != hdr_gain_map_xmp_signature(&checked)?
+    {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined file changed the preserved video or the gain-map XMP",
+        ));
+    }
+    let text = String::from_utf8_lossy(&bytes[..video_start]);
+    if !text.contains("MotionPhoto=\"1\"") && !text.contains("MotionPhoto='1'") {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined JPEG does not contain MotionPhoto=1",
+        ));
+    }
+    if !text.contains("Padding=\"0\"") {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined JPEG does not keep Item:Padding=0",
+        ));
+    }
+    let resources = photo
+        .resources()
+        .map(|resource| AndroidMotionResourceAudit {
+            id: resource.id.0,
+            source_role: format!("{:?}", resource.role),
+            mime: resource.mime.clone(),
+            vendor_role: resource.vendor_role.clone(),
+            byte_length: resource.extents.iter().map(|extent| extent.length()).sum(),
+            operations: plan
+                .report()
+                .resources
+                .iter()
+                .filter(|entry| entry.resource == Some(resource.id))
+                .map(|entry| AndroidMotionResourceOperation {
+                    disposition: format!("{:?}", entry.disposition),
+                    reason: entry.reason.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+    let mut not_carried = omitted_unmapped
+        .into_iter()
+        .map(|(_, note)| note)
+        .collect::<Vec<_>>();
+    not_carried.push(format!(
+        "{}; reported cover is {} ms",
+        cover.note, cover.cover_ms
+    ));
+    if remainder != 0 {
+        not_carried.push(format!(
+            "presentation time was truncated to {presentation_us} us; {remainder} timescale ticks remain"
+        ));
+    }
+    not_carried.push(
+        "ExtInfo is the motionphoto type marker plus imageTime before the video; no per-shot hash, firstFrame, or watermark stream was added"
+            .to_owned(),
+    );
+    not_carried.push(
+        "10.0.10.42 is the Y04s/W20 package, not an S60/W10 device, and Path.D plus the feature switch were not device-verified"
+            .to_owned(),
+    );
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: "vivo-combined-jpeg-mp4".to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes: carried,
+        namespace_absent: false,
+        not_carried,
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(&bytes),
+        video_byte_length: u64::try_from(video.len()).unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo staging", error))?;
+    staging
+        .write_all(&bytes)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Android Motion Photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Android Motion Photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: plan.report().clone(),
+        resources,
+        video_compatibility: compatibility,
+        vendor_metadata,
+        video_brand_changed: false,
+    })
+}
+
+fn vivo_still_reencode_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
+    let plan = photo.plan(
+        TargetProfile::AndroidJpeg,
+        xdremux_motion_photo::WritePolicy::default(),
+    );
+    let detail = plan
+        .report()
+        .resources
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry.disposition,
+                Disposition::TranscodeRequired | Disposition::Unmapped | Disposition::Dropped
+            )
+        })
+        .map(|entry| format!("{:?}: {}", entry.disposition, entry.reason))
+        .collect::<Vec<_>>()
+        .join("; ");
+    RuntimeError::new(
+        "vivo Motion Photo",
+        format!(
+            "10.0.10.42 combined playback is a JPEG plus the preserved MP4. Publication stopped before still re-encoding, which would drop or rewrite resources: {detail}"
+        ),
+    )
 }
 
 fn publish_preserved_vivo_source(
