@@ -137,16 +137,18 @@ jobs:
               --output "$output/vivo-to-${target}MP.jpg" --motion-report-json \
               > "$output/vivo-to-${target}.json"
           done
-          if "$cli" convert --input "$vivo" --target vivo \
-            --output "$output/vivo-to-vivoMP.jpg" > "$output/vivo-refused.txt" 2>&1; then
-            echo "vivo target must not publish a file" >&2
+          "$cli" convert --input "$vivo" --target vivo \
+            --output "$output/vivo-to-vivoMP.jpg" --motion-report-json \
+            > "$output/vivo-to-vivo.json"
+          cmp "$vivo" "$output/vivo-to-vivoMP.jpg"
+          if "$cli" convert --input "$oppo" --target vivo \
+            --output "$output/oppo-to-vivoMP.jpg" > "$output/vivo-other-source.txt" 2>&1; then
+            echo "a non-vivo source must not be published as vivo" >&2
             exit 1
           fi
-          if "$cli" convert --input "$vivo" --target huawei \
-            --output "$output/vivo-to-huaweiMP.jpg" > "$output/huawei-incomplete.txt" 2>&1; then
-            echo "huawei target must not publish without parsable play info" >&2
-            exit 1
-          fi
+          "$cli" convert --input "$vivo" --target huawei \
+            --output "$output/vivo-to-huaweiMP.jpg" --motion-report-json \
+            > "$output/vivo-to-huawei.json"
           if "$cli" convert --input fixtures/motion-photo/samsung/heif-ultrahdr-01.heic \
             --target oppo --output "$output/samsung-heic-to-oppoMP.jpg" \
             > "$output/oppo-heic-plan.txt" 2>&1; then
@@ -199,11 +201,13 @@ jobs:
           carried = oppo["carried_source_attributes"]
           if "OpCamera:VideoLength" not in carried:
               raise SystemExit("OPPO source VideoLength was not carried")
-          huawei = (root / "huawei-incomplete.txt").read_text()
-          if "readPlayInfo" not in huawei:
-              raise SystemExit("huawei refusal does not name readPlayInfo")
-          if (root / "vivo-to-huaweiMP.jpg").exists():
-              raise SystemExit("huawei file was published")
+          huawei_bytes = (root / "vivo-to-huaweiMP.jpg").read_bytes()
+          play = huawei_bytes[-40:-20].decode("ascii").strip()
+          if play != "1333:2501":
+              raise SystemExit(f"huawei play info is {play!r}, expected presentation and mvhd milliseconds")
+          huawei = json.loads((root / "vivo-to-huawei.json").read_text())
+          if "1333:2501" not in json.dumps(huawei["not_carried"]):
+              raise SystemExit("huawei report does not name the millisecond play info")
           oppo_plan = (root / "oppo-heic-plan.txt").read_text()
           if "JPEG Motion Photo" not in oppo_plan or "TranscodeRequired" not in oppo_plan:
               raise SystemExit("OPPO HEIC input did not report the blocked JPEG route")

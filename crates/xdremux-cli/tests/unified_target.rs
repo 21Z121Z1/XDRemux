@@ -326,25 +326,106 @@ fn samsung_heic_target_keeps_mpvd_as_the_last_top_level_box() {
 }
 
 #[test]
-fn vivo_target_refuses_to_publish_a_google_container() {
+fn vivo_target_preserves_a_source_that_already_has_both_uuid_boxes() {
     let dir = tempfile::tempdir().unwrap();
-    let input = fixture("vivo/android-v1-sdr-01.jpg");
+    for (name, meta) in [
+        ("vivo/android-v1-sdr-01.jpg", false),
+        ("vivo/android-v1-sdr-02.jpg", true),
+    ] {
+        let input = fixture(name);
+        let output = dir.path().join(format!("{meta}MP.jpg"));
+        let (code, stdout, stderr) = run(vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            "vivo".into(),
+            "--motion-report-json".into(),
+        ]);
+        assert_eq!(code, 0, "{name}: {stderr} {stdout}");
+        let source = fs::read(&input).unwrap();
+        let bytes = fs::read(&output).unwrap();
+        assert_eq!(bytes, source, "{name}");
+        assert!(bytes
+            .windows(b"vivoMediaEStream".len())
+            .any(|w| w == b"vivoMediaEStream"));
+        assert!(bytes
+            .windows(b"vivoMediaExtInfo".len())
+            .any(|w| w == b"vivoMediaExtInfo"));
+        assert_eq!(
+            bytes
+                .windows(b"application/livePhoto-meta".len())
+                .any(|w| w == b"application/livePhoto-meta"),
+            meta,
+            "{name}"
+        );
+        let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(report["container"], "vivo-preserved-source-layout");
+        assert_eq!(report["native_vendor_claim"], false);
+        assert_eq!(report["motion_video_copies"], 1);
+        assert!(report["not_carried"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str().unwrap().contains("not synthesized")));
+    }
+}
+
+#[test]
+fn vivo_target_does_not_invent_a_layout_for_another_vendor() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("oppo/coloros15-ultrahdr-01.jpg");
     let output = dir.path().join("vivoMP.jpg");
     let (code, _, stderr) = convert(&input, &output, "vivo");
     assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("livePhoto-meta"), "{stderr}");
+    assert!(stderr.contains("vivoMediaEStream"), "{stderr}");
+    assert!(!stderr.contains("motionphoto0001"), "{stderr}");
     assert!(!output.exists());
 }
 
 #[test]
-fn huawei_target_does_not_publish_a_blank_play_info_tail() {
+fn huawei_target_writes_seek_and_duration_milliseconds() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("vivo/android-v1-sdr-01.jpg");
     let output = dir.path().join("huaweiMP.jpg");
-    let (code, _, stderr) = convert(&input, &output, "huawei");
-    assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("readPlayInfo"), "{stderr}");
-    assert!(!output.exists());
+    let (code, stdout, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+        "--motion-report-json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {stdout}");
+    let source = fs::read(&input).unwrap();
+    let photo = MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+    let video = photo.motion_video_bytes().unwrap();
+    let at = source
+        .windows(video.len())
+        .position(|window| window == video)
+        .unwrap();
+    let bytes = fs::read(&output).unwrap();
+    assert_eq!(&bytes[..at], &source[..at]);
+    assert_eq!(&bytes[at..at + video.len()], video);
+    assert_eq!(bytes.len(), at + video.len() + 40);
+    let play = std::str::from_utf8(&bytes[bytes.len() - 40..bytes.len() - 20])
+        .unwrap()
+        .trim();
+    assert_eq!(play, "1333:2501");
+    let tag = std::str::from_utf8(&bytes[bytes.len() - 20..])
+        .unwrap()
+        .trim();
+    assert_eq!(tag, format!("LIVE_{}", video.len()));
+    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["native_vendor_claim"], false);
+    assert_eq!(report["motion_video_copies"], 1);
+    let notes = report["not_carried"].to_string();
+    assert!(notes.contains("1333:2501"), "{notes}");
+    assert!(notes.contains("truncat"), "{notes}");
 }
 
 #[test]

@@ -63,7 +63,7 @@ xdremux convert --input IMG_001.jpg
 xdremux convert --input IMG_001.jpg --target xiaomi --output IMG_001MP.jpg
 ```
 
-不带 `--target` 时，Motion Photo 仍生成配套的 HEIC 和 MOV，源文件保持不变。`--target` 可选 `apple`、`android-standard`（别名 `standard`）、`google`、`samsung`、`oppo`、`vivo`、`xiaomi`、`huawei`。一加和 realme 使用 `oppo`。`xiaomi`、`google`、`android-standard` 写公开 Motion Photo；`oppo` 在 JPEG 上沿用已有的 OpCamera，不声称 HEIF 实况；`huawei` 和 `vivo` 目前不发布文件：华为播放信息的两个整数还没有证据，vivo 的 MP4 元数据轨道外壳也还没有。HEIC 源转 `oppo` 会规划 JPEG 实况并在静图重编码前停下。视频能保留时保持原字节。结构检查不是相册实机结果。详见 [CLI 参考](docs/cli.md)。
+不带 `--target` 时，Motion Photo 仍生成配套的 HEIC 和 MOV，源文件保持不变。`--target` 可选 `apple`、`android-standard`（别名 `standard`）、`google`、`samsung`、`oppo`、`vivo`、`xiaomi`、`huawei`。一加和 realme 使用 `oppo`。`xiaomi`、`google`、`android-standard` 写公开 Motion Photo；`oppo` 在 JPEG 上沿用已有的 OpCamera；17.10.62 和 25.17.35 都要求 `image/jpeg`，不声称 HEIF 实况。`vivo` 只原样发布已经带有 `vivoMediaEStream` 和 `vivoMediaExtInfo` 的 JPEG。`huawei` 在视频位于文件末尾时写出毫秒起点和时长，空白字段不再发布。HEIC 源转 `oppo` 会规划 JPEG 实况并在静图重编码前停下。视频能保留时保持原字节。结构检查不是相册实机结果。详见 [CLI 参考](docs/cli.md)。
 
 ProXDR 输出需要面向 OPPO 相册时，添加兼容选项：
 
