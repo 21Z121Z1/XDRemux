@@ -20,7 +20,7 @@ use xdremux_engine::{
     MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
 };
 use xdremux_runtime::{
-    motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target,
+    motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target_for,
     AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource, ApplePortraitSemanticProfile,
     BatchAssetKind, BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition,
     PortableRuntime, VendorMetadataCarry,
@@ -1003,7 +1003,12 @@ fn run_convert(
                 return 1;
             }
             let resolved_motion_target = match motion_target {
-                Some(target) => match resolve_motion_output_target(target, &source, &asset) {
+                Some(target) => match resolve_motion_output_target_for(
+                    target,
+                    &source,
+                    &asset,
+                    arguments.target.map(|target| target.name()),
+                ) {
                     Ok(target) => Some(target),
                     Err(error) => {
                         let _ = writeln!(

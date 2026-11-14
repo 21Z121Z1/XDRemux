@@ -49,8 +49,8 @@ pub fn validate_apple_styles_file(
     apple_texture::validate_existing(executable.as_ref(), input.as_ref())
 }
 pub use android_motion_photo::{
-    resolve_motion_output_target, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
-    AndroidMotionResourceAudit, AndroidMotionResourceOperation,
+    resolve_motion_output_target, resolve_motion_output_target_for, AndroidMotionPhotoFileReceipt,
+    AndroidMotionPhotoPairSource, AndroidMotionResourceAudit, AndroidMotionResourceOperation,
 };
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 #[cfg(target_os = "macos")]

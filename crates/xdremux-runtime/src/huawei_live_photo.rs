@@ -2,15 +2,21 @@
 //! `LiveUtils.getVideoOffset` reads the last 20 bytes. After trimming, they must
 //! start with `LIVE_`, and the second `_` field is the video length L.
 //! The video then starts at `file_size - L - 40`. The preceding 20 bytes are a
-//! play-info field. This build only shows that `readPlayInfo` splits them on
-//! `:` into two integers. Their meaning is not established, so they stay blank.
+//! play-info field. `readPlayInfo` trims them and splits on `:` into two
+//! integers. A blank field returns null. Those integers are not named here and
+//! no fixture supplies them, so this module does not publish a file.
 
+#[cfg(test)]
 use crate::{Result, RuntimeError};
 
+#[cfg(test)]
 const TAIL_LEN: usize = 40;
+#[cfg(test)]
 const FIELD_LEN: usize = 20;
+#[cfg(test)]
 const LIVE_TAG: &str = "LIVE_";
 
+#[cfg(test)]
 pub(crate) fn assemble(still: &[u8], video: &[u8]) -> Result<Vec<u8>> {
     if still.is_empty() || video.is_empty() {
         return Err(RuntimeError::new(
@@ -52,8 +58,19 @@ pub(crate) fn assemble(still: &[u8], video: &[u8]) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Same rule as `LiveUtils.readPlayInfo`: 20 bytes, trim, split on `:`, then
+/// two decimal integers. A blank field trims to empty and does not parse.
+pub(crate) fn play_info_parses(field: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(field) else {
+        return false;
+    };
+    let parts: Vec<&str> = text.trim().split(':').collect();
+    parts.len() >= 2 && parts[0].parse::<i32>().is_ok() && parts[1].parse::<i32>().is_ok()
+}
+
 /// Mirror `LiveUtils.getVideoOffset`: last 20 bytes, trim, `LIVE_`, then L,
 /// then `file_size - L - 40`.
+#[cfg(test)]
 pub(crate) fn recover_video(file: &[u8]) -> Option<&[u8]> {
     if file.len() < TAIL_LEN {
         return None;
@@ -120,5 +137,13 @@ mod tests {
         assert_eq!(span.len(), 36);
         assert_eq!(&span[..16], &v2[8..24]);
         assert!(span.windows(6).any(|window| window == b"v2_f19"));
+    }
+
+    #[test]
+    fn blank_play_info_does_not_parse_and_the_synthetic_pair_does() {
+        assert!(!play_info_parses(&[b' '; 20]));
+        let mut field = [b' '; 20];
+        field[..5].copy_from_slice(b"19:30");
+        assert!(play_info_parses(&field));
     }
 }

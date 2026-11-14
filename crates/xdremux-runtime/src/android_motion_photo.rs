@@ -96,8 +96,32 @@ pub fn resolve_motion_output_target(
     source: &[u8],
     asset: &SourceAsset,
 ) -> Result<MotionOutputTarget> {
+    resolve_motion_output_target_for(target, source, asset, None)
+}
+
+/// Resolve an automatic Android writer for one destination.
+///
+/// OPPO 25.17.35 `isOlivePhoto` accepts `image/jpeg` only, so a HEIC source is
+/// planned as JPEG. That plan does not itself re-encode the still.
+pub fn resolve_motion_output_target_for(
+    target: MotionOutputTarget,
+    source: &[u8],
+    asset: &SourceAsset,
+    destination: Option<&str>,
+) -> Result<MotionOutputTarget> {
     if target != MotionOutputTarget::GoogleAuto {
         return Ok(target);
+    }
+    if destination == Some("oppo") {
+        return match motion_still_encoding(source, asset) {
+            Some(MotionStillEncoding::Jpeg | MotionStillEncoding::Heic) => {
+                Ok(MotionOutputTarget::GoogleJpeg)
+            }
+            None => Err(RuntimeError::new(
+                "Android Motion Photo target",
+                "automatic target requires a JPEG or HEIC primary still; AVIF and other still formats have no compatible writer",
+            )),
+        };
     }
     match motion_still_encoding(source, asset) {
         Some(MotionStillEncoding::Jpeg) => Ok(MotionOutputTarget::GoogleJpeg),
@@ -251,10 +275,7 @@ fn convert_android_motion_photo(
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
     if carry.destination == "oppo" && photo.still().mime != "image/jpeg" {
-        return Err(RuntimeError::new(
-            "OPPO Motion Photo",
-            "OPPO gallery 25.17.35 isOlivePhoto accepts only MIME image/jpeg; this package has no reachable HEIF olive path. 17.x has not been compared, so a HEIC file is not published as an OPPO live photo",
-        ));
+        return Err(oppo_jpeg_route_blocked(&photo));
     }
     if carry.destination == "vivo" {
         return Err(RuntimeError::new(
@@ -263,7 +284,17 @@ fn convert_android_motion_photo(
         ));
     }
     if carry.destination == "huawei" {
-        return publish_huawei_live_photo(&photo, output, compatibility, carry);
+        let blank = [b' '; 20];
+        if crate::huawei_live_photo::play_info_parses(&blank) {
+            return Err(RuntimeError::new(
+                "Huawei live photo",
+                "the play-info parser accepted a blank field; publication stays stopped until that result is explained",
+            ));
+        }
+        return Err(RuntimeError::new(
+            "Huawei live photo",
+            "LiveUtils.readPlayInfo trims 20 bytes and requires two colon-separated integers; a blank field does not parse and returns null. Those integers are not named in this package and no repository fixture supplies them, so no file is published. This target is not complete",
+        ));
     }
     let (plan, omitted_unmapped) = plan_public_motion(&photo, target_profile, carry)?;
     let omitted_ids = omitted_unmapped
@@ -451,98 +482,34 @@ fn convert_android_motion_photo(
     })
 }
 
-fn publish_huawei_live_photo(
-    photo: &MotionPhoto<'_>,
-    output: &Path,
-    compatibility: MotionVideoCompatibility,
-    carry: VendorMetadataCarry,
-) -> Result<AndroidMotionPhotoFileReceipt> {
-    let still = photo
-        .still_bytes()
-        .map_err(|error| RuntimeError::external("Huawei still", error))?;
-    let video = photo
-        .motion_video_bytes()
-        .map_err(|error| RuntimeError::external("Huawei video", error))?;
-    let bytes = crate::huawei_live_photo::assemble(still, video)?;
-    let parent = output
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(parent)
-        .map_err(|error| RuntimeError::external("Huawei live photo output directory", error))?;
-    let mut staging = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|error| RuntimeError::external("Huawei live photo staging", error))?;
-    staging
-        .write_all(&bytes)
-        .and_then(|()| staging.as_file().sync_all())
-        .map_err(|error| RuntimeError::external("Huawei live photo durable write", error))?;
-    staging.persist_noclobber(output).map_err(|error| {
-        RuntimeError::external("Huawei live photo non-overwriting publication", error.error)
-    })?;
-    let mut vendor_metadata = VendorMetadataReport {
-        destination: carry.destination.to_owned(),
-        container: carry.container.to_owned(),
-        native_vendor_claim: false,
-        gallery_verified: false,
-        carried_attributes: Vec::new(),
-        namespace_absent: true,
-        not_carried: vec![
-            "play-info integers were not written; the 20-byte field is blank".to_owned(),
-            "Google Motion Photo directory is not the locator for this gallery build".to_owned(),
-        ],
-        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
-        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(&bytes),
-        video_byte_length: u64::try_from(video.len()).unwrap_or(u64::MAX),
-    };
-    if photo.presentation_time().is_some() {
-        vendor_metadata.not_carried.push(
-            "presentation timestamp has no field in the verified 40-byte tail and was not written"
-                .to_owned(),
-        );
-    }
-    let resources = photo
-        .resources()
-        .map(|resource| AndroidMotionResourceAudit {
-            id: resource.id.0,
-            source_role: format!("{:?}", resource.role),
-            mime: resource.mime.clone(),
-            vendor_role: resource.vendor_role.clone(),
-            byte_length: resource.extents.iter().map(|extent| extent.length()).sum(),
-            operations: vec![AndroidMotionResourceOperation {
-                disposition: if resource.role == ResourceRole::PrimaryStill
-                    || resource.role == ResourceRole::PrimaryMotionVideo
-                {
-                    "Preserved".to_owned()
-                } else {
-                    "LeftOut".to_owned()
-                },
-                reason: if resource.role == ResourceRole::PrimaryMotionVideo {
-                    "video bytes sit immediately before the 40-byte Huawei tail".to_owned()
-                } else if resource.role == ResourceRole::PrimaryStill {
-                    "still bytes precede the preserved video".to_owned()
-                } else {
-                    "not part of the verified Huawei offset formula".to_owned()
-                },
-            }],
+fn oppo_jpeg_route_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
+    let plan = photo.plan(
+        TargetProfile::AndroidJpeg,
+        xdremux_motion_photo::WritePolicy::default(),
+    );
+    let blocked = plan
+        .report()
+        .resources
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry.disposition,
+                Disposition::TranscodeRequired | Disposition::Unmapped | Disposition::Dropped
+            )
         })
-        .collect();
-    Ok(AndroidMotionPhotoFileReceipt {
-        output: output.to_path_buf(),
-        conversion_report: xdremux_motion_photo::ConversionReport {
-            target: TargetProfile::PreserveSource,
-            resources: vec![xdremux_motion_photo::ResourceConversion {
-                resource: Some(photo.motion_video().id),
-                disposition: Disposition::Preserved,
-                reason: "one preserved video located by file size - length - 40".to_owned(),
-            }],
-            evidence: vec![PreservationEvidence::VideoContainerBytesEqual],
-            pairing: xdremux_motion_photo::PairingMetadata::default(),
-        },
-        resources,
-        video_compatibility: compatibility,
-        video_brand_changed: false,
-        vendor_metadata,
-    })
+        .map(|entry| format!("{:?}: {}", entry.disposition, entry.reason))
+        .collect::<Vec<_>>();
+    let detail = if blocked.is_empty() {
+        plan.compatibility().blockers.join("; ")
+    } else {
+        blocked.join("; ")
+    };
+    RuntimeError::new(
+        "OPPO Motion Photo",
+        format!(
+            "25.17.35 isOlivePhoto requires image/jpeg, so the planned output is a JPEG Motion Photo that keeps the source video bytes. 17.x has not been compared and a HEIF olive file is not written. Publication stopped before still re-encoding, which would otherwise drop or rewrite resources: {detail}"
+        ),
+    )
 }
 
 fn plan_public_motion<'a>(

@@ -117,8 +117,8 @@ impl VendorMetadataCarry {
                 preserve_namespace: None,
                 leave_out_unmapped: false,
                 gaps: &[
-                    "Huawei gallery 11.0.19.478 getVideoOffset reads the last 20 bytes for LIVE_<length> and uses file size minus that length minus 40",
-                    "the 20-byte play-info field is blank because this package only shows that readPlayInfo parses two colon-separated integers; their meaning is not established",
+                    "Huawei gallery 11.0.19.478 getVideoOffset reads LIVE_<length>; readPlayInfo separately requires two colon-separated integers and returns null for a blank field",
+                    "the two integers are not named and no repository fixture supplies them, so publication is stopped",
                     "an optional 20-byte vN_fM tag is counted inside L and is not written; frame and cover meaning are still unknown",
                     "this package has no Google Motion Photo namespace; that directory is not the Huawei locator",
                     "gallery playback is not device-verified",
@@ -622,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn jpeg_carry_copies_source_attributes_and_keeps_one_video_suffix() {
+    fn vivo_carry_does_not_copy_vcamera_and_keeps_one_video_suffix() {
         let source = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:VCamera="http://ns.vivo.com/photos/1.0/camera/" VCamera:VMotionPhotoVersion="1" VCamera:VMotionPhotoSource="1" VCamera:VMediaKitVersion="1.0.0.7"/></x:xmpmeta>"#;
         let output_packet = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" Camera:MotionPhoto="1" Camera:MotionPhotoPresentationTimestampUs="1333944"></rdf:Description></x:xmpmeta>"#;
         let tail = b"ONE-VIDEO";
@@ -637,10 +637,8 @@ mod tests {
         .unwrap();
         assert!(output.ends_with(tail));
         let text = String::from_utf8_lossy(&output);
-        assert!(text.contains("VCamera:VMotionPhotoVersion=\"1\""));
-        assert!(text.contains("VCamera:VMediaKitVersion=\"1.0.0.7\""));
-        assert!(text.contains("xmlns:VCamera=\"http://ns.vivo.com/photos/1.0/camera/\""));
-        assert_eq!(report.carried_attributes.len(), 3);
+        assert!(!text.contains("VCamera:"));
+        assert!(report.carried_attributes.is_empty());
         assert!(report
             .not_carried
             .iter()

@@ -280,13 +280,14 @@ fn samsung_target_publishes_primary_video_and_names_the_secondary_stream() {
 }
 
 #[test]
-fn oppo_target_refuses_heic_for_the_verified_jpeg_gate() {
+fn oppo_heic_source_plans_jpeg_and_stops_before_still_reencode() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
-    let output = dir.path().join("oppoMP.heic");
+    let output = dir.path().join("oppoMP.jpg");
     let (code, _, stderr) = convert(&input, &output, "oppo");
     assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("image/jpeg"), "{stderr}");
+    assert!(stderr.contains("JPEG Motion Photo"), "{stderr}");
+    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
     assert!(!output.exists());
 }
 
@@ -336,49 +337,14 @@ fn vivo_target_refuses_to_publish_a_google_container() {
 }
 
 #[test]
-fn huawei_target_appends_one_preserved_video_and_a_40_byte_tail() {
+fn huawei_target_does_not_publish_a_blank_play_info_tail() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("vivo/android-v1-sdr-01.jpg");
     let output = dir.path().join("huaweiMP.jpg");
-    let (code, stdout, stderr) = run(vec![
-        "convert".into(),
-        "--input".into(),
-        input.as_os_str().to_owned(),
-        "--output".into(),
-        output.as_os_str().to_owned(),
-        "--target".into(),
-        "huawei".into(),
-        "--motion-report-json".into(),
-    ]);
-    assert_eq!(code, 0, "{stderr} {stdout}");
-    let source = fs::read(&input).unwrap();
-    let before =
-        MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
-    let video = before.motion_video_bytes().unwrap().to_vec();
-    let bytes = fs::read(&output).unwrap();
-    assert_eq!(
-        &bytes[bytes.len() - video.len() - 40..bytes.len() - 40],
-        video.as_slice()
-    );
-    let tag = std::str::from_utf8(&bytes[bytes.len() - 20..])
-        .unwrap()
-        .trim();
-    assert_eq!(tag, format!("LIVE_{}", video.len()));
-    assert!(bytes[bytes.len() - 40..bytes.len() - 20]
-        .iter()
-        .all(|byte| *byte == b' '));
-    assert_eq!(
-        bytes
-            .windows(video.len())
-            .filter(|window| *window == video.as_slice())
-            .count(),
-        1
-    );
-    let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(report["container"], "huawei-live-tail-40");
-    assert_eq!(report["native_vendor_claim"], false);
-    assert_eq!(report["consumer_gallery_verified"], false);
-    assert_eq!(report["motion_video_copies"], 1);
+    let (code, _, stderr) = convert(&input, &output, "huawei");
+    assert_eq!(code, 1, "{stderr}");
+    assert!(stderr.contains("readPlayInfo"), "{stderr}");
+    assert!(!output.exists());
 }
 
 #[test]

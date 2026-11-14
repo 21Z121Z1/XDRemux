@@ -12,7 +12,7 @@ use xdremux_engine::{
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 use xdremux_source::{probe_bytes, SourceAsset};
 
-use crate::android_motion_photo::resolve_motion_output_target;
+use crate::android_motion_photo::resolve_motion_output_target_for;
 use crate::batch_checkpoint::{
     canonical_or_absolute, source_signature, source_signature_path, AndroidCheckpointIdentity,
     CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
@@ -336,7 +336,13 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
             google_target(options.motion_target).and_then(|target| {
                 if target == MotionOutputTarget::GoogleAuto {
                     let (source, asset) = analysis.as_ref()?;
-                    resolve_motion_output_target(target, source, asset).ok()
+                    resolve_motion_output_target_for(
+                        target,
+                        source,
+                        asset,
+                        destination_name(options.target),
+                    )
+                    .ok()
                 } else {
                     Some(target)
                 }
@@ -669,7 +675,14 @@ fn process_batch_item_with_options(
         };
         let resolved_android = if matches!(asset, SourceAsset::MotionPhoto { .. }) {
             google_target(motion_target)
-                .map(|target| resolve_motion_output_target(target, &source, &asset))
+                .map(|target| {
+                    resolve_motion_output_target_for(
+                        target,
+                        &source,
+                        &asset,
+                        destination_name(options.target),
+                    )
+                })
                 .transpose()?
         } else {
             None
