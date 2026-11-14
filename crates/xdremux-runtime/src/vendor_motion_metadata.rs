@@ -93,11 +93,12 @@ impl VendorMetadataCarry {
                 preserve_namespace: None,
                 leave_out_unmapped: false,
                 gaps: &[
-                    "vivo gallery 3.2.10.4 has no GCamera or VCamera vocabulary; those source fields stay only because the file bytes are unchanged",
-                    "publication keeps a JPEG whose MP4 already has both vivoMediaEStream and vivoMediaExtInfo; other layouts are not published",
-                    "application/livePhoto-meta is absent on sdr-01 and present on sdr-02, so it is not added",
-                    "the repeated sample live-photo token and EStream digest are not synthesized; DataBlock fields are not rewritten",
-                    "gallery playback is not device-verified",
+                    "a JPEG whose MP4 already has vivoMediaEStream and vivoMediaExtInfo is published unchanged, including GCamera, VCamera, the optional EOI gap, and mp42/hvc1",
+                    "application/livePhoto-meta is absent on sdr-01 and present on sdr-02, so it is kept only when already present",
+                    "the repeated sample live-photo token and EStream digest are not synthesized",
+                    "3.2.10.4 has no GCamera or VCamera strings in this package; that does not show the player ignores a file or that another source can never be written",
+                    "hash, firstFrame, and version for a new file are not established; long-press playback consumption is still being traced",
+                    "MediaExtra live_photo import is a device check, and gallery playback is not device-verified",
                 ],
             },
             ConversionTarget::Xiaomi => Self {
