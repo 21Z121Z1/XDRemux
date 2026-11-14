@@ -115,13 +115,13 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | --- | --- |
 | `apple` | Motion Photo 输出 Apple HEIC+MOV 文件对；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
 | `android-standard`（别名 `standard`）、`google` | 公开 Motion Photo 1.0。保留源 JPEG 或 HEIC 主图和原始视频字节。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
-| `samsung` | 同一公开 Motion Photo 容器。三星样本使用这套目录。不重写 SEF/SEFT，也不声称三星原生支持。 |
-| `oppo` | 同一公开 Motion Photo 容器。仅当源 XMP 已有 `OpCamera` 时才复制，并把已有的 `VideoLength` 改为这一段视频的字节长度。ProXDR 静态照片仍走 OPPO 相册静态路径。不生成私有尾部。一加和 realme 相册与 OPPO 相同，使用这个目标。 |
+| `samsung` | 公开 Motion Photo。SEF 和第二路自动播放视频留出并写明。HEIC 结果把顶层 `mpvd` 放在文件末尾，使用普通 32 位 size，载荷一直到文件尾。 |
+| `oppo` | 仅 JPEG 公开 Motion Photo。源 XMP 已有 `OpCamera` 时才复制。HEIC 源会拒绝：25.17.35 的 `isOlivePhoto` 要求 `image/jpeg`，17.x 尚未对照。一加和 realme 使用这个目标。 |
 | `vivo` | 不发布文件。相册 3.2.10.4 读取 MP4 轨道 `application/livePhoto-meta` 和 DataBlock 标签 1024010/1024011/1024012。序列化布局尚未确立，Google Motion Photo 不是这条读取路径。 |
-| `xiaomi` | 写入 4.3.1.15-global 会检查的 `MotionPhoto`、`MotionPhotoVersion` 和 `MotionPhotoPresentationTimestampUs`。不写 `MiCamera`。v2 长度公式尚未确认。 |
+| `xiaomi` | 公开 Motion Photo，版本恰好为 1。4.3.1.15-global 在此条件下用文件大小减去 MotionPhoto 项的 Length，不读 Padding。不写 `MiCamera` 和 `MicroVideo`。 |
 | `huawei` | 静态图、一段保留的视频，再加 40 字节尾。末 20 字节是 `LIVE_<视频长度>`。播放信息两个整数留空。这是 11.0.19.478 的偏移公式，不是实机结果。 |
 
-`convert` 和 `batch` 都支持 `--target`。JPEG 实况仍输出 JPEG，HEIC 实况仍输出 HEIC，主图和视频都不转码。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
+`convert` 和 `batch` 都支持 `--target`。JPEG 实况仍输出 JPEG，HEIC 实况仍输出 HEIC；`--target oppo` 遇到 HEIC 源会拒绝。主图和视频都不转码。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
 
 为兼容旧调用，未使用 `--target` 时仍支持 `--motion-target`、`--live-photo-output` 和 `--oppo-compatible`；这些选项不能与 `--target` 同时使用。Apple 编辑开关继续作为显式高级请求：如果指定 `--target`，必须为 `apple` 才能使用这些开关。目标预设不会自动启用实验性人像、摄影风格或电影效果推断。
 

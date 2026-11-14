@@ -145,6 +145,9 @@ fn vendor_targets_publish_public_motion_photos_without_inventing_fields() {
     assert!(!source
         .windows(b"OpCamera:".len())
         .any(|window| window == b"OpCamera:"));
+    let source_photo =
+        MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+    let source_video = source_photo.motion_video_bytes().unwrap().to_vec();
 
     for target in ["xiaomi", "samsung", "standard", "android-standard"] {
         let output = dir.path().join(format!("{target}MP.jpg"));
@@ -186,6 +189,10 @@ fn vendor_targets_publish_public_motion_photos_without_inventing_fields() {
         assert!(text.contains("MotionPhoto=\"1\""), "{target}");
         assert!(text.contains("Item:Padding=\"0\""), "{target}");
         assert!(!text.contains("MicroVideoVersion"), "{target}");
+        if target == "xiaomi" {
+            assert!(text.contains("MotionPhotoVersion=\"1\""));
+            assert!(bytes.ends_with(source_video.as_slice()));
+        }
     }
 }
 
@@ -270,6 +277,51 @@ fn samsung_target_publishes_primary_video_and_names_the_secondary_stream() {
             .any(|item| item.as_str().unwrap_or("").contains("MotionPhoto_AutoPlay")),
         "{left_out:?}"
     );
+}
+
+#[test]
+fn oppo_target_refuses_heic_for_the_verified_jpeg_gate() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let output = dir.path().join("oppoMP.heic");
+    let (code, _, stderr) = convert(&input, &output, "oppo");
+    assert_eq!(code, 1, "{stderr}");
+    assert!(stderr.contains("image/jpeg"), "{stderr}");
+    assert!(!output.exists());
+}
+
+#[test]
+fn samsung_heic_target_keeps_mpvd_as_the_last_top_level_box() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let output = dir.path().join("samsungMP.heic");
+    let (code, stdout, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "samsung".into(),
+        "--motion-report-json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {stdout}");
+    let bytes = fs::read(&output).unwrap();
+    let mut offset = 0usize;
+    let mut found = false;
+    while offset + 8 <= bytes.len() {
+        let size = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+        assert!(size >= 8, "special box size {size}");
+        let end = offset + size;
+        assert!(end <= bytes.len());
+        if &bytes[offset + 4..offset + 8] == b"mpvd" {
+            assert_eq!(end, bytes.len());
+            found = true;
+            break;
+        }
+        offset = end;
+    }
+    assert!(found);
 }
 
 #[test]

@@ -250,6 +250,12 @@ fn convert_android_motion_photo(
     photo
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
+    if carry.destination == "oppo" && photo.still().mime != "image/jpeg" {
+        return Err(RuntimeError::new(
+            "OPPO Motion Photo",
+            "OPPO gallery 25.17.35 isOlivePhoto accepts only MIME image/jpeg; this package has no reachable HEIF olive path. 17.x has not been compared, so a HEIC file is not published as an OPPO live photo",
+        ));
+    }
     if carry.destination == "vivo" {
         return Err(RuntimeError::new(
             "vivo Motion Photo",
@@ -410,6 +416,9 @@ fn convert_android_motion_photo(
             "vendor metadata",
             "copying source vendor attributes changed the video, presentation time, gain map, or video count",
         ));
+    }
+    if carry.destination == "samsung" && is_heif_file(&bytes) {
+        samsung_top_level_mpvd_reaches_eof(&bytes)?;
     }
 
     let parent = output
@@ -749,6 +758,49 @@ fn verify_preserved_resources(
         }
     }
     Ok(left_out)
+}
+
+fn is_heif_file(bytes: &[u8]) -> bool {
+    bytes.len() > 12 && &bytes[4..8] == b"ftyp"
+}
+
+/// Samsung 15.1.03.4 `ex.a.d` returns the `mpvd` payload start and the caller
+/// then reads through EOF. A normal 32-bit size must make that payload the
+/// rest of the file, so `mpvd` is the last top-level box.
+fn samsung_top_level_mpvd_reaches_eof(data: &[u8]) -> Result<()> {
+    let mut offset = 0usize;
+    while offset + 8 <= data.len() {
+        let size = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+        if size < 8 {
+            return Err(RuntimeError::new(
+                "Samsung HEIF Motion Photo",
+                "a top-level box uses size 0 or 1; Samsung 15.1.03.4 does not handle those forms",
+            ));
+        }
+        let end = offset.checked_add(size).ok_or_else(|| {
+            RuntimeError::new("Samsung HEIF Motion Photo", "top-level box size overflows")
+        })?;
+        if end > data.len() {
+            return Err(RuntimeError::new(
+                "Samsung HEIF Motion Photo",
+                "a top-level box extends past the file",
+            ));
+        }
+        if &data[offset + 4..offset + 8] == b"mpvd" {
+            if end != data.len() {
+                return Err(RuntimeError::new(
+                    "Samsung HEIF Motion Photo",
+                    "mpvd is not the last top-level box, so its payload would not run to EOF",
+                ));
+            }
+            return Ok(());
+        }
+        offset = end;
+    }
+    Err(RuntimeError::new(
+        "Samsung HEIF Motion Photo",
+        "no top-level mpvd box was found",
+    ))
 }
 
 fn leave_out_vendor_record(

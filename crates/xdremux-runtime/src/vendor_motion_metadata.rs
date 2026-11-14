@@ -67,6 +67,7 @@ impl VendorMetadataCarry {
                 leave_out_unmapped: true,
                 gaps: &[
                     "Samsung gallery 15.1.03.4 checks SEF MotionPhoto_Data before XMP; this output does not rewrite SEF, so only the XMP fallback can apply",
+                    "for a non-JPEG name, ex.a.d scans top-level boxes for mpvd and takes the payload through EOF; mpvd is last and uses a normal 32-bit size",
                     "that XMP fallback needs Item:Padding present and Item:Length greater than 1024; Padding is 0",
                     "a secondary MotionPhoto_AutoPlay stream is left out when it cannot be expressed",
                     "the HEIF box locator was not fully traced; this is not a Samsung-native or device claim",
@@ -105,8 +106,8 @@ impl VendorMetadataCarry {
                 gaps: &[
                     "Xiaomi gallery 4.3.1.15-global isGoogleMotionPhoto requires MotionPhoto>0, MotionPhotoVersion>0 and MotionPhotoPresentationTimestampUs>=0",
                     "MiCamera is registered and was not read by the checked recognition or offset function; it is not written",
-                    "the proven offset path is MicroVideo=1 plus MicroVideoOffset; the Motion Photo v2 length branch is not clear enough to implement",
-                    "MicroVideo fields are not written, because OPPO 25.17.35 rejects MicroVideoVersion",
+                    "when MicroVideo is not 1, version is exactly 1, and Directory has at least two items, the offset is file size minus the MotionPhoto item Length; Padding is not read",
+                    "MicroVideo is not written, so that priority branch is not taken; OPPO 25.17.35 also rejects MicroVideoVersion",
                     "xiaomi gallery playback is not device-verified",
                 ],
             },
@@ -118,7 +119,7 @@ impl VendorMetadataCarry {
                 gaps: &[
                     "Huawei gallery 11.0.19.478 getVideoOffset reads the last 20 bytes for LIVE_<length> and uses file size minus that length minus 40",
                     "the 20-byte play-info field is blank because this package only shows that readPlayInfo parses two colon-separated integers; their meaning is not established",
-                    "v2_, HD and cinema-graph tags were not traced and are not written",
+                    "an optional 20-byte vN_fM tag is counted inside L and is not written; frame and cover meaning are still unknown",
                     "this package has no Google Motion Photo namespace; that directory is not the Huawei locator",
                     "gallery playback is not device-verified",
                 ],
