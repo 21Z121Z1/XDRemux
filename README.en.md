@@ -60,9 +60,10 @@ Convert a supported Motion Photo:
 
 ```bash
 xdremux convert --input IMG_001.jpg
+xdremux convert --input IMG_001.jpg --target xiaomi --output IMG_001MP.jpg
 ```
 
-Motion Photo conversion creates a matched HEIC and MOV pair and keeps the source unchanged. Without `--output`, the command chooses names that do not collide with existing pair members.
+Without `--target`, Motion Photo conversion still creates a matched HEIC and MOV pair and keeps the source unchanged. `--target` accepts `apple`, `android-standard` (`standard`), `google`, `samsung`, `oppo`, `vivo`, `xiaomi`, or `huawei`. OnePlus and realme use `oppo`. `xiaomi`, `google`, and `android-standard` write a public Motion Photo. `oppo` carries existing OpCamera fields on JPEG. 17.10.62 and 25.17.35 both require `image/jpeg`, so this is not a HEIF playback claim. `vivo` keeps repository samples that already have both UUID boxes, and writes other JPEG Motion Photos as one JPEG plus the preserved MP4 with ExtInfo before the video. A HEIC still stops before re-encoding. 10.0.10.42 is the Y04s/W20 package, not a device-recognition result. `huawei` writes a millisecond start and duration when the video is a trailing range. A blank play-info field is not published. A HEIC source with `--target oppo` is planned as a JPEG Motion Photo and stops before the still is re-encoded. Preserved video bytes stay unchanged. A structural check is not a gallery result. See the [CLI reference](docs/cli.en.md).
 
 For a ProXDR still intended for OPPO Gallery, add the compatibility option:
 

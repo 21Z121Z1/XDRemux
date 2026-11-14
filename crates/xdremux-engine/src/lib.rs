@@ -18,6 +18,7 @@ mod execution;
 mod product_policy;
 mod provisional_guided_filter;
 mod source_profile;
+mod target;
 
 use std::collections::BTreeSet;
 
@@ -108,6 +109,7 @@ pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
 };
+pub use target::{ConversionTarget, TargetAssetKind, TargetCapabilities};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputIntent {
@@ -166,6 +168,53 @@ impl std::str::FromStr for LivePhotoOutput {
             "pair" => Ok(Self::Pair),
             "pvt" => Ok(Self::Pvt),
             _ => Err("Live Photo output must be pair or pvt"),
+        }
+    }
+}
+
+/// Motion Photo export destination. This does not alter still-image HDR policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionOutputTarget {
+    ApplePair,
+    ApplePvt,
+    /// Resolve to the matching Google container after inspecting the still bytes.
+    GoogleAuto,
+    GoogleJpeg,
+    GoogleHeic,
+}
+
+/// Video-container handling for Google Motion Photo exports.
+/// The video container and encoded samples are always preserved unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MotionVideoCompatibility {
+    /// Copy the complete video container unchanged, regardless of its brand.
+    #[default]
+    Preserve,
+}
+
+impl std::str::FromStr for MotionVideoCompatibility {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "preserve" => Ok(Self::Preserve),
+            _ => Err("video compatibility must be preserve"),
+        }
+    }
+}
+
+impl std::str::FromStr for MotionOutputTarget {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "apple-pair" => Ok(Self::ApplePair),
+            "apple-pvt" => Ok(Self::ApplePvt),
+            "google-jpeg" => Ok(Self::GoogleJpeg),
+            "google-heic" => Ok(Self::GoogleHeic),
+            _ => {
+                Err("Motion Photo target must be apple-pair, apple-pvt, google-jpeg or google-heic")
+            }
         }
     }
 }

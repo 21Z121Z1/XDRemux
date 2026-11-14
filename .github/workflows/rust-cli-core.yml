@@ -108,6 +108,150 @@ jobs:
       - name: Test portable Rust CLI semantics
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
 
+      - name: Verify Android-compatible HEIF Exif emission
+        if: runner.os == 'Linux'
+        run: cargo test --locked -p xdremux-codec portable::primary_heif::tests::encodes_exif_with_android_readable_identifier_without_changing_tiff
+
+      # Temporary public-fixture export for the target-preset device acceptance.
+      # Do not run or upload media for unrelated PRs.
+      - name: Export destination-target acceptance fixtures
+        if: runner.os == 'Linux' && github.head_ref == 'cursor/target-fidelity-outputs-1ba2'
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/target-acceptance"
+          mkdir -p "$output"
+          cli="target/debug/xdremux"
+          input="fixtures/motion-photo/vivo/android-v1-sdr-01.jpg"
+          printf '%s\n' "${GITHUB_SHA}" > "$output/ci-event-sha.txt"
+          git rev-parse HEAD > "$output/checked-out-head.txt"
+          sha256sum "$input" > "$output/source.sha256"
+
+          vivo="fixtures/motion-photo/vivo/android-v1-sdr-01.jpg"
+          xiaomi="fixtures/motion-photo/xiaomi/android-v1-ultrahdr-01.jpg"
+          oppo="fixtures/motion-photo/oppo/coloros15-ultrahdr-01.jpg"
+          sha256sum "$vivo" "$xiaomi" "$oppo" > "$output/sources.sha256"
+
+          for target in android-standard standard google samsung oppo xiaomi; do
+            "$cli" convert --input "$vivo" --target "$target" \
+              --output "$output/vivo-to-${target}MP.jpg" --motion-report-json \
+              > "$output/vivo-to-${target}.json"
+          done
+          "$cli" convert --input "$vivo" --target vivo \
+            --output "$output/vivo-to-vivoMP.jpg" --motion-report-json \
+            > "$output/vivo-to-vivo.json"
+          cmp "$vivo" "$output/vivo-to-vivoMP.jpg"
+          "$cli" convert --input "$oppo" --target vivo \
+            --output "$output/oppo-to-vivoMP.jpg" --motion-report-json \
+            > "$output/oppo-to-vivo.json"
+          "$cli" convert --input "$xiaomi" --target vivo \
+            --output "$output/xiaomi-to-vivoMP.jpg" --motion-report-json \
+            > "$output/xiaomi-to-vivo.json"
+          if "$cli" convert --input fixtures/motion-photo/samsung/heif-ultrahdr-01.heic \
+            --target vivo --output "$output/samsung-heic-to-vivoMP.jpg" \
+            > "$output/vivo-heic-plan.txt" 2>&1; then
+            echo "vivo HEIC source must not publish before the still can be re-encoded" >&2
+            exit 1
+          fi
+          "$cli" convert --input "$vivo" --target huawei \
+            --output "$output/vivo-to-huaweiMP.jpg" --motion-report-json \
+            > "$output/vivo-to-huawei.json"
+          if "$cli" convert --input fixtures/motion-photo/samsung/heif-ultrahdr-01.heic \
+            --target oppo --output "$output/samsung-heic-to-oppoMP.jpg" \
+            > "$output/oppo-heic-plan.txt" 2>&1; then
+            echo "oppo HEIC source must not publish before the still can be re-encoded" >&2
+            exit 1
+          fi
+          "$cli" convert --input "$xiaomi" --target xiaomi \
+            --output "$output/xiaomi-to-xiaomiMP.jpg" --motion-report-json \
+            > "$output/xiaomi-to-xiaomi.json"
+          "$cli" convert --input "$oppo" --target oppo \
+            --output "$output/oppo-to-oppoMP.jpg" --motion-report-json \
+            > "$output/oppo-to-oppo.json"
+
+          "$cli" convert --input "$vivo" --target apple \
+            --output "$output/vivo-apple.heic" \
+            > "$output/apple-pair-report.txt"
+          "$cli" validate "$output/vivo-apple.heic" --json \
+            > "$output/apple-still-validation.json"
+          "$cli" validate "$output/vivo-apple.mov" --json \
+            > "$output/apple-video-validation.json"
+
+          "$cli" convert --input "$output/vivo-apple.heic" \
+            --motion-video "$output/vivo-apple.mov" --target google \
+            --output "$output/vivo-to-googleMP.heic" --motion-report-json \
+            > "$output/google-heic-report.json"
+          python3 - "$output" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          for report_path in sorted(root.glob("*.json")):
+              if report_path.name.endswith("-validation.json"):
+                  continue
+              report = json.loads(report_path.read_text())
+              if "native_vendor_claim" not in report:
+                  continue
+              if report["native_vendor_claim"] is not False or report["consumer_gallery_verified"] is not False:
+                  raise SystemExit(f"device or native claim in {report_path.name}")
+              if report["motion_video_copies"] != 1:
+                  raise SystemExit(f"video was duplicated in {report_path.name}")
+              if report["exif_identifier_present"] is not True:
+                  raise SystemExit(f"EXIF identifier missing in {report_path.name}")
+          heic = (root / "vivo-to-googleMP.heic").read_bytes()
+          apple = (root / "vivo-apple.heic").read_bytes()
+          for name, data in (("heic", heic), ("apple", apple)):
+              if b"\x00\x00\x00\x06Exif\x00\x00II*\x00" not in data and b"\x00\x00\x00\x06Exif\x00\x00MM\x00*" not in data:
+                  raise SystemExit(f"Android-compatible HEIF Exif item not found: {name}")
+          oppo = json.loads((root / "oppo-to-oppo.json").read_text())
+          carried = oppo["carried_source_attributes"]
+          if "OpCamera:VideoLength" not in carried:
+              raise SystemExit("OPPO source VideoLength was not carried")
+          huawei_bytes = (root / "vivo-to-huaweiMP.jpg").read_bytes()
+          play = huawei_bytes[-40:-20].decode("ascii").strip()
+          if play != "1333:2501":
+              raise SystemExit(f"huawei play info is {play!r}, expected presentation and mvhd milliseconds")
+          huawei = json.loads((root / "vivo-to-huawei.json").read_text())
+          if "1333:2501" not in json.dumps(huawei["not_carried"]):
+              raise SystemExit("huawei report does not name the millisecond play info")
+          oppo_plan = (root / "oppo-heic-plan.txt").read_text()
+          if "JPEG Motion Photo" not in oppo_plan or "TranscodeRequired" not in oppo_plan:
+              raise SystemExit("OPPO HEIC input did not report the blocked JPEG route")
+          if (root / "samsung-heic-to-oppoMP.jpg").exists():
+              raise SystemExit("OPPO JPEG route published a HEIC source")
+          for name in ("oppo-to-vivoMP.jpg", "xiaomi-to-vivoMP.jpg"):
+              data = (root / name).read_bytes()
+              marker = b"ftyp"
+              ftyp = data.rfind(marker)
+              if ftyp < 4:
+                  raise SystemExit(f"{name} has no ftyp")
+              start = ftyp - 4
+              prefix = data[:start]
+              if b"motionphoto00010000000000000" not in prefix:
+                  raise SystemExit(f"{name} type marker is not before the video")
+              if b"com.android.camera.imageTime" not in prefix:
+                  raise SystemExit(f"{name} imageTime is not before the video")
+              if b"Padding=\"0\"" not in prefix:
+                  raise SystemExit(f"{name} does not keep Padding=0")
+              if b"vivoMediaEStream" in prefix:
+                  raise SystemExit(f"{name} copied a watermark stream into the photo region")
+          vivo_heic = (root / "vivo-heic-plan.txt").read_text()
+          if "TranscodeRequired" not in vivo_heic or (root / "samsung-heic-to-vivoMP.jpg").exists():
+              raise SystemExit("vivo HEIC input was not stopped before still re-encoding")
+          PY
+          sha256sum "$vivo" "$xiaomi" "$oppo" > "$output/sources-after.sha256"
+          sha256sum "$output"/*MP.jpg "$output"/*MP.heic "$output"/vivo-apple.heic "$output"/vivo-apple.mov > "$output/outputs.sha256"
+
+      - name: Upload public target acceptance media and proof
+        if: always() && runner.os == 'Linux' && github.head_ref == 'cursor/target-fidelity-outputs-1ba2'
+        uses: actions/upload-artifact@v7
+        with:
+          name: target-acceptance-public-fixtures
+          path: ${{ runner.temp }}/target-acceptance/
+          retention-days: 7
+          if-no-files-found: warn
+
   macos-package:
     name: macos-package (arm64)
     runs-on: xcode-27

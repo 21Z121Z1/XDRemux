@@ -80,6 +80,14 @@ PVT does not introduce another MOV/HEIF parser, asset identifier, codec operatio
 
 See [CLI packaging](cli.en.md#pvt-directory-output) and [publication](architecture.en.md#publication) for collision and recovery rules. A valid package structure does not establish Photos import or dynamic wallpaper support.
 
+## Google Motion Photo export
+
+The `convert` command may select `google-jpeg` or `google-heic`. Runtime delegates parsing, compatibility planning, XMP rewriting, `mpvd` assembly, and strict output validation to LibLivePhoto. No independent Motion Photo writer is introduced. The new target is separate from the existing Apple pair/PVT converter and does not change its defaults.
+
+The default `WritePolicy` rejects unmapped resources. Planning rejects still-container transcoding and timestamps that cannot be represented as exact integer microseconds. After execution, runtime strictly reparses the single output, compares video bytes and presentation time against the source, and requires evidence for still-payload identity. A synced temporary file is published with an exclusive no-clobber operation. This protects existing destination entries; it does not promise power-loss durability or native Android Gallery support.
+
+The separate Apple HEIC+MOV input route uses `Input::ApplePair` (never basename inference), checks identity, and composes `AndroidHeif`. Video compatibility has only one mode, `preserve`: the runtime requires byte-identical video containers without transcoding or relabeling. The fail-closed resource audit compares all auxiliary image payloads and Gain Map XMP properties, rejects unmapped or dropped source resources, and exposes every LibLivePhoto disposition in optional CLI JSON. The dependency remains pinned to the reviewed LibLivePhoto commit `9328a0502bb2318b05d255ed83652c7d7c7d3b4c`; this is a commit pin, not a new stable release.
+
 ## Verification and evidence limits
 
 The existing parser and payload conformance checks cover the consumer boundary. The real-fixture CLI gate converts and validates all 14 pinned Motion Photo inputs. Runtime tests compare the known source time with the written time and check the conversion report.
@@ -90,7 +98,9 @@ This test does not identify the semantic role of the second video stream or prov
 
 The completion gate binds local checks to the committed `HEAD`. GitHub runs the consumer build and checks in a separate environment. Reader, writer, fixture, CI, and device results must remain separate claims.
 
-The standalone library converter and external-workspace check exercise Android/Apple round trips without the XDRemux product stack. The library compatibility documentation specifies the integer-microsecond restriction for Apple-to-Android output. Original Gallery and Photos acceptance remain independent requirements. The pinned library records [format support](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/FORMAT_SUPPORT.md) and [vendor evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/evidence/VENDORS.md).
+The standalone library converter and external-workspace check exercise Android/Apple round trips without the XDRemux product stack. XDRemux additionally tests Apple HEIC+MOV → Android HEIC → Apple HEIC+MOV → Android HEIC, preserving video media payloads and HEIF auxiliary images. The library compatibility documentation specifies the integer-microsecond restriction for Apple-to-Android output. Original Gallery and Photos acceptance remain independent requirements. The pinned library records [format support](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/FORMAT_SUPPORT.md) and [vendor fixture evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/fixtures/vendor/README.md).
+
+Batch accepts the same Google JPEG/HEIC single-file targets without introducing a second writer. Checkpoint schema 3 separates Apple and Google routes and differentiates video compatibility policies; Google entries bind complete output SHA-256, not an Apple asset identifier. Input source provenance and strict output reparse are required before resuming. See the [CLI batch contract](cli.en.md#batch) and [device acceptance matrix](validation/android-motion-gallery-matrix.en.md). Samsung/vendor-native output and AVIF product targets remain disabled pending evidence.
 
 ## Compatibility feature
 

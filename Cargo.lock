@@ -390,7 +390,7 @@ dependencies = [
 [[package]]
 name = "liblivephoto"
 version = "0.1.0"
-source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552596db0f66095600d23cf7937a631b9ec"
+source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=9328a0502bb2318b05d255ed83652c7d7c7d3b4c#9328a0502bb2318b05d255ed83652c7d7c7d3b4c"
 dependencies = [
  "liblivephoto-format",
  "quick-xml",
@@ -400,7 +400,7 @@ dependencies = [
 [[package]]
 name = "liblivephoto-format"
 version = "0.1.0"
-source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552596db0f66095600d23cf7937a631b9ec"
+source = "git+https://github.com/21Z121Z1/LibLivePhoto?rev=9328a0502bb2318b05d255ed83652c7d7c7d3b4c#9328a0502bb2318b05d255ed83652c7d7c7d3b4c"
 
 [[package]]
 name = "linux-raw-sys"
@@ -916,7 +916,6 @@ version = "0.1.0"
 dependencies = [
  "half",
  "serde",
- "serde_json",
  "sha2",
  "xdremux-format",
 ]

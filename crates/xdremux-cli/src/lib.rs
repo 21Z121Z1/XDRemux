@@ -15,10 +15,15 @@ use std::path::{Path, PathBuf};
 use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
-use xdremux_engine::{AppleFeatureRequest, ConversionRequest, HdrExportProfile, LivePhotoOutput};
+use xdremux_engine::{
+    AppleFeatureRequest, ConversionRequest, ConversionTarget, HdrExportProfile, LivePhotoOutput,
+    MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
+};
 use xdremux_runtime::{
-    motion_photo_checkpoint_path, plan_batch_items, ApplePortraitSemanticProfile, BatchAssetKind,
-    BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
+    motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target_for,
+    AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource, ApplePortraitSemanticProfile,
+    BatchAssetKind, BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition,
+    PortableRuntime, VendorMetadataCarry,
 };
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
@@ -165,9 +170,34 @@ struct ConvertArgs {
     /// Input ProXDR, Motion Photo, or ordinary video with --apple-cinematic.
     #[arg(long, value_name = "INPUT")]
     input: PathBuf,
-    /// Output HEIC or MOV; Cinematic chooses a new .xdremux.mov file.
+    /// Output HEIC, MOV, or Google Motion Photo JPEG; Cinematic uses .xdremux.mov.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+    /// Destination. `standard` is an alias of `android-standard`. Vendor targets publish a real file.
+    #[arg(
+        long,
+        value_name = "TARGET",
+        group = "motion_destination",
+        conflicts_with_all = ["motion_target", "live_photo_output", "oppo_compatible"]
+    )]
+    target: Option<ConversionTarget>,
+    /// Motion Photo destination; Google targets produce one file without transcoding.
+    #[arg(
+        long,
+        value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        group = "motion_destination",
+        conflicts_with = "live_photo_output"
+    )]
+    motion_target: Option<MotionOutputTarget>,
+    /// Companion Apple Live Photo MOV (requires a Google HEIC-capable destination).
+    #[arg(long, value_name = "MOV", requires = "motion_destination")]
+    motion_video: Option<PathBuf>,
+    /// Preserve all video container bytes (the only supported mode).
+    #[arg(long, value_name = "preserve", requires = "motion_destination")]
+    motion_video_compat: Option<MotionVideoCompatibility>,
+    /// Write a complete Google Motion Photo resource audit as JSON to stdout.
+    #[arg(long, requires = "motion_destination")]
+    motion_report_json: bool,
     /// Use a source-bound fixed-view camera estimate; explicit --focal-length-35mm takes priority.
     #[arg(long, value_name = "JSON", requires = "apple_cinematic")]
     cinematic_camera_estimate: Option<PathBuf>,
@@ -221,6 +251,25 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
+    /// Destination for every item. `standard` is an alias of `android-standard`.
+    #[arg(
+        long,
+        value_name = "TARGET",
+        group = "motion_destination",
+        conflicts_with_all = ["motion_target", "live_photo_output", "oppo_compatible"]
+    )]
+    target: Option<ConversionTarget>,
+    /// Motion Photo destination: Apple pair/PVT or one Google JPEG/HEIC file.
+    #[arg(
+        long,
+        value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        group = "motion_destination",
+        conflicts_with = "live_photo_output"
+    )]
+    motion_target: Option<MotionOutputTarget>,
+    /// Preserve all video container bytes (the only supported mode).
+    #[arg(long, value_name = "preserve", requires = "motion_destination")]
+    motion_video_compat: Option<MotionVideoCompatibility>,
     /// Reuse a completed Live Photo pair only when durable source provenance matches.
     #[arg(long)]
     skip_existing: bool,
@@ -519,6 +568,64 @@ fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf
     }
 }
 
+fn default_target_still_output(input: &Path) -> PathBuf {
+    let stem = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("capture");
+    let mut sequence = 1_u32;
+    loop {
+        let suffix = if sequence == 1 {
+            String::new()
+        } else {
+            format!(" ({sequence})")
+        };
+        let candidate = input.with_file_name(format!("{stem}.xdremux{suffix}.heic"));
+        if candidate != input && !candidate.exists() {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
+fn default_google_motion_output(input: &Path, target: MotionOutputTarget) -> PathBuf {
+    let extension = match target {
+        MotionOutputTarget::GoogleJpeg => "jpg",
+        MotionOutputTarget::GoogleHeic => "heic",
+        _ => unreachable!("Google output naming requires a Google target"),
+    };
+    let stem = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("capture");
+    let stem = stem.strip_suffix("MP").unwrap_or(stem);
+    let mut sequence = 1_u32;
+    loop {
+        let candidate = if sequence == 1 {
+            input.with_file_name(format!("{stem}MP.{extension}"))
+        } else {
+            input.with_file_name(format!("{stem} ({sequence})MP.{extension}"))
+        };
+        if candidate != input && !candidate.exists() {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
+fn target_request(
+    target: Option<ConversionTarget>,
+    kind: TargetAssetKind,
+    request: ConversionRequest,
+) -> Result<ConversionRequest, String> {
+    match target {
+        Some(target) => target
+            .apply_request(kind, request)
+            .map_err(|reason| format!("{}: {reason}", target.name())),
+        None => Ok(request),
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
     if let Some(raw) = std::env::var_os("XDREMUX_APPLE_ADAPTER") {
@@ -558,12 +665,175 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
         })
 }
 
+fn emit_android_motion_receipt(
+    language: Language,
+    input: &Path,
+    movie: Option<&Path>,
+    receipt: AndroidMotionPhotoFileReceipt,
+    json_report: bool,
+    stdout: &mut impl Write,
+) -> u8 {
+    if json_report {
+        let resources = receipt
+            .resources
+            .iter()
+            .map(|item| {
+                json!({
+                    "id": item.id,
+                    "source_role": item.source_role,
+                    "mime": item.mime,
+                    "vendor_role": item.vendor_role,
+                    "byte_length": item.byte_length,
+                    "operations": item.operations.iter().map(|operation| json!({
+                        "disposition": operation.disposition,
+                        "reason": operation.reason,
+                    })).collect::<Vec<_>>(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let generated = receipt
+            .conversion_report
+            .resources
+            .iter()
+            .filter(|item| item.resource.is_none())
+            .map(|item| {
+                json!({
+                    "disposition": format!("{:?}", item.disposition),
+                    "reason": item.reason,
+                })
+            })
+            .collect::<Vec<_>>();
+        let document = json!({
+            "input": input.display().to_string(),
+            "companion_movie": movie.map(|path| path.display().to_string()),
+            "output": receipt.output.display().to_string(),
+            "target": format!("{:?}", receipt.conversion_report.target),
+            "video_container_policy": match receipt.video_compatibility {
+                MotionVideoCompatibility::Preserve => "preserve",
+            },
+            "video_brand_changed": receipt.video_brand_changed,
+            "resources": resources,
+            "generated": generated,
+            "evidence": receipt.conversion_report.evidence.iter()
+                .map(|item| format!("{item:?}")).collect::<Vec<_>>(),
+            "pairing": format!("{:?}", receipt.conversion_report.pairing),
+            "consumer_gallery_verified": false,
+            "destination": receipt.vendor_metadata.destination,
+            "container": receipt.vendor_metadata.container,
+            "native_vendor_claim": receipt.vendor_metadata.native_vendor_claim,
+            "carried_source_attributes": receipt.vendor_metadata.carried_attributes,
+            "source_vendor_namespace_absent": receipt.vendor_metadata.namespace_absent,
+            "not_carried": receipt.vendor_metadata.not_carried,
+            "gaps": receipt.vendor_metadata.gaps,
+            "exif_identifier_present": receipt.vendor_metadata.exif_identifier_present,
+            "video_byte_length": receipt.vendor_metadata.video_byte_length,
+            "motion_video_copies": 1,
+        });
+        if serde_json::to_writer_pretty(&mut *stdout, &document).is_err() {
+            return 1;
+        }
+        return if writeln!(stdout).is_ok() { 0 } else { 1 };
+    }
+    if writeln!(
+        stdout,
+        "{}",
+        message!(
+            language,
+            "converted: {} -> {}",
+            "已转换：{} -> {}",
+            input.display(),
+            receipt.output.display(),
+        )
+    )
+    .is_err()
+    {
+        return 1;
+    }
+    let carried = if receipt.vendor_metadata.carried_attributes.is_empty() {
+        message!(language, "none", "无")
+    } else {
+        receipt.vendor_metadata.carried_attributes.join(", ")
+    };
+    if writeln!(
+        stdout,
+        "{}",
+        message!(
+            language,
+            "note: destination {0} wrote {1}; carried source attributes: {2}; native vendor support is not claimed; gallery playback is not device-verified",
+            "提示：目标 {0} 写入 {1}；沿用的源字段：{2}；不声称厂商原生支持；相册播放未经真机验收",
+            receipt.vendor_metadata.destination,
+            receipt.vendor_metadata.container,
+            carried,
+        )
+    )
+    .is_ok()
+    {
+        0
+    } else {
+        1
+    }
+}
+
 fn run_convert(
     language: Language,
     arguments: ConvertArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    let selected_motion_target = arguments.motion_target.or_else(|| {
+        arguments
+            .target
+            .and_then(|target| target.capabilities().motion)
+    });
+    if arguments.target.is_some_and(|target| !target.is_apple())
+        && (arguments.product.apple_portrait
+            || arguments.product.apple_portrait_oppo
+            || arguments.product.apple_styles
+            || arguments.product.apple_cinematic)
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
+        return 1;
+    }
+    if (arguments.motion_video.is_some()
+        && !matches!(
+            selected_motion_target,
+            Some(MotionOutputTarget::GoogleHeic | MotionOutputTarget::GoogleAuto)
+        ))
+        || ((arguments.motion_video_compat.is_some() || arguments.motion_report_json)
+            && !matches!(
+                selected_motion_target,
+                Some(
+                    MotionOutputTarget::GoogleAuto
+                        | MotionOutputTarget::GoogleJpeg
+                        | MotionOutputTarget::GoogleHeic
+                )
+            ))
+    {
+        let _ = writeln!(stderr, "{}", message!(language,
+            "error: --motion-video requires google-heic; video compatibility and JSON reports require a Google target",
+            "错误：--motion-video 必须使用 google-heic；视频兼容策略及 JSON 报告仅支持 Google 输出目标"));
+        return 1;
+    }
+    if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-target applies only to Motion Photo inputs",
+                "错误：--motion-target 仅适用于 Motion Photo 输入"
+            )
+        );
+        return 1;
+    }
     if let Err(error) = reject_package_input(&arguments.input) {
         let _ = writeln!(
             stderr,
@@ -594,11 +864,15 @@ fn run_convert(
             stderr,
         );
     }
-    let request = arguments.product.request();
+    let mut request = arguments.product.request();
     let apple_portrait = arguments.product.apple_portrait || arguments.product.apple_portrait_oppo;
     #[cfg(target_os = "macos")]
     let apple_portrait_profile = arguments.product.portrait_profile();
     let apple_styles = arguments.product.apple_styles;
+    let motion_target = selected_motion_target;
+    let motion_video = arguments.motion_video;
+    let video_compatibility = arguments.motion_video_compat.unwrap_or_default();
+    let motion_report_json = arguments.motion_report_json;
     let input = arguments.input;
     let output = arguments.output;
     let source = match fs::read(&input) {
@@ -618,6 +892,87 @@ fn run_convert(
         }
     };
 
+    let runtime = PortableRuntime::new();
+    if let Some(movie_path) = motion_video {
+        request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request) {
+            Ok(request) => request,
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(language, "error: {error}", "错误：{error}")
+                );
+                return 1;
+            }
+        };
+        if apple_portrait || apple_styles || request.apple_features.any() {
+            let _ = writeln!(stderr, "{}", message!(language,
+                "error: Apple editing features cannot be combined with an Android Motion Photo output",
+                "错误：Apple 编辑功能不能与 Android Motion Photo 输出组合"));
+            return 1;
+        }
+        if let Err(error) = reject_package_input(&movie_path) {
+            let _ = writeln!(stderr, "error: {error}");
+            return 1;
+        }
+        if input == movie_path
+            || (fs::canonicalize(&input).is_ok()
+                && fs::canonicalize(&input).ok() == fs::canonicalize(&movie_path).ok())
+        {
+            let _ = writeln!(
+                stderr,
+                "error: Apple still and movie inputs must be distinct files"
+            );
+            return 1;
+        }
+        let movie = match fs::read(&movie_path) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "error: could not read {}: {error}",
+                    movie_path.display()
+                );
+                return 1;
+            }
+        };
+        let target = MotionOutputTarget::GoogleHeic;
+        let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
+        return match runtime.convert_android_motion_photo_pair_file_with_carry(
+            AndroidMotionPhotoPairSource {
+                still: &source,
+                movie: &movie,
+                still_path: &input,
+                movie_path: &movie_path,
+            },
+            &output,
+            target,
+            request,
+            video_compatibility,
+            arguments
+                .target
+                .map(VendorMetadataCarry::from_target)
+                .unwrap_or_else(VendorMetadataCarry::legacy),
+        ) {
+            Ok(receipt) => emit_android_motion_receipt(
+                language,
+                &input,
+                Some(&movie_path),
+                receipt,
+                motion_report_json,
+                stdout,
+            ),
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(language, "error: {error}", "错误：{error}")
+                );
+                1
+            }
+        };
+    }
+
     let asset = match probe_bytes(&source) {
         Ok(value) => value,
         Err(error) => {
@@ -629,12 +984,84 @@ fn run_convert(
             return 1;
         }
     };
-    let runtime = PortableRuntime::new();
-    let result = match asset {
+    let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
+            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
+            {
+                Ok(request) => request,
+                Err(error) => {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
+                    return 1;
+                }
+            };
             if apple_portrait || apple_styles {
                 let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
+            }
+            let resolved_motion_target = match motion_target {
+                Some(target) => match resolve_motion_output_target_for(
+                    target,
+                    &source,
+                    &asset,
+                    arguments.target.map(|target| target.name()),
+                ) {
+                    Ok(target) => Some(target),
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        return 1;
+                    }
+                },
+                None => None,
+            };
+            if let Some(
+                target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
+            ) = resolved_motion_target
+            {
+                let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
+                return match runtime.convert_android_motion_photo_file_with_carry(
+                    &source,
+                    &input,
+                    &output,
+                    target,
+                    request,
+                    video_compatibility,
+                    arguments
+                        .target
+                        .map(VendorMetadataCarry::from_target)
+                        .unwrap_or_else(VendorMetadataCarry::legacy),
+                ) {
+                    Ok(receipt) => emit_android_motion_receipt(
+                        language,
+                        &input,
+                        None,
+                        receipt,
+                        motion_report_json,
+                        stdout,
+                    ),
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        1
+                    }
+                };
+            }
+            if let Some(target) = resolved_motion_target {
+                request.live_photo_output = match target {
+                    MotionOutputTarget::ApplePair => LivePhotoOutput::Pair,
+                    MotionOutputTarget::ApplePvt => LivePhotoOutput::Pvt,
+                    _ => unreachable!(),
+                };
             }
             let output = output
                 .unwrap_or_else(|| default_motion_photo_output(&input, request.live_photo_output));
@@ -688,6 +1115,32 @@ fn run_convert(
             }
         }
         SourceAsset::ProXdr { .. } => {
+            if arguments.motion_target.is_some()
+                || arguments.motion_video_compat.is_some()
+                || arguments.motion_report_json
+            {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(
+                        language,
+                        "error: --motion-target applies only to Motion Photo inputs",
+                        "错误：--motion-target 仅适用于 Motion Photo 输入"
+                    )
+                );
+                return 1;
+            }
+            request = match target_request(arguments.target, TargetAssetKind::ProXdr, request) {
+                Ok(request) => request,
+                Err(error) => {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
+                    return 1;
+                }
+            };
             if let Some(path) = &output {
                 if let Err(error) = xdremux_runtime::validate_still_output_path(path) {
                     let _ = writeln!(
@@ -698,7 +1151,13 @@ fn run_convert(
                     return 1;
                 }
             }
-            let output = output.unwrap_or_else(|| input.clone());
+            let output = output.unwrap_or_else(|| {
+                if arguments.target.is_some() {
+                    default_target_still_output(&input)
+                } else {
+                    input.clone()
+                }
+            });
             if apple_portrait {
                 #[cfg(target_os = "macos")]
                 {
@@ -1009,6 +1468,7 @@ fn is_generated_batch_output(path: &Path) -> bool {
     path.file_stem()
         .and_then(OsStr::to_str)
         .is_some_and(|stem| {
+            let stem = stem.strip_suffix("MP").unwrap_or(stem);
             stem.ends_with(".xdremux")
                 || stem.rsplit_once(".xdremux (").is_some_and(|(_, suffix)| {
                     suffix
@@ -1139,6 +1599,7 @@ fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
     match kind {
         BatchAssetKind::ProXdr => "pro-xdr",
         BatchAssetKind::LivePhoto => "live-photo",
+        BatchAssetKind::AndroidMotionPhoto => "motion-photo",
         BatchAssetKind::Cinematic => "cinematic",
     }
 }
@@ -1165,6 +1626,61 @@ fn run_batch(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    let selected_motion_target = arguments.motion_target.or_else(|| {
+        arguments
+            .target
+            .and_then(|target| target.capabilities().motion)
+    });
+    if arguments.target.is_some_and(|target| !target.is_apple())
+        && (arguments.product.apple_portrait
+            || arguments.product.apple_portrait_oppo
+            || arguments.product.apple_styles
+            || arguments.product.apple_cinematic)
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
+        return 2;
+    }
+    if arguments.motion_video_compat.is_some()
+        && !matches!(
+            selected_motion_target,
+            Some(
+                MotionOutputTarget::GoogleAuto
+                    | MotionOutputTarget::GoogleJpeg
+                    | MotionOutputTarget::GoogleHeic
+            )
+        )
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-video-compat requires a Google Motion Photo target",
+                "错误：--motion-video-compat 需要 Google Motion Photo 输出目标"
+            )
+        );
+        return 2;
+    }
+    if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: --motion-target cannot be combined with --apple-cinematic",
+                "错误：--motion-target 不能与 --apple-cinematic 组合"
+            )
+        );
+        return 2;
+    }
     if arguments.product.apple_cinematic
         && (arguments.resume
             || arguments.skip_existing
@@ -1207,7 +1723,14 @@ fn run_batch(
         reuse_existing,
         categorize_output: arguments.categorize,
         cinematic_output: arguments.product.apple_cinematic,
-        live_photo_output: arguments.product.live_photo_output,
+        live_photo_output: match arguments.motion_target {
+            Some(MotionOutputTarget::ApplePvt) => LivePhotoOutput::Pvt,
+            Some(MotionOutputTarget::ApplePair) => LivePhotoOutput::Pair,
+            _ => arguments.product.live_photo_output,
+        },
+        motion_target: selected_motion_target,
+        motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
+        target: arguments.target,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
@@ -1254,10 +1777,15 @@ fn run_batch(
         reuse_existing,
         jobs: arguments.jobs,
         apple_adapter_executable,
+        motion_target: selected_motion_target,
+        target: arguments.target,
+        motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
     };
+    let mut request = arguments.product.request();
+    request.live_photo_output = plan_options.live_photo_output;
     let receipt = runtime.convert_batch_with_options_and_apple_profiles(
         items,
-        arguments.product.request(),
+        request,
         &execution_options,
         arguments.product.portrait_profile(),
         arguments.product.cinematic_options(),
@@ -1480,6 +2008,64 @@ mod tests {
         assert!(arguments.product.oppo_compatible);
         let request = arguments.product.request();
         assert!(request.requests_oppo_gallery_compatibility());
+    }
+
+    #[test]
+    fn destination_target_is_one_option_on_convert_and_batch() {
+        for command in ["convert", "batch"] {
+            let parsed = parse(&[command, "--input", "capture.heic", "--target", "google"]);
+            let target = match parsed.command {
+                RootCommand::Convert(args) => args.target,
+                RootCommand::Batch(args) => args.target,
+                _ => unreachable!(),
+            };
+            assert_eq!(target, Some(ConversionTarget::Google));
+            for conflicting in [
+                ["--motion-target", "google-heic"],
+                ["--live-photo-output", "pvt"],
+                ["--oppo-compatible", ""],
+            ] {
+                let mut args = vec![
+                    "xdremux",
+                    command,
+                    "--input",
+                    "capture.heic",
+                    "--target",
+                    "google",
+                    conflicting[0],
+                ];
+                if !conflicting[1].is_empty() {
+                    args.push(conflicting[1]);
+                }
+                assert!(Cli::try_parse_from(args).is_err());
+            }
+        }
+        assert!(Cli::try_parse_from([
+            "xdremux",
+            "convert",
+            "--input",
+            "capture.jpg",
+            "--platform",
+            "android",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn target_still_naming_does_not_replace_a_source_or_existing_output() {
+        let root = unique_dir("target-still");
+        fs::create_dir_all(&root).unwrap();
+        let input = root.join("capture.heic");
+        fs::write(&input, b"original").unwrap();
+        let first = default_target_still_output(&input);
+        assert_eq!(first, root.join("capture.xdremux.heic"));
+        fs::write(&first, b"previous").unwrap();
+        assert_eq!(
+            default_target_still_output(&input),
+            root.join("capture.xdremux (2).heic")
+        );
+        assert_eq!(fs::read(input).unwrap(), b"original");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1729,6 +2315,9 @@ mod tests {
             input_dirs: vec![root.clone()],
             recursive: false,
             output_dir: None,
+            target: None,
+            motion_target: None,
+            motion_video_compat: None,
             skip_existing: false,
             resume: false,
             checkpoint: None,

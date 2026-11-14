@@ -1,7 +1,10 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static VALIDATE_DIR_SEQ: AtomicU64 = AtomicU64::new(0);
 
 use serde_json::Value;
 use xdremux_engine::ConversionRequest;
@@ -22,8 +25,9 @@ fn unique_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time must be after epoch")
         .as_nanos();
+    let seq = VALIDATE_DIR_SEQ.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!(
-        "xdremux-cli-validate-{}-{stamp}",
+        "xdremux-cli-validate-{}-{stamp}-{seq}",
         std::process::id()
     ))
 }

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod android_motion_photo;
 #[cfg(target_os = "macos")]
 mod apple_adapter;
 #[cfg(target_os = "macos")]
@@ -12,6 +13,7 @@ mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
 mod hdr_look;
+mod huawei_live_photo;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
@@ -21,6 +23,8 @@ mod style_reconstruction;
 #[cfg(target_os = "macos")]
 mod system_heif_hdr;
 mod validation;
+mod vendor_motion_metadata;
+mod vivo_combined;
 #[cfg(target_os = "macos")]
 pub use style_reconstruction::{reconstruct_styles_hdr, reconstruct_styles_hdr_with_display};
 
@@ -45,6 +49,10 @@ pub fn validate_apple_styles_file(
 ) -> Result<()> {
     apple_texture::validate_existing(executable.as_ref(), input.as_ref())
 }
+pub use android_motion_photo::{
+    resolve_motion_output_target, resolve_motion_output_target_for, AndroidMotionPhotoFileReceipt,
+    AndroidMotionPhotoPairSource, AndroidMotionResourceAudit, AndroidMotionResourceOperation,
+};
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 #[cfg(target_os = "macos")]
 pub use hdr_look::render_hdr_look;
@@ -60,6 +68,7 @@ pub use validation::{
     GainMapValidationProfile, IsoHdrSemanticsReport, IsoHdrValidationReport,
     LivePhotoValidationReport, ValidationReport,
 };
+pub use vendor_motion_metadata::{VendorMetadataCarry, VendorMetadataReport};
 pub use xdremux_heif::PhotographicStylesAssembly;
 
 use std::error::Error;
@@ -774,6 +783,127 @@ impl PortableRuntime {
             output.as_ref(),
             request.live_photo_output,
         )
+    }
+
+    /// Compose and safely publish a single-file Google Motion Photo.
+    /// No transcoding or implicit resource loss is permitted.
+    pub fn convert_android_motion_photo_file(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.convert_android_motion_photo_file_with_policy(
+            source,
+            input,
+            output,
+            target,
+            request,
+            xdremux_engine::MotionVideoCompatibility::Preserve,
+        )
+    }
+
+    /// Compose a single-file Google target with explicit video-container policy.
+    pub fn convert_android_motion_photo_file_with_policy(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.convert_android_motion_photo_file_with_carry(
+            source,
+            input,
+            output,
+            target,
+            request,
+            compatibility,
+            VendorMetadataCarry::legacy(),
+        )
+    }
+
+    /// Public Motion Photo output, plus vendor attributes copied from the source.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_android_motion_photo_file_with_carry(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.validate_android_motion_request(request)?;
+        android_motion_photo::convert_android_motion_photo_file_with_policy(
+            source,
+            input.as_ref(),
+            output.as_ref(),
+            target,
+            compatibility,
+            carry,
+        )
+    }
+
+    /// Convert a verified Apple HEIC+MOV pair directly into a Google HEIC file.
+    /// The two inputs must share Apple pairing identity and exact presentation time.
+    pub fn convert_android_motion_photo_pair_file(
+        &self,
+        pair: AndroidMotionPhotoPairSource<'_>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.convert_android_motion_photo_pair_file_with_carry(
+            pair,
+            output,
+            target,
+            request,
+            compatibility,
+            VendorMetadataCarry::legacy(),
+        )
+    }
+
+    /// Apple pair input with the same vendor-metadata policy as a single file.
+    pub fn convert_android_motion_photo_pair_file_with_carry(
+        &self,
+        pair: AndroidMotionPhotoPairSource<'_>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.validate_android_motion_request(request)?;
+        android_motion_photo::convert_android_motion_photo_pair_file(
+            pair.still,
+            pair.movie,
+            pair.still_path,
+            pair.movie_path,
+            output.as_ref(),
+            target,
+            compatibility,
+            carry,
+        )
+    }
+
+    fn validate_android_motion_request(&self, request: ConversionRequest) -> Result<()> {
+        if request.hdr_profile != HdrExportProfile::Compatible
+            || request.requests_oppo_gallery_compatibility()
+            || request.apple_features.any()
+            || request.live_photo_output != xdremux_engine::LivePhotoOutput::Pair
+        {
+            return Err(RuntimeError::new(
+                "Android Motion Photo conversion",
+                "HDR export profiles, OPPO output intent, Apple editing features and Apple PVT packaging do not apply to Google Motion Photo output",
+            ));
+        }
+        Ok(())
     }
 
     /// Publish a Rust-assembled Photographic Styles graph as one atomic file.
