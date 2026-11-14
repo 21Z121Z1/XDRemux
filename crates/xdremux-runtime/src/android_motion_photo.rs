@@ -72,6 +72,7 @@ fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) 
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod presentation_time_tests {
     use super::{same_presentation_time, MediaTime};
 
@@ -209,6 +210,7 @@ pub(crate) fn convert_android_motion_photo_file_with_policy(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn convert_android_motion_photo_pair_file(
     still: &[u8],
     movie: &[u8],

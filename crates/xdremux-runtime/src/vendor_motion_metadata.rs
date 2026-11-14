@@ -341,7 +341,7 @@ fn splice_vendor_attributes(
                 ));
             };
             let value_end = value_at + end_rel;
-            if &current[value_at..value_end] != value {
+            if current[value_at..value_end] != value {
                 current.replace_range(value_at..value_end, &value);
             }
         } else {
@@ -460,7 +460,7 @@ fn output_timestamp_us(packet: &str) -> Option<String> {
         let end = value.find('"')?;
         let token = &value[..end];
         if token.bytes().all(|byte| byte.is_ascii_digit()) {
-            let before = rest[..index].as_bytes();
+            let before = &rest.as_bytes()[..index];
             let primary = before.last().is_none_or(|byte| !byte.is_ascii_alphabetic());
             if primary {
                 return Some(token.to_owned());
@@ -560,7 +560,7 @@ fn pad_xmp_packet(packet: &str, len: usize) -> Result<String> {
     let pad = len - packet.len();
     let mut padded = String::with_capacity(len);
     padded.push_str(&packet[..packet.len() - CLOSE.len()]);
-    padded.extend(std::iter::repeat(' ').take(pad));
+    padded.extend(std::iter::repeat_n(' ', pad));
     padded.push_str(CLOSE);
     Ok(padded)
 }

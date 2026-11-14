@@ -74,10 +74,11 @@ pub fn motion_still_encoding(data: &[u8], asset: &SourceAsset) -> Option<MotionS
     if box_size < 16 || box_size > bytes.len() {
         return None;
     }
+    let (compatible, _) = bytes.get(16..box_size)?.as_chunks::<4>();
     let brands = bytes
         .get(8..12)
         .into_iter()
-        .chain(bytes.get(16..box_size)?.chunks_exact(4));
+        .chain(compatible.iter().map(|brand| brand.as_slice()));
     if brands.into_iter().any(|brand| {
         brand == &b"heic"[..]
             || brand == &b"heix"[..]
@@ -214,8 +215,14 @@ mod tests {
     fn motion_still_codec_checks_ftyp_only_and_never_trusts_extension() {
         let still = SourceAsset::MotionPhoto {
             source_kind: "androidHeifMotionPhotoV1".to_owned(),
-            still: ByteSpan { offset: 0, length: 0 },
-            video: ByteSpan { offset: 0, length: 0 },
+            still: ByteSpan {
+                offset: 0,
+                length: 0,
+            },
+            video: ByteSpan {
+                offset: 0,
+                length: 0,
+            },
             presentation_timestamp_us: None,
             presentation_source: None,
             stream_count: 1,
@@ -227,7 +234,10 @@ mod tests {
             }
             motion_still_encoding(data, &asset)
         };
-        assert_eq!(with_length(b"\xff\xd8\xff\xd9"), Some(MotionStillEncoding::Jpeg));
+        assert_eq!(
+            with_length(b"\xff\xd8\xff\xd9"),
+            Some(MotionStillEncoding::Jpeg)
+        );
         assert_eq!(
             with_length(b"\x00\x00\x00\x14ftypmif1\x00\x00\x00\x00heic"),
             Some(MotionStillEncoding::Heic)

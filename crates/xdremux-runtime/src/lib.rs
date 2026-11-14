@@ -827,6 +827,7 @@ impl PortableRuntime {
     }
 
     /// Public Motion Photo output, plus vendor attributes copied from the source.
+    #[allow(clippy::too_many_arguments)]
     pub fn convert_android_motion_photo_file_with_carry(
         &self,
         source: &[u8],

@@ -170,11 +170,10 @@ fn vendor_targets_publish_public_motion_photos_without_inventing_fields() {
         assert_eq!(report["motion_video_copies"], 1);
         assert_eq!(report["exif_identifier_present"], true, "{target}");
         let bytes = fs::read(&output).unwrap();
-        assert_eq!(
-            bytes
+        assert!(
+            !bytes
                 .windows(b"OpCamera:".len())
                 .any(|window| window == b"OpCamera:"),
-            false,
             "{target} invented OpCamera metadata"
         );
         let carried = report["carried_source_attributes"]
