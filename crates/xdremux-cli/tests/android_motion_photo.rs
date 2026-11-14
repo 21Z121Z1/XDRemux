@@ -374,7 +374,10 @@ fn vivo_jpeg_through_apple_pair_converts_to_google_heic_with_exact_time() {
         .presentation_time()
         .zip(android.presentation_time())
         .is_some_and(|(before, after)| before.equivalent(after)));
-    assert_eq!(apple.motion_video_bytes().unwrap(), android.motion_video_bytes().unwrap());
+    assert_eq!(
+        apple.motion_video_bytes().unwrap(),
+        android.motion_video_bytes().unwrap()
+    );
 }
 
 #[test]

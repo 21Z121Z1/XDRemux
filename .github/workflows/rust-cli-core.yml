@@ -115,7 +115,7 @@ jobs:
       # Temporary public-fixture export for the target-preset device acceptance.
       # Do not run or upload media for unrelated PRs.
       - name: Export destination-target acceptance fixtures
-        if: runner.os == 'Linux' && github.head_ref == 'feat/unified-target-cli'
+        if: runner.os == 'Linux' && github.head_ref == 'cursor/target-fidelity-outputs-1ba2'
         shell: bash
         run: |
           set -euo pipefail
@@ -127,17 +127,32 @@ jobs:
           git rev-parse HEAD > "$output/checked-out-head.txt"
           sha256sum "$input" > "$output/source.sha256"
 
-          "$cli" convert --input "$input" --target google \
-            --output "$output/vivo-googleMP.jpg" --motion-report-json \
-            > "$output/google-jpeg-report.json"
-          "$cli" inspect "$output/vivo-googleMP.jpg" --json \
-            > "$output/google-jpeg-inspect.json"
+          vivo="fixtures/motion-photo/vivo/android-v1-sdr-01.jpg"
+          xiaomi="fixtures/motion-photo/xiaomi/android-v1-ultrahdr-01.jpg"
+          oppo="fixtures/motion-photo/oppo/coloros15-ultrahdr-01.jpg"
+          sha256sum "$vivo" "$xiaomi" "$oppo" > "$output/sources.sha256"
 
-          "$cli" convert --input "$input" --target oppo \
-            --output "$output/vivo-oppoMP.jpg" --motion-report-json \
-            > "$output/oppo-motion-report.json"
+          for target in android-standard standard google samsung oppo xiaomi; do
+            "$cli" convert --input "$vivo" --target "$target" \
+              --output "$output/vivo-to-${target}MP.jpg" --motion-report-json \
+              > "$output/vivo-to-${target}.json"
+          done
+          if "$cli" convert --input "$vivo" --target vivo \
+            --output "$output/vivo-to-vivoMP.jpg" > "$output/vivo-refused.txt"; then
+            echo "vivo target must not publish a file" >&2
+            exit 1
+          fi
+          "$cli" convert --input "$vivo" --target huawei \
+            --output "$output/vivo-to-huaweiMP.jpg" --motion-report-json \
+            > "$output/vivo-to-huawei.json"
+          "$cli" convert --input "$xiaomi" --target xiaomi \
+            --output "$output/xiaomi-to-xiaomiMP.jpg" --motion-report-json \
+            > "$output/xiaomi-to-xiaomi.json"
+          "$cli" convert --input "$oppo" --target oppo \
+            --output "$output/oppo-to-oppoMP.jpg" --motion-report-json \
+            > "$output/oppo-to-oppo.json"
 
-          "$cli" convert --input "$input" --target apple \
+          "$cli" convert --input "$vivo" --target apple \
             --output "$output/vivo-apple.heic" \
             > "$output/apple-pair-report.txt"
           "$cli" validate "$output/vivo-apple.heic" --json \
@@ -149,22 +164,46 @@ jobs:
             --motion-video "$output/vivo-apple.mov" --target google \
             --output "$output/vivo-to-googleMP.heic" --motion-report-json \
             > "$output/google-heic-report.json"
-          "$cli" inspect "$output/vivo-to-googleMP.heic" --json \
-            > "$output/google-heic-inspect.json"
-          python3 - "$output/vivo-apple.heic" "$output/vivo-to-googleMP.heic" <<'PY'
-          from pathlib import Path
+          python3 - "$output" <<'PY'
+          import json
           import sys
+          from pathlib import Path
 
-          for file in sys.argv[1:]:
-              data = Path(file).read_bytes()
-              if b"\x00\x00\x00\x06Exif\x00\x00II*\x00" not in data:
-                  raise SystemExit(f"Android-compatible HEIF Exif item not found: {file}")
+          root = Path(sys.argv[1])
+          for report_path in sorted(root.glob("*.json")):
+              if report_path.name.endswith("-validation.json"):
+                  continue
+              report = json.loads(report_path.read_text())
+              if "native_vendor_claim" not in report:
+                  continue
+              if report["native_vendor_claim"] is not False or report["consumer_gallery_verified"] is not False:
+                  raise SystemExit(f"device or native claim in {report_path.name}")
+              if report["motion_video_copies"] != 1:
+                  raise SystemExit(f"video was duplicated in {report_path.name}")
+              if report["exif_identifier_present"] is not True:
+                  raise SystemExit(f"EXIF identifier missing in {report_path.name}")
+          heic = (root / "vivo-to-googleMP.heic").read_bytes()
+          apple = (root / "vivo-apple.heic").read_bytes()
+          for name, data in (("heic", heic), ("apple", apple)):
+              if b"\x00\x00\x00\x06Exif\x00\x00II*\x00" not in data and b"\x00\x00\x00\x06Exif\x00\x00MM\x00*" not in data:
+                  raise SystemExit(f"Android-compatible HEIF Exif item not found: {name}")
+          oppo = json.loads((root / "oppo-to-oppo.json").read_text())
+          carried = oppo["carried_source_attributes"]
+          if "OpCamera:VideoLength" not in carried:
+              raise SystemExit("OPPO source VideoLength was not carried")
+          huawei = json.loads((root / "vivo-to-huawei.json").read_text())
+          if huawei["container"] != "huawei-live-tail-40" or huawei["native_vendor_claim"] is not False:
+              raise SystemExit("huawei report does not describe the 40-byte tail")
+          huawei_bytes = (root / "vivo-to-huaweiMP.jpg").read_bytes()
+          tag = huawei_bytes[-20:].decode("utf-8").strip()
+          if not tag.startswith("LIVE_"):
+              raise SystemExit("huawei tail is missing LIVE_")
           PY
-          sha256sum "$input" > "$output/source-after.sha256"
-          sha256sum "$output"/vivo-* > "$output/outputs.sha256"
+          sha256sum "$vivo" "$xiaomi" "$oppo" > "$output/sources-after.sha256"
+          sha256sum "$output"/*MP.jpg "$output"/*MP.heic "$output"/vivo-apple.heic "$output"/vivo-apple.mov > "$output/outputs.sha256"
 
       - name: Upload public target acceptance media and proof
-        if: always() && runner.os == 'Linux' && github.head_ref == 'feat/unified-target-cli'
+        if: always() && runner.os == 'Linux' && github.head_ref == 'cursor/target-fidelity-outputs-1ba2'
         uses: actions/upload-artifact@v7
         with:
           name: target-acceptance-public-fixtures

@@ -18,6 +18,7 @@ use crate::batch_checkpoint::{
     CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
 };
 use crate::categorize::classification_relative_directory;
+use crate::vendor_motion_metadata::VendorMetadataCarry;
 use crate::{ApplePortraitSemanticProfile, PortableRuntime, Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +47,8 @@ pub struct BatchPlanOptions {
     /// Android targets use one MP-suffixed output, not an Apple pair.
     pub motion_target: Option<MotionOutputTarget>,
     pub motion_video_compatibility: MotionVideoCompatibility,
+    /// Included in the Android checkpoint key so vendor metadata policies do not reuse each other.
+    pub target: Option<ConversionTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,6 +286,10 @@ fn google_target_name(target: MotionOutputTarget) -> &'static str {
     }
 }
 
+fn destination_name(target: Option<ConversionTarget>) -> Option<&'static str> {
+    target.map(ConversionTarget::name)
+}
+
 fn video_compatibility_name(policy: MotionVideoCompatibility) -> &'static str {
     match policy {
         MotionVideoCompatibility::Preserve => "preserve",
@@ -365,6 +372,7 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
                         &signature,
                         google_target_name(target),
                         video_compatibility_name(options.motion_video_compatibility),
+                        destination_name(options.target),
                     )?
                     .map(|item| item.output)
                     .filter(|output| {
@@ -505,6 +513,7 @@ struct BatchCheckpointEvent {
 #[derive(Debug)]
 struct AndroidCheckpointDetails {
     target: MotionOutputTarget,
+    destination: Option<ConversionTarget>,
     compatibility: MotionVideoCompatibility,
     output_sha256: Option<String>,
 }
@@ -538,6 +547,7 @@ impl BatchCheckpointEvent {
                 AndroidCheckpointIdentity {
                     target: google_target_name(android.target),
                     compatibility: video_compatibility_name(android.compatibility),
+                    destination: destination_name(android.destination),
                     output_sha256: android.output_sha256.as_deref(),
                 },
                 outcome,
@@ -683,6 +693,7 @@ fn process_batch_item_with_options(
                             &signature,
                             google_target_name(target),
                             video_compatibility_name(motion_video_compatibility),
+                            destination_name(options.target),
                         )?
                     } else {
                         None
@@ -700,6 +711,7 @@ fn process_batch_item_with_options(
                                 outcome: OwnedCheckpointOutcome::SkippedExisting(String::new()),
                                 android: Some(AndroidCheckpointDetails {
                                     target,
+                                    destination: options.target,
                                     compatibility: motion_video_compatibility,
                                     output_sha256: Some(prior.sha256.clone()),
                                 }),
@@ -719,13 +731,17 @@ fn process_batch_item_with_options(
                             "existing Google Motion Photo has no matching source, target, video policy and output digest; refusing to reuse or overwrite",
                         ));
                     }
-                    let conversion = runtime.convert_android_motion_photo_file_with_policy(
+                    let conversion = runtime.convert_android_motion_photo_file_with_carry(
                         &source,
                         &item.input,
                         &item.output,
                         target,
                         request,
                         motion_video_compatibility,
+                        options
+                            .target
+                            .map(VendorMetadataCarry::from_target)
+                            .unwrap_or_else(VendorMetadataCarry::legacy),
                     );
                     let result = conversion.and_then(|receipt| {
                         let digest = source_signature_path(&receipt.output)?.sha256;
@@ -744,6 +760,7 @@ fn process_batch_item_with_options(
                         },
                         android: Some(AndroidCheckpointDetails {
                             target,
+                            destination: options.target,
                             compatibility: motion_video_compatibility,
                             output_sha256: digest,
                         }),

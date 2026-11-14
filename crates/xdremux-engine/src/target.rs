@@ -34,17 +34,18 @@ impl ConversionTarget {
                 motion: Some(MotionOutputTarget::ApplePair),
                 proxdr: Some(OutputIntent::Standard),
             },
-            Self::AndroidStandard | Self::Google | Self::Samsung => TargetCapabilities {
+            Self::AndroidStandard
+            | Self::Google
+            | Self::Samsung
+            | Self::Vivo
+            | Self::Xiaomi
+            | Self::Huawei => TargetCapabilities {
                 motion: Some(MotionOutputTarget::GoogleAuto),
                 proxdr: Some(OutputIntent::Standard),
             },
             Self::Oppo => TargetCapabilities {
                 motion: Some(MotionOutputTarget::GoogleAuto),
                 proxdr: Some(OutputIntent::OppoGallery),
-            },
-            Self::Vivo | Self::Xiaomi | Self::Huawei => TargetCapabilities {
-                motion: None,
-                proxdr: None,
             },
         }
     }
@@ -102,7 +103,7 @@ impl std::str::FromStr for ConversionTarget {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "apple" => Ok(Self::Apple),
-            "android-standard" => Ok(Self::AndroidStandard),
+            "android-standard" | "standard" => Ok(Self::AndroidStandard),
             "google" => Ok(Self::Google),
             "samsung" => Ok(Self::Samsung),
             "oppo" => Ok(Self::Oppo),
@@ -110,7 +111,7 @@ impl std::str::FromStr for ConversionTarget {
             "xiaomi" => Ok(Self::Xiaomi),
             "huawei" => Ok(Self::Huawei),
             _ => Err(
-                "target must be apple, android-standard, google, samsung, oppo, vivo, xiaomi or huawei",
+                "target must be apple, android-standard (standard), google, samsung, oppo, vivo, xiaomi or huawei",
             ),
         }
     }
@@ -131,25 +132,29 @@ mod tests {
             ConversionTarget::Google,
             ConversionTarget::Samsung,
             ConversionTarget::Oppo,
+            ConversionTarget::Vivo,
+            ConversionTarget::Xiaomi,
+            ConversionTarget::Huawei,
         ] {
             assert_eq!(
                 target.capabilities().motion,
                 Some(MotionOutputTarget::GoogleAuto)
             );
+            assert!(target.capabilities().proxdr.is_some());
         }
         assert_eq!(
             ConversionTarget::Oppo.capabilities().proxdr,
             Some(OutputIntent::OppoGallery)
         );
-        for target in [
-            ConversionTarget::Vivo,
-            ConversionTarget::Xiaomi,
-            ConversionTarget::Huawei,
-        ] {
-            let capabilities = target.capabilities();
-            assert!(capabilities.motion.is_none());
-            assert!(capabilities.proxdr.is_none());
-        }
+        assert_eq!(
+            ConversionTarget::Vivo.capabilities().proxdr,
+            Some(OutputIntent::Standard)
+        );
+        assert_eq!(
+            "standard".parse::<ConversionTarget>().unwrap(),
+            ConversionTarget::AndroidStandard
+        );
+        assert_eq!(ConversionTarget::AndroidStandard.name(), "android-standard");
         assert!("android".parse::<ConversionTarget>().is_err());
     }
 
@@ -165,8 +170,13 @@ mod tests {
             .apply_request(TargetAssetKind::MotionPhoto, still)
             .unwrap();
         assert_eq!(motion.output, OutputIntent::Standard);
-        assert!(ConversionTarget::Huawei
+        let huawei = ConversionTarget::Huawei
             .apply_request(TargetAssetKind::MotionPhoto, request)
-            .is_err());
+            .unwrap();
+        assert_eq!(huawei.output, OutputIntent::Standard);
+        let huawei_still = ConversionTarget::Huawei
+            .apply_request(TargetAssetKind::ProXdr, request)
+            .unwrap();
+        assert_eq!(huawei_still.output, OutputIntent::Standard);
     }
 }

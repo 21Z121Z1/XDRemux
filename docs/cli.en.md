@@ -117,12 +117,14 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | Target | Current route |
 | --- | --- |
 | `apple` | Apple Live Photo HEIC+MOV for Motion Photo; standard ISO HDR HEIC for ProXDR stills. |
-| `android-standard`, `google` | Android Motion Photo with its existing JPEG/HEIC primary image and preserved video; standard ISO HDR HEIC for ProXDR stills. |
-| `samsung` | The same standards-based Android route; a Samsung-native SEF writer is not enabled. |
-| `oppo` | The standards-based Android Motion Photo writer (preserve-only video); OPPO Gallery compatibility for ProXDR stills. |
-| `vivo`, `xiaomi`, `huawei` | Reserved names. No writer is enabled; conversion fails explicitly. |
+| `android-standard` (`standard`), `google` | Public Motion Photo 1.0, keeping the source JPEG or HEIC primary and the original video bytes. ProXDR stills use standard ISO HDR HEIC. |
+| `samsung` | The same public Motion Photo container. Samsung fixtures use that directory. SEF/SEFT is not rewritten, and this is not a Samsung-native claim. |
+| `oppo` | The same public Motion Photo container. `OpCamera` attributes are copied only when the source XMP already has them, and an existing `VideoLength` is set to that one video. ProXDR stills keep the OPPO Gallery still route. Private trailers are not synthesized. OnePlus and realme use this target. |
+| `vivo` | No file is published. Gallery 3.2.10.4 reads an MP4 `application/livePhoto-meta` track and DataBlock tags 1024010/1024011/1024012. The serialize layout is not established, and a Google Motion Photo is not that reader. |
+| `xiaomi` | Public Motion Photo fields `MotionPhoto`, `MotionPhotoVersion`, and `MotionPhotoPresentationTimestampUs`, which 4.3.1.15-global checks. `MiCamera` is not written. The v2 length formula is not confirmed. |
+| `huawei` | Still bytes, one preserved video, then a 40-byte tail whose last 20 bytes are `LIVE_<video length>`. The play-info integers are left blank. This is the 11.0.19.478 offset formula, not a device result. |
 
-`--target` works on both `convert` and `batch`. It replaces choosing a separate platform, still-image extension, and Motion Photo writer manually. JPEG Motion Photos remain JPEG, and HEIC Motion Photos remain HEIC: the current writer cannot transcode the still into another format without losing preservation guarantees. Unsupported vendor resources fail closed; a target name alone does not establish native gallery recognition, HDR activation, or sharing behavior. The reported working `preserve` playback on OPPO applies only to the tested files. No native Samsung or OPPO Motion Photo writer is claimed.
+`--target` works on both `convert` and `batch`. JPEG Motion Photos remain JPEG, and HEIC Motion Photos remain HEIC. The writer does not transcode the still or the video. A target name does not establish gallery recognition, HDR activation, or sharing behavior. `--motion-report-json` records the container, carried source attributes, resources that were not rewritten, and `native_vendor_claim: false`. No device in this repository has accepted these outputs.
 
 For backward compatibility, the existing `--motion-target`, `--live-photo-output`, and `--oppo-compatible` options remain available when `--target` is absent. They cannot be combined with `--target`. Apple editing flags remain explicit advanced requests and require `--target apple` if a target is supplied. A supplied target never implicitly enables experimental Portrait, Styles, or Cinematic inference.
 

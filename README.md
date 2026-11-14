@@ -60,9 +60,10 @@ xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
 
 ```bash
 xdremux convert --input IMG_001.jpg
+xdremux convert --input IMG_001.jpg --target xiaomi --output IMG_001MP.jpg
 ```
 
-Motion Photo 转换生成配套的 HEIC 和 MOV，源文件保持不变。未指定 `--output` 时，程序选择不会与已有文件对成员冲突的名称。
+不带 `--target` 时，Motion Photo 仍生成配套的 HEIC 和 MOV，源文件保持不变。`--target` 可选 `apple`、`android-standard`（别名 `standard`）、`google`、`samsung`、`oppo`、`vivo`、`xiaomi`、`huawei`。一加和 realme 使用 `oppo`。`xiaomi`、`google`、`android-standard` 写公开 Motion Photo；`oppo` 在 JPEG 上沿用已有的 OpCamera，不声称 HEIF 实况；`huawei` 在视频后写 40 字节 `LIVE_` 尾；`vivo` 因专有 MP4 元数据轨道尚未写全而不发布文件。视频能保留时保持原字节。结构检查不是相册实机结果。详见 [CLI 参考](docs/cli.md)。
 
 ProXDR 输出需要面向 OPPO 相册时，添加兼容选项：
 

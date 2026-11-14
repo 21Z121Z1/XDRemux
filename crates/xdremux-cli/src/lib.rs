@@ -23,7 +23,7 @@ use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target,
     AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource, ApplePortraitSemanticProfile,
     BatchAssetKind, BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition,
-    PortableRuntime,
+    PortableRuntime, VendorMetadataCarry,
 };
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
@@ -173,7 +173,7 @@ struct ConvertArgs {
     /// Output HEIC, MOV, or Google Motion Photo JPEG; Cinematic uses .xdremux.mov.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
-    /// Destination preset; detects the input and selects the supported lossless route.
+    /// Destination. `standard` is an alias of `android-standard`. Vendor targets publish a real file.
     #[arg(
         long,
         value_name = "TARGET",
@@ -251,7 +251,7 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
-    /// Destination preset for every item; mixed JPEG/HEIC inputs route individually.
+    /// Destination for every item. `standard` is an alias of `android-standard`.
     #[arg(
         long,
         value_name = "TARGET",
@@ -718,6 +718,16 @@ fn emit_android_motion_receipt(
                 .map(|item| format!("{item:?}")).collect::<Vec<_>>(),
             "pairing": format!("{:?}", receipt.conversion_report.pairing),
             "consumer_gallery_verified": false,
+            "destination": receipt.vendor_metadata.destination,
+            "container": receipt.vendor_metadata.container,
+            "native_vendor_claim": receipt.vendor_metadata.native_vendor_claim,
+            "carried_source_attributes": receipt.vendor_metadata.carried_attributes,
+            "source_vendor_namespace_absent": receipt.vendor_metadata.namespace_absent,
+            "not_carried": receipt.vendor_metadata.not_carried,
+            "gaps": receipt.vendor_metadata.gaps,
+            "exif_identifier_present": receipt.vendor_metadata.exif_identifier_present,
+            "video_byte_length": receipt.vendor_metadata.video_byte_length,
+            "motion_video_copies": 1,
         });
         if serde_json::to_writer_pretty(&mut *stdout, &document).is_err() {
             return 1;
@@ -733,6 +743,27 @@ fn emit_android_motion_receipt(
             "已转换：{} -> {}",
             input.display(),
             receipt.output.display(),
+        )
+    )
+    .is_err()
+    {
+        return 1;
+    }
+    let carried = if receipt.vendor_metadata.carried_attributes.is_empty() {
+        message!(language, "none", "无")
+    } else {
+        receipt.vendor_metadata.carried_attributes.join(", ")
+    };
+    if writeln!(
+        stdout,
+        "{}",
+        message!(
+            language,
+            "note: destination {0} wrote {1}; carried source attributes: {2}; native vendor support is not claimed; gallery playback is not device-verified",
+            "提示：目标 {0} 写入 {1}；沿用的源字段：{2}；不声称厂商原生支持；相册播放未经真机验收",
+            receipt.vendor_metadata.destination,
+            receipt.vendor_metadata.container,
+            carried,
         )
     )
     .is_ok()
@@ -754,24 +785,21 @@ fn run_convert(
             .target
             .and_then(|target| target.capabilities().motion)
     });
-    if arguments.target.is_some_and(|target| {
-        let capabilities = target.capabilities();
-        capabilities.motion.is_none() && capabilities.proxdr.is_none()
-    }) {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: this vendor target is reserved; no verified writer is available",
-            "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"));
-        return 1;
-    }
     if arguments.target.is_some_and(|target| !target.is_apple())
         && (arguments.product.apple_portrait
             || arguments.product.apple_portrait_oppo
             || arguments.product.apple_styles
             || arguments.product.apple_cinematic)
     {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: Apple editing features require --target apple",
-            "错误：Apple 编辑功能需要 --target apple"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
         return 1;
     }
     if (arguments.motion_video.is_some()
@@ -910,7 +938,7 @@ fn run_convert(
         };
         let target = MotionOutputTarget::GoogleHeic;
         let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
-        return match runtime.convert_android_motion_photo_pair_file(
+        return match runtime.convert_android_motion_photo_pair_file_with_carry(
             AndroidMotionPhotoPairSource {
                 still: &source,
                 movie: &movie,
@@ -921,6 +949,10 @@ fn run_convert(
             target,
             request,
             video_compatibility,
+            arguments
+                .target
+                .map(VendorMetadataCarry::from_target)
+                .unwrap_or_else(VendorMetadataCarry::legacy),
         ) {
             Ok(receipt) => emit_android_motion_receipt(
                 language,
@@ -954,7 +986,8 @@ fn run_convert(
     };
     let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
-            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request) {
+            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
+            {
                 Ok(request) => request,
                 Err(error) => {
                     let _ = writeln!(
@@ -983,17 +1016,22 @@ fn run_convert(
                 },
                 None => None,
             };
-            if let Some(target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)) =
-                resolved_motion_target
+            if let Some(
+                target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
+            ) = resolved_motion_target
             {
                 let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
-                return match runtime.convert_android_motion_photo_file_with_policy(
+                return match runtime.convert_android_motion_photo_file_with_carry(
                     &source,
                     &input,
                     &output,
                     target,
                     request,
                     video_compatibility,
+                    arguments
+                        .target
+                        .map(VendorMetadataCarry::from_target)
+                        .unwrap_or_else(VendorMetadataCarry::legacy),
                 ) {
                     Ok(receipt) => emit_android_motion_receipt(
                         language,
@@ -1588,24 +1626,21 @@ fn run_batch(
             .target
             .and_then(|target| target.capabilities().motion)
     });
-    if arguments.target.is_some_and(|target| {
-        let capabilities = target.capabilities();
-        capabilities.motion.is_none() && capabilities.proxdr.is_none()
-    }) {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: this vendor target is reserved; no verified writer is available",
-            "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"));
-        return 2;
-    }
     if arguments.target.is_some_and(|target| !target.is_apple())
         && (arguments.product.apple_portrait
             || arguments.product.apple_portrait_oppo
             || arguments.product.apple_styles
             || arguments.product.apple_cinematic)
     {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: Apple editing features require --target apple",
-            "错误：Apple 编辑功能需要 --target apple"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
         return 2;
     }
     if arguments.motion_video_compat.is_some()
@@ -1690,6 +1725,7 @@ fn run_batch(
         },
         motion_target: selected_motion_target,
         motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
+        target: arguments.target,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,

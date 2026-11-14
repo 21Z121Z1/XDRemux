@@ -54,6 +54,8 @@ struct CheckpointItem {
         skip_serializing_if = "Option::is_none"
     )]
     video_compatibility: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    destination: Option<String>,
     #[serde(
         rename = "outputSHA256",
         default,
@@ -76,10 +78,13 @@ struct CheckpointItem {
 impl CheckpointItem {
     fn route_key(&self) -> String {
         match &self.output_target {
-            Some(target) => format!(
-                "{target}:{}",
-                self.video_compatibility.as_deref().unwrap_or("preserve")
-            ),
+            Some(target) => {
+                let compatibility = self.video_compatibility.as_deref().unwrap_or("preserve");
+                match &self.destination {
+                    Some(destination) => format!("{target}:{compatibility}:{destination}"),
+                    None => format!("{target}:{compatibility}"),
+                }
+            }
             None if self.output_package_path.is_some() => "apple-pvt".to_owned(),
             None => "apple-pair".to_owned(),
         }
@@ -205,9 +210,16 @@ impl MotionPhotoCheckpoint {
         signature: &SourceSignature,
         target: &str,
         compatibility: &str,
+        destination: Option<&str>,
     ) -> Result<Option<ReusableAndroidMotionPhoto>> {
         let source = canonical_existing(source)?;
-        let key = (path_string(&source), format!("{target}:{compatibility}"));
+        let key = (
+            path_string(&source),
+            match destination {
+                Some(destination) => format!("{target}:{compatibility}:{destination}"),
+                None => format!("{target}:{compatibility}"),
+            },
+        );
         let Some(item) = self.items.get(&key) else {
             return Ok(None);
         };
@@ -275,6 +287,7 @@ pub(crate) struct MotionPhotoCheckpointWriter {
 pub(crate) struct AndroidCheckpointIdentity<'a> {
     pub target: &'a str,
     pub compatibility: &'a str,
+    pub destination: Option<&'a str>,
     pub output_sha256: Option<&'a str>,
 }
 
@@ -347,6 +360,7 @@ impl MotionPhotoCheckpointWriter {
                 .map(path_string),
             output_target: None,
             video_compatibility: None,
+            destination: None,
             output_sha256: None,
             status: outcome.status().to_owned(),
             input_size: Some(signature.size),
@@ -377,6 +391,7 @@ impl MotionPhotoCheckpointWriter {
             output_package_path: None,
             output_target: Some(identity.target.to_owned()),
             video_compatibility: Some(identity.compatibility.to_owned()),
+            destination: identity.destination.map(ToOwned::to_owned),
             output_sha256: identity.output_sha256.map(ToOwned::to_owned),
             status: outcome.status().to_owned(),
             input_size: Some(signature.size),

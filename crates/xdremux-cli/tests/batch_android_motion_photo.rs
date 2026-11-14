@@ -283,7 +283,10 @@ fn google_batch_preserves_non_mp42_video_brand() {
         MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
     let after = MotionPhoto::parse(Input::SingleFile(&encoded), ParseOptions::strict()).unwrap();
     assert_eq!(&before.motion_video_bytes().unwrap()[8..12], b"isom");
-    assert_eq!(after.motion_video_bytes().unwrap(), before.motion_video_bytes().unwrap());
+    assert_eq!(
+        after.motion_video_bytes().unwrap(),
+        before.motion_video_bytes().unwrap()
+    );
     assert_eq!(before.presentation_time(), after.presentation_time());
 }
 
