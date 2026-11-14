@@ -726,7 +726,7 @@ fn publish_preserved_vivo_source(
 fn vivo_layout_missing() -> RuntimeError {
     RuntimeError::new(
         "vivo Motion Photo",
-        "this source has no vivoMediaEStream and vivoMediaExtInfo pair to preserve, so those boxes are not invented and no file is published. application/livePhoto-meta is kept only when the source MP4 already has it. The repeated sample token and EStream digest are not written. Gallery 3.2.10.4 has no GCamera or VCamera strings in this package; that does not show the player ignores a file, and the long-press playback path is still being traced. This is not full coverage",
+        "this source has no vivoMediaEStream and vivoMediaExtInfo pair to preserve, so those boxes are not invented and no file is published. Repository vivo samples stay single-file JPEG+MP4. Gallery 3.2.10.4 can also play a separate MP4 found through MediaExtra live_photo and the file name, then setDataSource on that whole file; that old path does not require a sidecar or a device-database row. application/livePhoto-meta is kept only when the source MP4 already has it. The repeated sample token and EStream digest are not written. Cross-source output is not accepted yet",
     )
 }
 

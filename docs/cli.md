@@ -117,7 +117,7 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | `android-standard`（别名 `standard`）、`google` | 公开 Motion Photo 1.0。保留源 JPEG 或 HEIC 主图和原始视频字节。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
 | `samsung` | 公开 Motion Photo。SEF 和第二路自动播放视频留出并写明。HEIC 结果把顶层 `mpvd` 放在文件末尾，使用普通 32 位 size，载荷一直到文件尾。 |
 | `oppo` | 源主图已是 JPEG 时写公开 Motion Photo，并复制已有的 `OpCamera`。HEIC 主图会规划成 JPEG 实况，但在静图重编码会改写或丢掉资源时停止发布。25.17.35 的 `isOlivePhoto` 和 17.10.62 的 `saq.w` 都要求 `image/jpeg`。17.10.62 的 v3 签名者 SHA-1 是 `39bad40aa2730a1914e27939c1c04529df320c98`。一加和 realme 使用这个目标。 |
-| `vivo` | MP4 里已经同时有 `vivoMediaEStream` 和 `vivoMediaExtInfo` 的 JPEG 按原字节发布，包括 GCamera、VCamera、EOI 后可选的一字节，以及 `mp42`/`hvc1`。`application/livePhoto-meta` 只在源文件已经有时保留。其他源暂时不发布。3.2.10.4 里没有这些 XMP 字符串，不能据此说相册不播放文件。 |
+| `vivo` | 仓库样本是单文件 JPEG+MP4 实况。MP4 里已经同时有 `vivoMediaEStream` 和 `vivoMediaExtInfo` 的 JPEG 按原字节发布，包括 GCamera、VCamera、EOI 后可选的一字节，以及 `mp42`/`hvc1`。`application/livePhoto-meta` 只在源文件已经有时保留。相册 3.2.10.4 也能用 MediaExtra 的 `live_photo` 和文件名找到独立 MP4 再整文件播放；那是旧版的一条方案，不是必须输出 sidecar。其他来源尚未验收。 |
 | `xiaomi` | 公开 Motion Photo，版本恰好为 1。4.3.1.15-global 在此条件下用文件大小减去 MotionPhoto 项的 Length，不读 Padding。不写 `MiCamera` 和 `MicroVideo`。 |
 | `huawei` | 视频位于文件末尾时，原样保留前缀和视频，并追加 40 字节尾。播放信息是毫秒 `start:time`：`seekTo` 用源演示时间截到毫秒，自动停止延时用保留的 `mvhd` 时长截到毫秒。不写空白字段。 |
 
