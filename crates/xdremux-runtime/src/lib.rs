@@ -12,6 +12,7 @@ mod batch_checkpoint;
 mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
+mod harmony_motion;
 mod hdr_look;
 mod huawei_live_photo;
 mod live_photo;
@@ -41,6 +42,7 @@ pub use batch_checkpoint::{
 };
 #[cfg(target_os = "macos")]
 pub use cinematic_camera::CinematicFocalLengthSource;
+pub use harmony_motion::is_harmony_motion_photo;
 
 #[cfg(target_os = "macos")]
 pub fn validate_apple_styles_file(
@@ -844,6 +846,22 @@ impl PortableRuntime {
             input.as_ref(),
             output.as_ref(),
             target,
+            compatibility,
+            carry,
+        )
+    }
+
+    /// Keep an existing OpenHarmony HEIC motion file, or stop without writing.
+    pub fn convert_huawei_harmony_file(
+        &self,
+        source: &[u8],
+        output: impl AsRef<Path>,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        android_motion_photo::convert_huawei_harmony_file(
+            source,
+            output.as_ref(),
             compatibility,
             carry,
         )

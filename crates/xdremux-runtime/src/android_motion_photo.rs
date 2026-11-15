@@ -12,8 +12,9 @@ use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
 use xdremux_motion_photo::{
-    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions,
-    PreservationEvidence, ResourceRole, TargetProfile, UnmappedPolicy, WritePolicy,
+    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, PairingMetadata, ParseOptions,
+    PreservationEvidence, ResourceConversion, ResourceRole, TargetProfile, UnmappedPolicy,
+    WritePolicy,
 };
 use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 
@@ -271,6 +272,9 @@ fn convert_android_motion_photo(
             ));
         }
     }
+    if carry.destination == "huawei" {
+        return convert_huawei_harmony_file(marker_source, output, compatibility, carry);
+    }
     let photo = MotionPhoto::parse(source, ParseOptions::compatible())
         .map_err(|error| RuntimeError::external("Android Motion Photo analysis", error))?;
     photo
@@ -480,6 +484,151 @@ fn convert_android_motion_photo(
     })
 }
 
+pub(crate) fn convert_huawei_harmony_file(
+    source: &[u8],
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    let Some(motion) = crate::harmony_motion::parse_harmony_motion(source) else {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "this file is not a HEIC still plus an appended MP4 with com.openharmony.covertime and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are not invented. The Android gallery 11.0.19.478 JPEG plus 40-byte tail is not this target's output",
+        ));
+    };
+    validate_android_output_path(output, MotionOutputTarget::GoogleHeic)?;
+    if fs::symlink_metadata(output).is_ok() {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "output already exists; refusing to overwrite the source or unknown provenance",
+        ));
+    }
+    let movie = &source[motion.video_start..motion.video_start + motion.movie_bytes];
+    if source
+        .windows(movie.len())
+        .filter(|window| *window == movie)
+        .count()
+        != 1
+    {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "the appended movie is not a single range, so the file is not published",
+        ));
+    }
+    let mut carried = vec![
+        format!("com.openharmony.covertime={}", motion.cover_time_ms),
+        format!("com.openharmony.videoId={}", motion.video_id),
+    ];
+    let mut not_carried = vec![
+        "videoId is a source field and was not generated as a pairing identifier".to_owned(),
+        "covertime is the source big-endian float32 in milliseconds and is not the Android seekTo pair".to_owned(),
+        "Harmony gallery import and playback were not verified; the downstream reader writes an Apple Live Photo instead".to_owned(),
+        "photoAccessHelper in that app selects the original HEIC and does not create a moving-photo asset".to_owned(),
+        "the Android gallery 11.0.19.478 40-byte tail is not this output".to_owned(),
+    ];
+    if let Some(start) = &motion.start_time_text {
+        carried.push(format!("com.openharmony.starttime={start}"));
+        not_carried.push(
+            "starttime is copied as source text and is not used as a playback duration".to_owned(),
+        );
+    } else {
+        not_carried.push("starttime was absent and was not invented".to_owned());
+    }
+    match motion.deferred_video_enhance {
+        Some(value) => carried.push(format!("com.openharmony.deferredVideoEnhanceFlag={value}")),
+        None => {
+            not_carried.push("deferredVideoEnhanceFlag was absent and was not invented".to_owned())
+        }
+    }
+    if motion.trailer.is_empty() {
+        not_carried.push("no bytes follow the appended MP4; a v6 trailer was not added".to_owned());
+    } else {
+        let prefix = String::from_utf8_lossy(&motion.trailer[..motion.trailer.len().min(8)]);
+        not_carried.push(format!(
+            "the source trailer is {} bytes, starts with {prefix:?}, and stays after the MP4; ASCII LIVE_ inside it is not the Android length field",
+            motion.trailer.len()
+        ));
+    }
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: carry.container.to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes: carried,
+        namespace_absent: false,
+        not_carried,
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(source),
+        video_byte_length: u64::try_from(motion.movie_bytes + motion.trailer.len())
+            .unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Harmony motion photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Harmony motion photo staging", error))?;
+    staging
+        .write_all(source)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Harmony motion photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Harmony motion photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: ConversionReport {
+            target: TargetProfile::PreserveSource,
+            resources: vec![ResourceConversion {
+                resource: None,
+                disposition: Disposition::Preserved,
+                reason: "HEIC prefix, appended MP4, and any source trailer are unchanged"
+                    .to_owned(),
+            }],
+            evidence: vec![PreservationEvidence::SourceBytesEqual],
+            pairing: PairingMetadata::default(),
+        },
+        resources: vec![
+            AndroidMotionResourceAudit {
+                id: 0,
+                source_role: "PrimaryStill".to_owned(),
+                mime: "image/heic".to_owned(),
+                vendor_role: None,
+                byte_length: u64::try_from(motion.video_start).unwrap_or(u64::MAX),
+                operations: vec![AndroidMotionResourceOperation {
+                    disposition: "Preserved".to_owned(),
+                    reason: "HEIC still bytes, including HDR and auxiliary items, are unchanged"
+                        .to_owned(),
+                }],
+            },
+            AndroidMotionResourceAudit {
+                id: 1,
+                source_role: "MotionVideo".to_owned(),
+                mime: "video/mp4".to_owned(),
+                vendor_role: None,
+                byte_length: u64::try_from(motion.movie_bytes + motion.trailer.len())
+                    .unwrap_or(u64::MAX),
+                operations: vec![AndroidMotionResourceOperation {
+                    disposition: "Preserved".to_owned(),
+                    reason: "appended MP4 and its source trailer keep their original encoding"
+                        .to_owned(),
+                }],
+            },
+        ],
+        video_compatibility: compatibility,
+        video_brand_changed: false,
+        vendor_metadata,
+    })
+}
+
+/// Android `com.android.gallery3d` 11.0.19.478 tail. `--target huawei` does not
+/// call this. Harmony output is the OpenHarmony HEIC container.
+#[allow(dead_code)]
 fn publish_huawei_live_photo(
     source_bytes: &[u8],
     photo: &MotionPhoto<'_>,
@@ -796,7 +945,7 @@ fn vivo_still_reencode_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
     RuntimeError::new(
         "vivo Motion Photo",
         format!(
-            "10.0.10.42 combined playback is a JPEG plus the preserved MP4. Publication stopped before still re-encoding, which would drop or rewrite resources: {detail}"
+            "HEIC Motion Photo is not supported by Albums 10.0.10.42 (Y04s/W20 overseas proxy, not S60; XmpUtil requires JPEG SOI) or Gallery 3.2.10.4 (sidecar only, no combined fallback). The 10.0 path needs a JPEG still plus the preserved MP4. Publication stopped before still transcoding, which would drop or rewrite resources: {detail}"
         ),
     )
 }
@@ -968,7 +1117,7 @@ fn oppo_jpeg_route_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
     RuntimeError::new(
         "OPPO Motion Photo",
         format!(
-            "25.17.35 isOlivePhoto and 17.10.62 saq.w both require image/jpeg before the JPEG olive reader. Neither package shows a HEIF olive path, so the planned output is a JPEG Motion Photo that keeps the source video bytes. Publication stopped before still re-encoding, which would otherwise drop or rewrite resources: {detail}"
+            "HEIC Motion Photo is not supported by Photos 17.10.62 or 25.17.35: image/jpeg plus JpegOLiveReader SOI. The planned JPEG Motion Photo would keep the source video bytes. Publication stopped before still transcoding, which would otherwise drop or rewrite resources: {detail}"
         ),
     )
 }

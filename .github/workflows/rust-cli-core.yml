@@ -153,9 +153,12 @@ jobs:
             echo "vivo HEIC source must not publish before the still can be re-encoded" >&2
             exit 1
           fi
-          "$cli" convert --input "$vivo" --target huawei --accept-unverified-target \
-            --output "$output/vivo-to-huaweiMP.jpg" --motion-report-json \
-            > "$output/vivo-to-huawei.json"
+          if "$cli" convert --input "$vivo" --target huawei --accept-unverified-target \
+            --output "$output/vivo-to-huaweiMP.jpg" \
+            > "$output/huawei-jpeg-plan.txt" 2>&1; then
+            echo "a JPEG source must not be published as a Harmony motion photo" >&2
+            exit 1
+          fi
           if "$cli" convert --input fixtures/motion-photo/samsung/heif-ultrahdr-01.heic \
             --target oppo --output "$output/samsung-heic-to-oppoMP.jpg" \
             > "$output/oppo-heic-plan.txt" 2>&1; then
@@ -213,13 +216,11 @@ jobs:
           carried = oppo["carried_source_attributes"]
           if "OpCamera:VideoLength" not in carried:
               raise SystemExit("OPPO source VideoLength was not carried")
-          huawei_bytes = (root / "vivo-to-huaweiMP.jpg").read_bytes()
-          play = huawei_bytes[-40:-20].decode("ascii").strip()
-          if play != "1333:2501":
-              raise SystemExit(f"huawei play info is {play!r}, expected presentation and mvhd milliseconds")
-          huawei = json.loads((root / "vivo-to-huawei.json").read_text())
-          if "1333:2501" not in json.dumps(huawei["not_carried"]):
-              raise SystemExit("huawei report does not name the millisecond play info")
+          huawei_plan = (root / "huawei-jpeg-plan.txt").read_text()
+          if "11.0.19.478" not in huawei_plan or "not invented" not in huawei_plan:
+              raise SystemExit("JPEG input was not stopped before a Harmony or Android-tail write")
+          if (root / "vivo-to-huaweiMP.jpg").exists():
+              raise SystemExit("huawei JPEG source was published")
           oppo_plan = (root / "oppo-heic-plan.txt").read_text()
           if "JPEG Motion Photo" not in oppo_plan or "TranscodeRequired" not in oppo_plan:
               raise SystemExit("OPPO HEIC input did not report the blocked JPEG route")

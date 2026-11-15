@@ -482,10 +482,33 @@ fn vivo_heic_source_stops_before_still_reencode() {
 }
 
 #[test]
-fn huawei_target_writes_seek_and_duration_milliseconds() {
+fn huawei_jpeg_does_not_publish_the_android_gallery_tail() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("vivo/android-v1-sdr-01.jpg");
     let output = dir.path().join("huaweiMP.jpg");
+    let (code, _, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+    ]);
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!output.exists());
+    assert!(stderr.contains("11.0.19.478"), "{stderr}");
+    assert!(stderr.contains("not invented"), "{stderr}");
+    assert!(stderr.contains("does not enable"), "{stderr}");
+}
+
+#[test]
+fn huawei_keeps_an_existing_openharmony_heic_byte_for_byte() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("mate.heic");
+    let source = openharmony_motion_photo();
+    fs::write(&input, &source).unwrap();
+    let output = dir.path().join("mateMP.heic");
     let (code, stdout, stderr) = run(vec![
         "convert".into(),
         "--input".into(),
@@ -497,31 +520,95 @@ fn huawei_target_writes_seek_and_duration_milliseconds() {
         "--motion-report-json".into(),
     ]);
     assert_eq!(code, 0, "{stderr} {stdout}");
-    let source = fs::read(&input).unwrap();
-    let photo = MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
-    let video = photo.motion_video_bytes().unwrap();
-    let at = source
-        .windows(video.len())
-        .position(|window| window == video)
-        .unwrap();
-    let bytes = fs::read(&output).unwrap();
-    assert_eq!(&bytes[..at], &source[..at]);
-    assert_eq!(&bytes[at..at + video.len()], video);
-    assert_eq!(bytes.len(), at + video.len() + 40);
-    let play = std::str::from_utf8(&bytes[bytes.len() - 40..bytes.len() - 20])
-        .unwrap()
-        .trim();
-    assert_eq!(play, "1333:2501");
-    let tag = std::str::from_utf8(&bytes[bytes.len() - 20..])
-        .unwrap()
-        .trim();
-    assert_eq!(tag, format!("LIVE_{}", video.len()));
+    assert_eq!(fs::read(&output).unwrap(), source);
     let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["destination"], "huawei");
+    assert_eq!(report["container"], "harmony-openharmony-heic-mp4");
     assert_eq!(report["native_vendor_claim"], false);
+    assert_eq!(report["consumer_gallery_verified"], false);
     assert_eq!(report["motion_video_copies"], 1);
+    let carried = report["carried_source_attributes"].to_string();
+    assert!(
+        carried.contains("com.openharmony.covertime=1234.5"),
+        "{carried}"
+    );
+    assert!(
+        carried.contains("com.openharmony.videoId=20260907021031595"),
+        "{carried}"
+    );
     let notes = report["not_carried"].to_string();
-    assert!(notes.contains("1333:2501"), "{notes}");
-    assert!(notes.contains("truncat"), "{notes}");
+    assert!(notes.contains("not generated"), "{notes}");
+    assert!(notes.contains("not the Android"), "{notes}");
+    assert!(stderr.contains("photoAccessHelper"), "{stderr}");
+}
+
+#[test]
+fn other_heic_motion_is_not_rewritten_into_harmony() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let output = dir.path().join("heldMP.heic");
+    let (code, _, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+    ]);
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!output.exists());
+    assert!(stderr.contains("not invented"), "{stderr}");
+}
+
+fn box_bytes(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&u32::try_from(payload.len() + 8).unwrap().to_be_bytes());
+    bytes.extend_from_slice(kind);
+    bytes.extend_from_slice(payload);
+    bytes
+}
+
+fn openharmony_motion_photo() -> Vec<u8> {
+    let names = [
+        b"com.openharmony.covertime".as_slice(),
+        b"com.openharmony.deferredVideoEnhanceFlag".as_slice(),
+        b"com.openharmony.starttime".as_slice(),
+        b"com.openharmony.videoId".as_slice(),
+    ];
+    let values: [&[u8]; 4] = [
+        &1234.5f32.to_be_bytes(),
+        b"0",
+        b"1788718230582",
+        b"20260907021031595",
+    ];
+    let mut keys_payload = vec![0, 0, 0, 0];
+    keys_payload.extend_from_slice(&u32::try_from(names.len()).unwrap().to_be_bytes());
+    for name in names {
+        keys_payload.extend_from_slice(&u32::try_from(name.len() + 8).unwrap().to_be_bytes());
+        keys_payload.extend_from_slice(b"mdta");
+        keys_payload.extend_from_slice(name);
+    }
+    let mut ilst_payload = Vec::new();
+    for (index, value) in values.into_iter().enumerate() {
+        let mut data_payload = vec![0; 8];
+        data_payload.extend_from_slice(value);
+        let data = box_bytes(b"data", &data_payload);
+        let item_id = u32::try_from(index + 1).unwrap().to_be_bytes();
+        ilst_payload.extend_from_slice(&box_bytes(&item_id, &data));
+    }
+    let mut meta_payload = vec![0, 0, 0, 0];
+    meta_payload.extend_from_slice(&box_bytes(b"hdlr", &[0; 8]));
+    meta_payload.extend_from_slice(&box_bytes(b"keys", &keys_payload));
+    meta_payload.extend_from_slice(&box_bytes(b"ilst", &ilst_payload));
+    let mut bytes = box_bytes(b"ftyp", b"heic\0\0\0\0heicmif1");
+    bytes.extend_from_slice(&box_bytes(b"mdat", b"heif-still-hdr"));
+    bytes.extend_from_slice(&box_bytes(b"ftyp", b"mp42\0\0\0\0isommp42"));
+    bytes.extend_from_slice(&box_bytes(b"mdat", b"video-samples"));
+    bytes.extend_from_slice(&box_bytes(b"moov", &box_bytes(b"meta", &meta_payload)));
+    bytes.extend_from_slice(b"v6_f27LIVE_");
+    bytes.extend(std::iter::repeat_n(b' ', 49));
+    bytes
 }
 
 #[test]

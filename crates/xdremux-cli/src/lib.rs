@@ -20,10 +20,10 @@ use xdremux_engine::{
     LivePhotoOutput, MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
 };
 use xdremux_runtime::{
-    motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target_for,
-    AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource, ApplePortraitSemanticProfile,
-    BatchAssetKind, BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition,
-    PortableRuntime, VendorMetadataCarry,
+    is_harmony_motion_photo, motion_photo_checkpoint_path, plan_batch_items,
+    resolve_motion_output_target_for, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
+    ApplePortraitSemanticProfile, BatchAssetKind, BatchExecutionOptions, BatchPlanOptions,
+    BatchSuccessDisposition, PortableRuntime, VendorMetadataCarry,
 };
 use xdremux_source::{
     inspect_path, motion_still_encoding, probe_bytes, MotionStillEncoding, SourceAsset,
@@ -1003,6 +1003,56 @@ fn run_convert(
     };
 
     let runtime = PortableRuntime::new();
+    if arguments.target == Some(ConversionTarget::Huawei) && motion_video.is_none() {
+        if apple_portrait || apple_styles {
+            let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
+            return 1;
+        }
+        let motion_heic = is_harmony_motion_photo(&source)
+            || probe_bytes(&source).ok().is_some_and(|asset| {
+                matches!(asset, SourceAsset::MotionPhoto { .. })
+                    && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic)
+            });
+        if gate_unverified_target(
+            language,
+            arguments.target,
+            motion_heic,
+            arguments.accept_unverified_target,
+            stderr,
+        ) != 0
+        {
+            return 1;
+        }
+        let output = output.unwrap_or_else(|| {
+            default_google_motion_output(&input, MotionOutputTarget::GoogleHeic)
+        });
+        return match runtime.convert_huawei_harmony_file(
+            &source,
+            &output,
+            video_compatibility,
+            arguments
+                .target
+                .map(VendorMetadataCarry::from_target)
+                .unwrap_or_else(VendorMetadataCarry::legacy),
+        ) {
+            Ok(receipt) => emit_android_motion_receipt(
+                language,
+                &input,
+                None,
+                receipt,
+                motion_report_json,
+                stdout,
+            ),
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(language, "error: {error}", "错误：{error}")
+                );
+                1
+            }
+        };
+    }
     if let Some(movie_path) = motion_video {
         request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request) {
             Ok(request) => request,
