@@ -46,18 +46,9 @@ impl VendorMetadataCarry {
                 preserve_namespace: None,
                 leave_out_unmapped: false,
                 gaps: &[
-                    "android-standard selects the public Motion Photo container, not a vendor profile",
-                    "gallery recognition is not a device result",
-                ],
-            },
-            ConversionTarget::Google => Self {
-                destination: "google",
-                container: "public-motion-photo-1.0",
-                preserve_namespace: None,
-                leave_out_unmapped: false,
-                gaps: &[
-                    "Google Motion Photo 1.0 writer; a previous device report is not re-proven by this build",
-                    "gallery recognition is not a device result",
+                    "android-standard, standard, and google are one Motion Photo 1.0 target",
+                    "the specification is not a player; Google Photos notes are consumer evidence for this target",
+                    "gallery recognition of this file is not a device result",
                 ],
             },
             ConversionTarget::Samsung => Self {

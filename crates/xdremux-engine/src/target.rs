@@ -10,8 +10,8 @@ pub enum TargetAssetKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConversionTarget {
     Apple,
+    /// Public Motion Photo 1.0. `standard` and `google` are command aliases.
     AndroidStandard,
-    Google,
     Samsung,
     Oppo,
     Vivo,
@@ -34,15 +34,12 @@ impl ConversionTarget {
                 motion: Some(MotionOutputTarget::ApplePair),
                 proxdr: Some(OutputIntent::Standard),
             },
-            Self::AndroidStandard
-            | Self::Google
-            | Self::Samsung
-            | Self::Vivo
-            | Self::Xiaomi
-            | Self::Huawei => TargetCapabilities {
-                motion: Some(MotionOutputTarget::GoogleAuto),
-                proxdr: Some(OutputIntent::Standard),
-            },
+            Self::AndroidStandard | Self::Samsung | Self::Vivo | Self::Xiaomi | Self::Huawei => {
+                TargetCapabilities {
+                    motion: Some(MotionOutputTarget::GoogleAuto),
+                    proxdr: Some(OutputIntent::Standard),
+                }
+            }
             Self::Oppo => TargetCapabilities {
                 motion: Some(MotionOutputTarget::GoogleAuto),
                 proxdr: Some(OutputIntent::OppoGallery),
@@ -58,7 +55,6 @@ impl ConversionTarget {
         match self {
             Self::Apple => "apple",
             Self::AndroidStandard => "android-standard",
-            Self::Google => "google",
             Self::Samsung => "samsung",
             Self::Oppo => "oppo",
             Self::Vivo => "vivo",
@@ -103,15 +99,14 @@ impl std::str::FromStr for ConversionTarget {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "apple" => Ok(Self::Apple),
-            "android-standard" | "standard" => Ok(Self::AndroidStandard),
-            "google" => Ok(Self::Google),
+            "android-standard" | "standard" | "google" => Ok(Self::AndroidStandard),
             "samsung" => Ok(Self::Samsung),
             "oppo" => Ok(Self::Oppo),
             "vivo" => Ok(Self::Vivo),
             "xiaomi" => Ok(Self::Xiaomi),
             "huawei" => Ok(Self::Huawei),
             _ => Err(
-                "target must be apple, android-standard (standard), google, samsung, oppo, vivo, xiaomi or huawei",
+                "target must be apple, android-standard (standard, google), samsung, oppo, vivo, xiaomi or huawei",
             ),
         }
     }
@@ -129,7 +124,6 @@ mod tests {
         );
         for target in [
             ConversionTarget::AndroidStandard,
-            ConversionTarget::Google,
             ConversionTarget::Samsung,
             ConversionTarget::Oppo,
             ConversionTarget::Vivo,
@@ -155,6 +149,14 @@ mod tests {
             ConversionTarget::AndroidStandard
         );
         assert_eq!(ConversionTarget::AndroidStandard.name(), "android-standard");
+        assert_eq!(
+            "google".parse::<ConversionTarget>().unwrap(),
+            ConversionTarget::AndroidStandard
+        );
+        assert_eq!(
+            "standard".parse::<ConversionTarget>().unwrap(),
+            "google".parse::<ConversionTarget>().unwrap()
+        );
         assert!("android".parse::<ConversionTarget>().is_err());
     }
 

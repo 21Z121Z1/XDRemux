@@ -19,6 +19,7 @@ mod product_policy;
 mod provisional_guided_filter;
 mod source_profile;
 mod target;
+mod target_support;
 
 use std::collections::BTreeSet;
 
@@ -110,6 +111,7 @@ pub use source_profile::{
     gain_map_source_profile_from_jpeg,
 };
 pub use target::{ConversionTarget, TargetAssetKind, TargetCapabilities};
+pub use target_support::{target_preflight, EvidenceLevel, SupportClaim, TargetPreflight};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputIntent {

@@ -114,12 +114,14 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | 目标 | 当前转换路径 |
 | --- | --- |
 | `apple` | Motion Photo 输出 Apple HEIC+MOV 文件对；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
-| `android-standard`（别名 `standard`）、`google` | 公开 Motion Photo 1.0。保留源 JPEG 或 HEIC 主图和原始视频字节。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `android-standard`（别名 `standard`、`google`） | 同一个公开 Motion Photo 1.0 目标。三个名字共用规划与输出字节。规范本身不是播放器。此前 Google Photos 能播放部分样本的记录是这个目标的消费者证据，不是第二套策略。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
 | `samsung` | 公开 Motion Photo。SEF 和第二路自动播放视频留出并写明。HEIC 结果把顶层 `mpvd` 放在文件末尾，使用普通 32 位 size，载荷一直到文件尾。 |
 | `oppo` | 源主图已是 JPEG 时写公开 Motion Photo，并复制已有的 `OpCamera`。HEIC 主图会规划成 JPEG 实况，但在静图重编码会改写或丢掉资源时停止发布。25.17.35 的 `isOlivePhoto` 和 17.10.62 的 `saq.w` 都要求 `image/jpeg`。17.10.62 的 v3 签名者 SHA-1 是 `39bad40aa2730a1914e27939c1c04529df320c98`。一加和 realme 使用这个目标。 |
 | `vivo` | 已有两个 UUID 盒的仓库样本按原字节保留。其他 JPEG 实况写成 JPEG 加保留的 MP4：`MotionPhoto=1`、`Item:Padding=0`，视频起点是文件大小减去 `Item:Length`。ExtInfo 写在该起点之前，类型是 `motionphoto0001…`，`imageTime` 是离源演示时间最近的 30fps 帧。HEIC 主图在重编码前停止。这里的 10.0.10.42 是 Y04s/W20 包。这不是实机识别结果。 |
 | `xiaomi` | 公开 Motion Photo，版本恰好为 1。4.3.1.15-global 在此条件下用文件大小减去 MotionPhoto 项的 Length，不读 Padding。不写 `MiCamera` 和 `MicroVideo`。 |
 | `huawei` | 视频位于文件末尾时，原样保留前缀和视频，并追加 40 字节尾。播放信息是毫秒 `start:time`：`seekTo` 用源演示时间截到毫秒，自动停止延时用保留的 `mvhd` 时长截到毫秒。不写空白字段。 |
+
+`--target` 在写出任何文件之前打印这份输入的证据。兼容性不确定或有损降级时，交互终端要回答 `y`，非交互运行要加 `--accept-unverified-target`。该选项不能启用尚不存在的编码器。HEIC 主图转到 OPPO、vivo、小米或华为时，仍会在重编码前停止。
 
 `convert` 和 `batch` 都支持 `--target`。JPEG 实况仍输出 JPEG，HEIC 实况仍输出 HEIC。`--target oppo` 遇到 HEIC 主图会规划 JPEG 实况，并在重编码静图之前停止。主图和视频都不转码。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
 

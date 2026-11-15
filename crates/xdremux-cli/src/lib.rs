@@ -16,8 +16,8 @@ use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subco
 use i18n::{message, Language};
 use serde_json::json;
 use xdremux_engine::{
-    AppleFeatureRequest, ConversionRequest, ConversionTarget, HdrExportProfile, LivePhotoOutput,
-    MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
+    target_preflight, AppleFeatureRequest, ConversionRequest, ConversionTarget, HdrExportProfile,
+    LivePhotoOutput, MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
 };
 use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, resolve_motion_output_target_for,
@@ -25,7 +25,10 @@ use xdremux_runtime::{
     BatchAssetKind, BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition,
     PortableRuntime, VendorMetadataCarry,
 };
-use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
+use xdremux_source::{
+    inspect_path, motion_still_encoding, probe_bytes, MotionStillEncoding, SourceAsset,
+    SourceInspection,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -173,7 +176,7 @@ struct ConvertArgs {
     /// Output HEIC, MOV, or Google Motion Photo JPEG; Cinematic uses .xdremux.mov.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
-    /// Destination. `standard` is an alias of `android-standard`. Vendor targets publish a real file.
+    /// Destination. `standard` and `google` are aliases of `android-standard`. Vendor targets publish a real file.
     #[arg(
         long,
         value_name = "TARGET",
@@ -198,6 +201,9 @@ struct ConvertArgs {
     /// Write a complete Google Motion Photo resource audit as JSON to stdout.
     #[arg(long, requires = "motion_destination")]
     motion_report_json: bool,
+    /// Continue after the unverified-target warning. Does not enable a missing encoder.
+    #[arg(long, requires = "target")]
+    accept_unverified_target: bool,
     /// Use a source-bound fixed-view camera estimate; explicit --focal-length-35mm takes priority.
     #[arg(long, value_name = "JSON", requires = "apple_cinematic")]
     cinematic_camera_estimate: Option<PathBuf>,
@@ -251,7 +257,7 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
-    /// Destination for every item. `standard` is an alias of `android-standard`.
+    /// Destination for every item. `standard` and `google` are aliases of `android-standard`.
     #[arg(
         long,
         value_name = "TARGET",
@@ -270,6 +276,9 @@ struct BatchArgs {
     /// Preserve all video container bytes (the only supported mode).
     #[arg(long, value_name = "preserve", requires = "motion_destination")]
     motion_video_compat: Option<MotionVideoCompatibility>,
+    /// Continue after the unverified-target warning. Does not enable a missing encoder.
+    #[arg(long, requires = "target")]
+    accept_unverified_target: bool,
     /// Reuse a completed Live Photo pair only when durable source provenance matches.
     #[arg(long)]
     skip_existing: bool,
@@ -774,6 +783,107 @@ fn emit_android_motion_receipt(
     }
 }
 
+fn gate_unverified_target(
+    language: Language,
+    target: Option<ConversionTarget>,
+    motion_still_is_heic: bool,
+    accept: bool,
+    stderr: &mut impl Write,
+) -> u8 {
+    let Some(target) = target else {
+        return 0;
+    };
+    let plan = target_preflight(target, motion_still_is_heic);
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(language, "preflight: {0}", "预检：{0}", plan.destination)
+    );
+    let _ = writeln!(stderr, "{}", plan.player);
+    for claim in plan.claims {
+        let _ = writeln!(
+            stderr,
+            "- {0}: {1}: {2}",
+            claim.subject,
+            claim.level.label(),
+            claim.detail
+        );
+    }
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(language, "kept: {0}", "保留：{0}", plan.kept.join("; "))
+    );
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "transcoded: {0}",
+            "转码：{0}",
+            if plan.transcoded.is_empty() {
+                "none".to_owned()
+            } else {
+                plan.transcoded.join("; ")
+            }
+        )
+    );
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "dropped: {0}",
+            "损失：{0}",
+            if plan.dropped.is_empty() {
+                "none".to_owned()
+            } else {
+                plan.dropped.join("; ")
+            }
+        )
+    );
+    let _ = writeln!(stderr, "{}", plan.warning);
+    if let Some(blocked) = plan.blocked {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(language, "stopped: {blocked}", "已停止：{blocked}")
+        );
+        return 1;
+    }
+    if !plan.requires_confirmation || accept {
+        return 0;
+    }
+    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "Proceed with this unverified target? [y/N]",
+                "仍要写入这个未经确认的目标吗？[y/N]"
+            )
+        );
+        let mut answer = String::new();
+        if std::io::stdin().read_line(&mut answer).is_ok() {
+            let answer = answer.trim();
+            if answer.eq_ignore_ascii_case("y") || answer.eq_ignore_ascii_case("yes") {
+                return 0;
+            }
+        }
+    }
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "stopped before writing. Re-run with --accept-unverified-target to accept this risk in a non-interactive session. That option does not enable a missing encoder",
+            "写入前已停止。非交互运行需要 --accept-unverified-target 才接受此风险。该选项不能启用尚不存在的编码器"
+        )
+    );
+    1
+}
+
 fn run_convert(
     language: Language,
     arguments: ConvertArgs,
@@ -938,6 +1048,20 @@ fn run_convert(
         };
         let target = MotionOutputTarget::GoogleHeic;
         let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
+        let motion_heic = probe_bytes(&source).ok().is_some_and(|asset| {
+            matches!(asset, SourceAsset::MotionPhoto { .. })
+                && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic)
+        });
+        if gate_unverified_target(
+            language,
+            arguments.target,
+            motion_heic,
+            arguments.accept_unverified_target,
+            stderr,
+        ) != 0
+        {
+            return 1;
+        }
         return match runtime.convert_android_motion_photo_pair_file_with_carry(
             AndroidMotionPhotoPairSource {
                 still: &source,
@@ -984,6 +1108,18 @@ fn run_convert(
             return 1;
         }
     };
+    let motion_heic = matches!(asset, SourceAsset::MotionPhoto { .. })
+        && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic);
+    if gate_unverified_target(
+        language,
+        arguments.target,
+        motion_heic,
+        arguments.accept_unverified_target,
+        stderr,
+    ) != 0
+    {
+        return 1;
+    }
     let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
             request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
@@ -1704,6 +1840,24 @@ fn run_batch(
             return 2;
         }
     };
+    let motion_heic = inputs.iter().any(|input| {
+        fs::read(input).ok().is_some_and(|bytes| {
+            probe_bytes(&bytes).ok().is_some_and(|asset| {
+                matches!(asset, SourceAsset::MotionPhoto { .. })
+                    && motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic)
+            })
+        })
+    });
+    if gate_unverified_target(
+        language,
+        arguments.target,
+        motion_heic,
+        arguments.accept_unverified_target,
+        stderr,
+    ) != 0
+    {
+        return 1;
+    }
     let reuse_existing = arguments.skip_existing || arguments.resume;
     let checkpoint_path = if arguments.product.apple_cinematic {
         None
@@ -2019,7 +2173,7 @@ mod tests {
                 RootCommand::Batch(args) => args.target,
                 _ => unreachable!(),
             };
-            assert_eq!(target, Some(ConversionTarget::Google));
+            assert_eq!(target, Some(ConversionTarget::AndroidStandard));
             for conflicting in [
                 ["--motion-target", "google-heic"],
                 ["--live-photo-output", "pvt"],
@@ -2318,6 +2472,7 @@ mod tests {
             target: None,
             motion_target: None,
             motion_video_compat: None,
+            accept_unverified_target: false,
             skip_existing: false,
             resume: false,
             checkpoint: None,

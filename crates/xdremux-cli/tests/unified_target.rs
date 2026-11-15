@@ -12,7 +12,7 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn run(args: Vec<OsString>) -> (u8, String, String) {
+fn run_cli(args: Vec<OsString>) -> (u8, String, String) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = xdremux_cli::run_from(args, &mut stdout, &mut stderr);
@@ -21,6 +21,15 @@ fn run(args: Vec<OsString>) -> (u8, String, String) {
         String::from_utf8(stdout).unwrap(),
         String::from_utf8(stderr).unwrap(),
     )
+}
+
+fn run(mut args: Vec<OsString>) -> (u8, String, String) {
+    if args.iter().any(|arg| arg == "--target")
+        && !args.iter().any(|arg| arg == "--accept-unverified-target")
+    {
+        args.push("--accept-unverified-target".into());
+    }
+    run_cli(args)
 }
 
 fn convert(input: &Path, output: &Path, target: &str) -> (u8, String, String) {
@@ -531,4 +540,96 @@ fn conflicting_legacy_options_fail_before_publication() {
     ]);
     assert_eq!(code, 2, "{stderr}");
     assert!(!output.exists());
+}
+
+#[test]
+fn standard_aliases_share_plan_and_output_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("vivo/android-v1-sdr-01.jpg");
+    let mut bytes = Vec::new();
+    for name in ["android-standard", "standard", "google"] {
+        let output = dir.path().join(format!("{name}MP.jpg"));
+        let (status, stdout, stderr) = run(vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            name.into(),
+            "--motion-report-json".into(),
+        ]);
+        assert_eq!(status, 0, "{stderr}");
+        let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(report["destination"], "android-standard");
+        assert!(stderr.contains("not a player"), "{stderr}");
+        bytes.push(fs::read(output).unwrap());
+    }
+    assert_eq!(bytes[0], bytes[1]);
+    assert_eq!(bytes[0], bytes[2]);
+}
+
+#[test]
+fn unverified_target_writes_nothing_until_the_risk_is_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("vivo/android-v1-sdr-01.jpg");
+    let output = dir.path().join("heldMP.jpg");
+    let (status, _, stderr) = run_cli(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "google".into(),
+    ]);
+    assert_eq!(status, 1, "{stderr}");
+    assert!(!output.exists());
+    assert!(stderr.contains("android-standard"), "{stderr}");
+    assert!(stderr.contains("not a player"), "{stderr}");
+    assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
+
+    let (status, _, stderr) = convert(&input, &output, "standard");
+    assert_eq!(status, 0, "{stderr}");
+    assert!(output.is_file());
+}
+
+#[test]
+fn blocked_heic_stays_blocked_after_the_warning_is_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let output = dir.path().join("blockedMP.jpg");
+    let (status, _, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+        "--accept-unverified-target".into(),
+    ]);
+    assert_eq!(status, 1, "{stderr}");
+    assert!(!output.exists());
+    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
+    assert!(stderr.contains("does not enable"), "{stderr}");
+}
+
+#[test]
+fn batch_target_writes_nothing_without_acceptance() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("vivo/android-v1-sdr-01.jpg");
+    let out = dir.path().join("out");
+    let (status, _, stderr) = run_cli(vec![
+        "batch".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "android-standard".into(),
+    ]);
+    assert_eq!(status, 1, "{stderr}");
+    assert!(!out.join("android-v1-sdr-01.xdremuxMP.jpg").exists());
+    assert!(stderr.contains("android-standard"), "{stderr}");
 }
