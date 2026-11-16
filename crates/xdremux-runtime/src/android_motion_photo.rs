@@ -80,7 +80,9 @@ mod presentation_time_tests {
             Some(apple),
             Some(MediaTime::new(201, 300).unwrap()),
         ));
+        assert!(same_presentation_time(None, None));
         assert!(!same_presentation_time(Some(apple), None));
+        assert!(!same_presentation_time(None, Some(android)));
     }
 }
 
