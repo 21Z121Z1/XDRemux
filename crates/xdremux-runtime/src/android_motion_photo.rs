@@ -11,8 +11,8 @@ use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
 use xdremux_motion_photo::{
-    ConversionReport, Disposition, Input, MotionPhoto, ParseOptions, PreservationEvidence,
-    ResourceRole, TargetProfile, WritePolicy,
+    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions,
+    PreservationEvidence, ResourceRole, TargetProfile, WritePolicy,
 };
 
 use crate::{Result, RuntimeError};
@@ -51,6 +51,36 @@ pub struct AndroidMotionResourceAudit {
 pub struct AndroidMotionResourceOperation {
     pub disposition: String,
     pub reason: String,
+}
+
+// Container writers can express the same exact instant with different rational
+// timescales. Compare the instant without rounding to a common time unit.
+fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) -> bool {
+    match (source, output) {
+        (Some(a), Some(b)) => a.equivalent(b),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod presentation_time_tests {
+    use super::{same_presentation_time, MediaTime};
+
+    #[test]
+    fn compares_exact_rational_instants_not_timestamp_encoding() {
+        let apple = MediaTime::new(2, 3).unwrap();
+        let android = MediaTime::new(200, 300).unwrap();
+        assert_ne!(apple, android);
+        assert!(same_presentation_time(Some(apple), Some(android)));
+        assert!(!same_presentation_time(
+            Some(apple),
+            Some(MediaTime::new(201, 300).unwrap()),
+        ));
+        assert!(same_presentation_time(None, None));
+        assert!(!same_presentation_time(Some(apple), None));
+        assert!(!same_presentation_time(None, Some(android)));
+    }
 }
 
 fn profile(target: MotionOutputTarget) -> Result<(TargetProfile, &'static str, &'static str)> {
@@ -225,10 +255,12 @@ fn convert_android_motion_photo(
         .map_err(|error| RuntimeError::external("output video", error))?;
     let expected_movie = expected_video_bytes(original_movie, compatibility)?;
     let brand_changed = original_movie != expected_movie;
-    if written_movie != expected_movie || photo.presentation_time() != checked.presentation_time() {
+    if written_movie != expected_movie
+        || !same_presentation_time(photo.presentation_time(), checked.presentation_time())
+    {
         return Err(RuntimeError::new(
             "Android Motion Photo verification",
-            "video container changed outside the explicitly permitted ftyp major brand, or exact presentation timestamp changed",
+            "video container changed outside the explicitly permitted ftyp major brand, or exact presentation instant changed",
         ));
     }
     if brand_changed
