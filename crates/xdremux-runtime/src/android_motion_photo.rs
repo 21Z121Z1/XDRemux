@@ -585,7 +585,7 @@ fn republish_heic_as_sdr_jpeg(
     receipt.vendor_metadata.not_carried.insert(
         0,
         format!(
-            "HEIC primary was decoded and encoded as 8-bit sRGB JPEG at quality {}; Display P3 or sRGB ICC is converted to sRGB, and HDR transfers are refused instead of clamping code values",
+            "HEIC primary was decoded and encoded as 8-bit sRGB JPEG at quality {}; the embedded sRGB or Display P3 ICC was applied by this program, irot was applied to the pixels, and the source Orientation tag was not copied. HDR transfers are refused instead of clamping code values",
             crate::heic_sdr_jpeg::JPEG_QUALITY
         ),
     );
@@ -601,6 +601,10 @@ fn republish_heic_as_sdr_jpeg(
         .vendor_metadata
         .not_carried
         .insert(3, "source video container bytes were preserved".to_owned());
+    receipt.vendor_metadata.not_carried.insert(
+        4,
+        "EXIF Make, Model, DateTime, DateTimeOriginal, and DateTimeDigitized were copied when present; JPEG Orientation is 1 because irot was applied; other EXIF was not copied".to_owned(),
+    );
     Ok(receipt)
 }
 

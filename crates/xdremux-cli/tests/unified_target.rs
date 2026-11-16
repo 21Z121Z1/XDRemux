@@ -303,7 +303,14 @@ fn oppo_heic_source_becomes_an_srgb_jpeg_motion_photo_after_confirmation() {
     ]);
     assert_eq!(code, 1, "{stderr}");
     assert!(!held.exists());
-    assert!(stderr.contains("gain map"), "{stderr}");
+    assert!(stderr.contains("gain map is not applied"), "{stderr}");
+    assert!(stderr.contains("sRGB JPEG"), "{stderr}");
+    assert!(stderr.contains("Orientation"), "{stderr}");
+    assert!(!stderr.contains("transcoded: none"), "{stderr}");
+    assert!(
+        !stderr.contains("gain map the JPEG writer keeps"),
+        "{stderr}"
+    );
     assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
 
     let output = dir.path().join("oppoMP.jpg");
@@ -539,7 +546,119 @@ fn assert_sdr_jpeg_motion(input: &Path, output: &Path, stdout: &str) {
         notes.contains("video container bytes were preserved"),
         "{notes}"
     );
+    assert!(notes.contains("Orientation is 1"), "{notes}");
+    assert!(bytes.windows(b"samsung\0".len()).any(|w| w == b"samsung\0"));
+    assert!(bytes
+        .windows(b"Galaxy S26 Ultra\0".len())
+        .any(|w| w == b"Galaxy S26 Ultra\0"));
+    assert!(bytes
+        .windows(b"2026:03:12 13:56:09\0".len())
+        .any(|w| w == b"2026:03:12 13:56:09\0"));
+    assert!(bytes
+        .windows(12)
+        .any(|w| w == b"\x12\x01\x03\x00\x01\x00\x00\x00\x01\x00\x00\x00"));
+    assert!(!bytes
+        .windows(12)
+        .any(|w| w == b"\x12\x01\x03\x00\x01\x00\x00\x00\x06\x00\x00\x00"));
+    let mut marker = 2usize;
+    let mut size = None;
+    while marker + 8 < bytes.len() {
+        if bytes[marker] != 0xff {
+            break;
+        }
+        let kind = bytes[marker + 1];
+        if kind == 0xd8 || kind == 0xd9 {
+            marker += 2;
+            continue;
+        }
+        let length = u16::from_be_bytes([bytes[marker + 2], bytes[marker + 3]]) as usize;
+        if matches!(kind, 0xc0..=0xc2) {
+            size = Some((
+                u16::from_be_bytes([bytes[marker + 7], bytes[marker + 8]]),
+                u16::from_be_bytes([bytes[marker + 5], bytes[marker + 6]]),
+            ));
+            break;
+        }
+        marker += 2 + length;
+    }
+    assert_eq!(size, Some((3000, 4000)));
     assert_ne!(source, bytes);
+    assert_eq!(source, fs::read(input).unwrap());
+}
+
+#[test]
+fn heic_batch_matches_convert_loss_count_for_oppo_vivo_and_xiaomi() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let before = fs::read(&input).unwrap();
+    for target in ["oppo", "vivo", "xiaomi"] {
+        let output = dir.path().join(format!("{target}MP.jpg"));
+        let (code, stdout, stderr) = run(vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            target.into(),
+            "--motion-report-json".into(),
+        ]);
+        assert_eq!(code, 0, "{target} {stderr}");
+        let convert_report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        let omitted = convert_report["omitted_resource_count"].as_u64().unwrap();
+        assert!(omitted > 0, "{target} {convert_report}");
+        let batch_dir = dir.path().join(format!("{target}-batch"));
+        let (code, batch_stdout, stderr) = run(vec![
+            "batch".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output-dir".into(),
+            batch_dir.as_os_str().to_owned(),
+            "--target".into(),
+            target.into(),
+            "--json".into(),
+        ]);
+        assert_eq!(code, 0, "{target} {stderr} {batch_stdout}");
+        let receipt: serde_json::Value = serde_json::from_str(&batch_stdout).unwrap();
+        assert_eq!(
+            receipt["successes"][0]["omitted_resource_count"], omitted,
+            "{target}"
+        );
+        let published = batch_dir.join("heif-ultrahdr-01.xdremuxMP.jpg");
+        assert!(published.exists(), "{target}");
+        assert_sdr_jpeg_motion(&input, &published, &stdout);
+        assert_eq!(fs::read(&input).unwrap(), before);
+    }
+}
+
+#[test]
+fn rejected_heic_color_profile_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = fs::read(fixture("samsung/heif-ultrahdr-01.heic")).unwrap();
+    let mut broken = source.clone();
+    let icc = broken
+        .windows(4)
+        .position(|window| window == b"acsp")
+        .unwrap();
+    broken[icc - 24..icc - 20].copy_from_slice(b"link");
+    let input = dir.path().join("broken-color.heic");
+    fs::write(&input, &broken).unwrap();
+    let output = dir.path().join("brokenMP.jpg");
+    let (code, _, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+    ]);
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!output.exists(), "{stderr}");
+    assert!(
+        stderr.contains("ICC") || stderr.contains("color") || stderr.contains("sRGB"),
+        "{stderr}"
+    );
 }
 
 #[test]

@@ -59,6 +59,14 @@ pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> Target
     };
     if still_is_heic {
         plan.warning = heic_motion_warning(target);
+        if matches!(
+            target,
+            ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi
+        ) {
+            plan.kept = HEIC_SDR_JPEG_KEPT;
+            plan.transcoded = HEIC_SDR_JPEG_TRANSCODED;
+            plan.dropped = HEIC_SDR_JPEG_DROPPED;
+        }
     } else if target == ConversionTarget::Huawei {
         plan.blocked = Some(HUAWEI_NOT_HARMONY);
         plan.warning = HUAWEI_NOT_HARMONY;
@@ -66,8 +74,22 @@ pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> Target
     plan
 }
 
-const HARMONY_HEIC_WARNING: &str = "huawei keeps this file only when it is already a HEIC still plus an appended MP4 with com.openharmony.covertime (big-endian float32 milliseconds) and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are copied, not created. BeetMan/XDRemux-Flutter reads this Mate 70 container and writes an Apple Live Photo; that reader is not a Harmony gallery writer. Its photoAccessHelper picker returns the original HEIC and does not create a moving-photo asset. Harmony gallery import and playback of this file are not verified. The Android gallery 11.0.19.478 40-byte tail is not this output";
-const SDR_JPEG_HEIC_WARNING: &str = "HEIC Motion Photo is not supported by the reviewed OPPO, vivo, or Xiaomi gallery builds, so this still is decoded and encoded as an 8-bit sRGB JPEG. Display P3 or sRGB is converted to sRGB. PQ, HLG, and other HDR transfers are refused instead of clamping code values. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
+const HARMONY_HEIC_WARNING: &str = "huawei keeps this file only when it is already a HEIC still plus an appended MP4 with com.openharmony.covertime (big-endian float32 milliseconds) and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are copied, not created. OpenHarmony photoAccessHelper creates a moving photo from a separate image resource and a separate video resource through MediaAssetChangeRequest; that API does not define this combined container. This route does not call it. BeetMan/XDRemux-Flutter reads this container and writes an Apple Live Photo; that reader is not a Harmony gallery writer. Harmony gallery import and playback of this file are not verified. The Android gallery 11.0.19.478 40-byte tail is not this output";
+const HEIC_SDR_JPEG_KEPT: &[&str] = &[
+    "preserved video bytes",
+    "EXIF Make, Model, DateTime, DateTimeOriginal, and DateTimeDigitized when the source still has them",
+];
+const HEIC_SDR_JPEG_TRANSCODED: &[&str] = &[
+    "HEIC primary becomes an 8-bit sRGB JPEG; this program applies one admitted sRGB or Display P3 ICC transform",
+];
+const HEIC_SDR_JPEG_DROPPED: &[&str] = &[
+    "gain map is not applied and is not copied",
+    "HDR display",
+    "HEIF auxiliary items other than the primary still",
+    "source Orientation value; irot is applied to the pixels and the JPEG Orientation is 1",
+    "other EXIF fields, including GPS and MakerNote",
+];
+const SDR_JPEG_HEIC_WARNING: &str = "HEIC Motion Photo is not supported by the reviewed OPPO, vivo, or Xiaomi gallery builds, so this still is decoded and encoded as an 8-bit sRGB JPEG. This program applies one admitted sRGB or Display P3 ICC transform; libheif's output tag is not that proof. Display P3 nclx without an ICC uses the Display P3 profile. PQ, HLG, and other HDR transfers are refused instead of clamping code values. irot is applied to the pixels and JPEG Orientation is 1. Make, Model, and the date tags are copied when present; other EXIF is not. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
 const HUAWEI_NOT_HARMONY: &str = "This file is not the OpenHarmony HEIC motion container. --target huawei does not publish the Android gallery 11.0.19.478 JPEG plus 40-byte tail. videoId, deferredVideoEnhanceFlag, starttime, and the v6 trailer are not invented. Accepting the warning does not enable that output";
 
 const SAMSUNG_HEIC_WARNING: &str = "Samsung gallery 15.1.03.4 code can read a top-level mpvd that runs to EOF. Opening the HEIC still is not the same as playing it as motion. SEF is left out. This file was not played on a device";
@@ -263,6 +285,17 @@ mod tests {
             assert!(plan.warning.contains("gain map"));
             assert!(plan.warning.contains("not supported"));
             assert!(!plan.warning.contains("not established"));
+            assert!(!plan.kept.iter().any(|item| item.contains("gain map")));
+            assert!(plan
+                .transcoded
+                .iter()
+                .any(|item| item.contains("sRGB JPEG")));
+            assert!(plan.dropped.iter().any(|item| item.contains("gain map")));
+            assert!(plan.dropped.iter().any(|item| item.contains("Orientation")));
+            assert!(plan.kept.iter().any(|item| item.contains("DateTime")));
+            let jpeg = target_preflight(target, false);
+            assert!(jpeg.kept.iter().any(|item| item.contains("gain")));
+            assert!(jpeg.transcoded.is_empty());
         }
         assert!(target_preflight(ConversionTarget::Oppo, false)
             .claims

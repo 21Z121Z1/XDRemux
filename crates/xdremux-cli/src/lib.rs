@@ -736,6 +736,7 @@ fn emit_android_motion_receipt(
             "gaps": receipt.vendor_metadata.gaps,
             "exif_identifier_present": receipt.vendor_metadata.exif_identifier_present,
             "still_sdr_jpeg": receipt.still_sdr_jpeg,
+            "omitted_resource_count": receipt.omitted_resource_count,
             "video_byte_length": receipt.vendor_metadata.video_byte_length,
             "motion_video_copies": 1,
         });
