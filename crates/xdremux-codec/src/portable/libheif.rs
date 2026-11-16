@@ -1,6 +1,6 @@
 use libheif_rs::{
-    Channel, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue, EncoderQuality,
-    HeifContext, Image, ImageHandle, LibHeif, RgbChroma,
+    Channel, ColorPrimaries, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue,
+    EncoderQuality, HeifContext, Image, ImageHandle, LibHeif, RgbChroma, TransferCharacteristics,
 };
 use xdremux_engine::{
     CapabilityInventory, GainMapChannels, GainMapCodec, GainMapCodecLayout,
@@ -244,6 +244,86 @@ impl LibHeifProvider {
             hvcc: common_hvcc.ok_or_else(|| CodecError::invalid("encoder produced no tiles"))?,
             profile: request.target,
         })
+    }
+
+    /// Decode the primary item as 8-bit sRGB for a disclosed SDR JPEG.
+    ///
+    /// libheif's interleaved RGB output is accepted only when it is tagged
+    /// BT.709 primaries and the sRGB transfer. PQ, HLG, linear, and BT.2020
+    /// 10/12-bit transfers are refused so HDR code values are not clamped.
+    /// An embedded ICC must be an admitted sRGB or Display P3 profile.
+    pub fn decode_sdr_display_rgb8(&self, source: &[u8]) -> Result<Raster8> {
+        if source.is_empty() {
+            return Err(CodecError::invalid("HEIF decode input is empty"));
+        }
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context
+            .primary_image_handle()
+            .map_err(CodecError::libheif)?;
+        if let Some(profile) = handle.color_profile_nclx() {
+            match profile.transfer_characteristics() {
+                TransferCharacteristics::ITU_R_BT_2100_0_PQ
+                | TransferCharacteristics::ITU_R_BT_2100_0_HLG
+                | TransferCharacteristics::Linear
+                | TransferCharacteristics::Logarithmic100
+                | TransferCharacteristics::Logarithmic100Sqrt10
+                | TransferCharacteristics::ITU_R_BT_2020_2_10bit
+                | TransferCharacteristics::ITU_R_BT_2020_2_12bit => {
+                    return Err(CodecError::unsupported(
+                        "primary uses an HDR transfer; refusing to clamp those code values into an 8-bit JPEG",
+                    ));
+                }
+                _ => {}
+            }
+        }
+        let icc = handle.color_profile_raw().map(|profile| profile.data);
+        if let Some(profile) = icc.as_deref() {
+            xdremux_metadata::identify_sdr_color_space(Some(profile), None).map_err(|error| {
+                CodecError::unsupported(format!(
+                    "primary ICC is not an admitted sRGB or Display P3 SDR profile: {error}"
+                ))
+            })?;
+        } else if handle.color_profile_nclx().is_none() {
+            return Err(CodecError::unsupported(
+                "primary has no ICC or nclx color description; refusing to assume sRGB",
+            ));
+        }
+        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+        let image = lib
+            .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
+            .map_err(CodecError::libheif)?;
+        let output = image.color_profile_nclx();
+        let tagged_srgb = output.as_ref().is_some_and(|profile| {
+            profile.color_primaries() == ColorPrimaries::ITU_R_BT_709_5
+                && profile.transfer_characteristics() == TransferCharacteristics::IEC_61966_2_1
+                && profile.full_range_flag() == 1
+        });
+        if !tagged_srgb {
+            return Err(CodecError::unsupported(
+                "libheif did not tag the decoded primary as full-range sRGB; refusing to label those pixels as JPEG sRGB",
+            ));
+        }
+        let plane = image
+            .planes()
+            .interleaved
+            .ok_or_else(|| CodecError::invalid("decoded RGB image has no interleaved plane"))?;
+        if plane.bits_per_pixel != 8 {
+            return Err(CodecError::unsupported(
+                "decoded primary is not 8-bit; refusing to shift HDR or wide samples into JPEG",
+            ));
+        }
+        let data =
+            copy_plane_to_raster(plane.data, plane.stride, image.width(), image.height(), 3)?;
+        Raster8::new(
+            image.width(),
+            image.height(),
+            usize::try_from(image.width())
+                .ok()
+                .and_then(|width| width.checked_mul(3))
+                .ok_or_else(|| CodecError::invalid("decoded RGB row size overflows"))?,
+            RasterPixelFormat::Rgb8,
+            data,
+        )
     }
 
     fn decode_heif(&self, request: &HeifRasterDecodeRequest) -> Result<Raster8> {
@@ -934,5 +1014,28 @@ mod tests {
         assert_eq!(decoded.width, 512);
         assert_eq!(decoded.height, 512);
         assert_eq!(decoded.format, RasterPixelFormat::Rgb8);
+    }
+
+    #[test]
+    fn samsung_ultra_hdr_primary_decodes_as_full_range_srgb() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic");
+        let data = std::fs::read(path).expect("samsung heic fixture");
+        let decoded = LibHeifProvider::new()
+            .decode_sdr_display_rgb8(&data)
+            .expect("Display P3 primary should become sRGB");
+        assert_eq!(decoded.width, 3000);
+        assert_eq!(decoded.height, 4000);
+        let count = (decoded.data.len() / 3) as u64;
+        let mut sum = [0u64; 3];
+        let mut max = 0u8;
+        for pixel in decoded.data.as_chunks::<3>().0 {
+            sum[0] += u64::from(pixel[0]);
+            sum[1] += u64::from(pixel[1]);
+            sum[2] += u64::from(pixel[2]);
+            max = max.max(pixel[0]).max(pixel[1]).max(pixel[2]);
+        }
+        assert!(sum[1] / count > 20, "primary looks clamped dark");
+        assert!(max > 200);
     }
 }

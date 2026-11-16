@@ -288,15 +288,37 @@ fn samsung_target_publishes_primary_video_and_names_the_secondary_stream() {
 }
 
 #[test]
-fn oppo_heic_source_plans_jpeg_and_stops_before_still_reencode() {
+fn oppo_heic_source_becomes_an_srgb_jpeg_motion_photo_after_confirmation() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
-    let output = dir.path().join("oppoMP.jpg");
-    let (code, _, stderr) = convert(&input, &output, "oppo");
+    let held = dir.path().join("heldMP.jpg");
+    let (code, _, stderr) = run_cli(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        held.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+    ]);
     assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("JPEG Motion Photo"), "{stderr}");
-    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
-    assert!(!output.exists());
+    assert!(!held.exists());
+    assert!(stderr.contains("gain map"), "{stderr}");
+    assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
+
+    let output = dir.path().join("oppoMP.jpg");
+    let (code, stdout, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+        "--motion-report-json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_sdr_jpeg_motion(&input, &output, &stdout);
 }
 
 #[test]
@@ -471,14 +493,53 @@ fn vivo_target_writes_a_combined_jpeg_for_oppo_and_google_sources() {
 }
 
 #[test]
-fn vivo_heic_source_stops_before_still_reencode() {
+fn vivo_and_xiaomi_heic_sources_become_srgb_jpeg_motion_photos() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
-    let output = dir.path().join("vivoMP.jpg");
-    let (code, _, stderr) = convert(&input, &output, "vivo");
-    assert_eq!(code, 1, "{stderr}");
-    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
-    assert!(!output.exists());
+    for target in ["vivo", "xiaomi"] {
+        let output = dir.path().join(format!("{target}MP.jpg"));
+        let (code, stdout, stderr) = run(vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            target.into(),
+            "--motion-report-json".into(),
+        ]);
+        assert_eq!(code, 0, "{target} {stderr}");
+        assert_sdr_jpeg_motion(&input, &output, &stdout);
+        assert_eq!(
+            fs::read(&input).unwrap(),
+            fs::read(fixture("samsung/heif-ultrahdr-01.heic")).unwrap()
+        );
+    }
+}
+
+fn assert_sdr_jpeg_motion(input: &Path, output: &Path, stdout: &str) {
+    let bytes = fs::read(output).unwrap();
+    assert!(bytes.starts_with(&[0xff, 0xd8]), "output is not a JPEG");
+    let source = fs::read(input).unwrap();
+    let source_photo =
+        MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+    let video = source_photo.motion_video_bytes().unwrap();
+    let output_photo =
+        MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict()).unwrap();
+    output_photo.validate().unwrap();
+    assert_eq!(output_photo.motion_video_bytes().unwrap(), video);
+    let report: serde_json::Value = serde_json::from_str(stdout).unwrap();
+    assert_eq!(report["still_sdr_jpeg"], true);
+    assert_eq!(report["native_vendor_claim"], false);
+    assert_eq!(report["motion_video_copies"], 1);
+    let notes = report["not_carried"].to_string();
+    assert!(notes.contains("gain map"), "{notes}");
+    assert!(notes.contains("sRGB"), "{notes}");
+    assert!(
+        notes.contains("video container bytes were preserved"),
+        "{notes}"
+    );
+    assert_ne!(source, bytes);
 }
 
 #[test]
@@ -892,24 +953,23 @@ fn unverified_target_writes_nothing_until_the_risk_is_accepted() {
 }
 
 #[test]
-fn blocked_heic_stays_blocked_after_the_warning_is_accepted() {
+fn heic_sdr_jpeg_is_not_written_when_the_warning_is_not_accepted() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
     let output = dir.path().join("blockedMP.jpg");
-    let (status, _, stderr) = run(vec![
+    let (status, _, stderr) = run_cli(vec![
         "convert".into(),
         "--input".into(),
         input.as_os_str().to_owned(),
         "--output".into(),
         output.as_os_str().to_owned(),
         "--target".into(),
-        "oppo".into(),
-        "--accept-unverified-target".into(),
+        "xiaomi".into(),
     ]);
     assert_eq!(status, 1, "{stderr}");
     assert!(!output.exists());
-    assert!(stderr.contains("TranscodeRequired"), "{stderr}");
-    assert!(stderr.contains("does not enable"), "{stderr}");
+    assert!(stderr.contains("gain map"), "{stderr}");
+    assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
 }
 
 #[test]

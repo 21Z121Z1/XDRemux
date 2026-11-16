@@ -14,6 +14,7 @@ mod categorize;
 mod cinematic_camera;
 mod harmony_motion;
 mod hdr_look;
+mod heic_sdr_jpeg;
 mod huawei_live_photo;
 mod live_photo;
 mod live_photo_package;

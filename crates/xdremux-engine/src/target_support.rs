@@ -58,12 +58,7 @@ pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> Target
         ConversionTarget::Huawei => HUAWEI,
     };
     if still_is_heic {
-        if let Some(blocked) = heic_block(target) {
-            plan.blocked = Some(blocked);
-            plan.warning = blocked;
-        } else if let Some(warning) = heic_motion_warning(target) {
-            plan.warning = warning;
-        }
+        plan.warning = heic_motion_warning(target);
     } else if target == ConversionTarget::Huawei {
         plan.blocked = Some(HUAWEI_NOT_HARMONY);
         plan.warning = HUAWEI_NOT_HARMONY;
@@ -72,34 +67,22 @@ pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> Target
 }
 
 const HARMONY_HEIC_WARNING: &str = "huawei keeps this file only when it is already a HEIC still plus an appended MP4 with com.openharmony.covertime (big-endian float32 milliseconds) and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are copied, not created. BeetMan/XDRemux-Flutter reads this Mate 70 container and writes an Apple Live Photo; that reader is not a Harmony gallery writer. Its photoAccessHelper picker returns the original HEIC and does not create a moving-photo asset. Harmony gallery import and playback of this file are not verified. The Android gallery 11.0.19.478 40-byte tail is not this output";
+const SDR_JPEG_HEIC_WARNING: &str = "HEIC Motion Photo is not supported by the reviewed OPPO, vivo, or Xiaomi gallery builds, so this still is decoded and encoded as an 8-bit sRGB JPEG. Display P3 or sRGB is converted to sRGB. PQ, HLG, and other HDR transfers are refused instead of clamping code values. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
 const HUAWEI_NOT_HARMONY: &str = "This file is not the OpenHarmony HEIC motion container. --target huawei does not publish the Android gallery 11.0.19.478 JPEG plus 40-byte tail. videoId, deferredVideoEnhanceFlag, starttime, and the v6 trailer are not invented. Accepting the warning does not enable that output";
 
 const SAMSUNG_HEIC_WARNING: &str = "Samsung gallery 15.1.03.4 code can read a top-level mpvd that runs to EOF. Opening the HEIC still is not the same as playing it as motion. SEF is left out. This file was not played on a device";
 const STANDARD_HEIC_WARNING: &str = "android-standard, also selected by standard and google, keeps this HEIC and the source video bytes in Motion Photo 1.0. The specification allows that container and is not a player. You confirmed Google Photos played some HEIC motion samples and that preserved video played. That is consumer evidence for this standard target, not another target, and it does not name a Photos version or cover this file. Samsung 15.1.03.4 is the traced mpvd reader. A kept gain map is not HDR display";
 const APPLE_HEIC_WARNING: &str = "This Apple route writes a HEIC still plus MOV for Photos live pairing. That pairing rule is not a statement that iOS cannot open an Android combined file. The movie is remuxed. A kept gain map is not HDR display. This pair was not played on a device in this change";
 
-fn heic_motion_warning(target: ConversionTarget) -> Option<&'static str> {
+fn heic_motion_warning(target: ConversionTarget) -> &'static str {
     match target {
-        ConversionTarget::Samsung => Some(SAMSUNG_HEIC_WARNING),
-        ConversionTarget::AndroidStandard => Some(STANDARD_HEIC_WARNING),
-        ConversionTarget::Apple => Some(APPLE_HEIC_WARNING),
-        ConversionTarget::Huawei => Some(HARMONY_HEIC_WARNING),
-        _ => None,
-    }
-}
-
-fn heic_block(target: ConversionTarget) -> Option<&'static str> {
-    match target {
-        ConversionTarget::Oppo => Some(
-            "HEIC Motion Photo is not supported by Photos 17.10.62 or 25.17.35. isOlivePhoto and saq.w require MIME image/jpeg, and the decoder only constructs JpegOLiveReader, which returns empty without JPEG SOI. ExoPlayer mpvd is not the olive player. This is these two builds, not every ColorOS version. A JPEG Motion Photo would require still transcoding. TranscodeRequired: re-encoding this HEIC still would drop or rewrite HDR and auxiliary resources, so publication stops before that transcode. Accepting the warning does not enable that conversion",
-        ),
-        ConversionTarget::Vivo => Some(
-            "HEIC Motion Photo is not supported by Albums 10.0.10.42 or Gallery 3.2.10.4. 10.0.10.42 XmpUtil requires JPEG SOI and that DEX has no mpvd; the package is the Y04s/W20 overseas proxy, not an S60 domestic build. 3.2.10.4 plays a sidecar and does not fall back to a combined file. These two builds are not every vivo version. The 10.0 combined path needs a JPEG still. TranscodeRequired: re-encoding this HEIC still would drop or rewrite HDR and auxiliary resources, so publication stops before that transcode. Accepting the warning does not enable that conversion",
-        ),
-        ConversionTarget::Xiaomi => Some(
-            "HEIC Motion Photo is not supported by Gallery 4.3.1.15-global. Flag 1073 uses XmpHelper, which requires JPEG SOI. Flags 1006 and 1071 also call readMicroMotionVideoOffset and are cleared when that offset is not positive. Flag 1026 marks a still HEIF only. That DEX has no mpvd. This is this build, not every Xiaomi version. A JPEG Motion Photo would require still transcoding. TranscodeRequired: re-encoding this HEIC still would drop or rewrite HDR and auxiliary resources, so publication stops before that transcode. Accepting the warning does not enable that conversion",
-        ),
-        _ => None,
+        ConversionTarget::Samsung => SAMSUNG_HEIC_WARNING,
+        ConversionTarget::AndroidStandard => STANDARD_HEIC_WARNING,
+        ConversionTarget::Apple => APPLE_HEIC_WARNING,
+        ConversionTarget::Huawei => HARMONY_HEIC_WARNING,
+        ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi => {
+            SDR_JPEG_HEIC_WARNING
+        }
     }
 }
 
@@ -274,24 +257,13 @@ mod tests {
             ConversionTarget::Xiaomi,
         ] {
             let plan = target_preflight(target, true);
-            let blocked = plan.blocked.unwrap();
-            assert!(blocked.contains("not supported"));
-            assert!(blocked.contains("TranscodeRequired"));
-            assert!(blocked.contains("does not enable"));
-            assert!(!blocked.contains("not established"));
+            assert!(plan.blocked.is_none());
+            assert!(plan.requires_confirmation);
+            assert!(plan.warning.contains("sRGB JPEG"));
+            assert!(plan.warning.contains("gain map"));
+            assert!(plan.warning.contains("not supported"));
+            assert!(!plan.warning.contains("not established"));
         }
-        assert!(target_preflight(ConversionTarget::Oppo, true)
-            .blocked
-            .unwrap()
-            .contains("JpegOLiveReader"));
-        assert!(target_preflight(ConversionTarget::Vivo, true)
-            .blocked
-            .unwrap()
-            .contains("not an S60"));
-        assert!(target_preflight(ConversionTarget::Xiaomi, true)
-            .blocked
-            .unwrap()
-            .contains("1026"));
         assert!(target_preflight(ConversionTarget::Oppo, false)
             .claims
             .iter()

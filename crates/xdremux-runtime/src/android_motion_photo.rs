@@ -34,6 +34,8 @@ pub struct AndroidMotionPhotoFileReceipt {
     pub vendor_metadata: VendorMetadataReport,
     /// Resources the plan explicitly left out of the published file.
     pub omitted_resource_count: usize,
+    /// The still was decoded from HEIC and encoded as 8-bit sRGB JPEG.
+    pub still_sdr_jpeg: bool,
 }
 
 /// Caller-owned, explicitly associated Apple Live Photo input files.
@@ -116,7 +118,7 @@ pub fn resolve_motion_output_target_for(
     if target != MotionOutputTarget::GoogleAuto {
         return Ok(target);
     }
-    if destination == Some("oppo") || destination == Some("vivo") {
+    if destination == Some("oppo") || destination == Some("vivo") || destination == Some("xiaomi") {
         return match motion_still_encoding(source, asset) {
             Some(MotionStillEncoding::Jpeg | MotionStillEncoding::Heic) => {
                 Ok(MotionOutputTarget::GoogleJpeg)
@@ -282,8 +284,16 @@ fn convert_android_motion_photo(
     photo
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
-    if carry.destination == "oppo" && photo.still().mime != "image/jpeg" {
-        return Err(oppo_jpeg_route_blocked(&photo));
+    if matches!(carry.destination, "oppo" | "vivo" | "xiaomi") && photo.still().mime != "image/jpeg"
+    {
+        return republish_heic_as_sdr_jpeg(
+            &photo,
+            marker_source,
+            inputs,
+            output,
+            compatibility,
+            carry,
+        );
     }
     if carry.destination == "vivo" {
         if vivo_native_single_file(&photo) {
@@ -485,7 +495,113 @@ fn convert_android_motion_photo(
         video_brand_changed: false,
         vendor_metadata,
         omitted_resource_count,
+        still_sdr_jpeg: false,
     })
+}
+
+fn republish_heic_as_sdr_jpeg(
+    photo: &MotionPhoto<'_>,
+    marker_source: &[u8],
+    inputs: &[&Path],
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG video", error))?
+        .to_vec();
+    let presentation = photo.presentation_time();
+    let still = photo
+        .still_bytes()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG still", error))?;
+    let jpeg = crate::heic_sdr_jpeg::encode_sdr_jpeg(still)
+        .or_else(|_| crate::heic_sdr_jpeg::encode_sdr_jpeg(marker_source))?;
+    let parts = MotionPhoto::parse(
+        Input::Parts {
+            still: &jpeg,
+            movie: &video,
+            presentation,
+        },
+        ParseOptions::compatible(),
+    )
+    .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion", error))?;
+    parts
+        .validate()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion validation", error))?;
+    let plan = parts.plan(
+        TargetProfile::AndroidJpeg,
+        WritePolicy {
+            unmapped: UnmappedPolicy::DropExplicitly,
+            ..WritePolicy::default()
+        },
+    );
+    if !plan.can_execute() {
+        return Err(RuntimeError::new(
+            "HEIC SDR JPEG",
+            plan.compatibility().blockers.join("; "),
+        ));
+    }
+    let composed = plan
+        .execute()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion execute", error))?;
+    if composed.files.len() != 1 || !composed.files[0].bytes.ends_with(&video) {
+        return Err(RuntimeError::new(
+            "HEIC SDR JPEG",
+            "the JPEG Motion Photo writer did not keep the source video as one suffix",
+        ));
+    }
+    let motion = composed
+        .files
+        .into_iter()
+        .next()
+        .map(|file| file.bytes)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "HEIC SDR JPEG",
+                "the JPEG Motion Photo writer returned no file",
+            )
+        })?;
+    let dropped = photo
+        .resources()
+        .filter(|resource| {
+            !matches!(
+                resource.role,
+                ResourceRole::PrimaryStill | ResourceRole::PrimaryMotionVideo
+            )
+        })
+        .count();
+    let mut receipt = convert_android_motion_photo(
+        Input::SingleFile(&motion),
+        &motion,
+        inputs,
+        output,
+        MotionOutputTarget::GoogleJpeg,
+        compatibility,
+        carry,
+    )?;
+    receipt.still_sdr_jpeg = true;
+    receipt.omitted_resource_count = receipt.omitted_resource_count.saturating_add(dropped);
+    receipt.vendor_metadata.not_carried.insert(
+        0,
+        format!(
+            "HEIC primary was decoded and encoded as 8-bit sRGB JPEG at quality {}; Display P3 or sRGB ICC is converted to sRGB, and HDR transfers are refused instead of clamping code values",
+            crate::heic_sdr_jpeg::JPEG_QUALITY
+        ),
+    );
+    receipt.vendor_metadata.not_carried.insert(
+        1,
+        "the gain map was not applied and was not copied; HDR display is lost".to_owned(),
+    );
+    receipt.vendor_metadata.not_carried.insert(
+        2,
+        "HEIF auxiliary items other than the primary still were not copied".to_owned(),
+    );
+    receipt
+        .vendor_metadata
+        .not_carried
+        .insert(3, "source video container bytes were preserved".to_owned());
+    Ok(receipt)
 }
 
 pub(crate) fn convert_huawei_harmony_file(
@@ -628,6 +744,7 @@ pub(crate) fn convert_huawei_harmony_file(
         video_brand_changed: false,
         vendor_metadata,
         omitted_resource_count: 0,
+        still_sdr_jpeg: false,
     })
 }
 
@@ -751,6 +868,7 @@ fn publish_huawei_live_photo(
         video_brand_changed: false,
         vendor_metadata,
         omitted_resource_count: 0,
+        still_sdr_jpeg: false,
     })
 }
 
@@ -929,6 +1047,7 @@ fn publish_vivo_combined(
         vendor_metadata,
         video_brand_changed: false,
         omitted_resource_count,
+        still_sdr_jpeg: false,
     })
 }
 
@@ -1091,6 +1210,7 @@ fn publish_preserved_vivo_source(
         video_brand_changed: false,
         vendor_metadata,
         omitted_resource_count: 0,
+        still_sdr_jpeg: false,
     })
 }
 
@@ -1098,36 +1218,6 @@ fn vivo_layout_missing() -> RuntimeError {
     RuntimeError::new(
         "vivo Motion Photo",
         "this source has no vivoMediaEStream and vivoMediaExtInfo pair to preserve, so those boxes are not invented and no file is published. Repository vivo samples stay single-file JPEG+MP4. Gallery 3.2.10.4 can also play a separate MP4 found through MediaExtra live_photo and the file name, then setDataSource on that whole file; that old path does not require a sidecar or a device-database row. application/livePhoto-meta is kept only when the source MP4 already has it. The repeated sample token and EStream digest are not written. Cross-source output is not accepted yet",
-    )
-}
-
-fn oppo_jpeg_route_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
-    let plan = photo.plan(
-        TargetProfile::AndroidJpeg,
-        xdremux_motion_photo::WritePolicy::default(),
-    );
-    let blocked = plan
-        .report()
-        .resources
-        .iter()
-        .filter(|entry| {
-            matches!(
-                entry.disposition,
-                Disposition::TranscodeRequired | Disposition::Unmapped | Disposition::Dropped
-            )
-        })
-        .map(|entry| format!("{:?}: {}", entry.disposition, entry.reason))
-        .collect::<Vec<_>>();
-    let detail = if blocked.is_empty() {
-        plan.compatibility().blockers.join("; ")
-    } else {
-        blocked.join("; ")
-    };
-    RuntimeError::new(
-        "OPPO Motion Photo",
-        format!(
-            "HEIC Motion Photo is not supported by Photos 17.10.62 or 25.17.35: image/jpeg plus JpegOLiveReader SOI. The planned JPEG Motion Photo would keep the source video bytes. Publication stopped before still transcoding, which would otherwise drop or rewrite resources: {detail}"
-        ),
     )
 }
 
