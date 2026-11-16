@@ -543,6 +543,216 @@ fn huawei_keeps_an_existing_openharmony_heic_byte_for_byte() {
 }
 
 #[test]
+fn batch_harmony_uses_the_same_preserve_path_as_convert() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("mate.heic");
+    let source = openharmony_motion_photo();
+    fs::write(&input, &source).unwrap();
+    let out = dir.path().join("out");
+    let (code, stdout, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+        "--json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {stdout}");
+    let published = out.join("mate.xdremuxMP.heic");
+    assert_eq!(fs::read(&published).unwrap(), source);
+    let receipt: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(receipt["succeeded"], 1);
+    assert_eq!(receipt["failed"], 0);
+    assert_eq!(receipt["successes"][0]["omitted_resource_count"], 0);
+}
+
+#[test]
+fn batch_harmony_writes_nothing_before_risk_is_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("mate.heic");
+    fs::write(&input, openharmony_motion_photo()).unwrap();
+    let out = dir.path().join("out");
+    let (code, _, stderr) = run_cli(vec![
+        "batch".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+    ]);
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!out.join("mate.xdremuxMP.heic").exists());
+    assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
+}
+
+#[test]
+fn batch_harmony_keeps_a_good_file_and_rejects_jpeg_and_a_bad_container() {
+    let dir = tempfile::tempdir().unwrap();
+    let good = dir.path().join("good.heic");
+    let bad = dir.path().join("bad.heic");
+    let jpeg = dir.path().join("still.jpg");
+    let source = openharmony_motion_photo();
+    fs::write(&good, &source).unwrap();
+    let mut broken = source.clone();
+    let marker = b"com.openharmony.videoId";
+    let at = broken
+        .windows(marker.len())
+        .position(|w| w == marker)
+        .unwrap();
+    broken[at..at + marker.len()].fill(b'x');
+    fs::write(&bad, broken).unwrap();
+    fs::copy(fixture("vivo/android-v1-sdr-01.jpg"), &jpeg).unwrap();
+    let out = dir.path().join("out");
+    let (code, stdout, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        good.as_os_str().to_owned(),
+        "--input".into(),
+        bad.as_os_str().to_owned(),
+        "--input".into(),
+        jpeg.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+        "--json".into(),
+    ]);
+    assert_ne!(code, 0, "{stdout}");
+    assert_eq!(fs::read(out.join("good.xdremuxMP.heic")).unwrap(), source);
+    assert!(!out.join("bad.xdremuxMP.heic").exists());
+    assert!(!out.join("still.xdremuxMP.jpg").exists());
+    let receipt: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(receipt["succeeded"], 1);
+    assert_eq!(receipt["failed"], 2);
+    let errors = receipt["failures"].to_string();
+    assert!(
+        errors.contains("not invented") || errors.contains("not a HEIC"),
+        "{stderr} {errors}"
+    );
+}
+
+#[test]
+fn batch_harmony_resume_does_not_skip_a_changed_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("mate.heic");
+    let source = openharmony_motion_photo();
+    fs::write(&input, &source).unwrap();
+    let out = dir.path().join("out");
+    let args = vec![
+        "batch".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "huawei".into(),
+        "--resume".into(),
+        "--json".into(),
+    ];
+    let (code, first, stderr) = run(args.clone());
+    assert_eq!(code, 0, "{stderr} {first}");
+    let published = out.join("mate.xdremuxMP.heic");
+    assert_eq!(fs::read(&published).unwrap(), source);
+    let (code, second, stderr) = run(args.clone());
+    assert_eq!(code, 0, "{stderr} {second}");
+    let skipped: serde_json::Value = serde_json::from_str(&second).unwrap();
+    assert_eq!(skipped["skipped_existing"], 1);
+    let mut changed = fs::read(&published).unwrap();
+    changed[0] ^= 0xff;
+    fs::write(&published, &changed).unwrap();
+    let (code, third, _stderr) = run(args);
+    assert_ne!(code, 0, "{third}");
+    let receipt: serde_json::Value = serde_json::from_str(&third).unwrap();
+    assert_eq!(receipt["skipped_existing"], 0);
+    assert_ne!(fs::read(&published).unwrap(), source);
+}
+
+#[test]
+fn batch_omitted_count_matches_left_out_resources_and_stays_zero_when_none() {
+    let dir = tempfile::tempdir().unwrap();
+    let oppo = fixture("oppo/coloros15-ultrahdr-01.jpg");
+    let oppo_out = dir.path().join("oppoMP.jpg");
+    let (code, convert_stdout, stderr) = run(vec![
+        "convert".into(),
+        "--input".into(),
+        oppo.as_os_str().to_owned(),
+        "--output".into(),
+        oppo_out.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+        "--motion-report-json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let convert_report: serde_json::Value = serde_json::from_str(&convert_stdout).unwrap();
+    let left_out = convert_report["not_carried"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item.as_str().unwrap_or("").contains("left out"))
+        .count();
+    assert!(left_out > 0, "{convert_report}");
+
+    let out = dir.path().join("batch");
+    let (code, stdout, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        oppo.as_os_str().to_owned(),
+        "--output-dir".into(),
+        out.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+        "--json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {stdout}");
+    let receipt: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(receipt["successes"][0]["omitted_resource_count"], left_out);
+
+    let (code, human, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        oppo.as_os_str().to_owned(),
+        "--output-dir".into(),
+        dir.path().join("human").as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {human}");
+    assert!(
+        human.contains(&format!("{left_out} source resources")),
+        "{human}"
+    );
+
+    let clean = fixture("vivo/android-v1-sdr-01.jpg");
+    let (code, stdout, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        clean.as_os_str().to_owned(),
+        "--output-dir".into(),
+        dir.path().join("clean").as_os_str().to_owned(),
+        "--target".into(),
+        "google".into(),
+        "--json".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr} {stdout}");
+    let clean_receipt: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(clean_receipt["successes"][0]["omitted_resource_count"], 0);
+    let (code, human, stderr) = run(vec![
+        "batch".into(),
+        "--input".into(),
+        clean.as_os_str().to_owned(),
+        "--output-dir".into(),
+        dir.path().join("clean-human").as_os_str().to_owned(),
+        "--target".into(),
+        "google".into(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(!human.contains("remain only"), "{human}");
+}
+
+#[test]
 fn other_heic_motion_is_not_rewritten_into_harmony() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");

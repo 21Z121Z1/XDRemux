@@ -32,6 +32,8 @@ pub struct AndroidMotionPhotoFileReceipt {
     pub video_compatibility: MotionVideoCompatibility,
     pub video_brand_changed: bool,
     pub vendor_metadata: VendorMetadataReport,
+    /// Resources the plan explicitly left out of the published file.
+    pub omitted_resource_count: usize,
 }
 
 /// Caller-owned, explicitly associated Apple Live Photo input files.
@@ -299,6 +301,7 @@ fn convert_android_motion_photo(
         return publish_huawei_live_photo(marker_source, &photo, output, compatibility, carry);
     }
     let (plan, omitted_unmapped) = plan_public_motion(&photo, target_profile, carry)?;
+    let omitted_resource_count = omitted_unmapped.len();
     let omitted_ids = omitted_unmapped
         .iter()
         .map(|(id, _)| *id)
@@ -481,6 +484,7 @@ fn convert_android_motion_photo(
         video_compatibility: compatibility,
         video_brand_changed: false,
         vendor_metadata,
+        omitted_resource_count,
     })
 }
 
@@ -623,6 +627,7 @@ pub(crate) fn convert_huawei_harmony_file(
         video_compatibility: compatibility,
         video_brand_changed: false,
         vendor_metadata,
+        omitted_resource_count: 0,
     })
 }
 
@@ -745,6 +750,7 @@ fn publish_huawei_live_photo(
         video_compatibility: compatibility,
         video_brand_changed: false,
         vendor_metadata,
+        omitted_resource_count: 0,
     })
 }
 
@@ -777,6 +783,7 @@ fn publish_vivo_combined(
     compose_carry.leave_out_unmapped = true;
     let (plan, omitted_unmapped) =
         plan_public_motion(photo, TargetProfile::AndroidJpeg, compose_carry)?;
+    let omitted_resource_count = omitted_unmapped.len();
     let composed = plan
         .execute()
         .map_err(|error| RuntimeError::external("vivo Motion Photo execution", error))?;
@@ -921,6 +928,7 @@ fn publish_vivo_combined(
         video_compatibility: compatibility,
         vendor_metadata,
         video_brand_changed: false,
+        omitted_resource_count,
     })
 }
 
@@ -1082,6 +1090,7 @@ fn publish_preserved_vivo_source(
         video_compatibility: compatibility,
         video_brand_changed: false,
         vendor_metadata,
+        omitted_resource_count: 0,
     })
 }
 

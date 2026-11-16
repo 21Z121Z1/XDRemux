@@ -19,7 +19,9 @@ use crate::batch_checkpoint::{
 };
 use crate::categorize::classification_relative_directory;
 use crate::vendor_motion_metadata::VendorMetadataCarry;
-use crate::{ApplePortraitSemanticProfile, PortableRuntime, Result, RuntimeError};
+use crate::{
+    is_harmony_motion_photo, ApplePortraitSemanticProfile, PortableRuntime, Result, RuntimeError,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchItem {
@@ -324,15 +326,23 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     let mut items = Vec::with_capacity(inputs.len());
 
     for input in inputs {
+        let file_bytes = fs::read(input).ok();
+        let harmony = options.target == Some(ConversionTarget::Huawei)
+            && file_bytes
+                .as_ref()
+                .is_some_and(|bytes| is_harmony_motion_photo(bytes));
         let analysis = (google_target(options.motion_target).is_some()
             || options.live_photo_output == LivePhotoOutput::Pvt)
-            .then(|| fs::read(input).ok())
+            .then_some(file_bytes)
             .flatten()
             .and_then(|source| probe_bytes(&source).ok().map(|asset| (source, asset)));
-        let motion = analysis
-            .as_ref()
-            .is_some_and(|(_, asset)| matches!(asset, SourceAsset::MotionPhoto { .. }));
-        let android = if motion {
+        let motion = harmony
+            || analysis
+                .as_ref()
+                .is_some_and(|(_, asset)| matches!(asset, SourceAsset::MotionPhoto { .. }));
+        let android = if harmony {
+            Some(MotionOutputTarget::GoogleHeic)
+        } else if motion {
             google_target(options.motion_target).and_then(|target| {
                 if target == MotionOutputTarget::GoogleAuto {
                     let (source, asset) = analysis.as_ref()?;
@@ -657,6 +667,86 @@ fn process_batch_item_with_options(
         create_output_parent(&item.output)?;
         let source = fs::read(&item.input)
             .map_err(|error| RuntimeError::external("batch input read", error))?;
+        if options.target == Some(ConversionTarget::Huawei) && is_harmony_motion_photo(&source) {
+            let signature = source_signature(&item.input, &source)?;
+            let target = MotionOutputTarget::GoogleHeic;
+            let prior = if reuse_existing {
+                checkpoint.reusable_android_item(
+                    &item.input,
+                    &signature,
+                    google_target_name(target),
+                    video_compatibility_name(motion_video_compatibility),
+                    destination_name(options.target),
+                )?
+            } else {
+                None
+            };
+            if let Some(ref prior) = prior {
+                let current = fs::read(&item.output).ok();
+                let same_bytes = current.as_deref() == Some(source.as_slice());
+                let same_digest = source_signature_path(&item.output)
+                    .ok()
+                    .is_some_and(|signature| signature.sha256 == prior.sha256);
+                if prior.output == canonical_or_absolute(&item.output)? && same_bytes && same_digest
+                {
+                    checkpoint_event = Some(BatchCheckpointEvent {
+                        source: item.input.clone(),
+                        image: item.output.clone(),
+                        video: item.output.clone(),
+                        package: None,
+                        signature,
+                        outcome: OwnedCheckpointOutcome::SkippedExisting(String::new()),
+                        android: Some(AndroidCheckpointDetails {
+                            target,
+                            destination: options.target,
+                            compatibility: motion_video_compatibility,
+                            output_sha256: Some(prior.sha256.clone()),
+                        }),
+                    });
+                    return Ok(BatchSuccess {
+                        input: item.input.clone(),
+                        outputs: vec![item.output.clone()],
+                        kind: BatchAssetKind::AndroidMotionPhoto,
+                        disposition: BatchSuccessDisposition::SkippedExisting,
+                        omitted_resource_count: Some(0),
+                    });
+                }
+            }
+            if fs::symlink_metadata(&item.output).is_ok() {
+                return Err(RuntimeError::new(
+                    "batch resume provenance",
+                    "existing Harmony output does not match the preserved source; refusing to reuse or overwrite",
+                ));
+            }
+            let receipt = runtime.convert_huawei_harmony_file(
+                &source,
+                &item.output,
+                motion_video_compatibility,
+                VendorMetadataCarry::from_target(ConversionTarget::Huawei),
+            )?;
+            let digest = source_signature_path(&receipt.output)?.sha256;
+            checkpoint_event = Some(BatchCheckpointEvent {
+                source: item.input.clone(),
+                image: receipt.output.clone(),
+                video: receipt.output.clone(),
+                package: None,
+                signature,
+                outcome: OwnedCheckpointOutcome::Success(String::new()),
+                android: Some(AndroidCheckpointDetails {
+                    target,
+                    destination: options.target,
+                    compatibility: motion_video_compatibility,
+                    output_sha256: Some(digest),
+                }),
+            });
+            return Ok(BatchSuccess {
+                input: item.input.clone(),
+                outputs: vec![receipt.output],
+                kind: BatchAssetKind::AndroidMotionPhoto,
+                disposition: BatchSuccessDisposition::Converted,
+                omitted_resource_count: Some(receipt.omitted_resource_count),
+            });
+        }
         let asset = probe_bytes(&source)
             .map_err(|error| RuntimeError::external("batch source probe", error))?;
         let request = if let Some(target) = options.target {
@@ -756,6 +846,10 @@ fn process_batch_item_with_options(
                             .map(VendorMetadataCarry::from_target)
                             .unwrap_or_else(VendorMetadataCarry::legacy),
                     );
+                    let omitted = conversion
+                        .as_ref()
+                        .ok()
+                        .map(|receipt| receipt.omitted_resource_count);
                     let result = conversion.and_then(|receipt| {
                         let digest = source_signature_path(&receipt.output)?.sha256;
                         Ok((receipt.output, digest))
@@ -783,7 +877,7 @@ fn process_batch_item_with_options(
                         outputs: vec![output],
                         kind: BatchAssetKind::AndroidMotionPhoto,
                         disposition: BatchSuccessDisposition::Converted,
-                        omitted_resource_count: Some(0),
+                        omitted_resource_count: omitted,
                     });
                 }
                 let package = (request.live_photo_output == LivePhotoOutput::Pvt)

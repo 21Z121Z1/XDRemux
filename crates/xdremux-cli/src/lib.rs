@@ -1892,10 +1892,11 @@ fn run_batch(
     };
     let motion_heic = inputs.iter().any(|input| {
         fs::read(input).ok().is_some_and(|bytes| {
-            probe_bytes(&bytes).ok().is_some_and(|asset| {
-                matches!(asset, SourceAsset::MotionPhoto { .. })
-                    && motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic)
-            })
+            (arguments.target == Some(ConversionTarget::Huawei) && is_harmony_motion_photo(&bytes))
+                || probe_bytes(&bytes).ok().is_some_and(|asset| {
+                    matches!(asset, SourceAsset::MotionPhoto { .. })
+                        && motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic)
+                })
         })
     });
     if gate_unverified_target(
