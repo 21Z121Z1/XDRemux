@@ -133,7 +133,7 @@ const ANDROID_STANDARD: TargetPreflight = TargetPreflight {
         SupportClaim { subject: "still", level: EvidenceLevel::FormatStandard, detail: "JPEG or HEIC primary, matching the source still. The specification also names AVIF; this writer does not publish AVIF" },
         SupportClaim { subject: "motion", level: EvidenceLevel::FormatStandard, detail: "Motion Photo 1.0, Padding 0, no MicroVideoVersion" },
         SupportClaim { subject: "video", level: EvidenceLevel::CodeReachable, detail: "original video bytes preserved in one copy" },
-        SupportClaim { subject: "google-photos", level: EvidenceLevel::DeviceConfirmed, detail: "you confirmed Google Photos played some HEIC motion samples and that preserved video played. No Photos version was named. This checkout does not contain the historical gphotos-re tree, so that confirmation is not re-derived as APK control flow. It is consumer evidence for this standard target, not a second target, and it does not cover every file this writer emits" },
+        SupportClaim { subject: "google-photos", level: EvidenceLevel::Unknown, detail: "a historical playback report covers some HEIC samples and preserved video, without a device model, Photos version, or output identity for this build. Current output recognition, playback, and HDR remain untested" },
         SupportClaim { subject: "video-codec", level: EvidenceLevel::Unknown, detail: "hvc1 in checked samples is the file codec, not proof every device plays HEVC, H.264, AV1, or HDR video" },
         SupportClaim { subject: "hdr-display", level: EvidenceLevel::Unknown, detail: "a kept gain map is not HDR display" },
     ],
@@ -250,12 +250,10 @@ mod tests {
             let plan = target_preflight(target, false);
             assert!(plan.requires_confirmation);
             assert!(!plan.warning.contains("本项目无用户真机确认"));
-            if target != ConversionTarget::AndroidStandard {
-                assert!(plan
-                    .claims
-                    .iter()
-                    .all(|claim| claim.level != EvidenceLevel::DeviceConfirmed));
-            }
+            assert!(plan
+                .claims
+                .iter()
+                .all(|claim| claim.level != EvidenceLevel::DeviceConfirmed));
         }
         let standard = target_preflight(ConversionTarget::AndroidStandard, true);
         assert!(standard.warning.contains("Google Photos"));

@@ -114,7 +114,7 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | 目标 | 当前转换路径 |
 | --- | --- |
 | `apple` | Motion Photo 输出 Apple HEIC+MOV 文件对；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
-| `android-standard`（别名 `standard`、`google`） | 同一个公开 Motion Photo 1.0 目标。三个名字共用规划与输出字节。规范本身不是播放器。此前 Google Photos 能播放部分样本的记录是这个目标的消费者证据，不是第二套策略。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `android-standard`（别名 `standard`、`google`） | 同一个公开 Motion Photo 1.0 目标。三个名字共用规划与输出字节。规范本身不是播放器。此前 Google Photos 播放部分样本的记录缺少验证本次构建所需的设备型号、应用版本和输出标识，因此消费者状态仍为 `unknown`。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
 | `samsung` | 公开 Motion Photo。SEF 和第二路自动播放视频留出并写明。HEIC 结果把顶层 `mpvd` 放在文件末尾，使用普通 32 位 size，载荷一直到文件尾。 |
 | `oppo` | 源主图已是 JPEG 时写公开 Motion Photo，并复制已有的 `OpCamera`。Photos 17.10.62 和 25.17.35 不支持 HEIC 实况：`image/jpeg` 闸门，解码器只构造 `JpegOLiveReader`，没有 JPEG SOI 就返回空。接受损失说明后，主图像解码为 8 位 sRGB JPEG，由本程序套用已承认的 sRGB 或 Display P3 ICC，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。视频字节保留，不应用 gain map。17.10.62 的 v3 签名者 SHA-1 是 `39bad40aa2730a1914e27939c1c04529df320c98`。一加和 realme 使用这个目标。这两版不是所有 ColorOS。 |
 | `vivo` | 已有两个 UUID 盒的仓库样本按原字节保留。其他 JPEG 实况写成 JPEG 加保留的 MP4：`MotionPhoto=1`、`Item:Padding=0`，视频起点是文件大小减去 `Item:Length`。ExtInfo 写在该起点之前，类型是 `motionphoto0001…`，`imageTime` 是离源演示时间最近的 30fps 帧。10.0.10.42（Y04s/W20 海外代理，不是 S60）和 3.2.10.4 都不支持 HEIC 实况：前者 `XmpUtil` 要求 JPEG SOI 且 DEX 没有 `mpvd`，后者只播 sidecar、不回退合写文件。接受说明后主图像变成 8 位 sRGB JPEG：本程序套用内嵌 ICC，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。视频字节不变。这两版不是所有 vivo。 |
@@ -123,7 +123,7 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 
 `--target` 在写出任何文件之前打印这份输入的证据。兼容性不确定或有损降级时，交互终端要回答 `y`，非交互运行要加 `--accept-unverified-target`。该选项不能启用尚不存在的编码器。HEIC 主图转到 OPPO、vivo 或小米时，要先接受损失说明，才会解码成 8 位 sRGB JPEG。内嵌 ICC 由本程序套用，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。不应用 gain map，也不把 HDR 传输曲线夹断成 JPEG。`--target huawei` 只保留已经是 OpenHarmony HEIC 容器的文件。
 
-`convert` 和 `batch` 都支持 `--target`。JPEG 实况仍输出 JPEG，HEIC 实况仍输出 HEIC。`--target oppo` 遇到 HEIC 主图会规划 JPEG 实况，并在重编码静图之前停止。主图和视频都不转码。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
+`convert` 和 `batch` 都支持 `--target`。Android standard 和三星保留源静图容器。OPPO、vivo 和小米使用 JPEG：确认后，符合准入条件的 SDR HEIC 主图转码为 8 位 sRGB JPEG，并丢弃 Gain Map。原视频字节保留。华为只保留已经是 OpenHarmony HEIC 实况容器的文件。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
 
 为兼容旧调用，未使用 `--target` 时仍支持 `--motion-target`、`--live-photo-output` 和 `--oppo-compatible`；这些选项不能与 `--target` 同时使用。Apple 编辑开关继续作为显式高级请求：如果指定 `--target`，必须为 `apple` 才能使用这些开关。目标预设不会自动启用实验性人像、摄影风格或电影效果推断。
 

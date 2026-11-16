@@ -18,6 +18,22 @@
 
 可用 `cargo test --locked -p xdremux-cli --test batch_android_motion_photo` 执行自动化矩阵。H1 是测试期间由 LibLivePhoto `Input::Parts` 生成的样本，不是相机原生 HEIC。不能仅因 LibLivePhoto 提供 AVIF 配置就启用产品级 AVIF 输出。
 
+## 统一目标候选输出
+
+`unified_target` CLI 测试离线覆盖下列计划。所有行的设备状态仍为未测试，包括 Android standard：历史 Google Photos 播放记录未绑定设备、应用版本与本次构建的输出。发布前，调用方必须通过 `--accept-unverified-target` 或终端交互接受预检说明。
+
+| 目标 | 离线要求 | 设备状态 |
+| --- | --- | --- |
+| `android-standard`、`standard`、`google` | 别名输出完全相同的公开 Motion Photo；保留源静图容器和视频 | 未测试 |
+| `samsung` | 公开 Motion Photo；保留主视频并报告未携带的 SEF/第二路视频；HEIC 的 `mpvd` 位于末尾 | 未测试 |
+| `oppo` | JPEG Motion Photo；确认后把 HEIC 主图变为 8 位 sRGB JPEG，保留原视频并明确报告 Gain Map 损失 | 未测试 |
+| `vivo` | JPEG Motion Photo；保留已有兼容合写文件，其他输入按 JPEG 合写计划输出；HEIC 降级要求同样的确认和损失报告 | 未测试 |
+| `xiaomi` | 版本为 1 的公开 JPEG Motion Photo；HEIC 降级要求同样的确认和损失报告 | 未测试 |
+| `huawei` | 按原字节保留已有 OpenHarmony HEIC 实况容器；拒绝其他输入，不创建拍摄元数据 | 未测试 |
+| `apple` | 现有 HEIC+MOV 文件对；Photos 识别、播放、编辑和 HDR 需要独立证据 | 未测试 |
+
+运行 `cargo test --locked -p xdremux-cli --test unified_target` 验证这些离线路径。华为测试容器为合成文件，不能作为设备原始验收样本。
+
 ## 准备测试文件
 
 ```bash

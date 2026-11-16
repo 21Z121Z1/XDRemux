@@ -18,6 +18,22 @@ Run each supported conversion with a new output directory. Confirm the input SHA
 
 Use `cargo test --locked -p xdremux-cli --test batch_android_motion_photo` for the portable matrix. The clean H1 sample is synthesized within the test; do not mislabel its writer-produced metadata as a camera-original HEIC. A native AVIF writer must not be activated solely because the underlying library exposes an AVIF profile.
 
+## Unified target candidates
+
+The `unified_target` CLI tests exercise these plans offline. Every row remains untested on devices, including Android standard: historical Google Photos playback reports do not identify a device, app version, and output from this build. A caller must accept the preflight with `--accept-unverified-target` or terminal confirmation before publication.
+
+| Target | Offline requirement | Device status |
+| --- | --- | --- |
+| `android-standard`, `standard`, `google` | Identical public Motion Photo output for aliases; source still container and video preserved | Not tested |
+| `samsung` | Public Motion Photo; preserve the primary video and report omitted SEF/secondary streams; HEIC `mpvd` last | Not tested |
+| `oppo` | JPEG Motion Photo; HEIC primary becomes 8-bit sRGB JPEG after confirmation, with original video and an explicit Gain Map loss report | Not tested |
+| `vivo` | JPEG Motion Photo; preserve an existing compatible combined file, otherwise write the combined JPEG plan; HEIC downgrade has the same confirmation and loss report | Not tested |
+| `xiaomi` | Public JPEG Motion Photo with version 1; HEIC downgrade has the same confirmation and loss report | Not tested |
+| `huawei` | Preserve an existing OpenHarmony HEIC motion container byte-for-byte; reject other inputs without creating capture metadata | Not tested |
+| `apple` | Existing HEIC+MOV pair route; requires separate Photos recognition, playback, editing, and HDR evidence | Not tested |
+
+Run `cargo test --locked -p xdremux-cli --test unified_target` for these offline paths. The Huawei test container is synthesized and is not a device-original acceptance sample.
+
 ## Package preparation
 
 ```bash

@@ -1109,3 +1109,27 @@ fn batch_target_writes_nothing_without_acceptance() {
     assert!(!out.join("android-v1-sdr-01.xdremuxMP.jpg").exists());
     assert!(stderr.contains("android-standard"), "{stderr}");
 }
+
+#[test]
+fn standard_preflight_does_not_promote_historical_playback_to_device_acceptance() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = fixture("vivo/android-v1-sdr-01.jpg");
+    let before = fs::read(&input).unwrap();
+    let output = dir.path().join("unacceptedMP.jpg");
+    let (code, _, stderr) = run_cli(vec![
+        "convert".into(),
+        "--input".into(),
+        input.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "android-standard".into(),
+    ]);
+    assert_ne!(code, 0, "{stderr}");
+    assert!(stderr.contains("google-photos: unknown:"), "{stderr}");
+    assert!(stderr.contains("historical playback report"), "{stderr}");
+    assert!(stderr.contains("remain untested"), "{stderr}");
+    assert!(!stderr.contains(": device-confirmed:"), "{stderr}");
+    assert!(!output.exists());
+    assert_eq!(fs::read(input).unwrap(), before);
+}
