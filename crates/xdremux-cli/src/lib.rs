@@ -758,9 +758,15 @@ fn run_convert(
         let capabilities = target.capabilities();
         capabilities.motion.is_none() && capabilities.proxdr.is_none()
     }) {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: this vendor target is reserved; no verified writer is available",
-            "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: this vendor target is reserved; no verified writer is available",
+                "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"
+            )
+        );
         return 1;
     }
     if arguments.target.is_some_and(|target| !target.is_apple())
@@ -769,9 +775,15 @@ fn run_convert(
             || arguments.product.apple_styles
             || arguments.product.apple_cinematic)
     {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: Apple editing features require --target apple",
-            "错误：Apple 编辑功能需要 --target apple"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
         return 1;
     }
     if (arguments.motion_video.is_some()
@@ -954,7 +966,8 @@ fn run_convert(
     };
     let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
-            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request) {
+            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
+            {
                 Ok(request) => request,
                 Err(error) => {
                     let _ = writeln!(
@@ -983,8 +996,9 @@ fn run_convert(
                 },
                 None => None,
             };
-            if let Some(target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)) =
-                resolved_motion_target
+            if let Some(
+                target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
+            ) = resolved_motion_target
             {
                 let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
                 return match runtime.convert_android_motion_photo_file_with_policy(
@@ -1592,9 +1606,15 @@ fn run_batch(
         let capabilities = target.capabilities();
         capabilities.motion.is_none() && capabilities.proxdr.is_none()
     }) {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: this vendor target is reserved; no verified writer is available",
-            "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: this vendor target is reserved; no verified writer is available",
+                "错误：该厂商目标目前仅为占位符，尚无经过验证的写入器"
+            )
+        );
         return 2;
     }
     if arguments.target.is_some_and(|target| !target.is_apple())
@@ -1603,9 +1623,15 @@ fn run_batch(
             || arguments.product.apple_styles
             || arguments.product.apple_cinematic)
     {
-        let _ = writeln!(stderr, "{}", message!(language,
-            "error: Apple editing features require --target apple",
-            "错误：Apple 编辑功能需要 --target apple"));
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
         return 2;
     }
     if arguments.motion_video_compat.is_some()

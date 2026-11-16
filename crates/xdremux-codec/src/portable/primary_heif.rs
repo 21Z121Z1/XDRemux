@@ -219,8 +219,8 @@ mod tests {
     fn encodes_exif_with_android_readable_identifier_without_changing_tiff() {
         // Empty TIFF IFD0: little-endian TIFF header, zero entries and no next IFD.
         let tiff = b"II*\0\x08\0\0\0\0\0\0\0\0\0";
-        let request = PrimaryHeifEncodeRequest::live_photo(raster(), None)
-            .with_exif_tiff(tiff.to_vec());
+        let request =
+            PrimaryHeifEncodeRequest::live_photo(raster(), None).with_exif_tiff(tiff.to_vec());
         let encoded = LibHeifProvider::new()
             .encode_primary_heif(&request)
             .unwrap();

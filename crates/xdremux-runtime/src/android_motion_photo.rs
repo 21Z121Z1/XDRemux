@@ -10,11 +10,11 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
-use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 use xdremux_motion_photo::{
-    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions, PreservationEvidence,
-    ResourceRole, TargetProfile, WritePolicy,
+    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions,
+    PreservationEvidence, ResourceRole, TargetProfile, WritePolicy,
 };
+use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 
 use crate::{Result, RuntimeError};
 
@@ -63,26 +63,6 @@ fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) 
         (Some(a), Some(b)) => a.equivalent(b),
         (None, None) => true,
         _ => false,
-    }
-}
-
-#[cfg(test)]
-mod presentation_time_tests {
-    use super::{same_presentation_time, MediaTime};
-
-    #[test]
-    fn compares_exact_rational_instants_not_timestamp_encoding() {
-        let apple = MediaTime::new(2, 3).unwrap();
-        let android = MediaTime::new(200, 300).unwrap();
-        assert_ne!(apple, android);
-        assert!(same_presentation_time(Some(apple), Some(android)));
-        assert!(!same_presentation_time(
-            Some(apple),
-            Some(MediaTime::new(201, 300).unwrap()),
-        ));
-        assert!(same_presentation_time(None, None));
-        assert!(!same_presentation_time(Some(apple), None));
-        assert!(!same_presentation_time(None, Some(android)));
     }
 }
 
@@ -555,4 +535,24 @@ fn hdr_gain_map_xmp_signature(photo: &MotionPhoto<'_>) -> Result<Vec<(String, St
         }
     }
     Ok(properties)
+}
+
+#[cfg(test)]
+mod presentation_time_tests {
+    use super::{same_presentation_time, MediaTime};
+
+    #[test]
+    fn compares_exact_rational_instants_not_timestamp_encoding() {
+        let apple = MediaTime::new(2, 3).unwrap();
+        let android = MediaTime::new(200, 300).unwrap();
+        assert_ne!(apple, android);
+        assert!(same_presentation_time(Some(apple), Some(android)));
+        assert!(!same_presentation_time(
+            Some(apple),
+            Some(MediaTime::new(201, 300).unwrap()),
+        ));
+        assert!(same_presentation_time(None, None));
+        assert!(!same_presentation_time(Some(apple), None));
+        assert!(!same_presentation_time(None, Some(android)));
+    }
 }
