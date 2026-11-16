@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-moxcms = { version = "=0.9.1", default-features = false, features = ["lut"] }
+moxcms = { version = "=0.9.2", default-features = false, features = ["lut"] }
 quick-xml = "0.42"
 xdremux-format = { path = "../xdremux-format" }
 
