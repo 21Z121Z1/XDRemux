@@ -85,6 +85,15 @@ xdremux validate output.jpg --semantic --json
 
 Google libultrahdr v1.5.1 已用三星样本 `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg` 通过此检查。它对原样本和重新封装的 JPEG 报告了相同的增益图参数，并将两者解码为逐字节一致的线性 RGBA 半精度浮点数据。该检查覆盖 ISO APP2 和 MPF。注册 APP8 和随目标显示器变化的 HDR 渲染仍待独立验证。[libultrahdr 源码](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
+另检查了两份公开相机原图的 JPEG 注册载体。两份原图都拍摄于 GB/T 48347—2026 在 2026 年 9 月发布之前。
+
+| 相机原图 | 文件 SHA-256 | 观察到的布局 |
+| --- | --- | --- |
+| 华为 Pura 90 Pro Max，DCFever 33253 | `75dede756cbce0026d6e505c233c00451b1b985f46fb527b9cdb562b1a86ec3c` | 两幅图均使用 `ITUT35` APP8，提供者定向代码为 `0x0007`。原始偏移指向增强图像 SOI。第二偏移排除了 28 字节的 APP8 及紧随其后的 18 字节 JFIF APP0。两幅 JPEG 后有 `VLDMAGIC` 不透明尾部。[相机原图](https://www.dcfever.com/phones/viewsamples.php?picture=33253) |
+| 华为 Pura 80 Ultra，DCFever 31923 | `a26adb6f4cddff91f3e8196cfe276d27f0a34836fab4c960c2aa9283cc4f17e3` | 两幅图均使用 `ITUT35` APP5，提供者定向代码为 `0x0006`。[相机原图](https://www.dcfever.com/phones/viewsamples.php?picture=31923) |
+
+Libultrahdr 通过 ISO APP2 将 Pura 90 原图识别为 Ultra HDR。XDRemux 的规范格式校验器拒绝该文件的尾部。只取两幅 JPEG 后，校验器仍拒绝第二偏移。对本地诊断副本修正偏移后，发现母版显示记录先列三项 x 坐标，再列三项 y 坐标。按表 18 交错排列坐标后，校验器报告动态载荷尾部或填充异常。原图保存在仓库外。ISO 读取通过和 APP8 头部一致只验证了各自的读取范围，注册载荷互操作和渲染仍待验证。
+
 当前编码配置下的实测误差：
 
 | 对比 | 平均 | 最大 |
