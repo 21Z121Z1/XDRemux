@@ -170,6 +170,31 @@ impl std::str::FromStr for LivePhotoOutput {
     }
 }
 
+/// Motion Photo export destination. This does not alter still-image HDR policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionOutputTarget {
+    ApplePair,
+    ApplePvt,
+    GoogleJpeg,
+    GoogleHeic,
+}
+
+impl std::str::FromStr for MotionOutputTarget {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "apple-pair" => Ok(Self::ApplePair),
+            "apple-pvt" => Ok(Self::ApplePvt),
+            "google-jpeg" => Ok(Self::GoogleJpeg),
+            "google-heic" => Ok(Self::GoogleHeic),
+            _ => {
+                Err("Motion Photo target must be apple-pair, apple-pvt, google-jpeg or google-heic")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConversionRequest {
     pub output: OutputIntent,

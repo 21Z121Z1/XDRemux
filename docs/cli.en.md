@@ -89,6 +89,7 @@ Language changes human help, labels, and error context owned by the CLI. It does
 | ProXDR still, including Styles or Portrait | The input path is the destination. | Successful conversion replaces the input through atomic publication. |
 | Motion Photo with default pair output | A new HEIC basename beside the source, with a matching MOV. | The source is not replaced. The selected names must not collide with existing pair members. |
 | Motion Photo with PVT output | A new `.pvt` directory beside the source. | The source is not replaced. |
+| Motion Photo with Google JPEG/HEIC target | A new `*MP.jpg` or `*MP.heic` file beside the source. | The source is not replaced; existing files are never overwritten. |
 | `--apple-cinematic` | `SOURCE.xdremux.mov` beside the source. | The source is not replaced. An existing destination is rejected. |
 
 > [!CAUTION]
@@ -100,6 +101,17 @@ xdremux convert --input IMG_001.jpg
 ```
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
+
+### Google Motion Photo output (`convert` only)
+
+```bash
+xdremux convert --input photo.jpg --motion-target google-jpeg
+xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
+```
+
+`--motion-target` accepts `apple-pair`, `apple-pvt`, `google-jpeg`, or `google-heic`. It is mutually exclusive with the existing `--live-photo-output` option. Without either option, Apple pair output remains the default. Batch conversion retains its existing Apple behavior.
+
+Google targets use LibLivePhoto's `plan → execute` writer and produce one self-contained file. They retain the source's JPEG or HEIC still encoding, video container bytes, and exact presentation timestamp. The destination filename must end in `MP.jpg`, `MP.jpeg`, or `MP.heic` (matching the selected target). An omitted output name is generated automatically. No still transcode or silent resource drop is performed: unsupported source containers, unrepresentable timestamps, and unmapped vendor resources fail before publication. These writer guarantees do not imply that a particular Android Gallery app has accepted the output.
 
 ### Product options
 

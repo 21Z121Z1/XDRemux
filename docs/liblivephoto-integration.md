@@ -80,6 +80,12 @@ PVT 不增加另一套 MOV/HEIF 解析器、资产标识符、编码操作或重
 
 名称冲突和恢复规则见 [CLI 封装说明](cli.md#pvt-目录输出)及[发布契约](architecture.md#发布)。包结构有效不能证明 Photos 导入或动态墙纸支持。
 
+## Google Motion Photo 导出
+
+`convert` 命令可选择 `google-jpeg` 或 `google-heic`。运行时直接交由 LibLivePhoto 完成格式解析、兼容性规划、XMP 改写、`mpvd` 封装和严格输出验证，不实现第二套 Motion Photo 写入器。新目标独立于现有 Apple 文件对/PVT 转换器，不改变其默认行为。
+
+默认 `WritePolicy` 拒绝无法映射的资源。规划阶段拒绝静态图像格式转码和不能精确表示为整数微秒的时间戳。执行后，运行时对单文件严格重解析，对比源视频字节与呈现时间，并要求静态图像载荷不变的验证证据。同步写入临时文件后，通过排他、无覆盖操作发布。此机制保护已有目标文件，但不承诺断电后的完整持久性，也不代表已通过 Android 相册实机验证。
+
 ## 验证与证据边界
 
 现有解析器和载荷符合性检查覆盖调用方边界。真实样本 CLI 检查转换并验证全部 14 个固定 Motion Photo 输入。运行时测试还比较已知源时间与写入时间，并检查转换报告。
@@ -90,7 +96,7 @@ PVT 不增加另一套 MOV/HEIF 解析器、资产标识符、编码操作或重
 
 完成检查将本地结果绑定到已提交的 `HEAD`。GitHub 在独立环境中运行调用方构建和检查。读取、写入、样本、CI 和设备结果必须分别描述。
 
-独立库的转换器和外部工作区检查可脱离 XDRemux 产品栈执行 Android/Apple 往返。Apple 转 Android 时的整数微秒限制见库的兼容性文档。原厂相册和 Photos 验收仍是独立要求。固定库版本提供[格式支持说明](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/FORMAT_SUPPORT.md)与[厂商证据](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/evidence/VENDORS.md)。
+独立库的转换器和外部工作区检查可脱离 XDRemux 产品栈执行 Android/Apple 往返。Apple 转 Android 时的整数微秒限制见库的兼容性文档。原厂相册和 Photos 验收仍是独立要求。固定库版本提供[格式支持说明](https://github.com/21Z121Z1/LibLivePhoto/blob/a4142f6c104b750736f3ecea8e5d5a66578de5b5/FORMAT_SUPPORT.md)与[厂商样本证据](https://github.com/21Z121Z1/LibLivePhoto/blob/a4142f6c104b750736f3ecea8e5d5a66578de5b5/fixtures/vendor/README.zh-CN.md)。
 
 ## 兼容功能
 

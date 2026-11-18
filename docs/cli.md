@@ -86,6 +86,7 @@ xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
 | ProXDR 静态照片，包括摄影风格或人像 | 以输入路径为输出目标。 | 转换成功后，通过原子发布替换输入。 |
 | Motion Photo，默认文件对输出 | 在源文件旁选择新的 HEIC 文件名，并生成同名 MOV。 | 不替换源文件，名称不能与已有文件对成员冲突。 |
 | Motion Photo，PVT 输出 | 在源文件旁选择新的 `.pvt` 目录。 | 不替换源文件。 |
+| Motion Photo，Google JPEG/HEIC 输出 | 在源文件旁生成新的 `*MP.jpg` 或 `*MP.heic` 单文件。 | 不替换源文件，也不覆盖已有文件。 |
 | `--apple-cinematic` | 在源文件旁使用 `SOURCE.xdremux.mov`。 | 不替换源文件；目标已存在时拒绝写入。 |
 
 > [!CAUTION]
@@ -97,6 +98,17 @@ xdremux convert --input IMG_001.jpg
 ```
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
+
+### Google Motion Photo 输出（仅 `convert`）
+
+```bash
+xdremux convert --input photo.jpg --motion-target google-jpeg
+xdremux convert --input photo.heic --motion-target google-heic --output captureMP.heic
+```
+
+`--motion-target` 可选 `apple-pair`、`apple-pvt`、`google-jpeg`、`google-heic`，不能与原有的 `--live-photo-output` 同时使用。两个选项都不指定时，仍然默认输出 Apple 文件对。批处理暂不改变 Apple 输出行为。
+
+Google 目标通过 LibLivePhoto 的 `plan → execute` 写入器输出一个自包含文件。转换保留源 JPEG/HEIC 静态图像编码、视频容器字节和精确呈现时间。输出文件名须以 `MP.jpg`、`MP.jpeg` 或 `MP.heic` 结尾，并与目标类型相符；未指定输出路径时自动生成。不进行隐式转码或丢弃无法映射的资源：静态图像格式不匹配、时间戳无法精确表达、厂商资源无法保留时，发布前直接失败。文件结构通过检查不等于已在特定 Android 相册中通过实机验证。
 
 ### 产品选项
 
