@@ -12,17 +12,17 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
+use clap::{error::ErrorKind, ArgGroup, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
 use xdremux_engine::{
-    target_preflight, AppleFeatureRequest, ConversionRequest, ConversionTarget, HdrExportProfile,
-    LivePhotoOutput, MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
-    TargetPreflight,
+    explicit_jpeg_preflight, target_preflight, AppleFeatureRequest, ConversionRequest,
+    ConversionTarget, HdrExportProfile, LivePhotoOutput, MotionOutputTarget,
+    MotionVideoCompatibility, TargetAssetKind, TargetPreflight,
 };
 use xdremux_runtime::{
     is_harmony_motion_photo, motion_photo_checkpoint_path, plan_batch_items,
-    resolve_motion_output_target_for, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
+    resolve_motion_output_target, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
     ApplePortraitSemanticProfile, BatchAssetKind, BatchExecutionOptions, BatchPlanOptions,
     BatchSuccessDisposition, PortableRuntime, VendorMetadataCarry,
 };
@@ -170,6 +170,7 @@ impl ProductConversionArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(group(ArgGroup::new("motion_destination").multiple(true)))]
 struct ConvertArgs {
     /// Input ProXDR, Motion Photo, or ordinary video with --apple-cinematic.
     #[arg(long, value_name = "INPUT")]
@@ -182,7 +183,7 @@ struct ConvertArgs {
         long,
         value_name = "TARGET",
         group = "motion_destination",
-        conflicts_with_all = ["motion_target", "live_photo_output", "oppo_compatible"]
+        conflicts_with_all = ["live_photo_output", "oppo_compatible"]
     )]
     target: Option<ConversionTarget>,
     /// Motion Photo destination; Google targets produce one file without transcoding.
@@ -243,6 +244,7 @@ fn parse_batch_jobs(raw: &str) -> Result<usize, String> {
 }
 
 #[derive(Debug, Args)]
+#[command(group(ArgGroup::new("motion_destination").multiple(true)))]
 struct BatchArgs {
     /// Explicit input file. Repeat to add multiple files.
     #[arg(long = "input", value_name = "FILE")]
@@ -263,7 +265,7 @@ struct BatchArgs {
         long,
         value_name = "TARGET",
         group = "motion_destination",
-        conflicts_with_all = ["motion_target", "live_photo_output", "oppo_compatible"]
+        conflicts_with_all = ["live_photo_output", "oppo_compatible"]
     )]
     target: Option<ConversionTarget>,
     /// Motion Photo destination: Apple pair/PVT or one Google JPEG/HEIC file.
@@ -856,6 +858,41 @@ fn print_target_preflight(
     let _ = writeln!(stderr, "{}", plan.warning);
 }
 
+fn plan_cli_motion(
+    language: Language,
+    destination: ConversionTarget,
+    explicit: Option<MotionOutputTarget>,
+    heic: bool,
+    harmony: bool,
+    stderr: &mut impl Write,
+) -> TargetPreflight {
+    let plan = match explicit {
+        Some(MotionOutputTarget::GoogleHeic) => {
+            target_preflight(destination.android_motion_destination(true), true, false)
+        }
+        Some(MotionOutputTarget::GoogleJpeg) => explicit_jpeg_preflight(destination, heic),
+        Some(MotionOutputTarget::ApplePair | MotionOutputTarget::ApplePvt) => {
+            target_preflight(ConversionTarget::Apple, heic, false)
+        }
+        _ => return target_preflight(destination, heic, harmony),
+    };
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "Using the explicitly requested Motion Photo format. Playback on the requested platform is unverified.",
+            "将使用明确指定的实况格式。目标平台相册播放尚未验证。"
+        )
+    );
+    if explicit == Some(MotionOutputTarget::GoogleHeic) {
+        if let Some(reason) = target_preflight(destination, true, false).fallback {
+            let _ = writeln!(stderr, "{reason}");
+        }
+    }
+    plan
+}
+
 fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> u8 {
     if accept {
         return 0;
@@ -1010,6 +1047,7 @@ fn run_convert(
 
     let runtime = PortableRuntime::new();
     if arguments.target == Some(ConversionTarget::Huawei)
+        && arguments.motion_target.is_none()
         && motion_video.is_none()
         && is_harmony_motion_photo(&source)
     {
@@ -1095,21 +1133,17 @@ fn run_convert(
                 return 1;
             }
         };
-        let target = if matches!(
-            arguments.target,
-            Some(ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi)
-        ) {
-            MotionOutputTarget::GoogleJpeg
-        } else {
-            MotionOutputTarget::GoogleHeic
-        };
+        let target = MotionOutputTarget::GoogleHeic;
         if let Some(destination) = arguments.target {
-            print_target_preflight(
+            let plan = plan_cli_motion(
                 language,
                 destination,
-                target_preflight(destination, true, false),
+                arguments.motion_target,
+                true,
+                false,
                 stderr,
             );
+            print_target_preflight(language, destination, plan, stderr);
             if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
                 return 1;
             }
@@ -1128,7 +1162,9 @@ fn run_convert(
             video_compatibility,
             arguments
                 .target
-                .map(|target| VendorMetadataCarry::from_target(target.motion_destination(false)))
+                .map(|target| {
+                    VendorMetadataCarry::from_target(target.android_motion_destination(true))
+                })
                 .unwrap_or_else(VendorMetadataCarry::legacy),
         ) {
             Ok(receipt) => emit_android_motion_receipt(
@@ -1182,23 +1218,21 @@ fn run_convert(
             if let Some(destination) = arguments.target {
                 let heic =
                     motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic);
-                print_target_preflight(
+                let plan = plan_cli_motion(
                     language,
                     destination,
-                    target_preflight(destination, heic, false),
+                    arguments.motion_target,
+                    heic,
+                    false,
                     stderr,
                 );
+                print_target_preflight(language, destination, plan, stderr);
                 if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
                     return 1;
                 }
             }
             let resolved_motion_target = match motion_target {
-                Some(target) => match resolve_motion_output_target_for(
-                    target,
-                    &source,
-                    &asset,
-                    arguments.target.map(|target| target.name()),
-                ) {
+                Some(target) => match resolve_motion_output_target(target, &source, &asset) {
                     Ok(target) => Some(target),
                     Err(error) => {
                         let _ = writeln!(
@@ -1215,6 +1249,7 @@ fn run_convert(
                 target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
             ) = resolved_motion_target
             {
+                let target_is_heic = target == MotionOutputTarget::GoogleHeic;
                 let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
                 return match runtime.convert_android_motion_photo_file_with_carry(
                     &source,
@@ -1226,7 +1261,9 @@ fn run_convert(
                     arguments
                         .target
                         .map(|target| {
-                            VendorMetadataCarry::from_target(target.motion_destination(false))
+                            VendorMetadataCarry::from_target(
+                                target.android_motion_destination(target_is_heic),
+                            )
                         })
                         .unwrap_or_else(VendorMetadataCarry::legacy),
                 ) {
@@ -1899,7 +1936,10 @@ fn run_batch(
     if let Some(destination) = arguments.target {
         let mut sources = std::collections::BTreeSet::new();
         for bytes in inputs.iter().filter_map(|input| fs::read(input).ok()) {
-            if destination == ConversionTarget::Huawei && is_harmony_motion_photo(&bytes) {
+            if arguments.motion_target.is_none()
+                && destination == ConversionTarget::Huawei
+                && is_harmony_motion_photo(&bytes)
+            {
                 sources.insert((true, true));
             } else if let Ok(asset @ SourceAsset::MotionPhoto { .. }) = probe_bytes(&bytes) {
                 let heic = motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic);
@@ -1908,7 +1948,14 @@ fn run_batch(
         }
         let mut requires_confirmation = false;
         for (heic, harmony) in sources {
-            let plan = target_preflight(destination, heic, harmony);
+            let plan = plan_cli_motion(
+                language,
+                destination,
+                arguments.motion_target,
+                heic,
+                harmony,
+                stderr,
+            );
             requires_confirmation |= plan.requires_confirmation;
             print_target_preflight(language, destination, plan, stderr);
         }

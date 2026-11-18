@@ -78,37 +78,14 @@ fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) 
 
 /// Resolve an automatic Android writer using the actual parsed still span.
 /// This selects a container; it does not transcode still images or video.
+/// An automatic Android writer preserves the source still container.
 pub fn resolve_motion_output_target(
     target: MotionOutputTarget,
     source: &[u8],
     asset: &SourceAsset,
 ) -> Result<MotionOutputTarget> {
-    resolve_motion_output_target_for(target, source, asset, None)
-}
-
-/// Resolve an automatic Android writer for one destination.
-///
-/// OPPO olive and vivo combined playback are JPEG containers, so a HEIC source
-/// is planned as JPEG. That plan does not itself re-encode the still.
-pub fn resolve_motion_output_target_for(
-    target: MotionOutputTarget,
-    source: &[u8],
-    asset: &SourceAsset,
-    destination: Option<&str>,
-) -> Result<MotionOutputTarget> {
     if target != MotionOutputTarget::GoogleAuto {
         return Ok(target);
-    }
-    if destination == Some("oppo") || destination == Some("vivo") || destination == Some("xiaomi") {
-        return match motion_still_encoding(source, asset) {
-            Some(MotionStillEncoding::Jpeg | MotionStillEncoding::Heic) => {
-                Ok(MotionOutputTarget::GoogleJpeg)
-            }
-            None => Err(RuntimeError::new(
-                "Android Motion Photo target",
-                "automatic target requires a JPEG or HEIC primary still; AVIF and other still formats have no compatible writer",
-            )),
-        };
     }
     match motion_still_encoding(source, asset) {
         Some(MotionStillEncoding::Jpeg) => Ok(MotionOutputTarget::GoogleJpeg),

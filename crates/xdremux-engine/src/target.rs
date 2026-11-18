@@ -69,11 +69,19 @@ impl ConversionTarget {
     }
 
     /// Select the effective Motion Photo writer for an identified source.
-    pub const fn motion_destination(self, is_harmony_container: bool) -> Self {
+    pub const fn motion_destination(self, still_is_heic: bool, is_harmony_container: bool) -> Self {
         match self {
             Self::Honor => Self::AndroidStandard,
             Self::Huawei if !is_harmony_container => Self::AndroidStandard,
+            Self::Oppo | Self::Vivo | Self::Xiaomi if still_is_heic => Self::AndroidStandard,
             _ => self,
+        }
+    }
+
+    pub const fn android_motion_destination(self, output_is_heic: bool) -> Self {
+        match self {
+            Self::Apple => Self::AndroidStandard,
+            _ => self.motion_destination(output_is_heic, false),
         }
     }
 

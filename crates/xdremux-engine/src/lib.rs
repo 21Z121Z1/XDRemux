@@ -111,7 +111,9 @@ pub use source_profile::{
     gain_map_source_profile_from_jpeg,
 };
 pub use target::{ConversionTarget, TargetAssetKind, TargetCapabilities};
-pub use target_support::{target_preflight, EvidenceLevel, SupportClaim, TargetPreflight};
+pub use target_support::{
+    explicit_jpeg_preflight, target_preflight, EvidenceLevel, SupportClaim, TargetPreflight,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputIntent {

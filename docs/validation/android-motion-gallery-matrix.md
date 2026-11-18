@@ -26,9 +26,9 @@
 | --- | --- | --- |
 | `android-standard`、`standard`、`google` | 别名输出完全相同的公开 Motion Photo；保留源静图容器和视频 | 未测试 |
 | `samsung` | 公开 Motion Photo；保留主视频并报告未携带的 SEF/第二路视频；HEIC 的 `mpvd` 位于末尾 | 未测试 |
-| `oppo` | JPEG Motion Photo；确认后把 HEIC 主图变为 8 位 sRGB JPEG，保留原视频并明确报告 Gain Map 损失 | 未测试 |
-| `vivo` | JPEG Motion Photo；保留已有兼容合写文件，其他输入按 JPEG 合写计划输出；HEIC 降级要求同样的确认和损失报告 | 未测试 |
-| `xiaomi` | 版本为 1 的公开 JPEG Motion Photo；HEIC 降级要求同样的确认和损失报告 | 未测试 |
+| `oppo` | JPEG 输入保持 JPEG。HEIF 回退为通用 HEIF，除非显式选择 JPEG | 未测试 |
+| `vivo` | 保留兼容的 JPEG 单文件或写入 JPEG。HEIF 回退为通用 HEIF，除非显式选择 JPEG | 未测试 |
+| `xiaomi` | JPEG 输出使用版本 1。HEIF 回退为通用 HEIF，除非显式选择 JPEG | 未测试 |
 | `huawei` | 按原字节保留已有 OpenHarmony HEIC 实况容器。其他实况输入先提示，再确认是否回退到通用 Android 格式 | 未测试 |
 | `honor` | 提示 XDRemux 尚无已验证的荣耀原生写入器，确认后使用通用 Android 格式 | 未测试 |
 | `apple` | 现有 HEIC+MOV 文件对；Photos 识别、播放、编辑和 HDR 需要独立证据 | 未测试 |
@@ -41,7 +41,7 @@
 
 | 相册或 API | 可达的读取路径 | 拒绝条件或待确认项 | 元数据和输出处理 |
 | --- | --- | --- | --- |
-| 三星相册 15.1.03.4 | 先尝试 SEF `MotionPhoto_Data`，再查 XMP。XMP 路径可定位 JPEG 尾部或一直延伸到 EOF 的 32 位顶层 HEIC `mpvd`。 | XMP 路径要求存在 `Item:Padding`，并且视频的 `Item:Length > 1024`。HEIC 路径不处理大小为 0 或扩展大小的 box。 | 写入公开 XMP，将 HEIC `mpvd` 放在最后，并报告省略的 SEF 或次要自动播放轨。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) |
+| 三星相册 15.1.03.4 | 先尝试 SEF `MotionPhoto_Data`，再查 XMP。XMP 路径可定位 JPEG 尾部或一直延伸到 EOF 的 32 位顶层 HEIC `mpvd`。 | JPEG XMP 路径要求视频条目含 `Item:Padding` 且 `Item:Length > 1024`。通用产物只在主图条目声明填充。HEIC 路径不处理大小为 0 或扩展大小的 box。 | 写入公开 XMP，将 HEIC `mpvd` 放在最后，并报告省略的 SEF 或次要自动播放轨。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) |
 | 小米相册 4.3.1.15-global | JPEG 路径检查 MotionPhoto 和版本均为正数，且展示时间戳非负。版本为 1 且未进入 `MicroVideo` 分支时，从 EOF 减去 MotionPhoto 条目长度定位视频。 | 追踪到的 HEIC 标记只表示静图，HEIC 未通过 JPEG 实况偏移读取路径。 | 写入 XMP `MotionPhotoVersion=1`。已查路径未读取 `MiCamera`。保留 MP4 字节，并在 HEIC 转 JPEG 前说明损失。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) |
 | OPPO Photos 17.10.62、25.17.35 | 追踪到的 olive photo 路径要求 JPEG MIME 和 SOI。25.17.35 检查 `MotionPhoto=1` 和可用的 XMP 容器。此前用户反馈保留视频的产物可以播放，未记录机型和相册版本。 | 追踪到的读取器没有 HEIC 路径。XMP 解析器拒绝 `MicroVideoVersion`。 | 写入公开 JPEG XMP，源文件有 `OpCamera` 才沿用。检查过的识别路径不以这些字段为必要条件。保留视频字节，并报告 HEIC 转 JPEG 的损失。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) [用户观察](https://github.com/21Z121Z1/XDRemux/pull/95) |
 | vivo Albums 10.0.10.42、Gallery 3.2.10.4 | 10.0.10.42 是 Y04s/W20 的代理样本，含 JPEG XMP 读取路径。3.2.10.4 通过 MediaExtra `live_photo` 查询并播放独立 MP4。 | 10.0.10.42 要求 JPEG SOI，没有 `mpvd` 路径。3.2.10.4 的独立 MP4 路径不会回退到单文件。S60 尚待查证。 | 两个 vivo UUID 区均存在时按原字节保留 JPEG+MP4。组合 JPEG 从源展示时间算出 `imageTime`，不生成哈希、首帧或水印元数据。[静态追踪和样本分析](https://github.com/21Z121Z1/XDRemux/pull/97) |
@@ -51,16 +51,21 @@
 
 ### APK 收集记录
 
-下列公开 APK 页面记录了版本和文件 SHA-256。工作环境直接下载返回 HTTP 403。本轮只记录页面列出的摘要，未用下载文件复算。上表静态结论来自 #97 已有的追踪。
+下表区分本地核验的字节与镜像条目。从 APKPure 下载的三星 15.1.03.4 和 OPPO 25.17.35 与 APKMirror 文件摘要一致。三星已复查 `com.samsung.android.motionphoto.utils.ex.d.c`、JPEG 路径 `d.d` 和 HEIF box 循环 `ex.a.d`。OPPO 的 `MediaItemExtKt.isOlivePhoto` 会同时检查 olive 标记与 JPEG MIME。其余静态结论沿用 #97 已有的追踪。
 
 | 包名 | 版本 | 页面列出的 APK SHA-256 和来源 |
 | --- | --- | --- |
-| `com.sec.android.gallery3d` | 15.1.03.4 (1510300004) | `b99d44e31c8d198590d06090010827c38773f7a9d6560dee59ad8aaa4ceae453` [APK 页面](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-gallery/samsung-gallery-15-1-03-4-release/samsung-gallery-15-1-03-4-android-apk-download/) |
+| `com.sec.android.gallery3d` | 15.1.03.4 (1510300004) | `b99d44e31c8d198590d06090010827c38773f7a9d6560dee59ad8aaa4ceae453` [APK 页面](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-gallery/samsung-gallery-15-1-03-4-release/samsung-gallery-15-1-03-4-android-apk-download/) [APKPure](https://d.apkpure.com/b/APK/com.sec.android.gallery3d?versionCode=1510300004) |
 | `com.miui.gallery` | 4.3.1.15-global (4030115) | `a726fed034edada620ff5a4e04f102080455e824c2246a5ff9368b1082d5559a` [APK 页面](https://www.apkmirror.com/apk/xiaomi-inc/miui-gallery/xiaomi-gallery-4-3-1-15-global-release/xiaomi-gallery-4-3-1-15-global-android-apk-download/) |
 | `com.coloros.gallery3d` | 17.10.62 (170100620) | `5118e681fa41b00e9417b3f0a9b45bac3793fa2ca8bdbd5f69e6c8cbb60a9e4c` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-17-10-62-release/oppo-photos-17-10-62-android-apk-download/) |
 | `com.coloros.gallery3d` | 25.17.35 (25017035) | `e270085d137a4dccc75e2f20f4b05c4a8dabaafe9d628461d145c18d08aef2f2` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-25-17-35-release/oppo-photos-25-17-35-android-apk-download/) |
 | `com.vivo.gallery` | 10.0.10.42 (100010042) | `6cb8edea5d750d0c1544d3fd7e79dd04fc388933ee14bf289b77234bc02ffe73` [APK 页面](https://www.apkmirror.com/apk/vivo-co-ltd/vivo-gallery/vivo-albums-10-0-10-42-release/vivo-albums-10-0-10-42-android-apk-download/) |
-| 荣耀相册 | MagicOS 10.0 | 从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。 [荣耀播放文档](https://www.honor.com/cn/support/content/zh-cn15897491/) |
+| `com.vivo.gallery` | 3.2.10.4 (30210004) | 已下载并复算 `94b5f58b40af41bb29eaed18a01cf03146486a6130c92b7a0877c140299241db`。内嵌证书 SHA-256 与 10.0.10.42 页面一致。[APKPure](https://d.apkpure.com/b/APK/com.vivo.gallery?versionCode=30210004) |
+| `com.hihonor.photos` | 150.1.1.300 候选 | 仅有第三方条目，下载地址未返回可用 APK。从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。 [荣耀播放文档](https://www.honor.com/cn/support/content/zh-cn15897491/) [APK 候选条目](https://www.962.net/azsoft/620612.html) |
+
+小米 APKPure 最新版本下载返回 `ep-miuigallery-v15240103`（999999902），已从 4.3.1.15-global 播放证据中排除。本轮的小米准确全球版、OPPO 17.10.62 和 vivo 10.0.10.42 均只有镜像条目信息。
+
+LibLivePhoto 另有带边界检查的荣耀 `LIVE_` 及反向 TLV 读取器，检查视频范围、拒绝歧义，并可读取 `HiHonor_OfflineData` 的场景模式。该读取契约与 ZLC 未固定版本的相册追踪分别记录，XDRemux 产物的相册识别仍待验证。 [LibLivePhoto 荣耀读取器](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/crates/liblivephoto/src/vendor/honor.rs#L48)
 
 ## 准备测试文件
 

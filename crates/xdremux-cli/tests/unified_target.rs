@@ -306,6 +306,8 @@ fn oppo_heic_source_becomes_an_srgb_jpeg_motion_photo_after_confirmation() {
         held.as_os_str().to_owned(),
         "--target".into(),
         "oppo".into(),
+        "--motion-target".into(),
+        "google-jpeg".into(),
     ]);
     assert_eq!(code, 1, "{stderr}");
     assert!(!held.exists());
@@ -328,6 +330,8 @@ fn oppo_heic_source_becomes_an_srgb_jpeg_motion_photo_after_confirmation() {
         output.as_os_str().to_owned(),
         "--target".into(),
         "oppo".into(),
+        "--motion-target".into(),
+        "google-jpeg".into(),
         "--motion-report-json".into(),
     ]);
     assert_eq!(code, 0, "{stderr}");
@@ -506,6 +510,71 @@ fn vivo_target_writes_a_combined_jpeg_for_oppo_and_google_sources() {
 }
 
 #[test]
+fn unsupported_vendor_heic_falls_back_to_heic_in_both_entry_points() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("clean.heic");
+    clean_samsung_heic(&input);
+    let baseline = dir.path().join("standardMP.heic");
+    assert_eq!(convert(&input, &baseline, "android-standard").0, 0);
+    let expected = fs::read(&baseline).unwrap();
+    for vendor in ["oppo", "vivo", "xiaomi", "honor", "huawei"] {
+        let output = dir.path().join(format!("{vendor}MP.heic"));
+        let (code, _, stderr) = convert(&input, &output, vendor);
+        assert_eq!(code, 0, "{vendor} {stderr}");
+        assert!(
+            stderr.contains("Falling back to standard Android Motion Photo"),
+            "{stderr}"
+        );
+        assert_eq!(fs::read(output).unwrap(), expected);
+
+        let out_dir = dir.path().join(vendor);
+        let (code, _, stderr) = run(vec![
+            "batch".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output-dir".into(),
+            out_dir.as_os_str().to_owned(),
+            "--target".into(),
+            vendor.into(),
+        ]);
+        assert_eq!(code, 0, "{vendor} {stderr}");
+        assert_eq!(
+            fs::read(out_dir.join("clean.xdremuxMP.heic")).unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn explicit_motion_format_is_used_without_platform_substitution() {
+    let dir = tempfile::tempdir().unwrap();
+    let heic = dir.path().join("clean.heic");
+    clean_samsung_heic(&heic);
+    let output = dir.path().join("explicitMP.heic");
+    let args = vec![
+        "convert".into(),
+        "--input".into(),
+        heic.as_os_str().to_owned(),
+        "--output".into(),
+        output.as_os_str().to_owned(),
+        "--target".into(),
+        "oppo".into(),
+        "--motion-target".into(),
+        "google-heic".into(),
+    ];
+    let (code, _, stderr) = run_cli(args.clone());
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!output.exists());
+    let (code, _, stderr) = run(args);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stderr.contains("explicitly requested Motion Photo format"),
+        "{stderr}"
+    );
+    assert_preserved_motion(&heic, &output);
+}
+
+#[test]
 fn vivo_and_xiaomi_heic_sources_become_srgb_jpeg_motion_photos() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
@@ -519,6 +588,8 @@ fn vivo_and_xiaomi_heic_sources_become_srgb_jpeg_motion_photos() {
             output.as_os_str().to_owned(),
             "--target".into(),
             target.into(),
+            "--motion-target".into(),
+            "google-jpeg".into(),
             "--motion-report-json".into(),
         ]);
         assert_eq!(code, 0, "{target} {stderr}");
@@ -607,6 +678,8 @@ fn heic_batch_matches_convert_loss_count_for_oppo_vivo_and_xiaomi() {
             output.as_os_str().to_owned(),
             "--target".into(),
             target.into(),
+            "--motion-target".into(),
+            "google-jpeg".into(),
             "--motion-report-json".into(),
         ]);
         assert_eq!(code, 0, "{target} {stderr}");
@@ -622,6 +695,8 @@ fn heic_batch_matches_convert_loss_count_for_oppo_vivo_and_xiaomi() {
             batch_dir.as_os_str().to_owned(),
             "--target".into(),
             target.into(),
+            "--motion-target".into(),
+            "google-jpeg".into(),
             "--json".into(),
         ]);
         assert_eq!(code, 0, "{target} {stderr} {batch_stdout}");
@@ -658,6 +733,8 @@ fn rejected_heic_color_profile_writes_nothing() {
         output.as_os_str().to_owned(),
         "--target".into(),
         "oppo".into(),
+        "--motion-target".into(),
+        "google-jpeg".into(),
     ]);
     assert_eq!(code, 1, "{stderr}");
     assert!(!output.exists(), "{stderr}");
@@ -1042,8 +1119,8 @@ fn conflicting_legacy_options_fail_before_publication() {
         input.as_os_str().to_owned(),
         "--target".into(),
         "google".into(),
-        "--motion-target".into(),
-        "google-jpeg".into(),
+        "--live-photo-output".into(),
+        "pair".into(),
     ]);
     assert_eq!(code, 2, "{stderr}");
     assert!(!output.exists());
@@ -1114,6 +1191,8 @@ fn heic_sdr_jpeg_is_not_written_when_the_warning_is_not_accepted() {
         output.as_os_str().to_owned(),
         "--target".into(),
         "xiaomi".into(),
+        "--motion-target".into(),
+        "google-jpeg".into(),
     ]);
     assert_eq!(status, 1, "{stderr}");
     assert!(!output.exists());

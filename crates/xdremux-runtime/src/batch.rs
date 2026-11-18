@@ -12,7 +12,7 @@ use xdremux_engine::{
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 use xdremux_source::{probe_bytes, SourceAsset};
 
-use crate::android_motion_photo::resolve_motion_output_target_for;
+use crate::android_motion_photo::resolve_motion_output_target;
 use crate::batch_checkpoint::{
     canonical_or_absolute, source_signature, source_signature_path, AndroidCheckpointIdentity,
     CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
@@ -327,7 +327,8 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
 
     for input in inputs {
         let file_bytes = fs::read(input).ok();
-        let harmony = options.target == Some(ConversionTarget::Huawei)
+        let harmony = options.motion_target == Some(MotionOutputTarget::GoogleAuto)
+            && options.target == Some(ConversionTarget::Huawei)
             && file_bytes
                 .as_ref()
                 .is_some_and(|bytes| is_harmony_motion_photo(bytes));
@@ -346,13 +347,7 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
             google_target(options.motion_target).and_then(|target| {
                 if target == MotionOutputTarget::GoogleAuto {
                     let (source, asset) = analysis.as_ref()?;
-                    resolve_motion_output_target_for(
-                        target,
-                        source,
-                        asset,
-                        destination_name(options.target),
-                    )
-                    .ok()
+                    resolve_motion_output_target(target, source, asset).ok()
                 } else {
                     Some(target)
                 }
@@ -667,7 +662,10 @@ fn process_batch_item_with_options(
         create_output_parent(&item.output)?;
         let source = fs::read(&item.input)
             .map_err(|error| RuntimeError::external("batch input read", error))?;
-        if options.target == Some(ConversionTarget::Huawei) && is_harmony_motion_photo(&source) {
+        if motion_target == Some(MotionOutputTarget::GoogleAuto)
+            && options.target == Some(ConversionTarget::Huawei)
+            && is_harmony_motion_photo(&source)
+        {
             let signature = source_signature(&item.input, &source)?;
             let target = MotionOutputTarget::GoogleHeic;
             let prior = if reuse_existing {
@@ -765,14 +763,7 @@ fn process_batch_item_with_options(
         };
         let resolved_android = if matches!(asset, SourceAsset::MotionPhoto { .. }) {
             google_target(motion_target)
-                .map(|target| {
-                    resolve_motion_output_target_for(
-                        target,
-                        &source,
-                        &asset,
-                        destination_name(options.target),
-                    )
-                })
+                .map(|target| resolve_motion_output_target(target, &source, &asset))
                 .transpose()?
         } else {
             None
@@ -844,7 +835,9 @@ fn process_batch_item_with_options(
                         options
                             .target
                             .map(|target| {
-                                VendorMetadataCarry::from_target(target.motion_destination(false))
+                                VendorMetadataCarry::from_target(target.android_motion_destination(
+                                    resolved_android == Some(MotionOutputTarget::GoogleHeic),
+                                ))
                             })
                             .unwrap_or_else(VendorMetadataCarry::legacy),
                     );

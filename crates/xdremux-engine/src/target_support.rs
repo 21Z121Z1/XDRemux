@@ -51,7 +51,7 @@ pub fn target_preflight(
     still_is_heic: bool,
     is_harmony_container: bool,
 ) -> TargetPreflight {
-    let effective = target.motion_destination(is_harmony_container);
+    let effective = target.motion_destination(still_is_heic, is_harmony_container);
     let mut plan = match effective {
         ConversionTarget::Apple => APPLE,
         ConversionTarget::AndroidStandard | ConversionTarget::Honor => ANDROID_STANDARD,
@@ -63,14 +63,6 @@ pub fn target_preflight(
     };
     if still_is_heic {
         plan.warning = heic_motion_warning(effective);
-        if matches!(
-            effective,
-            ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi
-        ) {
-            plan.kept = HEIC_SDR_JPEG_KEPT;
-            plan.transcoded = HEIC_SDR_JPEG_TRANSCODED;
-            plan.dropped = HEIC_SDR_JPEG_DROPPED;
-        }
     }
     plan.fallback = match (target, effective) {
         (ConversionTarget::Huawei, ConversionTarget::AndroidStandard) => {
@@ -79,12 +71,32 @@ pub fn target_preflight(
         (ConversionTarget::Honor, ConversionTarget::AndroidStandard) => {
             Some("XDRemux has no verified native Honor Motion Photo writer.")
         }
+        (
+            ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi,
+            ConversionTarget::AndroidStandard,
+        ) => Some("The reviewed gallery builds do not support HEIF Motion Photo."),
         _ => None,
     };
     plan
 }
 
-const HARMONY_HEIC_WARNING: &str = "huawei keeps this file only when it is already a HEIC still plus an appended MP4 with com.openharmony.covertime (big-endian float32 milliseconds) and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are copied, not created. OpenHarmony photoAccessHelper creates a moving photo from a separate image resource and a separate video resource through MediaAssetChangeRequest; that API does not define this combined container. This route does not call it. BeetMan/XDRemux-Flutter reads this container and writes an Apple Live Photo; that reader is not a Harmony gallery writer. Harmony gallery import and playback of this file are not verified. The Android gallery 11.0.19.478 40-byte tail is not this output";
+pub fn explicit_jpeg_preflight(target: ConversionTarget, source_is_heic: bool) -> TargetPreflight {
+    let destination = target.android_motion_destination(false);
+    let mut plan = target_preflight(destination, false, false);
+    if source_is_heic
+        && matches!(
+            destination,
+            ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi
+        )
+    {
+        plan.kept = HEIC_SDR_JPEG_KEPT;
+        plan.transcoded = HEIC_SDR_JPEG_TRANSCODED;
+        plan.dropped = HEIC_SDR_JPEG_DROPPED;
+        plan.warning = SDR_JPEG_HEIC_WARNING;
+    }
+    plan
+}
+
 const HEIC_SDR_JPEG_KEPT: &[&str] = &[
     "preserved video bytes",
     "EXIF Make, Model, DateTime, DateTimeOriginal, and DateTimeDigitized when the source still has them",
@@ -99,8 +111,9 @@ const HEIC_SDR_JPEG_DROPPED: &[&str] = &[
     "source Orientation value; irot is applied to the pixels and the JPEG Orientation is 1",
     "other EXIF fields, including GPS and MakerNote",
 ];
-const SDR_JPEG_HEIC_WARNING: &str = "HEIC Motion Photo is not supported by the reviewed OPPO, vivo, or Xiaomi gallery builds, so this still is decoded and encoded as an 8-bit sRGB JPEG. This program applies one admitted sRGB or Display P3 ICC transform; libheif's output tag is not that proof. Display P3 nclx without an ICC uses the Display P3 profile. PQ, HLG, and other HDR transfers are refused instead of clamping code values. irot is applied to the pixels and JPEG Orientation is 1. Make, Model, and the date tags are copied when present; other EXIF is not. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
+const SDR_JPEG_HEIC_WARNING: &str = "You explicitly requested JPEG Motion Photo. The HEIC still is decoded and encoded as an 8-bit sRGB JPEG. This program applies one admitted sRGB or Display P3 ICC transform; libheif's output tag is not that proof. Display P3 nclx without an ICC uses the Display P3 profile. PQ, HLG, and other HDR transfers are refused instead of clamping code values. irot is applied to the pixels and JPEG Orientation is 1. Make, Model, and the date tags are copied when present; other EXIF is not. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
 
+const HARMONY_HEIC_WARNING: &str = "huawei keeps this file only when it is already a HEIC still plus an appended MP4 with com.openharmony.covertime (big-endian float32 milliseconds) and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are copied, not created. OpenHarmony photoAccessHelper creates a moving photo from a separate image resource and a separate video resource through MediaAssetChangeRequest; that API does not define this combined container. This route does not call it. BeetMan/XDRemux-Flutter reads this container and writes an Apple Live Photo; that reader is not a Harmony gallery writer. Harmony gallery import and playback of this file are not verified. The Android gallery 11.0.19.478 40-byte tail is not this output";
 const SAMSUNG_HEIC_WARNING: &str = "Samsung gallery 15.1.03.4 code can read a top-level mpvd that runs to EOF. Opening the HEIC still is not the same as playing it as motion. SEF is left out. This file was not played on a device";
 const STANDARD_HEIC_WARNING: &str = "android-standard, also selected by standard and google, keeps this HEIC and the source video bytes in Motion Photo 1.0. The specification allows that container and is not a player. You confirmed Google Photos played some HEIC motion samples and that preserved video played. That is consumer evidence for this standard target, not another target, and it does not name a Photos version or cover this file. Samsung 15.1.03.4 is the traced mpvd reader. A kept gain map is not HDR display";
 const APPLE_HEIC_WARNING: &str = "This Apple route writes a HEIC still plus MOV for Photos live pairing. That pairing rule is not a statement that iOS cannot open an Android combined file. The movie is remuxed. A kept gain map is not HDR display. This pair was not played on a device in this change";
@@ -112,7 +125,7 @@ fn heic_motion_warning(target: ConversionTarget) -> &'static str {
         ConversionTarget::Apple => APPLE_HEIC_WARNING,
         ConversionTarget::Huawei => HARMONY_HEIC_WARNING,
         ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi => {
-            SDR_JPEG_HEIC_WARNING
+            STANDARD_HEIC_WARNING
         }
     }
 }
@@ -148,7 +161,7 @@ const ANDROID_STANDARD: TargetPreflight = TargetPreflight {
     ],
     kept: &["source still container", "preserved video bytes", "gain-map XMP the public writer keeps"],
     transcoded: &[],
-    dropped: &["vendor fields that are not part of the public container"],
+    dropped: &[],
     warning: "android-standard, also selected by standard and google, writes Motion Photo 1.0 and keeps the source video bytes. The specification allows the container and is not a player. Your Google Photos confirmation covers some HEIC samples and preserved video, not this file and not a named Photos version. Sample hvc1 is file encoding only. A kept gain map is not HDR display",
     fallback: None,
     requires_confirmation: true,
@@ -159,14 +172,14 @@ const SAMSUNG: TargetPreflight = TargetPreflight {
     player: "com.sec.android.gallery3d 15.1.03.4 code; playback is not device-confirmed",
     claims: &[
         SupportClaim { subject: "still", level: EvidenceLevel::CodeReachable, detail: "JPEG XMP fallback, and HEIC with a normal top-level mpvd last" },
-        SupportClaim { subject: "motion", level: EvidenceLevel::CodeReachable, detail: "XMP Motion Photo after SEF; Padding must be present and is 0" },
+        SupportClaim { subject: "motion", level: EvidenceLevel::CodeReachable, detail: "The JPEG XMP reader asks for Padding on the video item. The standard writer puts Padding on the primary item only" },
         SupportClaim { subject: "video", level: EvidenceLevel::CodeReachable, detail: "primary video bytes preserved; length must be greater than 1024" },
         SupportClaim { subject: "sef", level: EvidenceLevel::Unknown, detail: "SEF MotionPhoto_Data is preferred by that build and is not written" },
     ],
     kept: &["primary still", "primary video", "gain map the public writer keeps"],
     transcoded: &[],
     dropped: &["SEF records", "a secondary autoplay stream when it cannot be expressed"],
-    warning: "Samsung gallery 15.1.03.4 code reads SEF MotionPhoto_Data first, then JPEG XMP when Item:Length is greater than 1024 and Padding is present. This writer leaves SEF out and writes Padding 0. Opening a HEIC still is not the same as playing motion. Sample hvc1 is file encoding only. A kept gain map is not HDR display. This file was not played on a device",
+    warning: "Samsung gallery 15.1.03.4 code reads SEF MotionPhoto_Data first, then JPEG XMP when the video item has Item:Length greater than 1024 and its own Padding. The standard JPEG writer puts Padding on the primary item only, so the traced fallback cannot read that output. Opening a HEIC still is not the same as playing motion. Sample hvc1 is file encoding only. A kept gain map is not HDR display. This file was not played on a device",
     fallback: None,
     requires_confirmation: true,
 };
@@ -286,20 +299,10 @@ mod tests {
             ConversionTarget::Xiaomi,
         ] {
             let plan = target_preflight(target, true, false);
-            assert!(plan.fallback.is_none());
+            assert_eq!(plan.destination, "android-standard");
+            assert!(plan.fallback.unwrap().contains("do not support HEIF"));
             assert!(plan.requires_confirmation);
-            assert!(plan.warning.contains("sRGB JPEG"));
-            assert!(plan.warning.contains("gain map"));
-            assert!(plan.warning.contains("not supported"));
-            assert!(!plan.warning.contains("not established"));
-            assert!(!plan.kept.iter().any(|item| item.contains("gain map")));
-            assert!(plan
-                .transcoded
-                .iter()
-                .any(|item| item.contains("sRGB JPEG")));
-            assert!(plan.dropped.iter().any(|item| item.contains("gain map")));
-            assert!(plan.dropped.iter().any(|item| item.contains("Orientation")));
-            assert!(plan.kept.iter().any(|item| item.contains("DateTime")));
+            assert!(plan.transcoded.is_empty());
             let jpeg = target_preflight(target, false, false);
             assert!(jpeg.kept.iter().any(|item| item.contains("gain")));
             assert!(jpeg.transcoded.is_empty());
