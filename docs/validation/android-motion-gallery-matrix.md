@@ -50,6 +50,10 @@
 | HarmonyOS 媒体库 | 华为公开 API 接收独立图像和视频资源，也能分别导出。固定版本的 OpenHarmony 源码另有带 `LIVE_` 尾、可选版本/帧和封面信息的组合文件导入导出路径。 | OpenHarmony 源码无法确认商用 HarmonyOS 相册的导入行为。该媒体库的 `LIVE_` 长度可包含版本/帧与 cinemagraph 数据。#97 追踪的华为 Android 40 字节尾采用另一套长度规则。 | 已识别的 Mate 70 风格 HEIC+MP4 文件按原字节保留。下游 Flutter 解析有边界限制的 MP4 `keys`/`ilst`，要求有限的大端 float32 毫秒 `covertime` 和非空 `videoId`，读取可选的 `starttime` 与 `deferredVideoEnhanceFlag`，并把封面时间转为微秒。该读取代码不代表相册可导入。[华为 API](https://developer.huawei.com/consumer/en/doc/HarmonyOS-Guides-V13/photoaccesshelper-movingphoto-V13/) [OpenHarmony 源码](https://github.com/openharmony/multimedia_media_library/blob/ad09a5f888ed78c2c46f5c218fa144ef6774e8e9/frameworks/innerkitsimpl/media_library_helper/src/moving_photo_file_utils.cpp#L237) [下游读取器](https://github.com/BeetMan/XDRemux-Flutter/blob/e66e332643d676c870ee62b2110e91869694de40/xdremux/rust/src/motion_photo.rs#L696) |
 | Android Motion Photo 1.0 | 规范定义 Camera XMP、条目目录、长度、填充和展示时间。JPEG 追加媒体，HEIC 使用 `mpvd`，主图填充量等于该 box 的头长度。 | 真机接收、视频解码和 HDR 显示取决于播放端。XDRemux 无 AVIF 写入器。 | 保留主图编码、展示时间和视频字节，重新解析输出。通用写入器遇到不能映射的资源时停止，回退也遵循同一规则。[Android 格式](https://developer.android.com/media/platform/motion-photo-format) |
 
+### HarmonyOS 封面时间与资源边界
+
+OpenHarmony 写入组合文件时，将版本与帧记录和可选的 cinemagraph 字节计入 `LIVE_` 长度。读取时从文件总长减去声明长度和固定尾部字段定位主图边界，再拆分视频与附加数据。兼容导入会用拆分出来的视频和记录的帧索引解析封面时间。XDRemux-Flutter 的 Mate 70 路径查找 HEIF 前缀和追加的 MP4，要求存在 `ftyp`、`mdat`、`moov`、有限非负的 `covertime` 和有长度上限的 UTF-8 `videoId`，并报告解析出的元数据和视频字节范围。[OpenHarmony 读取器](https://github.com/openharmony/multimedia_media_library/blob/ad09a5f888ed78c2c46f5c218fa144ef6774e8e9/frameworks/innerkitsimpl/media_library_helper/src/moving_photo_file_utils.cpp#L659) [OpenHarmony 导入器](https://github.com/openharmony/multimedia_media_library/blob/ad09a5f888ed78c2c46f5c218fa144ef6774e8e9/services/background_task_manager/src/moving_photo_processor.cpp#L529) [下游格式识别](https://github.com/BeetMan/XDRemux-Flutter/blob/e66e332643d676c870ee62b2110e91869694de40/xdremux/rust/src/motion_photo.rs#L745)
+
 ### APK 收集记录
 
 Android `apksig` 8.7.3 已验证 APK 签名。三星 15.1.03.4 通过 v2 验签。小米 4.3.1.20-global、OPPO 25.17.35 和 vivo 3.2.10.4 通过 v3 验签。签名证书指纹与对应镜像条目一致，小米和 vivo 则分别与表内另一版本的条目一致。
