@@ -84,13 +84,14 @@ xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
 | 源类型或功能 | 省略 `--output` 时 | 输入保护 |
 | --- | --- | --- |
 | ProXDR 静态照片，包括摄影风格或人像 | 以输入路径为输出目标。 | 转换成功后，通过原子发布替换输入。 |
+| 使用 `--target` 的 ProXDR 静态照片 | 在源文件旁生成新的 `*.xdremux.heic`，冲突时追加序号。 | 不替换源文件。 |
 | Motion Photo，默认文件对输出 | 在源文件旁选择新的 HEIC 文件名，并生成同名 MOV。 | 不替换源文件，名称不能与已有文件对成员冲突。 |
 | Motion Photo，PVT 输出 | 在源文件旁选择新的 `.pvt` 目录。 | 不替换源文件。 |
 | Motion Photo，Google JPEG/HEIC 输出 | 在源文件旁生成新的 `*MP.jpg` 或 `*MP.heic` 单文件。 | 不替换源文件，也不覆盖已有文件。 |
 | `--apple-cinematic` | 在源文件旁使用 `SOURCE.xdremux.mov`。 | 不替换源文件；目标已存在时拒绝写入。 |
 
 > [!CAUTION]
-> 需要保留 ProXDR 原图时，指定独立的 `--output` 路径。省略此选项会在转换成功后替换源文件。
+> 不指定 `--target` 时，ProXDR 转换省略 `--output` 仍会在成功后替换输入。使用 `--target` 或单独指定 `--output` 可保留原图。
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
@@ -98,6 +99,29 @@ xdremux convert --input IMG_001.jpg
 ```
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
+
+### 目标预设（`--target`）
+
+只选择输出目标，由 XDRemux 根据已识别的源资源使用现有转换路径：
+
+```bash
+xdremux convert --input capture.jpg --target apple
+xdremux convert --input capture.jpg --target google
+xdremux convert --input capture.heic --target oppo
+xdremux batch --input-dir originals/ --output-dir converted/ --target android-standard --resume
+```
+
+| 目标 | 当前转换路径 |
+| --- | --- |
+| `apple` | Motion Photo 输出 Apple HEIC+MOV 文件对；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `android-standard`、`google` | Motion Photo 原样保留 JPEG/HEIC 主图编码和视频，生成 Android 单文件；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `samsung` | 暂用上述 Android 标准封装；尚未启用三星原生 SEF 写入器。 |
+| `oppo` | Motion Photo 使用 preserve-only 视频的 Android 标准封装；ProXDR 静态图使用 OPPO Gallery 兼容策略。 |
+| `vivo`、`xiaomi`、`huawei` | 预留目标名称，尚未启用写入器，执行时明确报错。 |
+
+`convert` 和 `batch` 均支持 `--target`，不需要额外的 `--platform`，也不需要手动选择 Motion Photo 主图扩展名。JPEG 实况仍输出 JPEG，HEIC 实况仍输出 HEIC：现有写入器不会暗中转码并损失资源保留保证。无法承接的厂商资源会直接阻止发布；选择目标不代表已验证该厂商相册识别、HDR 激活或分享行为。此前 OPPO 实机的 `preserve` 播放结果只覆盖已测试的样本，不等于存在 OPPO 或三星原生 Motion Photo 写入器。
+
+为兼容旧调用，未使用 `--target` 时仍支持 `--motion-target`、`--live-photo-output` 和 `--oppo-compatible`；这些选项不能与 `--target` 同时使用。Apple 编辑开关继续作为显式高级请求：如果指定 `--target`，必须为 `apple` 才能使用这些开关。目标预设不会自动启用实验性人像、摄影风格或电影效果推断。
 
 ### Google Motion Photo 输出（`convert` 和 `batch`）
 
@@ -200,6 +224,7 @@ OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust �
 
 ```bash
 xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
+xdremux batch --input-dir photo_dump/ --output-dir android/ --target google --resume --json
 xdremux batch --input-dir photo_dump/ --output-dir google/ --motion-target google-jpeg --resume --json
 xdremux batch --input photo.heic --output-dir google/ --motion-target google-heic --motion-video-compat preserve --resume
 ```
@@ -214,6 +239,7 @@ xdremux batch --input photo.heic --output-dir google/ --motion-target google-hei
 | `--input-dir DIR` | 添加一个目录，可重复。 |
 | `--recursive` | 默认关闭，启用后进入输入子目录。 |
 | `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
+| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei` | 选择平台/厂商预设。混合 Android Motion Photo 批处理会按每张主图的实际 JPEG 或 HEIC 编码选择输出。 |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
 | `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |

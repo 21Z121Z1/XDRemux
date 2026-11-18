@@ -87,13 +87,14 @@ Language changes human help, labels, and error context owned by the CLI. It does
 | Source or feature | Without `--output` | Source preservation |
 | --- | --- | --- |
 | ProXDR still, including Styles or Portrait | The input path is the destination. | Successful conversion replaces the input through atomic publication. |
+| ProXDR still with `--target` | A new `*.xdremux.heic` file beside the source (with a numbered suffix on collision). | The source is never replaced. |
 | Motion Photo with default pair output | A new HEIC basename beside the source, with a matching MOV. | The source is not replaced. The selected names must not collide with existing pair members. |
 | Motion Photo with PVT output | A new `.pvt` directory beside the source. | The source is not replaced. |
 | Motion Photo with Google JPEG/HEIC target | A new `*MP.jpg` or `*MP.heic` file beside the source. | The source is not replaced; existing files are never overwritten. |
 | `--apple-cinematic` | `SOURCE.xdremux.mov` beside the source. | The source is not replaced. An existing destination is rejected. |
 
 > [!CAUTION]
-> To retain a ProXDR original, specify a separate `--output` path. Omitting this option replaces the source after successful conversion.
+> Without `--target`, a ProXDR conversion still replaces its input when `--output` is omitted. Use `--target` or set a separate `--output` path to keep the original.
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
@@ -101,6 +102,29 @@ xdremux convert --input IMG_001.jpg
 ```
 
 The second example requires a supported Motion Photo. The file extension alone does not establish support.
+
+### Destination presets (`--target`)
+
+Select the destination; XDRemux chooses its existing conversion route from the inspected source:
+
+```bash
+xdremux convert --input capture.jpg --target apple
+xdremux convert --input capture.jpg --target google
+xdremux convert --input capture.heic --target oppo
+xdremux batch --input-dir originals/ --output-dir converted/ --target android-standard --resume
+```
+
+| Target | Current route |
+| --- | --- |
+| `apple` | Apple Live Photo HEIC+MOV for Motion Photo; standard ISO HDR HEIC for ProXDR stills. |
+| `android-standard`, `google` | Android Motion Photo with its existing JPEG/HEIC primary image and preserved video; standard ISO HDR HEIC for ProXDR stills. |
+| `samsung` | The same standards-based Android route; a Samsung-native SEF writer is not enabled. |
+| `oppo` | The standards-based Android Motion Photo writer (preserve-only video); OPPO Gallery compatibility for ProXDR stills. |
+| `vivo`, `xiaomi`, `huawei` | Reserved names. No writer is enabled; conversion fails explicitly. |
+
+`--target` works on both `convert` and `batch`. It replaces choosing a separate platform, still-image extension, and Motion Photo writer manually. JPEG Motion Photos remain JPEG, and HEIC Motion Photos remain HEIC: the current writer cannot transcode the still into another format without losing preservation guarantees. Unsupported vendor resources fail closed; a target name alone does not establish native gallery recognition, HDR activation, or sharing behavior. The reported working `preserve` playback on OPPO applies only to the tested files. No native Samsung or OPPO Motion Photo writer is claimed.
+
+For backward compatibility, the existing `--motion-target`, `--live-photo-output`, and `--oppo-compatible` options remain available when `--target` is absent. They cannot be combined with `--target`. Apple editing flags remain explicit advanced requests and require `--target apple` if a target is supplied. A supplied target never implicitly enables experimental Portrait, Styles, or Cinematic inference.
 
 ### Google Motion Photo output (`convert` and `batch`)
 
@@ -203,6 +227,7 @@ The profile still requires public ImageIO and Core Image APIs on macOS. It is no
 
 ```bash
 xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
+xdremux batch --input-dir photo_dump/ --output-dir android/ --target google --resume --json
 xdremux batch --input-dir photo_dump/ --output-dir google/ --motion-target google-jpeg --resume --json
 xdremux batch --input photo.heic --output-dir google/ --motion-target google-heic --motion-video-compat preserve --resume
 ```
@@ -217,6 +242,7 @@ Normal directory discovery selects HEIC, HEIF, JPG, and JPEG candidates. `--appl
 | `--input-dir DIR` | Adds one directory. Repeatable. |
 | `--recursive` | Disabled by default. Descends into input directories. |
 | `--output-dir DIR` | Without this option, generated outputs are beside their sources with an `.xdremux` suffix. |
+| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei` | Selects a platform/vendor preset. For mixed Android Motion Photo batches, selects JPEG or HEIC per input. |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | Motion Photo destination. Default is Apple pair. Google writes one `*.xdremuxMP.jpg` or `*.xdremuxMP.heic` file without transcoding the still image. |
 | `--motion-video-compat preserve` | Google targets only. Optional; `preserve` is the sole mode and is the default. No brand rewrite or transcode. |
 | `--jobs N` | Positive integer. Defaults to available parallelism, capped at `4`, with fallback `1`. |

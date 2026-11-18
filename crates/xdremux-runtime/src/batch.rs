@@ -6,11 +6,13 @@ use std::sync::mpsc;
 use std::thread;
 
 use xdremux_engine::{
-    ConversionRequest, LivePhotoOutput, MotionOutputTarget, MotionVideoCompatibility,
+    ConversionRequest, ConversionTarget, LivePhotoOutput, MotionOutputTarget,
+    MotionVideoCompatibility, TargetAssetKind,
 };
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 use xdremux_source::{probe_bytes, SourceAsset};
 
+use crate::android_motion_photo::resolve_motion_output_target;
 use crate::batch_checkpoint::{
     canonical_or_absolute, source_signature, source_signature_path, AndroidCheckpointIdentity,
     CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
@@ -55,6 +57,8 @@ pub struct BatchExecutionOptions {
     /// The public CLI supplies this only for a packaged macOS deployment.
     pub apple_adapter_executable: Option<PathBuf>,
     pub motion_target: Option<MotionOutputTarget>,
+    /// Destination profile, resolved per asset rather than across a mixed batch.
+    pub target: Option<ConversionTarget>,
     pub motion_video_compatibility: MotionVideoCompatibility,
 }
 
@@ -66,6 +70,7 @@ impl Default for BatchExecutionOptions {
             jobs: 1,
             apple_adapter_executable: None,
             motion_target: None,
+            target: None,
             motion_video_compatibility: MotionVideoCompatibility::Preserve,
         }
     }
@@ -261,9 +266,11 @@ fn reusable_planned_output(
 
 fn google_target(target: Option<MotionOutputTarget>) -> Option<MotionOutputTarget> {
     match target {
-        Some(target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)) => {
-            Some(target)
-        }
+        Some(
+            target @ (MotionOutputTarget::GoogleAuto
+            | MotionOutputTarget::GoogleJpeg
+            | MotionOutputTarget::GoogleHeic),
+        ) => Some(target),
         _ => None,
     }
 }
@@ -310,12 +317,23 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     let mut items = Vec::with_capacity(inputs.len());
 
     for input in inputs {
-        let motion = (google_target(options.motion_target).is_some()
+        let analysis = (google_target(options.motion_target).is_some()
             || options.live_photo_output == LivePhotoOutput::Pvt)
-            && xdremux_source::inspect_path(input)
-                .is_ok_and(|value| matches!(value.asset, SourceAsset::MotionPhoto { .. }));
+            .then(|| fs::read(input).ok())
+            .flatten()
+            .and_then(|source| probe_bytes(&source).ok().map(|asset| (source, asset)));
+        let motion = analysis
+            .as_ref()
+            .is_some_and(|(_, asset)| matches!(asset, SourceAsset::MotionPhoto { .. }));
         let android = if motion {
-            google_target(options.motion_target)
+            google_target(options.motion_target).and_then(|target| {
+                if target == MotionOutputTarget::GoogleAuto {
+                    let (source, asset) = analysis.as_ref()?;
+                    resolve_motion_output_target(target, source, asset).ok()
+                } else {
+                    Some(target)
+                }
+            })
         } else {
             None
         };
@@ -625,6 +643,27 @@ fn process_batch_item_with_options(
             .map_err(|error| RuntimeError::external("batch input read", error))?;
         let asset = probe_bytes(&source)
             .map_err(|error| RuntimeError::external("batch source probe", error))?;
+        let request = if let Some(target) = options.target {
+            let kind = match &asset {
+                SourceAsset::MotionPhoto { .. } => TargetAssetKind::MotionPhoto,
+                SourceAsset::ProXdr { .. } => TargetAssetKind::ProXdr,
+            };
+            target.apply_request(kind, request).map_err(|reason| {
+                RuntimeError::new(
+                    "batch destination target",
+                    format!("{}: {reason}", target.name()),
+                )
+            })?
+        } else {
+            request
+        };
+        let resolved_android = if matches!(asset, SourceAsset::MotionPhoto { .. }) {
+            google_target(motion_target)
+                .map(|target| resolve_motion_output_target(target, &source, &asset))
+                .transpose()?
+        } else {
+            None
+        };
         if request.hdr_profile != xdremux_engine::HdrExportProfile::Compatible
             && !matches!(asset, SourceAsset::ProXdr { .. })
         {
@@ -637,7 +676,7 @@ fn process_batch_item_with_options(
         match asset {
             SourceAsset::MotionPhoto { .. } => {
                 let signature = source_signature(&item.input, &source)?;
-                if let Some(target) = google_target(motion_target) {
+                if let Some(target) = resolved_android {
                     let prior = if reuse_existing {
                         checkpoint.reusable_android_item(
                             &item.input,
