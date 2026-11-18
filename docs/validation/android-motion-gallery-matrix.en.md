@@ -37,6 +37,8 @@ Run `cargo test --locked -p xdremux-cli --test unified_target` for these offline
 
 A local mixed batch used J1 and a public HEIC Motion Photo produced from H2 with `--target samsung`. With `--target honor`, the batch stopped before publication until confirmed. It then wrote separate `*MP.jpg` and `*MP.heic` files. `xdremux inspect` reported the same presentation times as the inputs, 1,333,944 μs for JPEG and 1,540,401 μs for HEIC. The video ranges compared byte for byte, and both input digests remained unchanged.
 
+Repeating the confirmed batch with `--skip-existing` preserved both published files. Adding `--motion-target google-jpeg` in a new directory produced the same JPEG. The standard writer reported that the HEIC item requires an explicit transcode path and stopped that item before publication.
+
 ## Gallery readers and metadata
 
 These are format and code observations. A reachable reader is evidence for the listed build. Device playback, HDR display and share/export of the generated files remain untested unless a device observation is recorded below.
