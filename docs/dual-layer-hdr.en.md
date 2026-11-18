@@ -56,6 +56,8 @@ An enabled registered base or combined mapping therefore stops file pixel recons
 
 `DynamicHdrMetadata::from_parts` packs caller-supplied statistics, up to two display-target sets, base curves, spline pieces, and saturation gains. It checks each field's bit width and conditional presence. This provides checked authoring without generating measurements or tone-mapping parameters.
 
+A regression uses scenario 6 from T/UWA 005.3-1—2023 Table A.2, packed according to GB/T 48347—2026 Table 19. It checks the encoded display target, curve parameters, both splines, and saturation gains, then reproduces the input bytes. The display test prescribes how to derive expected luminance for that historical video standard, so this vector verifies metadata handling and leaves pixel adaptation open. [UWA display test standard](https://www.uhd-world-association.com/wp-content/uploads/2024/10/UWA-_8-TUWA-005.3-1-2023-HDR-Video-Technology-Part-3-1-Technical-Requirements-and-Test-Methods-Display-Device.pdf)
+
 ## Verification
 
 Run the focused checks from the repository root:
@@ -102,6 +104,7 @@ These values describe one fixed encoding configuration. They are not a general q
 - A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
 - A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
 - The registered JPEG APP8 pair is written only on request (`--jpeg-registered-metadata`) and only when the source supplies enhanced registered metadata. A source without it is refused, rather than publishing a base declaration with no enhanced record. The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
+- The opt-in flag writes the registered metadata carriers. The JPEG writer uses the source's base Exif and ICC when present and omits alternate ICC. Full GB/T 48347—2026 §9.2 distribution-format conformance remains unverified.
 - The Gain Map encoder currently accepts eight-bit rasters. A standalone HEVC Gain Map uses compressed-resource remux for HEIF output, including higher precision; a JPEG destination explicitly selects eight-bit quantization and uses the JPEG encoder without requiring a HEVC Gain Map encoder. Generated mono and RGB 10/12-bit sources cover both destinations.
 - HEIF remux currently requires uniform coded tile dimensions, identical hvcC bytes, and compatible full-range BT.601 Gain Map compression declarations. Other layouts fail rather than being reinterpreted. Changing alternate application primaries requires a verified pixel/mapping conversion and is refused by this remux path.
 - Registered matrix/3D LUT sections can be read from and round-tripped through HEIF `it35` and JPEG APP8. Precision, finite values, sizes, and cube dimensions are validated. Their rendering semantics are not established, so the conversion preserves them without applying them to pixels; no implicit RGB-vector interpretation or LUT domain is invented.

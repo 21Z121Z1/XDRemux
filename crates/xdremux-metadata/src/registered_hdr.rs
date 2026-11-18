@@ -309,7 +309,7 @@ pub struct RegisteredJpegBaseDeclaration {
     pub offsets: Vec<(u32, u32)>,
 }
 
-/// `ITUT35` identity followed by the T.35 codes and the base image type.
+/// `ITUT35` identity followed by the T.35 codes and the image count.
 const APP8_BASE_HEADER: [u8; 12] = [b'I', b'T', b'U', b'T', b'3', b'5', 0x26, 0, 4, 0, 7, 1];
 const APP8_BASE_TYPE: u32 = 0x0100_0000;
 
@@ -568,6 +568,61 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_metadata_matches_uwa_reference_scenario() {
+        // T/UWA 005.3-1—2023 Table A.2, scenario 6, packed using GB/T 48347—2026 Table 19.
+        let payload = [
+            0x01, 0x00, 0x0b, 0xe7, 0x83, 0x7f, 0xfe, 0xab, 0x4b, 0x00, 0xcb, 0x16, 0x19, 0x40,
+            0x02, 0x8e, 0x01, 0x96, 0x07, 0xde, 0x45, 0xa2, 0xee, 0x4e, 0xd5, 0xa4, 0x69, 0x1d,
+            0x2d, 0x13, 0x0c, 0x80,
+        ];
+        let decoded = DynamicHdrMetadata::parse(&payload).unwrap();
+        assert_eq!(
+            decoded.statistics(),
+            DynamicHdrStatistics {
+                minimum_maxrgb_pq: 0,
+                average_maxrgb_pq: 3047,
+                variance_maxrgb_pq: 2103,
+                maximum_maxrgb_pq: 4094,
+            }
+        );
+        let [target] = decoded.tone_mappings() else {
+            panic!("scenario 6 specifies one display target");
+        };
+        assert_eq!(target.target_maximum_luminance_pq, 2770);
+        let base = target.base.unwrap();
+        assert_eq!((base.m_p, base.delta_mode, base.delta), (8217, 6, 0));
+        assert_eq!(
+            target.splines,
+            [
+                DynamicHdrSpline {
+                    threshold_mode: 0,
+                    threshold_mb: Some(176),
+                    threshold: 1007,
+                    delta1: 139,
+                    delta2: 279,
+                    strength: 114,
+                },
+                DynamicHdrSpline {
+                    threshold_mode: 1,
+                    threshold_mb: None,
+                    threshold: 3499,
+                    delta1: 291,
+                    delta2: 291,
+                    strength: 165,
+                },
+            ]
+        );
+        assert_eq!(decoded.saturation_gains(), &[38, 25]);
+        let encoded = DynamicHdrMetadata::from_parts(
+            decoded.statistics(),
+            decoded.tone_mappings().to_vec(),
+            decoded.saturation_gains().to_vec(),
+        )
+        .unwrap();
+        assert_eq!(encoded.as_bytes(), &payload);
+    }
+
+    #[test]
     fn dynamic_parameters_are_decoded_without_losing_packed_source() {
         let mut packed = Vec::new();
         let mut pos = 0;
@@ -755,11 +810,14 @@ mod tests {
             registered_jpeg_base_payload_len(2),
             "two images declare one offset pair"
         );
-        assert_eq!(&payload[..6], b"ITUT35");
-        assert_eq!(payload[6], 0x26);
-        assert_eq!(&payload[12..16], &0x0100_0000_u32.to_be_bytes());
+        // GB/T 48347—2026 Table 21, starting immediately after the JPEG marker and length.
+        let expected = [
+            b'I', b'T', b'U', b'T', b'3', b'5', 0x26, 0, 4, 0, 7, 2, 0x01, 0, 0, 0, 0x00, 0x12,
+            0xd6, 0x87, 0x00, 0x12, 0xd0, 0x68,
+        ];
+        assert_eq!(payload, expected);
         assert_eq!(
-            RegisteredJpegBaseDeclaration::parse_app8_payload(&payload).unwrap(),
+            RegisteredJpegBaseDeclaration::parse_app8_payload(&expected).unwrap(),
             declaration
         );
 
