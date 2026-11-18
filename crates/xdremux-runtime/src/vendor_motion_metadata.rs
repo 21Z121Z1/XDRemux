@@ -59,7 +59,7 @@ impl VendorMetadataCarry {
                 gaps: &[
                     "Samsung gallery 15.1.03.4 checks SEF MotionPhoto_Data before XMP; this output does not rewrite SEF, so only the XMP fallback can apply",
                     "for a non-JPEG name, ex.a.d scans top-level boxes for mpvd and takes the payload through EOF; mpvd is last and uses a normal 32-bit size",
-                    "that XMP fallback needs Item:Padding present and Item:Length greater than 1024; Padding is 0",
+                    "that XMP fallback needs Item:Padding present and Item:Length greater than 1024; the writer uses 0 for JPEG and the mpvd header length for HEIC",
                     "a secondary MotionPhoto_AutoPlay stream is left out when it cannot be expressed",
                     "the HEIF box locator was not fully traced; this is not a Samsung-native or device claim",
                 ],

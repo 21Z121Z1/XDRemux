@@ -94,6 +94,12 @@ fn google_target_chooses_original_still_container_and_preserves_video() {
     let (status, _, stderr) = convert(&heic, &output_heic, "google");
     assert_eq!(status, 0, "{stderr}");
     assert_preserved_motion(&heic, &output_heic);
+    let bytes = fs::read(&output_heic).unwrap();
+    let heic = MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict()).unwrap();
+    let xmp = heic.xmp_bytes().unwrap().unwrap();
+    assert!(std::str::from_utf8(xmp.as_ref())
+        .unwrap()
+        .contains("Item:Padding=\"8\""));
 }
 
 #[test]
