@@ -10,7 +10,8 @@ use xdremux_engine::{
     GainMapTileEncoder, OutputContainer,
 };
 use xdremux_format::dual_jpeg::index_dual_layer_jpeg;
-use xdremux_format::ChromaSampling;
+use xdremux_format::isobmff::{parse_boxes, parse_meta_box, scan_top_level_boxes, IREF, META};
+use xdremux_format::{ChromaSampling, FourCC};
 use xdremux_heif::{
     assemble_iso_gain_map_heif, DirectHevcGainMap, GainMapTile, HdrGainMapProfile,
     HdrMetadataAssembly, IsoGainMapAssembly,
@@ -296,6 +297,66 @@ fn a_registered_declaration_reaches_the_published_jpeg_with_consistent_offsets()
         RegisteredHdrMetadata::parse_app8_payload(&receipt.bytes[enhanced.payload.clone()])
             .expect("the enhanced payload must parse");
     assert_eq!(observed, expected_registered());
+}
+
+#[test]
+fn remux_replaces_an_unlinked_source_carrier_with_one_linked_carrier() {
+    let mut source = iso_source_with_registered_metadata();
+    let input_metadata = xdremux_heif::extract_hdr_metadata(&source).unwrap();
+    let registered_id = input_metadata.provenance.registered_item_id.unwrap();
+    let boxes = scan_top_level_boxes(&source).unwrap().boxes;
+    let meta = boxes.iter().find(|item| item.kind == META).unwrap();
+    let children = parse_boxes(&source, meta.data_start + 4..meta.data_end).unwrap();
+    let iref = children.iter().find(|item| item.kind == IREF).unwrap();
+    let refs = parse_boxes(&source, iref.data_start + 4..iref.data_end).unwrap();
+    let old = parse_meta_box(&source, meta).unwrap().iref.unwrap();
+    let position = old
+        .entries
+        .iter()
+        .position(|reference| reference.from_item_id == registered_id)
+        .unwrap();
+    let removed = refs[position].box_range();
+    assert_eq!(refs[position].kind.as_bytes(), b"cdsc");
+
+    // Move the trailing references left and replace the padding with a free
+    // sibling. Image and metadata extents keep their original offsets.
+    let start = iref.box_range().start;
+    let free = iref.data_end - removed.len();
+    source.copy_within(removed.end..iref.data_end, removed.start);
+    source[start..start + 4].copy_from_slice(&u32::try_from(free - start).unwrap().to_be_bytes());
+    source[free..free + 4].copy_from_slice(&u32::try_from(removed.len()).unwrap().to_be_bytes());
+    source[free + 4..free + 8].copy_from_slice(b"free");
+    let parsed = parse_meta_box(&source, meta).unwrap();
+    assert!(parsed
+        .iref
+        .unwrap()
+        .entries
+        .iter()
+        .all(|reference| reference.from_item_id != registered_id));
+
+    let output = PortableRuntime::new()
+        .convert_iso_heif_bytes(&source, ConversionRequest::default(), |_| {})
+        .unwrap();
+    let metadata = xdremux_heif::extract_hdr_metadata(&output.bytes).unwrap();
+    assert_eq!(
+        metadata.registered_metadata,
+        input_metadata.registered_metadata
+    );
+    let boxes = scan_top_level_boxes(&output.bytes).unwrap().boxes;
+    let meta = boxes.iter().find(|item| item.kind == META).unwrap();
+    let parsed = parse_meta_box(&output.bytes, meta).unwrap();
+    let carriers = parsed
+        .iinf
+        .entries
+        .iter()
+        .filter(|item| item.item_type == Some(FourCC::new(*b"it35")))
+        .count();
+    assert_eq!(carriers, 1);
+    assert!(parsed.iref.unwrap().entries.iter().any(|reference| {
+        reference.kind.as_bytes() == b"cdsc"
+            && Some(reference.from_item_id) == metadata.provenance.registered_item_id
+            && reference.to_item_ids == [metadata.provenance.derived_hdr_item_id.unwrap()]
+    }));
 }
 
 #[test]

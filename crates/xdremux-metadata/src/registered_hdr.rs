@@ -424,6 +424,11 @@ impl<'a> Cursor<'a> {
 }
 
 impl RegisteredHdrMetadata {
+    /// Identify the registered two-image HDR carrier before interpreting its payload.
+    pub fn has_it35_identity(bytes: &[u8]) -> bool {
+        bytes.starts_with(PREFIX)
+    }
+
     pub fn has_enabled_mapping(&self) -> bool {
         self.mapping_extension.as_ref().is_some_and(|extension| {
             [&extension.base, &extension.combined]

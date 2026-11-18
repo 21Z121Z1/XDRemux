@@ -120,8 +120,60 @@ fn it35_items(meta: &ParsedMeta) -> Vec<u32> {
         .collect()
 }
 
+/// Read the file-scope item in the single-image-group layout of GB/T 48347.
+pub(crate) fn read_unlinked_registered_metadata(
+    source: &[u8],
+    meta: &ParsedMeta,
+    derived: u32,
+) -> Result<Option<(u32, RegisteredHdrMetadata)>> {
+    let items = it35_items(meta);
+    let [item_id] = items.as_slice() else {
+        return Ok(None);
+    };
+    if tmap_items(meta).as_slice() != [derived] {
+        return Ok(None);
+    }
+    let Some(iref) = &meta.iref else {
+        return Ok(None);
+    };
+    if iref.entries.iter().any(|reference| {
+        reference.from_item_id == *item_id || reference.to_item_ids.contains(item_id)
+    }) {
+        return Ok(None);
+    }
+    let mut images = iref
+        .entries
+        .iter()
+        .filter(|reference| reference.kind == DIMG && reference.from_item_id == derived);
+    let Some([primary, gain]) = images
+        .next()
+        .map(|reference| reference.to_item_ids.as_slice())
+    else {
+        return Ok(None);
+    };
+    if images.next().is_some()
+        || *primary != meta.primary_item_id
+        || *gain == derived
+        || gain == primary
+    {
+        return Ok(None);
+    }
+    let index = validate_meta_integrity(source, meta)?;
+    let location = index
+        .locations
+        .get(item_id)
+        .ok_or_else(|| invalid(format!("unlinked t35 item {item_id} has no location")))?;
+    let payload = item_payload(source, meta.idat.as_ref(), location)?;
+    if !RegisteredHdrMetadata::has_it35_identity(&payload) {
+        return Ok(None);
+    }
+    let metadata = RegisteredHdrMetadata::parse_it35(&payload)
+        .map_err(|e| invalid(format!("registered HDR item {item_id}: {e}")))?;
+    Ok(Some((*item_id, metadata)))
+}
+
 /// Count carriers that exist but do not describe the derived HDR image.
-fn ignored_carriers(meta: &ParsedMeta, derived: Option<u32>) -> usize {
+fn ignored_carriers(meta: &ParsedMeta, derived: Option<u32>, registered: Option<u32>) -> usize {
     let property_is_used = |property: &PropertyInfo| {
         derived.is_some_and(|item_id| {
             meta.ipma.entries.iter().any(|entry| {
@@ -141,7 +193,7 @@ fn ignored_carriers(meta: &ParsedMeta, derived: Option<u32>) -> usize {
         .count();
     let items = it35_items(meta)
         .into_iter()
-        .filter(|id| derived.is_none_or(|derived| !cdsc_targets(meta, *id, derived)))
+        .filter(|id| Some(*id) != registered)
         .count();
     properties + items
 }
@@ -185,7 +237,7 @@ pub fn extract_hdr_metadata(source: &[u8]) -> Result<SourceHdrMetadata> {
             registered_metadata: None,
             provenance: HdrMetadataProvenance {
                 derived_hdr_item_id: None,
-                ignored_carrier_count: ignored_carriers(&meta, None),
+                ignored_carrier_count: ignored_carriers(&meta, None, None),
                 ..HdrMetadataProvenance::default()
             },
         });
@@ -200,12 +252,12 @@ pub fn extract_hdr_metadata(source: &[u8]) -> Result<SourceHdrMetadata> {
         [] => {
             return Err(invalid(
                 "the source has a tmap item but none describes the primary image",
-            ))
+            ));
         }
         _ => {
             return Err(invalid(
                 "the source declares more than one derived HDR image for the primary image",
-            ))
+            ));
         }
     };
     let index = validate_meta_integrity(source, &meta)?;
@@ -213,7 +265,6 @@ pub fn extract_hdr_metadata(source: &[u8]) -> Result<SourceHdrMetadata> {
     let mut declared = HdrStaticMetadata::default();
     let mut provenance = HdrMetadataProvenance {
         derived_hdr_item_id: Some(derived),
-        ignored_carrier_count: ignored_carriers(&meta, Some(derived)),
         ..HdrMetadataProvenance::default()
     };
     for (property, _) in item_properties(&index, derived)? {
@@ -264,6 +315,16 @@ pub fn extract_hdr_metadata(source: &[u8]) -> Result<SourceHdrMetadata> {
         provenance.registered_item_id = Some(item_id);
         registered_metadata = Some(data);
     }
+    if registered_metadata.is_none() {
+        if let Some((item_id, metadata)) =
+            read_unlinked_registered_metadata(source, &meta, derived)?
+        {
+            provenance.registered_item_id = Some(item_id);
+            registered_metadata = Some(metadata);
+        }
+    }
+    provenance.ignored_carrier_count =
+        ignored_carriers(&meta, Some(derived), provenance.registered_item_id);
 
     if let Some((mastering, light)) = registered_metadata
         .as_ref()

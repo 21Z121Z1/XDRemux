@@ -66,6 +66,8 @@ enum RegisteredTarget {
     Derived,
     Primary,
     Duplicate,
+    Unlinked,
+    UnlinkedForeign,
 }
 
 struct Built {
@@ -108,8 +110,30 @@ fn build(carriers: Carriers, with_derived: bool) -> Built {
             essential: true,
         }],
     }];
+    let unlinked = matches!(
+        carriers.registered,
+        Some(RegisteredTarget::Unlinked | RegisteredTarget::UnlinkedForeign)
+    );
 
     if with_derived {
+        let mut inputs = vec![base_id];
+        if unlinked {
+            let gain_id = 2;
+            entries.push(make_infe_box(gain_id, BASE, 1).unwrap());
+            iloc.push(IlocEntry {
+                item_id: gain_id,
+                construction_method: 1,
+                data_reference_index: 0,
+                base_offset: 0,
+                extents: vec![IlocExtent {
+                    index: None,
+                    offset: 0,
+                    length: 4,
+                }],
+            });
+            idat.extend_from_slice(b"gain");
+            inputs.push(gain_id);
+        }
         entries.push(make_infe_box(derived_id, TMAP, 0).unwrap());
         ipma.push(IpmaEntry {
             item_id: derived_id,
@@ -118,7 +142,7 @@ fn build(carriers: Carriers, with_derived: bool) -> Built {
         iref.push(IrefEntry {
             kind: DIMG,
             from_item_id: derived_id,
-            to_item_ids: vec![base_id],
+            to_item_ids: inputs,
         });
         iloc.push(IlocEntry {
             item_id: derived_id,
@@ -136,7 +160,10 @@ fn build(carriers: Carriers, with_derived: bool) -> Built {
 
     if let Some(target) = carriers.registered {
         entries.push(make_infe_box(registered_id, IT35, 1).unwrap());
-        let payload = registered_payload(true);
+        let mut payload = registered_payload(true);
+        if target == RegisteredTarget::UnlinkedForeign {
+            payload[0] = 0xb5;
+        }
         iloc.push(IlocEntry {
             item_id: registered_id,
             construction_method: 1,
@@ -149,14 +176,17 @@ fn build(carriers: Carriers, with_derived: bool) -> Built {
             }],
         });
         idat.extend_from_slice(&payload);
-        iref.push(IrefEntry {
-            kind: CDSC,
-            from_item_id: registered_id,
-            to_item_ids: vec![match target {
-                RegisteredTarget::Derived | RegisteredTarget::Duplicate => derived_id,
-                RegisteredTarget::Primary => base_id,
-            }],
-        });
+        if !unlinked {
+            iref.push(IrefEntry {
+                kind: CDSC,
+                from_item_id: registered_id,
+                to_item_ids: vec![if target == RegisteredTarget::Primary {
+                    base_id
+                } else {
+                    derived_id
+                }],
+            });
+        }
         if target == RegisteredTarget::Duplicate {
             entries.push(make_infe_box(registered_id + 1, IT35, 1).unwrap());
             let offset = u64::try_from(idat.len()).unwrap();
@@ -302,6 +332,36 @@ fn registered_metadata_for_the_derived_image_is_retained_with_its_dynamic_payloa
     );
     assert!(observed.provenance.properties_from_registered);
     assert_eq!(observed.provenance.registered_item_id, Some(4));
+}
+
+#[test]
+fn an_unlinked_registered_item_describes_the_single_dual_layer_image() {
+    // GB/T 48347—2026 Annex C.5 lists a tmap dimg and an it35 item without cdsc.
+    let built = build(
+        Carriers {
+            registered: Some(RegisteredTarget::Unlinked),
+            ..Carriers::default()
+        },
+        true,
+    );
+    let observed = extract_hdr_metadata(&built.bytes).unwrap();
+    assert!(observed.has_dynamic_metadata());
+    assert_eq!(observed.provenance.registered_item_id, Some(4));
+    assert_eq!(observed.provenance.ignored_carrier_count, 0);
+}
+
+#[test]
+fn an_unlinked_item_with_a_foreign_t35_identity_is_ignored() {
+    let built = build(
+        Carriers {
+            registered: Some(RegisteredTarget::UnlinkedForeign),
+            ..Carriers::default()
+        },
+        true,
+    );
+    let observed = extract_hdr_metadata(&built.bytes).unwrap();
+    assert!(observed.is_empty());
+    assert_eq!(observed.provenance.ignored_carrier_count, 1);
 }
 
 #[test]

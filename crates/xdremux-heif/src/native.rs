@@ -95,7 +95,7 @@ fn child<'a>(children: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&
         .ok_or_else(|| invalid(format!("{context}/{} is missing", kind)))
 }
 
-fn canonical_gain_map_graph_ids(meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
+fn canonical_gain_map_graph_ids(source: &[u8], meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
     let tmap_ids = meta
         .iinf
         .entries
@@ -165,6 +165,11 @@ fn canonical_gain_map_graph_ids(meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
         }) {
             removed.insert(item.item_id);
         }
+    }
+    if let Some((id, _)) =
+        crate::hdr_metadata::read_unlinked_registered_metadata(source, meta, tmap_id)?
+    {
+        removed.insert(id);
     }
     removed.remove(&meta.primary_item_id);
     Ok(removed)
@@ -1239,7 +1244,7 @@ pub fn assemble_iso_gain_map_heif(
     let meta_header = one_top_level(&top.boxes, META, "meta")?;
     let mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
     let meta = parse_meta_box(source, meta_header)?;
-    let removed_graph_ids = canonical_gain_map_graph_ids(&meta)?;
+    let removed_graph_ids = canonical_gain_map_graph_ids(source, &meta)?;
     let meta_children_start = meta_header
         .data_start
         .checked_add(4)
