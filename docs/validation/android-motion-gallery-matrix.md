@@ -65,9 +65,10 @@ Android `apksig` 8.7.3 已验证 APK 签名。三星 15.1.03.4 通过 v2 验签�
 | `com.coloros.gallery3d` | 25.17.35 (25017035) | `e270085d137a4dccc75e2f20f4b05c4a8dabaafe9d628461d145c18d08aef2f2` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-25-17-35-release/oppo-photos-25-17-35-android-apk-download/) |
 | `com.vivo.gallery` | 10.0.10.42 (100010042) | `6cb8edea5d750d0c1544d3fd7e79dd04fc388933ee14bf289b77234bc02ffe73` [APK 页面](https://www.apkmirror.com/apk/vivo-co-ltd/vivo-gallery/vivo-albums-10-0-10-42-release/vivo-albums-10-0-10-42-android-apk-download/) |
 | `com.vivo.gallery` | 3.2.10.4 (30210004) | 已下载并复算 `94b5f58b40af41bb29eaed18a01cf03146486a6130c92b7a0877c140299241db`。内嵌证书 SHA-256 与 10.0.10.42 页面一致。[APKPure](https://d.apkpure.com/b/APK/com.vivo.gallery?versionCode=30210004) |
-| `com.hihonor.photos` | 150.1.1.300 候选 | 仅有第三方条目，下载地址未返回可用 APK。从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。 [荣耀播放文档](https://www.honor.com/cn/support/content/zh-cn15897491/) [APK 候选条目](https://www.962.net/azsoft/620612.html) |
+| `com.hihonor.photos` | 150.1.1.300 候选 | 两个第三方条目的下载地址均返回 HTML。从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。[候选条目一](https://www.962.net/azsoft/620612.html) [候选条目二](https://www.fxxz.com/azsoft/733991.html) |
+| `com.hihonor.photos` | 152.0.10.794 (1520010794) | gnacho/gallery 记录了从荣耀 Magic V5 提取的 APK，报告 SHA-256 `2e8a8a89d6a9910210986935e4c01f46d3d6190936b9771520e3a13492e6ee86`。该记录未附原 APK 或签名证书，公开实现也没有复现荣耀的实况资源匹配路径。[版本报告](https://github.com/gnacho/gallery/blob/1529935f70e6d13deee98c876edf9d1a0139052e/analysis/latest/report.md#L7) [实况功能记录](https://github.com/gnacho/gallery/blob/1529935f70e6d13deee98c876edf9d1a0139052e/analysis/implementation-map.json#L658) |
 
-小米 APKPure 最新版本下载返回 `ep-miuigallery-v15240103`（999999902），已从 4.3.1.15-global 播放证据中排除。本轮的小米准确全球版、OPPO 17.10.62 和 vivo 10.0.10.42 均只有镜像条目信息。
+小米 APKPure 最新版本下载返回 `ep-miuigallery-v15240103`（999999902），已从 4.3.1.15-global 播放证据中排除。小米 4.3.1.15-global、OPPO 17.10.62 和 vivo 10.0.10.42 的 APK 仅有镜像条目信息。
 
 LibLivePhoto 另有带边界检查的荣耀 `LIVE_` 及反向 TLV 读取器，检查视频范围、拒绝歧义，并可读取 `HiHonor_OfflineData` 的场景模式。该读取契约与 ZLC 未固定版本的相册追踪分别记录，XDRemux 产物的相册识别仍待验证。 [LibLivePhoto 荣耀读取器](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/crates/liblivephoto/src/vendor/honor.rs#L48)
 
