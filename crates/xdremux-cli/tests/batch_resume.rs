@@ -79,7 +79,7 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
     let mut lines = checkpoint_text.lines();
     let header: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
     assert_eq!(header["kind"], "header");
-    assert_eq!(header["schemaVersion"], 2);
+    assert_eq!(header["schemaVersion"], 3);
     let item: Value = serde_json::from_str(lines.last().unwrap()).unwrap();
     assert_eq!(item["status"], "success");
     assert_eq!(item["assetIdentifier"], image_id);
