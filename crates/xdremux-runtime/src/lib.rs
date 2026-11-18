@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod android_motion_photo;
 #[cfg(target_os = "macos")]
 mod apple_adapter;
 #[cfg(target_os = "macos")]
@@ -45,6 +46,7 @@ pub fn validate_apple_styles_file(
 ) -> Result<()> {
     apple_texture::validate_existing(executable.as_ref(), input.as_ref())
 }
+pub use android_motion_photo::AndroidMotionPhotoFileReceipt;
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 #[cfg(target_os = "macos")]
 pub use hdr_look::render_hdr_look;
@@ -773,6 +775,34 @@ impl PortableRuntime {
             input.as_ref(),
             output.as_ref(),
             request.live_photo_output,
+        )
+    }
+
+    /// Compose and safely publish a single-file Google Motion Photo.
+    /// No transcoding or implicit resource loss is permitted.
+    pub fn convert_android_motion_photo_file(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        if request.hdr_profile != HdrExportProfile::Compatible
+            || request.requests_oppo_gallery_compatibility()
+            || request.apple_features.any()
+            || request.live_photo_output != xdremux_engine::LivePhotoOutput::Pair
+        {
+            return Err(RuntimeError::new(
+                "Android Motion Photo conversion",
+                "HDR export profiles, OPPO output intent, Apple editing features and Apple PVT packaging do not apply to Google Motion Photo output",
+            ));
+        }
+        android_motion_photo::convert_android_motion_photo_file(
+            source,
+            input.as_ref(),
+            output.as_ref(),
+            target,
         )
     }
 
