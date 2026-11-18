@@ -108,6 +108,10 @@ jobs:
       - name: Test portable Rust CLI semantics
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
 
+      - name: Verify Android-compatible HEIF Exif emission
+        if: runner.os == 'Linux'
+        run: cargo test --locked -p xdremux-codec portable::primary_heif::tests::encodes_exif_with_android_readable_identifier_without_changing_tiff
+
   macos-package:
     name: macos-package (arm64)
     runs-on: xcode-27

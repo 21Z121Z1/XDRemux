@@ -14,6 +14,7 @@ use xdremux_motion_photo::{
     ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions,
     PreservationEvidence, ResourceRole, TargetProfile, WritePolicy,
 };
+use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 
 use crate::{Result, RuntimeError};
 
@@ -53,13 +54,35 @@ pub struct AndroidMotionResourceOperation {
     pub reason: String,
 }
 
-// Container writers can express the same exact instant with different rational
-// timescales. Compare the instant without rounding to a common time unit.
+// Apple timed metadata and Android XMP may express the *same exact instant*
+// with different rational timescales. Structural MediaTime equality rejects
+// that lossless representation change even though the library writer already
+// checks the timestamps with MediaTime::equivalent.
 fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) -> bool {
     match (source, output) {
         (Some(a), Some(b)) => a.equivalent(b),
         (None, None) => true,
         _ => false,
+    }
+}
+
+/// Resolve an automatic Android writer using the actual parsed still span.
+/// This selects a container; it does not transcode still images or video.
+pub fn resolve_motion_output_target(
+    target: MotionOutputTarget,
+    source: &[u8],
+    asset: &SourceAsset,
+) -> Result<MotionOutputTarget> {
+    if target != MotionOutputTarget::GoogleAuto {
+        return Ok(target);
+    }
+    match motion_still_encoding(source, asset) {
+        Some(MotionStillEncoding::Jpeg) => Ok(MotionOutputTarget::GoogleJpeg),
+        Some(MotionStillEncoding::Heic) => Ok(MotionOutputTarget::GoogleHeic),
+        None => Err(RuntimeError::new(
+            "Android Motion Photo target",
+            "automatic target requires a JPEG or HEIC primary still; AVIF and other still formats have no compatible writer",
+        )),
     }
 }
 
