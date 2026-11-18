@@ -6,7 +6,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-liblivephoto-format = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "794ab552596db0f66095600d23cf7937a631b9ec" }
+liblivephoto-format = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "a4142f6c104b750736f3ecea8e5d5a66578de5b5" }
 
 [lints]
 workspace = true
