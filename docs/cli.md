@@ -119,11 +119,12 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | `oppo` | 源主图已是 JPEG 时写公开 Motion Photo，并复制已有的 `OpCamera`。Photos 17.10.62 和 25.17.35 不支持 HEIC 实况：`image/jpeg` 闸门，解码器只构造 `JpegOLiveReader`，没有 JPEG SOI 就返回空。接受损失说明后，主图像解码为 8 位 sRGB JPEG，由本程序套用已承认的 sRGB 或 Display P3 ICC，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。视频字节保留，不应用 gain map。17.10.62 的 v3 签名者 SHA-1 是 `39bad40aa2730a1914e27939c1c04529df320c98`。一加和 realme 使用这个目标。这两版不是所有 ColorOS。 |
 | `vivo` | 已有两个 UUID 盒的仓库样本按原字节保留。其他 JPEG 实况写成 JPEG 加保留的 MP4：`MotionPhoto=1`、`Item:Padding=0`，视频起点是文件大小减去 `Item:Length`。ExtInfo 写在该起点之前，类型是 `motionphoto0001…`，`imageTime` 是离源演示时间最近的 30fps 帧。10.0.10.42（Y04s/W20 海外代理，不是 S60）和 3.2.10.4 都不支持 HEIC 实况：前者 `XmpUtil` 要求 JPEG SOI 且 DEX 没有 `mpvd`，后者只播 sidecar、不回退合写文件。接受说明后主图像变成 8 位 sRGB JPEG：本程序套用内嵌 ICC，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。视频字节不变。这两版不是所有 vivo。 |
 | `xiaomi` | 公开 JPEG Motion Photo，版本恰好为 1。4.3.1.15-global 在此条件下用文件大小减去 MotionPhoto 项的 Length，不读 Padding。不写 `MiCamera` 和 `MicroVideo`。该版本不支持 HEIC 实况：1073 要 JPEG SOI，1006/1071 在 `readMicroMotionVideoOffset` 不大于 0 时被清掉，1026 只是静图 HEIF。接受说明后主图像变成 8 位 sRGB JPEG：本程序套用内嵌 ICC，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。视频字节不变。这不是所有小米版本。 |
-| `huawei` | 已有的 OpenHarmony 文件：HEIC 静帧加追加的 MP4。`com.openharmony.covertime` 是大端 float32 毫秒，`videoId` 只沿用源文件。HEIC 前缀、视频字节和已有的 `v6` 尾保持不变。JPEG 源不发布。Android 相册 11.0.19.478 的 40 字节尾不是这个输出。鸿蒙相册导入尚未验证。 |
+| `huawei` | 已有的 OpenHarmony 文件：HEIC 静帧加追加的 MP4。`com.openharmony.covertime` 是大端 float32 毫秒，`videoId` 只沿用源文件。HEIC 前缀、视频字节和已有的 `v6` 尾保持不变。其他实况输入经确认后回退到 Android Motion Photo 1.0。鸿蒙相册播放尚未验证。 |
+| `honor` | 确认后使用通用 Android 回退方案。荣耀文档说明部分机型可播放本机拍摄和特定方式共享的实况。XDRemux 输出的兼容性尚未验证。 |
 
-`--target` 在写出任何文件之前打印这份输入的证据。兼容性不确定或有损降级时，交互终端要回答 `y`，非交互运行要加 `--accept-unverified-target`。该选项不能启用尚不存在的编码器。HEIC 主图转到 OPPO、vivo 或小米时，要先接受损失说明，才会解码成 8 位 sRGB JPEG。内嵌 ICC 由本程序套用，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。不应用 gain map，也不把 HDR 传输曲线夹断成 JPEG。`--target huawei` 只保留已经是 OpenHarmony HEIC 容器的文件。
+`--target` 在写出任何文件之前打印这份输入的证据。兼容性不确定或有损降级时，交互终端要回答 `y`，非交互运行要加 `--accept-unverified-target`。该选项不能启用尚不存在的编码器。HEIC 主图转到 OPPO、vivo 或小米时，要先接受损失说明，才会解码成 8 位 sRGB JPEG。内嵌 ICC 由本程序套用，像素已按 `irot` 转正，JPEG Orientation 为 1，源里有 Make、Model 和日期时会复制。不应用 gain map，也不把 HDR 传输曲线夹断成 JPEG。华为和荣耀的回退提示会说明实际使用的写入器以及相册播放的验证状态。通用 Android 写入器保留 JPEG 或 HEIC 主图容器和视频字节，遇到无法映射的资源时会停止。
 
-`convert` 和 `batch` 都支持 `--target`。Android standard 和三星保留源静图容器。OPPO、vivo 和小米使用 JPEG：确认后，符合准入条件的 SDR HEIC 主图转码为 8 位 sRGB JPEG，并丢弃 Gain Map。原视频字节保留。华为只保留已经是 OpenHarmony HEIC 实况容器的文件。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
+`convert` 和 `batch` 都支持 `--target`。Android standard 和三星保留源静图容器。OPPO、vivo 和小米使用 JPEG：确认后，符合准入条件的 SDR HEIC 主图转码为 8 位 sRGB JPEG，并丢弃 Gain Map。原视频字节保留。华为混合批次确认一次后，可按原字节保留已有的 OpenHarmony 实况文件，并对其他实况使用通用 Android 方案。目标名称不代表相册识别、HDR 激活或分享行为。`--motion-report-json` 会写明容器、从源文件沿用的字段、没有重写的资源，以及 `native_vendor_claim: false`。这些输出都还没有在本仓库的设备上验收。
 
 为兼容旧调用，未使用 `--target` 时仍支持 `--motion-target`、`--live-photo-output` 和 `--oppo-compatible`；这些选项不能与 `--target` 同时使用。Apple 编辑开关继续作为显式高级请求：如果指定 `--target`，必须为 `apple` 才能使用这些开关。目标预设不会自动启用实验性人像、摄影风格或电影效果推断。
 
@@ -243,7 +244,7 @@ xdremux batch --input photo.heic --output-dir google/ --motion-target google-hei
 | `--input-dir DIR` | 添加一个目录，可重复。 |
 | `--recursive` | 默认关闭，启用后进入输入子目录。 |
 | `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
-| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei` | 选择平台/厂商预设。混合 Android Motion Photo 批处理会按每张主图的实际 JPEG 或 HEIC 编码选择输出。 |
+| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei\|honor` | 选择平台/厂商预设。混合 Android Motion Photo 批处理会按每张主图的实际 JPEG 或 HEIC 编码选择输出。 |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
 | `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |

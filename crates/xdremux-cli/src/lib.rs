@@ -18,6 +18,7 @@ use serde_json::json;
 use xdremux_engine::{
     target_preflight, AppleFeatureRequest, ConversionRequest, ConversionTarget, HdrExportProfile,
     LivePhotoOutput, MotionOutputTarget, MotionVideoCompatibility, TargetAssetKind,
+    TargetPreflight,
 };
 use xdremux_runtime::{
     is_harmony_motion_photo, motion_photo_checkpoint_path, plan_batch_items,
@@ -785,17 +786,25 @@ fn emit_android_motion_receipt(
     }
 }
 
-fn gate_unverified_target(
+fn print_target_preflight(
     language: Language,
-    target: Option<ConversionTarget>,
-    motion_still_is_heic: bool,
-    accept: bool,
+    target: ConversionTarget,
+    plan: TargetPreflight,
     stderr: &mut impl Write,
-) -> u8 {
-    let Some(target) = target else {
-        return 0;
-    };
-    let plan = target_preflight(target, motion_still_is_heic);
+) {
+    if let Some(reason) = plan.fallback {
+        let requested = target.name();
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "warning: {requested} has no supported native output for this Motion Photo. Falling back to standard Android Motion Photo (android-standard). Target gallery playback is unverified.",
+                "警告：{requested} 暂不支持将这份实况输出为原生格式。将回退到通用 Android Motion Photo（android-standard）。目标相册播放尚未验证。"
+            )
+        );
+        let _ = writeln!(stderr, "{reason}");
+    }
     let _ = writeln!(
         stderr,
         "{}",
@@ -845,15 +854,10 @@ fn gate_unverified_target(
         )
     );
     let _ = writeln!(stderr, "{}", plan.warning);
-    if let Some(blocked) = plan.blocked {
-        let _ = writeln!(
-            stderr,
-            "{}",
-            message!(language, "stopped: {blocked}", "已停止：{blocked}")
-        );
-        return 1;
-    }
-    if !plan.requires_confirmation || accept {
+}
+
+fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> u8 {
+    if accept {
         return 0;
     }
     if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
@@ -1005,24 +1009,17 @@ fn run_convert(
     };
 
     let runtime = PortableRuntime::new();
-    if arguments.target == Some(ConversionTarget::Huawei) && motion_video.is_none() {
-        if apple_portrait || apple_styles {
-            let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
-            return 1;
-        }
-        let motion_heic = is_harmony_motion_photo(&source)
-            || probe_bytes(&source).ok().is_some_and(|asset| {
-                matches!(asset, SourceAsset::MotionPhoto { .. })
-                    && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic)
-            });
-        if gate_unverified_target(
+    if arguments.target == Some(ConversionTarget::Huawei)
+        && motion_video.is_none()
+        && is_harmony_motion_photo(&source)
+    {
+        print_target_preflight(
             language,
-            arguments.target,
-            motion_heic,
-            arguments.accept_unverified_target,
+            ConversionTarget::Huawei,
+            target_preflight(ConversionTarget::Huawei, true, true),
             stderr,
-        ) != 0
-        {
+        );
+        if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
             return 1;
         }
         let output = output.unwrap_or_else(|| {
@@ -1098,22 +1095,26 @@ fn run_convert(
                 return 1;
             }
         };
-        let target = MotionOutputTarget::GoogleHeic;
-        let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
-        let motion_heic = probe_bytes(&source).ok().is_some_and(|asset| {
-            matches!(asset, SourceAsset::MotionPhoto { .. })
-                && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic)
-        });
-        if gate_unverified_target(
-            language,
+        let target = if matches!(
             arguments.target,
-            motion_heic,
-            arguments.accept_unverified_target,
-            stderr,
-        ) != 0
-        {
-            return 1;
+            Some(ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi)
+        ) {
+            MotionOutputTarget::GoogleJpeg
+        } else {
+            MotionOutputTarget::GoogleHeic
+        };
+        if let Some(destination) = arguments.target {
+            print_target_preflight(
+                language,
+                destination,
+                target_preflight(destination, true, false),
+                stderr,
+            );
+            if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
+                return 1;
+            }
         }
+        let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
         return match runtime.convert_android_motion_photo_pair_file_with_carry(
             AndroidMotionPhotoPairSource {
                 still: &source,
@@ -1127,7 +1128,7 @@ fn run_convert(
             video_compatibility,
             arguments
                 .target
-                .map(VendorMetadataCarry::from_target)
+                .map(|target| VendorMetadataCarry::from_target(target.motion_destination(false)))
                 .unwrap_or_else(VendorMetadataCarry::legacy),
         ) {
             Ok(receipt) => emit_android_motion_receipt(
@@ -1160,18 +1161,6 @@ fn run_convert(
             return 1;
         }
     };
-    let motion_heic = matches!(asset, SourceAsset::MotionPhoto { .. })
-        && motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic);
-    if gate_unverified_target(
-        language,
-        arguments.target,
-        motion_heic,
-        arguments.accept_unverified_target,
-        stderr,
-    ) != 0
-    {
-        return 1;
-    }
     let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
             request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
@@ -1189,6 +1178,19 @@ fn run_convert(
             if apple_portrait || apple_styles {
                 let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
+            }
+            if let Some(destination) = arguments.target {
+                let heic =
+                    motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic);
+                print_target_preflight(
+                    language,
+                    destination,
+                    target_preflight(destination, heic, false),
+                    stderr,
+                );
+                if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
+                    return 1;
+                }
             }
             let resolved_motion_target = match motion_target {
                 Some(target) => match resolve_motion_output_target_for(
@@ -1223,7 +1225,9 @@ fn run_convert(
                     video_compatibility,
                     arguments
                         .target
-                        .map(VendorMetadataCarry::from_target)
+                        .map(|target| {
+                            VendorMetadataCarry::from_target(target.motion_destination(false))
+                        })
                         .unwrap_or_else(VendorMetadataCarry::legacy),
                 ) {
                     Ok(receipt) => emit_android_motion_receipt(
@@ -1892,24 +1896,27 @@ fn run_batch(
             return 2;
         }
     };
-    let motion_heic = inputs.iter().any(|input| {
-        fs::read(input).ok().is_some_and(|bytes| {
-            (arguments.target == Some(ConversionTarget::Huawei) && is_harmony_motion_photo(&bytes))
-                || probe_bytes(&bytes).ok().is_some_and(|asset| {
-                    matches!(asset, SourceAsset::MotionPhoto { .. })
-                        && motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic)
-                })
-        })
-    });
-    if gate_unverified_target(
-        language,
-        arguments.target,
-        motion_heic,
-        arguments.accept_unverified_target,
-        stderr,
-    ) != 0
-    {
-        return 1;
+    if let Some(destination) = arguments.target {
+        let mut sources = std::collections::BTreeSet::new();
+        for bytes in inputs.iter().filter_map(|input| fs::read(input).ok()) {
+            if destination == ConversionTarget::Huawei && is_harmony_motion_photo(&bytes) {
+                sources.insert((true, true));
+            } else if let Ok(asset @ SourceAsset::MotionPhoto { .. }) = probe_bytes(&bytes) {
+                let heic = motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic);
+                sources.insert((heic, false));
+            }
+        }
+        let mut requires_confirmation = false;
+        for (heic, harmony) in sources {
+            let plan = target_preflight(destination, heic, harmony);
+            requires_confirmation |= plan.requires_confirmation;
+            print_target_preflight(language, destination, plan, stderr);
+        }
+        if requires_confirmation
+            && confirm_target(language, arguments.accept_unverified_target, stderr) != 0
+        {
+            return 1;
+        }
     }
     let reuse_existing = arguments.skip_existing || arguments.resume;
     let checkpoint_path = if arguments.product.apple_cinematic {

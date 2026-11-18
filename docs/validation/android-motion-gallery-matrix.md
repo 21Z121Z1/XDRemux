@@ -29,10 +29,38 @@
 | `oppo` | JPEG Motion Photo；确认后把 HEIC 主图变为 8 位 sRGB JPEG，保留原视频并明确报告 Gain Map 损失 | 未测试 |
 | `vivo` | JPEG Motion Photo；保留已有兼容合写文件，其他输入按 JPEG 合写计划输出；HEIC 降级要求同样的确认和损失报告 | 未测试 |
 | `xiaomi` | 版本为 1 的公开 JPEG Motion Photo；HEIC 降级要求同样的确认和损失报告 | 未测试 |
-| `huawei` | 按原字节保留已有 OpenHarmony HEIC 实况容器；拒绝其他输入，不创建拍摄元数据 | 未测试 |
+| `huawei` | 按原字节保留已有 OpenHarmony HEIC 实况容器。其他实况输入先提示，再确认是否回退到通用 Android 格式 | 未测试 |
+| `honor` | 提示 XDRemux 尚无已验证的荣耀原生写入器，确认后使用通用 Android 格式 | 未测试 |
 | `apple` | 现有 HEIC+MOV 文件对；Photos 识别、播放、编辑和 HDR 需要独立证据 | 未测试 |
 
 运行 `cargo test --locked -p xdremux-cli --test unified_target` 验证这些离线路径。华为测试容器为合成文件，不能作为设备原始验收样本。
+
+## 相册读取路径和元数据
+
+下表记录格式及静态代码证据。可达的读取路径只适用于所列版本。生成文件的真机播放、HDR 显示和分享导出仍待验证，单独记录实测结果。
+
+| 相册或 API | 可达的读取路径 | 拒绝条件或待确认项 | 元数据和输出处理 |
+| --- | --- | --- | --- |
+| 三星相册 15.1.03.4 | 先尝试 SEF `MotionPhoto_Data`，再查 XMP。XMP 路径可定位 JPEG 尾部或一直延伸到 EOF 的 32 位顶层 HEIC `mpvd`。 | XMP 路径要求存在 `Item:Padding`，并且视频的 `Item:Length > 1024`。HEIC 路径不处理大小为 0 或扩展大小的 box。 | 写入公开 XMP，将 HEIC `mpvd` 放在最后，并报告省略的 SEF 或次要自动播放轨。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) |
+| 小米相册 4.3.1.15-global | JPEG 路径检查 MotionPhoto 和版本均为正数，且展示时间戳非负。版本为 1 且未进入 `MicroVideo` 分支时，从 EOF 减去 MotionPhoto 条目长度定位视频。 | 追踪到的 HEIC 标记只表示静图，HEIC 未通过 JPEG 实况偏移读取路径。 | 写入 XMP `MotionPhotoVersion=1`。已查路径未读取 `MiCamera`。保留 MP4 字节，并在 HEIC 转 JPEG 前说明损失。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) |
+| OPPO Photos 17.10.62、25.17.35 | 追踪到的 olive photo 路径要求 JPEG MIME 和 SOI。25.17.35 检查 `MotionPhoto=1` 和可用的 XMP 容器。此前用户反馈保留视频的产物可以播放，未记录机型和相册版本。 | 追踪到的读取器没有 HEIC 路径。XMP 解析器拒绝 `MicroVideoVersion`。 | 写入公开 JPEG XMP，源文件有 `OpCamera` 才沿用。检查过的识别路径不以这些字段为必要条件。保留视频字节，并报告 HEIC 转 JPEG 的损失。[静态追踪](https://github.com/21Z121Z1/XDRemux/pull/97) [用户观察](https://github.com/21Z121Z1/XDRemux/pull/95) |
+| vivo Albums 10.0.10.42、Gallery 3.2.10.4 | 10.0.10.42 是 Y04s/W20 的代理样本，含 JPEG XMP 读取路径。3.2.10.4 通过 MediaExtra `live_photo` 查询并播放独立 MP4。 | 10.0.10.42 要求 JPEG SOI，没有 `mpvd` 路径。3.2.10.4 的独立 MP4 路径不会回退到单文件。S60 尚待查证。 | 两个 vivo UUID 区均存在时按原字节保留 JPEG+MP4。组合 JPEG 从源展示时间算出 `imageTime`，不生成哈希、首帧或水印元数据。[静态追踪和样本分析](https://github.com/21Z121Z1/XDRemux/pull/97) |
+| 荣耀 MagicOS 10.0 | 荣耀文档列明有指定机型可播放本机拍摄或同型号以荣耀分享等受支持方式传输的动态照片。 | 通用 JPEG、HEIC 实况的识别和拒绝情况均未测试。仍缺可追溯的相册 APK 和相机样本。 | 手册未给出可用来写入原生格式的私有元数据。CLI 在使用通用 Android 写入器前提示并等待确认。[荣耀播放文档](https://www.honor.com/cn/support/content/zh-cn15897491/) |
+| HarmonyOS 媒体库 | 华为公开 API 接收独立图像和视频资源，也能分别导出。固定版本的 OpenHarmony 源码另有带 `LIVE_` 尾、可选版本/帧和封面信息的组合文件导入导出路径。 | OpenHarmony 源码无法确认商用 HarmonyOS 相册的导入行为。该媒体库的 `LIVE_` 长度可包含版本/帧与 cinemagraph 数据。#97 追踪的华为 Android 40 字节尾采用另一套长度规则。 | 已识别的 Mate 70 风格 HEIC+MP4 文件按原字节保留。下游 Flutter 解析有边界限制的 MP4 `keys`/`ilst`，要求有限的大端 float32 毫秒 `covertime` 和非空 `videoId`，读取可选的 `starttime` 与 `deferredVideoEnhanceFlag`，并把封面时间转为微秒。该读取代码不代表相册可导入。[华为 API](https://developer.huawei.com/consumer/en/doc/HarmonyOS-Guides-V13/photoaccesshelper-movingphoto-V13/) [OpenHarmony 源码](https://github.com/openharmony/multimedia_media_library/blob/ad09a5f888ed78c2c46f5c218fa144ef6774e8e9/frameworks/innerkitsimpl/media_library_helper/src/moving_photo_file_utils.cpp#L237) [下游读取器](https://github.com/BeetMan/XDRemux-Flutter/blob/e66e332643d676c870ee62b2110e91869694de40/xdremux/rust/src/motion_photo.rs#L696) |
+| Android Motion Photo 1.0 | 规范定义 Camera XMP、条目目录、长度、填充和展示时间。JPEG 追加媒体，HEIC 使用 `mpvd`。 | 真机接收、视频解码和 HDR 显示取决于播放端。XDRemux 无 AVIF 写入器。 | 保留主图编码、展示时间和视频字节，重新解析输出。通用写入器遇到不能映射的资源时停止，回退也遵循同一规则。[Android 格式](https://developer.android.com/media/platform/motion-photo-format) |
+
+### APK 收集记录
+
+下列公开 APK 页面记录了版本和文件 SHA-256。工作环境直接下载返回 HTTP 403。本轮只记录页面列出的摘要，未用下载文件复算。上表静态结论来自 #97 已有的追踪。
+
+| 包名 | 版本 | 页面列出的 APK SHA-256 和来源 |
+| --- | --- | --- |
+| `com.sec.android.gallery3d` | 15.1.03.4 (1510300004) | `b99d44e31c8d198590d06090010827c38773f7a9d6560dee59ad8aaa4ceae453` [APK 页面](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-gallery/samsung-gallery-15-1-03-4-release/samsung-gallery-15-1-03-4-android-apk-download/) |
+| `com.miui.gallery` | 4.3.1.15-global (4030115) | `a726fed034edada620ff5a4e04f102080455e824c2246a5ff9368b1082d5559a` [APK 页面](https://www.apkmirror.com/apk/xiaomi-inc/miui-gallery/xiaomi-gallery-4-3-1-15-global-release/xiaomi-gallery-4-3-1-15-global-android-apk-download/) |
+| `com.coloros.gallery3d` | 17.10.62 (170100620) | `5118e681fa41b00e9417b3f0a9b45bac3793fa2ca8bdbd5f69e6c8cbb60a9e4c` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-17-10-62-release/oppo-photos-17-10-62-android-apk-download/) |
+| `com.coloros.gallery3d` | 25.17.35 (25017035) | 已收录该版本。 [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-25-17-35-release/oppo-photos-25-17-35-android-apk-download/) |
+| `com.vivo.gallery` | 10.0.10.42 (100010042) | `6cb8edea5d750d0c1544d3fd7e79dd04fc388933ee14bf289b77234bc02ffe73` [APK 页面](https://www.apkmirror.com/apk/vivo-co-ltd/vivo-gallery/vivo-albums-10-0-10-42-release/vivo-albums-10-0-10-42-android-apk-download/) |
+| 荣耀相册 | MagicOS 10.0 | 从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。 [荣耀播放文档](https://www.honor.com/cn/support/content/zh-cn15897491/) |
 
 ## 准备测试文件
 

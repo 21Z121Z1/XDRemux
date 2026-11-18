@@ -288,9 +288,6 @@ fn convert_android_motion_photo(
         }
         return publish_vivo_combined(marker_source, &photo, output, compatibility, carry);
     }
-    if carry.destination == "huawei" {
-        return publish_huawei_live_photo(marker_source, &photo, output, compatibility, carry);
-    }
     let (plan, omitted_unmapped) = plan_public_motion(&photo, target_profile, carry)?;
     let omitted_resource_count = omitted_unmapped.len();
     let omitted_ids = omitted_unmapped

@@ -42,15 +42,19 @@ pub struct TargetPreflight {
     pub transcoded: &'static [&'static str],
     pub dropped: &'static [&'static str],
     pub warning: &'static str,
-    /// Missing conversion. Accepting the warning does not start this work.
-    pub blocked: Option<&'static str>,
+    pub fallback: Option<&'static str>,
     pub requires_confirmation: bool,
 }
 
-pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> TargetPreflight {
-    let mut plan = match target {
+pub fn target_preflight(
+    target: ConversionTarget,
+    still_is_heic: bool,
+    is_harmony_container: bool,
+) -> TargetPreflight {
+    let effective = target.motion_destination(is_harmony_container);
+    let mut plan = match effective {
         ConversionTarget::Apple => APPLE,
-        ConversionTarget::AndroidStandard => ANDROID_STANDARD,
+        ConversionTarget::AndroidStandard | ConversionTarget::Honor => ANDROID_STANDARD,
         ConversionTarget::Samsung => SAMSUNG,
         ConversionTarget::Oppo => OPPO,
         ConversionTarget::Vivo => VIVO,
@@ -58,19 +62,25 @@ pub fn target_preflight(target: ConversionTarget, still_is_heic: bool) -> Target
         ConversionTarget::Huawei => HUAWEI,
     };
     if still_is_heic {
-        plan.warning = heic_motion_warning(target);
+        plan.warning = heic_motion_warning(effective);
         if matches!(
-            target,
+            effective,
             ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi
         ) {
             plan.kept = HEIC_SDR_JPEG_KEPT;
             plan.transcoded = HEIC_SDR_JPEG_TRANSCODED;
             plan.dropped = HEIC_SDR_JPEG_DROPPED;
         }
-    } else if target == ConversionTarget::Huawei {
-        plan.blocked = Some(HUAWEI_NOT_HARMONY);
-        plan.warning = HUAWEI_NOT_HARMONY;
     }
+    plan.fallback = match (target, effective) {
+        (ConversionTarget::Huawei, ConversionTarget::AndroidStandard) => {
+            Some("XDRemux supports Huawei output only for existing OpenHarmony HEIC motion files.")
+        }
+        (ConversionTarget::Honor, ConversionTarget::AndroidStandard) => {
+            Some("XDRemux has no verified native Honor Motion Photo writer.")
+        }
+        _ => None,
+    };
     plan
 }
 
@@ -90,7 +100,6 @@ const HEIC_SDR_JPEG_DROPPED: &[&str] = &[
     "other EXIF fields, including GPS and MakerNote",
 ];
 const SDR_JPEG_HEIC_WARNING: &str = "HEIC Motion Photo is not supported by the reviewed OPPO, vivo, or Xiaomi gallery builds, so this still is decoded and encoded as an 8-bit sRGB JPEG. This program applies one admitted sRGB or Display P3 ICC transform; libheif's output tag is not that proof. Display P3 nclx without an ICC uses the Display P3 profile. PQ, HLG, and other HDR transfers are refused instead of clamping code values. irot is applied to the pixels and JPEG Orientation is 1. Make, Model, and the date tags are copied when present; other EXIF is not. The gain map is not applied and is not copied, so HDR display is lost. Other HEIF auxiliary items are not copied. The source video bytes stay unchanged. Accepting this warning starts that JPEG encode";
-const HUAWEI_NOT_HARMONY: &str = "This file is not the OpenHarmony HEIC motion container. --target huawei does not publish the Android gallery 11.0.19.478 JPEG plus 40-byte tail. videoId, deferredVideoEnhanceFlag, starttime, and the v6 trailer are not invented. Accepting the warning does not enable that output";
 
 const SAMSUNG_HEIC_WARNING: &str = "Samsung gallery 15.1.03.4 code can read a top-level mpvd that runs to EOF. Opening the HEIC still is not the same as playing it as motion. SEF is left out. This file was not played on a device";
 const STANDARD_HEIC_WARNING: &str = "android-standard, also selected by standard and google, keeps this HEIC and the source video bytes in Motion Photo 1.0. The specification allows that container and is not a player. You confirmed Google Photos played some HEIC motion samples and that preserved video played. That is consumer evidence for this standard target, not another target, and it does not name a Photos version or cover this file. Samsung 15.1.03.4 is the traced mpvd reader. A kept gain map is not HDR display";
@@ -99,7 +108,7 @@ const APPLE_HEIC_WARNING: &str = "This Apple route writes a HEIC still plus MOV 
 fn heic_motion_warning(target: ConversionTarget) -> &'static str {
     match target {
         ConversionTarget::Samsung => SAMSUNG_HEIC_WARNING,
-        ConversionTarget::AndroidStandard => STANDARD_HEIC_WARNING,
+        ConversionTarget::AndroidStandard | ConversionTarget::Honor => STANDARD_HEIC_WARNING,
         ConversionTarget::Apple => APPLE_HEIC_WARNING,
         ConversionTarget::Huawei => HARMONY_HEIC_WARNING,
         ConversionTarget::Oppo | ConversionTarget::Vivo | ConversionTarget::Xiaomi => {
@@ -122,7 +131,7 @@ const APPLE: TargetPreflight = TargetPreflight {
     transcoded: &["movie container becomes MOV, so the original MP4 bytes are not the pair video"],
     dropped: &["resources the existing Apple pair writer does not carry"],
     warning: "This Apple route writes a still plus MOV. Photos live recognition is that pair, not a statement that iOS rejects every Android combined file. The movie is remuxed. A kept gain map is not HDR display. This pair was not played on a device in this change",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -141,7 +150,7 @@ const ANDROID_STANDARD: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["vendor fields that are not part of the public container"],
     warning: "android-standard, also selected by standard and google, writes Motion Photo 1.0 and keeps the source video bytes. The specification allows the container and is not a player. Your Google Photos confirmation covers some HEIC samples and preserved video, not this file and not a named Photos version. Sample hvc1 is file encoding only. A kept gain map is not HDR display",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -158,7 +167,7 @@ const SAMSUNG: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["SEF records", "a secondary autoplay stream when it cannot be expressed"],
     warning: "Samsung gallery 15.1.03.4 code reads SEF MotionPhoto_Data first, then JPEG XMP when Item:Length is greater than 1024 and Padding is present. This writer leaves SEF out and writes Padding 0. Opening a HEIC still is not the same as playing motion. Sample hvc1 is file encoding only. A kept gain map is not HDR display. This file was not played on a device",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -175,7 +184,7 @@ const OPPO: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["unmapped vendor tails the public JPEG container cannot express"],
     warning: "OPPO Photos 25.17.35 isOlivePhoto and 17.10.62 saq.w require image/jpeg, and JpegOLiveReader requires JPEG SOI. HEIC Motion Photo is not supported in these two builds. Existing OpCamera fields are copied. Sample hvc1 is file encoding only. A kept gain map is not HDR display. This file was not played on a device",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -193,7 +202,7 @@ const VIVO: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["watermark EStream is not copied", "per-shot hash and firstFrame are not invented"],
     warning: "vivo 10.0.10.42 on the Y04s/W20 overseas proxy, not S60, locates combined JPEG motion with file size minus Item:Length when Padding is 0. HEIC Motion Photo is not supported in that build or in 3.2.10.4, which plays a sidecar and does not fall back to a combined file. Sample hvc1 is file encoding only",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -210,7 +219,7 @@ const XIAOMI: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["MiCamera and MicroVideo are not written"],
     warning: "Xiaomi Gallery 4.3.1.15-global does not support HEIC Motion Photo. XmpHelper for flag 1073 requires JPEG SOI, and 1006/1071/1073 are cleared when readMicroMotionVideoOffset is not positive. Flag 1026 is a still HEIF mark. This is not every Xiaomi version. Sample hvc1 is file encoding only. A kept gain map is not HDR display. This file was not played on a device",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -228,7 +237,7 @@ const HUAWEI: TargetPreflight = TargetPreflight {
     transcoded: &[],
     dropped: &["nothing is dropped from a file that already has this container"],
     warning: "huawei preserves an existing OpenHarmony HEIC motion file. videoId and the other capture fields are not invented for a different still. Harmony gallery import and playback are not verified",
-    blocked: None,
+    fallback: None,
     requires_confirmation: true,
 };
 
@@ -247,7 +256,7 @@ mod tests {
             ConversionTarget::Xiaomi,
             ConversionTarget::Huawei,
         ] {
-            let plan = target_preflight(target, false);
+            let plan = target_preflight(target, false, false);
             assert!(plan.requires_confirmation);
             assert!(!plan.warning.contains("本项目无用户真机确认"));
             assert!(plan
@@ -255,12 +264,12 @@ mod tests {
                 .iter()
                 .all(|claim| claim.level != EvidenceLevel::DeviceConfirmed));
         }
-        let standard = target_preflight(ConversionTarget::AndroidStandard, true);
+        let standard = target_preflight(ConversionTarget::AndroidStandard, true, false);
         assert!(standard.warning.contains("Google Photos"));
         assert!(standard.warning.contains("preserved video"));
         assert!(standard.warning.contains("not a player"));
-        assert!(standard.blocked.is_none());
-        let apple = target_preflight(ConversionTarget::Apple, false);
+        assert!(standard.fallback.is_none());
+        let apple = target_preflight(ConversionTarget::Apple, false, false);
         assert!(apple.warning.contains("Android combined file"));
         assert!(!apple.warning.contains("whole system"));
         assert!(apple
@@ -276,8 +285,8 @@ mod tests {
             ConversionTarget::Vivo,
             ConversionTarget::Xiaomi,
         ] {
-            let plan = target_preflight(target, true);
-            assert!(plan.blocked.is_none());
+            let plan = target_preflight(target, true, false);
+            assert!(plan.fallback.is_none());
             assert!(plan.requires_confirmation);
             assert!(plan.warning.contains("sRGB JPEG"));
             assert!(plan.warning.contains("gain map"));
@@ -291,43 +300,45 @@ mod tests {
             assert!(plan.dropped.iter().any(|item| item.contains("gain map")));
             assert!(plan.dropped.iter().any(|item| item.contains("Orientation")));
             assert!(plan.kept.iter().any(|item| item.contains("DateTime")));
-            let jpeg = target_preflight(target, false);
+            let jpeg = target_preflight(target, false, false);
             assert!(jpeg.kept.iter().any(|item| item.contains("gain")));
             assert!(jpeg.transcoded.is_empty());
         }
-        assert!(target_preflight(ConversionTarget::Oppo, false)
+        assert!(target_preflight(ConversionTarget::Oppo, false, false)
             .claims
             .iter()
             .any(|claim| {
                 claim.level == EvidenceLevel::CodeReachable
                     && claim.detail.contains("not supported")
             }));
-        assert!(target_preflight(ConversionTarget::Vivo, false)
+        assert!(target_preflight(ConversionTarget::Vivo, false, false)
             .claims
             .iter()
             .any(|claim| claim.subject == "heic-motion" && claim.detail.contains("not S60")));
-        assert!(target_preflight(ConversionTarget::Xiaomi, false)
+        assert!(target_preflight(ConversionTarget::Xiaomi, false, false)
             .claims
             .iter()
             .any(|claim| claim.detail.contains("readMicroMotionVideoOffset")));
-        assert!(target_preflight(ConversionTarget::AndroidStandard, true)
-            .blocked
+        assert!(
+            target_preflight(ConversionTarget::AndroidStandard, true, false)
+                .fallback
+                .is_none()
+        );
+        assert!(target_preflight(ConversionTarget::Samsung, true, false)
+            .fallback
             .is_none());
-        assert!(target_preflight(ConversionTarget::Samsung, true)
-            .blocked
-            .is_none());
-        let standard = target_preflight(ConversionTarget::AndroidStandard, true);
-        assert!(standard.blocked.is_none());
+        let standard = target_preflight(ConversionTarget::AndroidStandard, true, false);
+        assert!(standard.fallback.is_none());
         assert!(standard.player.contains("not a player"));
         assert!(standard.warning.contains("Google Photos"));
-        let harmony = target_preflight(ConversionTarget::Huawei, true);
-        assert!(harmony.blocked.is_none());
+        let harmony = target_preflight(ConversionTarget::Huawei, true, true);
+        assert!(harmony.fallback.is_none());
         assert!(harmony.warning.contains("com.openharmony.covertime"));
         assert!(harmony.warning.contains("not a Harmony gallery writer"));
-        let jpeg = target_preflight(ConversionTarget::Huawei, false);
-        let blocked = jpeg.blocked.unwrap();
-        assert!(blocked.contains("11.0.19.478"));
-        assert!(blocked.contains("not invented"));
-        assert!(blocked.contains("does not enable"));
+        for target in [ConversionTarget::Huawei, ConversionTarget::Honor] {
+            let jpeg = target_preflight(target, false, false);
+            assert_eq!(jpeg.destination, "android-standard");
+            assert!(jpeg.fallback.is_some());
+        }
     }
 }

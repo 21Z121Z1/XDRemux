@@ -843,7 +843,9 @@ fn process_batch_item_with_options(
                         motion_video_compatibility,
                         options
                             .target
-                            .map(VendorMetadataCarry::from_target)
+                            .map(|target| {
+                                VendorMetadataCarry::from_target(target.motion_destination(false))
+                            })
                             .unwrap_or_else(VendorMetadataCarry::legacy),
                     );
                     let omitted = conversion

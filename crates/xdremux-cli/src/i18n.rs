@@ -143,7 +143,7 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
             "实况照片输出目标：Apple 文件对、PVT 或 Google JPEG/HEIC 单文件；Google 路径不隐式转码。"
         }
         ("convert", "target") | ("batch", "target") => {
-            "目标：apple、android-standard（别名 standard 和 google，同一规划）、samsung、oppo、vivo、xiaomi、huawei。厂商目标会写出文件；私有字段只沿用源文件里已有的内容。"
+            "目标：apple、android-standard（别名 standard 和 google，同一规划）、samsung、oppo、vivo、xiaomi、huawei、honor。厂商目标会写出文件；私有字段只沿用源文件里已有的内容。"
         }
         ("batch", "motion_target") => {
             "批量实况照片输出目标：Google JPEG/HEIC 单文件；未指定时保留 Apple 文件对或 PVT 输出。"

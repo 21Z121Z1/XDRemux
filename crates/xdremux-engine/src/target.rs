@@ -17,6 +17,7 @@ pub enum ConversionTarget {
     Vivo,
     Xiaomi,
     Huawei,
+    Honor,
 }
 
 /// Available product routes. An Android standard Motion Photo writer is not
@@ -34,12 +35,15 @@ impl ConversionTarget {
                 motion: Some(MotionOutputTarget::ApplePair),
                 proxdr: Some(OutputIntent::Standard),
             },
-            Self::AndroidStandard | Self::Samsung | Self::Vivo | Self::Xiaomi | Self::Huawei => {
-                TargetCapabilities {
-                    motion: Some(MotionOutputTarget::GoogleAuto),
-                    proxdr: Some(OutputIntent::Standard),
-                }
-            }
+            Self::AndroidStandard
+            | Self::Samsung
+            | Self::Vivo
+            | Self::Xiaomi
+            | Self::Huawei
+            | Self::Honor => TargetCapabilities {
+                motion: Some(MotionOutputTarget::GoogleAuto),
+                proxdr: Some(OutputIntent::Standard),
+            },
             Self::Oppo => TargetCapabilities {
                 motion: Some(MotionOutputTarget::GoogleAuto),
                 proxdr: Some(OutputIntent::OppoGallery),
@@ -60,6 +64,16 @@ impl ConversionTarget {
             Self::Vivo => "vivo",
             Self::Xiaomi => "xiaomi",
             Self::Huawei => "huawei",
+            Self::Honor => "honor",
+        }
+    }
+
+    /// Select the effective Motion Photo writer for an identified source.
+    pub const fn motion_destination(self, is_harmony_container: bool) -> Self {
+        match self {
+            Self::Honor => Self::AndroidStandard,
+            Self::Huawei if !is_harmony_container => Self::AndroidStandard,
+            _ => self,
         }
     }
 
@@ -105,8 +119,9 @@ impl std::str::FromStr for ConversionTarget {
             "vivo" => Ok(Self::Vivo),
             "xiaomi" => Ok(Self::Xiaomi),
             "huawei" => Ok(Self::Huawei),
+            "honor" => Ok(Self::Honor),
             _ => Err(
-                "target must be apple, android-standard (standard, google), samsung, oppo, vivo, xiaomi or huawei",
+                "target must be apple, android-standard (standard, google), samsung, oppo, vivo, xiaomi, huawei or honor",
             ),
         }
     }

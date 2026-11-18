@@ -662,24 +662,40 @@ fn rejected_heic_color_profile_writes_nothing() {
 }
 
 #[test]
-fn huawei_jpeg_does_not_publish_the_android_gallery_tail() {
+fn huawei_and_honor_require_consent_before_using_the_standard_writer() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("vivo/android-v1-sdr-01.jpg");
-    let output = dir.path().join("huaweiMP.jpg");
-    let (code, _, stderr) = run(vec![
-        "convert".into(),
-        "--input".into(),
-        input.as_os_str().to_owned(),
-        "--output".into(),
-        output.as_os_str().to_owned(),
-        "--target".into(),
-        "huawei".into(),
-    ]);
-    assert_eq!(code, 1, "{stderr}");
-    assert!(!output.exists());
-    assert!(stderr.contains("11.0.19.478"), "{stderr}");
-    assert!(stderr.contains("not invented"), "{stderr}");
-    assert!(stderr.contains("does not enable"), "{stderr}");
+    let standard = dir.path().join("standardMP.jpg");
+    let (code, _, stderr) = convert(&input, &standard, "android-standard");
+    assert_eq!(code, 0, "{stderr}");
+    for target in ["huawei", "honor"] {
+        let output = dir.path().join(format!("{target}MP.jpg"));
+        let args = vec![
+            "convert".into(),
+            "--input".into(),
+            input.as_os_str().to_owned(),
+            "--output".into(),
+            output.as_os_str().to_owned(),
+            "--target".into(),
+            target.into(),
+            "--motion-report-json".into(),
+        ];
+        let (code, _, stderr) = run_cli(args.clone());
+        assert_eq!(code, 1, "{stderr}");
+        assert!(!output.exists());
+        assert!(
+            stderr.contains("Falling back to standard Android Motion Photo"),
+            "{stderr}"
+        );
+        assert!(stderr.contains("--accept-unverified-target"), "{stderr}");
+
+        let (code, stdout, stderr) = run(args);
+        assert_eq!(code, 0, "{stderr}");
+        assert_eq!(fs::read(output).unwrap(), fs::read(&standard).unwrap());
+        let report: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(report["destination"], "android-standard");
+        assert_eq!(report["consumer_gallery_verified"], false);
+    }
 }
 
 #[test]
@@ -769,7 +785,7 @@ fn batch_harmony_writes_nothing_before_risk_is_accepted() {
 }
 
 #[test]
-fn batch_harmony_keeps_a_good_file_and_rejects_jpeg_and_a_bad_container() {
+fn batch_harmony_preserves_native_and_falls_back_per_input() {
     let dir = tempfile::tempdir().unwrap();
     let good = dir.path().join("good.heic");
     let bad = dir.path().join("bad.heic");
@@ -786,7 +802,7 @@ fn batch_harmony_keeps_a_good_file_and_rejects_jpeg_and_a_bad_container() {
     fs::write(&bad, broken).unwrap();
     fs::copy(fixture("vivo/android-v1-sdr-01.jpg"), &jpeg).unwrap();
     let out = dir.path().join("out");
-    let (code, stdout, stderr) = run(vec![
+    let args = vec![
         "batch".into(),
         "--input".into(),
         good.as_os_str().to_owned(),
@@ -799,19 +815,24 @@ fn batch_harmony_keeps_a_good_file_and_rejects_jpeg_and_a_bad_container() {
         "--target".into(),
         "huawei".into(),
         "--json".into(),
-    ]);
+    ];
+    let (code, _, stderr) = run_cli(args.clone());
+    assert_eq!(code, 1, "{stderr}");
+    assert!(!out.exists());
+    assert!(
+        stderr.contains("Falling back to standard Android Motion Photo"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("preflight: huawei"), "{stderr}");
+
+    let (code, stdout, _stderr) = run(args);
     assert_ne!(code, 0, "{stdout}");
     assert_eq!(fs::read(out.join("good.xdremuxMP.heic")).unwrap(), source);
     assert!(!out.join("bad.xdremuxMP.heic").exists());
-    assert!(!out.join("still.xdremuxMP.jpg").exists());
+    assert_preserved_motion(&jpeg, &out.join("still.xdremuxMP.jpg"));
     let receipt: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(receipt["succeeded"], 1);
-    assert_eq!(receipt["failed"], 2);
-    let errors = receipt["failures"].to_string();
-    assert!(
-        errors.contains("not invented") || errors.contains("not a HEIC"),
-        "{stderr} {errors}"
-    );
+    assert_eq!(receipt["succeeded"], 2);
+    assert_eq!(receipt["failed"], 1);
 }
 
 #[test]
@@ -933,7 +954,7 @@ fn batch_omitted_count_matches_left_out_resources_and_stays_zero_when_none() {
 }
 
 #[test]
-fn other_heic_motion_is_not_rewritten_into_harmony() {
+fn huawei_standard_fallback_refuses_unmapped_samsung_resources() {
     let dir = tempfile::tempdir().unwrap();
     let input = fixture("samsung/heif-ultrahdr-01.heic");
     let output = dir.path().join("heldMP.heic");
@@ -948,7 +969,10 @@ fn other_heic_motion_is_not_rewritten_into_harmony() {
     ]);
     assert_eq!(code, 1, "{stderr}");
     assert!(!output.exists());
-    assert!(stderr.contains("not invented"), "{stderr}");
+    assert!(
+        stderr.contains("Falling back to standard Android Motion Photo"),
+        "{stderr}"
+    );
 }
 
 fn box_bytes(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {

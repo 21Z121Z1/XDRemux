@@ -40,7 +40,7 @@ impl VendorMetadataCarry {
                 leave_out_unmapped: false,
                 gaps: &["Apple output is a HEIC+MOV pair, not an Android Motion Photo"],
             },
-            ConversionTarget::AndroidStandard => Self {
+            ConversionTarget::AndroidStandard | ConversionTarget::Honor => Self {
                 destination: "android-standard",
                 container: "public-motion-photo-1.0",
                 preserve_namespace: None,
