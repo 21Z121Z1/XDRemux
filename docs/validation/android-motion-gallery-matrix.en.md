@@ -52,6 +52,8 @@ These are format and code observations. A reachable reader is evidence for the l
 
 ### APK acquisition records
 
+Android `apksig` 8.7.3 verified the APK signatures. Samsung 15.1.03.4 verified with v2. Xiaomi 4.3.1.20-global, OPPO 25.17.35 and vivo 3.2.10.4 verified with v3. The signer fingerprints matched the corresponding mirror listings or, for the separately acquired Xiaomi and vivo versions, the listed fingerprint for the other named release.
+
 The APK records distinguish locally verified bytes from mirror listings. Samsung 15.1.03.4 and OPPO 25.17.35 were downloaded from APKPure and matched the APKMirror file hashes. The Samsung reader was traced through `com.samsung.android.motionphoto.utils.ex.d.c`, its JPEG branch `d.d` and the HEIF box loop `ex.a.d`. OPPO’s `MediaItemExtKt.isOlivePhoto` checks the olive flag and JPEG MIME. The other code findings use the existing PR #97 traces.
 
 | Package | Version | Listed APK SHA-256 and source |

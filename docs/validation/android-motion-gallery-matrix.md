@@ -52,6 +52,8 @@
 
 ### APK 收集记录
 
+Android `apksig` 8.7.3 已验证 APK 签名。三星 15.1.03.4 通过 v2 验签。小米 4.3.1.20-global、OPPO 25.17.35 和 vivo 3.2.10.4 通过 v3 验签。签名证书指纹与对应镜像条目一致，小米和 vivo 则分别与表内另一版本的条目一致。
+
 下表区分本地核验的字节与镜像条目。从 APKPure 下载的三星 15.1.03.4 和 OPPO 25.17.35 与 APKMirror 文件摘要一致。三星已复查 `com.samsung.android.motionphoto.utils.ex.d.c`、JPEG 路径 `d.d` 和 HEIF box 循环 `ex.a.d`。OPPO 的 `MediaItemExtKt.isOlivePhoto` 会同时检查 olive 标记与 JPEG MIME。其余静态结论沿用 #97 已有的追踪。
 
 | 包名 | 版本 | 页面列出的 APK SHA-256 和来源 |
