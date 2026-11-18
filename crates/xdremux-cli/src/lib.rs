@@ -12,19 +12,24 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
+use clap::{error::ErrorKind, ArgGroup, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
 use xdremux_engine::{
-    AppleFeatureRequest, ConversionRequest, HdrExportProfile, LivePhotoOutput, MotionOutputTarget,
-    MotionVideoCompatibility,
+    explicit_jpeg_preflight, target_preflight, AppleFeatureRequest, ConversionRequest,
+    ConversionTarget, HdrExportProfile, LivePhotoOutput, MotionOutputTarget,
+    MotionVideoCompatibility, TargetAssetKind, TargetPreflight,
 };
 use xdremux_runtime::{
-    motion_photo_checkpoint_path, plan_batch_items, AndroidMotionPhotoFileReceipt,
-    AndroidMotionPhotoPairSource, ApplePortraitSemanticProfile, BatchAssetKind,
-    BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
+    is_harmony_motion_photo, motion_photo_checkpoint_path, plan_batch_items,
+    resolve_motion_output_target, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
+    ApplePortraitSemanticProfile, BatchAssetKind, BatchExecutionOptions, BatchPlanOptions,
+    BatchSuccessDisposition, PortableRuntime, VendorMetadataCarry,
 };
-use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
+use xdremux_source::{
+    inspect_path, motion_still_encoding, probe_bytes, MotionStillEncoding, SourceAsset,
+    SourceInspection,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -165,6 +170,7 @@ impl ProductConversionArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(group(ArgGroup::new("motion_destination").multiple(true)))]
 struct ConvertArgs {
     /// Input ProXDR, Motion Photo, or ordinary video with --apple-cinematic.
     #[arg(long, value_name = "INPUT")]
@@ -172,22 +178,34 @@ struct ConvertArgs {
     /// Output HEIC, MOV, or Google Motion Photo JPEG; Cinematic uses .xdremux.mov.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+    /// Destination. `standard` and `google` are aliases of `android-standard`. Vendor targets publish a real file.
+    #[arg(
+        long,
+        value_name = "TARGET",
+        group = "motion_destination",
+        conflicts_with_all = ["live_photo_output", "oppo_compatible"]
+    )]
+    target: Option<ConversionTarget>,
     /// Motion Photo destination; Google targets produce one file without transcoding.
     #[arg(
         long,
         value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        group = "motion_destination",
         conflicts_with = "live_photo_output"
     )]
     motion_target: Option<MotionOutputTarget>,
-    /// Companion Apple Live Photo MOV (requires --motion-target google-heic).
-    #[arg(long, value_name = "MOV", requires = "motion_target")]
+    /// Companion Apple Live Photo MOV (requires a Google HEIC-capable destination).
+    #[arg(long, value_name = "MOV", requires = "motion_destination")]
     motion_video: Option<PathBuf>,
     /// Preserve all video container bytes (the only supported mode).
-    #[arg(long, value_name = "preserve", requires = "motion_target")]
+    #[arg(long, value_name = "preserve", requires = "motion_destination")]
     motion_video_compat: Option<MotionVideoCompatibility>,
     /// Write a complete Google Motion Photo resource audit as JSON to stdout.
-    #[arg(long, requires = "motion_target")]
+    #[arg(long, requires = "motion_destination")]
     motion_report_json: bool,
+    /// Continue after the unverified-target warning. Does not enable a missing encoder.
+    #[arg(long, requires = "target")]
+    accept_unverified_target: bool,
     /// Use a source-bound fixed-view camera estimate; explicit --focal-length-35mm takes priority.
     #[arg(long, value_name = "JSON", requires = "apple_cinematic")]
     cinematic_camera_estimate: Option<PathBuf>,
@@ -226,6 +244,7 @@ fn parse_batch_jobs(raw: &str) -> Result<usize, String> {
 }
 
 #[derive(Debug, Args)]
+#[command(group(ArgGroup::new("motion_destination").multiple(true)))]
 struct BatchArgs {
     /// Explicit input file. Repeat to add multiple files.
     #[arg(long = "input", value_name = "FILE")]
@@ -241,16 +260,28 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
+    /// Destination for every item. `standard` and `google` are aliases of `android-standard`.
+    #[arg(
+        long,
+        value_name = "TARGET",
+        group = "motion_destination",
+        conflicts_with_all = ["live_photo_output", "oppo_compatible"]
+    )]
+    target: Option<ConversionTarget>,
     /// Motion Photo destination: Apple pair/PVT or one Google JPEG/HEIC file.
     #[arg(
         long,
         value_name = "apple-pair|apple-pvt|google-jpeg|google-heic",
+        group = "motion_destination",
         conflicts_with = "live_photo_output"
     )]
     motion_target: Option<MotionOutputTarget>,
     /// Preserve all video container bytes (the only supported mode).
-    #[arg(long, value_name = "preserve", requires = "motion_target")]
+    #[arg(long, value_name = "preserve", requires = "motion_destination")]
     motion_video_compat: Option<MotionVideoCompatibility>,
+    /// Continue after the unverified-target warning. Does not enable a missing encoder.
+    #[arg(long, requires = "target")]
+    accept_unverified_target: bool,
     /// Reuse a completed Live Photo pair only when durable source provenance matches.
     #[arg(long)]
     skip_existing: bool,
@@ -549,6 +580,26 @@ fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf
     }
 }
 
+fn default_target_still_output(input: &Path) -> PathBuf {
+    let stem = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("capture");
+    let mut sequence = 1_u32;
+    loop {
+        let suffix = if sequence == 1 {
+            String::new()
+        } else {
+            format!(" ({sequence})")
+        };
+        let candidate = input.with_file_name(format!("{stem}.xdremux{suffix}.heic"));
+        if candidate != input && !candidate.exists() {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
 fn default_google_motion_output(input: &Path, target: MotionOutputTarget) -> PathBuf {
     let extension = match target {
         MotionOutputTarget::GoogleJpeg => "jpg",
@@ -571,6 +622,19 @@ fn default_google_motion_output(input: &Path, target: MotionOutputTarget) -> Pat
             return candidate;
         }
         sequence = sequence.saturating_add(1);
+    }
+}
+
+fn target_request(
+    target: Option<ConversionTarget>,
+    kind: TargetAssetKind,
+    request: ConversionRequest,
+) -> Result<ConversionRequest, String> {
+    match target {
+        Some(target) => target
+            .apply_request(kind, request)
+            .map_err(|reason| format!("{}: {reason}", target.name())),
+        None => Ok(request),
     }
 }
 
@@ -666,6 +730,18 @@ fn emit_android_motion_receipt(
                 .map(|item| format!("{item:?}")).collect::<Vec<_>>(),
             "pairing": format!("{:?}", receipt.conversion_report.pairing),
             "consumer_gallery_verified": false,
+            "destination": receipt.vendor_metadata.destination,
+            "container": receipt.vendor_metadata.container,
+            "native_vendor_claim": receipt.vendor_metadata.native_vendor_claim,
+            "carried_source_attributes": receipt.vendor_metadata.carried_attributes,
+            "source_vendor_namespace_absent": receipt.vendor_metadata.namespace_absent,
+            "not_carried": receipt.vendor_metadata.not_carried,
+            "gaps": receipt.vendor_metadata.gaps,
+            "exif_identifier_present": receipt.vendor_metadata.exif_identifier_present,
+            "still_sdr_jpeg": receipt.still_sdr_jpeg,
+            "omitted_resource_count": receipt.omitted_resource_count,
+            "video_byte_length": receipt.vendor_metadata.video_byte_length,
+            "motion_video_copies": 1,
         });
         if serde_json::to_writer_pretty(&mut *stdout, &document).is_err() {
             return 1;
@@ -683,6 +759,27 @@ fn emit_android_motion_receipt(
             receipt.output.display(),
         )
     )
+    .is_err()
+    {
+        return 1;
+    }
+    let carried = if receipt.vendor_metadata.carried_attributes.is_empty() {
+        message!(language, "none", "无")
+    } else {
+        receipt.vendor_metadata.carried_attributes.join(", ")
+    };
+    if writeln!(
+        stdout,
+        "{}",
+        message!(
+            language,
+            "note: destination {0} wrote {1}; carried source attributes: {2}; native vendor support is not claimed; gallery playback is not device-verified",
+            "提示：目标 {0} 写入 {1}；沿用的源字段：{2}；不声称厂商原生支持；相册播放未经真机验收",
+            receipt.vendor_metadata.destination,
+            receipt.vendor_metadata.container,
+            carried,
+        )
+    )
     .is_ok()
     {
         0
@@ -691,18 +788,186 @@ fn emit_android_motion_receipt(
     }
 }
 
+fn print_target_preflight(
+    language: Language,
+    target: ConversionTarget,
+    plan: TargetPreflight,
+    stderr: &mut impl Write,
+) {
+    if let Some(reason) = plan.fallback {
+        let requested = target.name();
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "warning: {requested} has no supported native output for this Motion Photo. Falling back to standard Android Motion Photo (android-standard). Target gallery playback is unverified.",
+                "警告：{requested} 暂不支持将这份实况输出为原生格式。将回退到通用 Android Motion Photo（android-standard）。目标相册播放尚未验证。"
+            )
+        );
+        let _ = writeln!(stderr, "{reason}");
+    }
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(language, "preflight: {0}", "预检：{0}", plan.destination)
+    );
+    let _ = writeln!(stderr, "{}", plan.player);
+    for claim in plan.claims {
+        let _ = writeln!(
+            stderr,
+            "- {0}: {1}: {2}",
+            claim.subject,
+            claim.level.label(),
+            claim.detail
+        );
+    }
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(language, "kept: {0}", "保留：{0}", plan.kept.join("; "))
+    );
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "transcoded: {0}",
+            "转码：{0}",
+            if plan.transcoded.is_empty() {
+                "none".to_owned()
+            } else {
+                plan.transcoded.join("; ")
+            }
+        )
+    );
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "dropped: {0}",
+            "损失：{0}",
+            if plan.dropped.is_empty() {
+                "none".to_owned()
+            } else {
+                plan.dropped.join("; ")
+            }
+        )
+    );
+    let _ = writeln!(stderr, "{}", plan.warning);
+}
+
+fn plan_cli_motion(
+    language: Language,
+    destination: ConversionTarget,
+    explicit: Option<MotionOutputTarget>,
+    heic: bool,
+    harmony: bool,
+    stderr: &mut impl Write,
+) -> TargetPreflight {
+    let plan = match explicit {
+        Some(MotionOutputTarget::GoogleHeic) => {
+            target_preflight(destination.android_motion_destination(true), true, false)
+        }
+        Some(MotionOutputTarget::GoogleJpeg) => explicit_jpeg_preflight(destination, heic),
+        Some(MotionOutputTarget::ApplePair | MotionOutputTarget::ApplePvt) => {
+            target_preflight(ConversionTarget::Apple, heic, false)
+        }
+        _ => return target_preflight(destination, heic, harmony),
+    };
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "Using the explicitly requested Motion Photo format. Playback on the requested platform is unverified.",
+            "将使用明确指定的实况格式。目标平台相册播放尚未验证。"
+        )
+    );
+    if explicit == Some(MotionOutputTarget::GoogleHeic) {
+        if let Some(reason) = target_preflight(destination, true, false).fallback {
+            let _ = writeln!(stderr, "{reason}");
+        }
+    }
+    plan
+}
+
+fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> u8 {
+    if accept {
+        return 0;
+    }
+    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "Proceed with this unverified target? [y/N]",
+                "仍要写入这个未经确认的目标吗？[y/N]"
+            )
+        );
+        let mut answer = String::new();
+        if std::io::stdin().read_line(&mut answer).is_ok() {
+            let answer = answer.trim();
+            if answer.eq_ignore_ascii_case("y") || answer.eq_ignore_ascii_case("yes") {
+                return 0;
+            }
+        }
+    }
+    let _ = writeln!(
+        stderr,
+        "{}",
+        message!(
+            language,
+            "stopped before writing. Re-run with --accept-unverified-target to accept this risk in a non-interactive session. That option does not enable a missing encoder",
+            "写入前已停止。非交互运行需要 --accept-unverified-target 才接受此风险。该选项不能启用尚不存在的编码器"
+        )
+    );
+    1
+}
+
 fn run_convert(
     language: Language,
     arguments: ConvertArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    let selected_motion_target = arguments.motion_target.or_else(|| {
+        arguments
+            .target
+            .and_then(|target| target.capabilities().motion)
+    });
+    if arguments.target.is_some_and(|target| !target.is_apple())
+        && (arguments.product.apple_portrait
+            || arguments.product.apple_portrait_oppo
+            || arguments.product.apple_styles
+            || arguments.product.apple_cinematic)
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
+        return 1;
+    }
     if (arguments.motion_video.is_some()
-        && arguments.motion_target != Some(MotionOutputTarget::GoogleHeic))
+        && !matches!(
+            selected_motion_target,
+            Some(MotionOutputTarget::GoogleHeic | MotionOutputTarget::GoogleAuto)
+        ))
         || ((arguments.motion_video_compat.is_some() || arguments.motion_report_json)
             && !matches!(
-                arguments.motion_target,
-                Some(MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)
+                selected_motion_target,
+                Some(
+                    MotionOutputTarget::GoogleAuto
+                        | MotionOutputTarget::GoogleJpeg
+                        | MotionOutputTarget::GoogleHeic
+                )
             ))
     {
         let _ = writeln!(stderr, "{}", message!(language,
@@ -757,7 +1022,7 @@ fn run_convert(
     #[cfg(target_os = "macos")]
     let apple_portrait_profile = arguments.product.portrait_profile();
     let apple_styles = arguments.product.apple_styles;
-    let motion_target = arguments.motion_target;
+    let motion_target = selected_motion_target;
     let motion_video = arguments.motion_video;
     let video_compatibility = arguments.motion_video_compat.unwrap_or_default();
     let motion_report_json = arguments.motion_report_json;
@@ -781,7 +1046,62 @@ fn run_convert(
     };
 
     let runtime = PortableRuntime::new();
+    if arguments.target == Some(ConversionTarget::Huawei)
+        && arguments.motion_target.is_none()
+        && motion_video.is_none()
+        && is_harmony_motion_photo(&source)
+    {
+        print_target_preflight(
+            language,
+            ConversionTarget::Huawei,
+            target_preflight(ConversionTarget::Huawei, true, true),
+            stderr,
+        );
+        if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
+            return 1;
+        }
+        let output = output.unwrap_or_else(|| {
+            default_google_motion_output(&input, MotionOutputTarget::GoogleHeic)
+        });
+        return match runtime.convert_huawei_harmony_file(
+            &source,
+            &output,
+            video_compatibility,
+            arguments
+                .target
+                .map(VendorMetadataCarry::from_target)
+                .unwrap_or_else(VendorMetadataCarry::legacy),
+        ) {
+            Ok(receipt) => emit_android_motion_receipt(
+                language,
+                &input,
+                None,
+                receipt,
+                motion_report_json,
+                stdout,
+            ),
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(language, "error: {error}", "错误：{error}")
+                );
+                1
+            }
+        };
+    }
     if let Some(movie_path) = motion_video {
+        request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request) {
+            Ok(request) => request,
+            Err(error) => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(language, "error: {error}", "错误：{error}")
+                );
+                return 1;
+            }
+        };
         if apple_portrait || apple_styles || request.apple_features.any() {
             let _ = writeln!(stderr, "{}", message!(language,
                 "error: Apple editing features cannot be combined with an Android Motion Photo output",
@@ -814,8 +1134,22 @@ fn run_convert(
             }
         };
         let target = MotionOutputTarget::GoogleHeic;
+        if let Some(destination) = arguments.target {
+            let plan = plan_cli_motion(
+                language,
+                destination,
+                arguments.motion_target,
+                true,
+                false,
+                stderr,
+            );
+            print_target_preflight(language, destination, plan, stderr);
+            if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
+                return 1;
+            }
+        }
         let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
-        return match runtime.convert_android_motion_photo_pair_file(
+        return match runtime.convert_android_motion_photo_pair_file_with_carry(
             AndroidMotionPhotoPairSource {
                 still: &source,
                 movie: &movie,
@@ -826,6 +1160,12 @@ fn run_convert(
             target,
             request,
             video_compatibility,
+            arguments
+                .target
+                .map(|target| {
+                    VendorMetadataCarry::from_target(target.android_motion_destination(true))
+                })
+                .unwrap_or_else(VendorMetadataCarry::legacy),
         ) {
             Ok(receipt) => emit_android_motion_receipt(
                 language,
@@ -857,24 +1197,75 @@ fn run_convert(
             return 1;
         }
     };
-    let result = match asset {
+    let result = match &asset {
         SourceAsset::MotionPhoto { .. } => {
+            request = match target_request(arguments.target, TargetAssetKind::MotionPhoto, request)
+            {
+                Ok(request) => request,
+                Err(error) => {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
+                    return 1;
+                }
+            };
             if apple_portrait || apple_styles {
                 let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
             }
+            if let Some(destination) = arguments.target {
+                let heic =
+                    motion_still_encoding(&source, &asset) == Some(MotionStillEncoding::Heic);
+                let plan = plan_cli_motion(
+                    language,
+                    destination,
+                    arguments.motion_target,
+                    heic,
+                    false,
+                    stderr,
+                );
+                print_target_preflight(language, destination, plan, stderr);
+                if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
+                    return 1;
+                }
+            }
+            let resolved_motion_target = match motion_target {
+                Some(target) => match resolve_motion_output_target(target, &source, &asset) {
+                    Ok(target) => Some(target),
+                    Err(error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {error}", "错误：{error}")
+                        );
+                        return 1;
+                    }
+                },
+                None => None,
+            };
             if let Some(
                 target @ (MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic),
-            ) = motion_target
+            ) = resolved_motion_target
             {
+                let target_is_heic = target == MotionOutputTarget::GoogleHeic;
                 let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
-                return match runtime.convert_android_motion_photo_file_with_policy(
+                return match runtime.convert_android_motion_photo_file_with_carry(
                     &source,
                     &input,
                     &output,
                     target,
                     request,
                     video_compatibility,
+                    arguments
+                        .target
+                        .map(|target| {
+                            VendorMetadataCarry::from_target(
+                                target.android_motion_destination(target_is_heic),
+                            )
+                        })
+                        .unwrap_or_else(VendorMetadataCarry::legacy),
                 ) {
                     Ok(receipt) => emit_android_motion_receipt(
                         language,
@@ -894,7 +1285,7 @@ fn run_convert(
                     }
                 };
             }
-            if let Some(target) = motion_target {
+            if let Some(target) = resolved_motion_target {
                 request.live_photo_output = match target {
                     MotionOutputTarget::ApplePair => LivePhotoOutput::Pair,
                     MotionOutputTarget::ApplePvt => LivePhotoOutput::Pvt,
@@ -953,7 +1344,10 @@ fn run_convert(
             }
         }
         SourceAsset::ProXdr { .. } => {
-            if motion_target.is_some() {
+            if arguments.motion_target.is_some()
+                || arguments.motion_video_compat.is_some()
+                || arguments.motion_report_json
+            {
                 let _ = writeln!(
                     stderr,
                     "{}",
@@ -965,6 +1359,17 @@ fn run_convert(
                 );
                 return 1;
             }
+            request = match target_request(arguments.target, TargetAssetKind::ProXdr, request) {
+                Ok(request) => request,
+                Err(error) => {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
+                    return 1;
+                }
+            };
             if let Some(path) = &output {
                 if let Err(error) = xdremux_runtime::validate_still_output_path(path) {
                     let _ = writeln!(
@@ -975,7 +1380,13 @@ fn run_convert(
                     return 1;
                 }
             }
-            let output = output.unwrap_or_else(|| input.clone());
+            let output = output.unwrap_or_else(|| {
+                if arguments.target.is_some() {
+                    default_target_still_output(&input)
+                } else {
+                    input.clone()
+                }
+            });
             if apple_portrait {
                 #[cfg(target_os = "macos")]
                 {
@@ -1444,10 +1855,36 @@ fn run_batch(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    let selected_motion_target = arguments.motion_target.or_else(|| {
+        arguments
+            .target
+            .and_then(|target| target.capabilities().motion)
+    });
+    if arguments.target.is_some_and(|target| !target.is_apple())
+        && (arguments.product.apple_portrait
+            || arguments.product.apple_portrait_oppo
+            || arguments.product.apple_styles
+            || arguments.product.apple_cinematic)
+    {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: Apple editing features require --target apple",
+                "错误：Apple 编辑功能需要 --target apple"
+            )
+        );
+        return 2;
+    }
     if arguments.motion_video_compat.is_some()
         && !matches!(
-            arguments.motion_target,
-            Some(MotionOutputTarget::GoogleJpeg | MotionOutputTarget::GoogleHeic)
+            selected_motion_target,
+            Some(
+                MotionOutputTarget::GoogleAuto
+                    | MotionOutputTarget::GoogleJpeg
+                    | MotionOutputTarget::GoogleHeic
+            )
         )
     {
         let _ = writeln!(
@@ -1496,6 +1933,38 @@ fn run_batch(
             return 2;
         }
     };
+    if let Some(destination) = arguments.target {
+        let mut sources = std::collections::BTreeSet::new();
+        for bytes in inputs.iter().filter_map(|input| fs::read(input).ok()) {
+            if arguments.motion_target.is_none()
+                && destination == ConversionTarget::Huawei
+                && is_harmony_motion_photo(&bytes)
+            {
+                sources.insert((true, true));
+            } else if let Ok(asset @ SourceAsset::MotionPhoto { .. }) = probe_bytes(&bytes) {
+                let heic = motion_still_encoding(&bytes, &asset) == Some(MotionStillEncoding::Heic);
+                sources.insert((heic, false));
+            }
+        }
+        let mut requires_confirmation = false;
+        for (heic, harmony) in sources {
+            let plan = plan_cli_motion(
+                language,
+                destination,
+                arguments.motion_target,
+                heic,
+                harmony,
+                stderr,
+            );
+            requires_confirmation |= plan.requires_confirmation;
+            print_target_preflight(language, destination, plan, stderr);
+        }
+        if requires_confirmation
+            && confirm_target(language, arguments.accept_unverified_target, stderr) != 0
+        {
+            return 1;
+        }
+    }
     let reuse_existing = arguments.skip_existing || arguments.resume;
     let checkpoint_path = if arguments.product.apple_cinematic {
         None
@@ -1520,8 +1989,9 @@ fn run_batch(
             Some(MotionOutputTarget::ApplePair) => LivePhotoOutput::Pair,
             _ => arguments.product.live_photo_output,
         },
-        motion_target: arguments.motion_target,
+        motion_target: selected_motion_target,
         motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
+        target: arguments.target,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
@@ -1568,7 +2038,8 @@ fn run_batch(
         reuse_existing,
         jobs: arguments.jobs,
         apple_adapter_executable,
-        motion_target: arguments.motion_target,
+        motion_target: selected_motion_target,
+        target: arguments.target,
         motion_video_compatibility: arguments.motion_video_compat.unwrap_or_default(),
     };
     let mut request = arguments.product.request();
@@ -1798,6 +2269,72 @@ mod tests {
         assert!(arguments.product.oppo_compatible);
         let request = arguments.product.request();
         assert!(request.requests_oppo_gallery_compatibility());
+    }
+
+    #[test]
+    fn destination_target_accepts_explicit_motion_format_on_convert_and_batch() {
+        for command in ["convert", "batch"] {
+            let parsed = parse(&[
+                command,
+                "--input",
+                "capture.heic",
+                "--target",
+                "google",
+                "--motion-target",
+                "google-heic",
+            ]);
+            let (target, motion_target) = match parsed.command {
+                RootCommand::Convert(args) => (args.target, args.motion_target),
+                RootCommand::Batch(args) => (args.target, args.motion_target),
+                _ => unreachable!(),
+            };
+            assert_eq!(target, Some(ConversionTarget::AndroidStandard));
+            assert_eq!(motion_target, Some(MotionOutputTarget::GoogleHeic));
+            for conflicting in [
+                ["--live-photo-output", "pvt"],
+                ["--oppo-compatible", ""],
+            ] {
+                let mut args = vec![
+                    "xdremux",
+                    command,
+                    "--input",
+                    "capture.heic",
+                    "--target",
+                    "google",
+                    conflicting[0],
+                ];
+                if !conflicting[1].is_empty() {
+                    args.push(conflicting[1]);
+                }
+                assert!(Cli::try_parse_from(args).is_err());
+            }
+        }
+        assert!(Cli::try_parse_from([
+            "xdremux",
+            "convert",
+            "--input",
+            "capture.jpg",
+            "--platform",
+            "android",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn target_still_naming_does_not_replace_a_source_or_existing_output() {
+        let root = unique_dir("target-still");
+        fs::create_dir_all(&root).unwrap();
+        let input = root.join("capture.heic");
+        fs::write(&input, b"original").unwrap();
+        let first = default_target_still_output(&input);
+        assert_eq!(first, root.join("capture.xdremux.heic"));
+        fs::write(&first, b"previous").unwrap();
+        assert_eq!(
+            default_target_still_output(&input),
+            root.join("capture.xdremux (2).heic")
+        );
+        assert_eq!(fs::read(input).unwrap(), b"original");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -2047,8 +2584,10 @@ mod tests {
             input_dirs: vec![root.clone()],
             recursive: false,
             output_dir: None,
+            target: None,
             motion_target: None,
             motion_video_compat: None,
+            accept_unverified_target: false,
             skip_existing: false,
             resume: false,
             checkpoint: None,

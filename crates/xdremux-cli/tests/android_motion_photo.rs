@@ -4,7 +4,12 @@ use std::path::{Path, PathBuf};
 
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions, TargetProfile, WritePolicy};
 
-fn run_with_args(args: Vec<OsString>) -> (u8, String, String) {
+fn run_with_args(mut args: Vec<OsString>) -> (u8, String, String) {
+    if args.iter().any(|arg| arg == "--target")
+        && !args.iter().any(|arg| arg == "--accept-unverified-target")
+    {
+        args.push("--accept-unverified-target".into());
+    }
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = xdremux_cli::run_from(args, &mut stdout, &mut stderr);
@@ -328,11 +333,20 @@ fn apple_heic_mov_pair_converts_to_android_heic_without_transcoding() {
 
 #[test]
 fn vivo_jpeg_through_apple_pair_converts_to_google_heic_with_exact_time() {
-    // Apple timed metadata and Android XMP may use different rational
-    // timescales for the same presentation instant.
+    // This real fixture exercises an Apple timed-metadata timescale that is
+    // equivalent to, but not necessarily structurally identical to, Android
+    // XMP's microsecond timestamp. All video bytes must remain unchanged.
     let dir = tempfile::tempdir().unwrap();
     let pair = dir.path().join("vivo-apple.heic");
-    let (status, _, error) = run(&fixture("vivo/android-v1-sdr-01.jpg"), &pair, "apple-pair");
+    let (status, _, error) = run_with_args(vec![
+        "convert".into(),
+        "--input".into(),
+        fixture("vivo/android-v1-sdr-01.jpg").into_os_string(),
+        "--target".into(),
+        "apple".into(),
+        "--output".into(),
+        pair.as_os_str().into(),
+    ]);
     assert_eq!(status, 0, "{error}");
     let still = fs::read(&pair).unwrap();
     let movie = fs::read(pair.with_extension("mov")).unwrap();
@@ -352,8 +366,8 @@ fn vivo_jpeg_through_apple_pair_converts_to_google_heic_with_exact_time() {
         pair.as_os_str().into(),
         "--motion-video".into(),
         pair.with_extension("mov").as_os_str().into(),
-        "--motion-target".into(),
-        "google-heic".into(),
+        "--target".into(),
+        "google".into(),
         "--output".into(),
         output.as_os_str().into(),
     ]);

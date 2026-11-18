@@ -84,13 +84,14 @@ xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
 | 源类型或功能 | 省略 `--output` 时 | 输入保护 |
 | --- | --- | --- |
 | ProXDR 静态照片，包括摄影风格或人像 | 以输入路径为输出目标。 | 转换成功后，通过原子发布替换输入。 |
+| 使用 `--target` 的 ProXDR 静态照片 | 在源文件旁生成新的 `*.xdremux.heic`，冲突时追加序号。 | 不替换源文件。 |
 | Motion Photo，默认文件对输出 | 在源文件旁选择新的 HEIC 文件名，并生成同名 MOV。 | 不替换源文件，名称不能与已有文件对成员冲突。 |
 | Motion Photo，PVT 输出 | 在源文件旁选择新的 `.pvt` 目录。 | 不替换源文件。 |
 | Motion Photo，Google JPEG/HEIC 输出 | 在源文件旁生成新的 `*MP.jpg` 或 `*MP.heic` 单文件。 | 不替换源文件，也不覆盖已有文件。 |
 | `--apple-cinematic` | 在源文件旁使用 `SOURCE.xdremux.mov`。 | 不替换源文件；目标已存在时拒绝写入。 |
 
 > [!CAUTION]
-> 需要保留 ProXDR 原图时，指定独立的 `--output` 路径。省略此选项会在转换成功后替换源文件。
+> 不指定 `--target` 时，ProXDR 转换省略 `--output` 仍会在成功后替换输入。使用 `--target` 或单独指定 `--output` 可保留原图。
 
 ```bash
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
@@ -98,6 +99,32 @@ xdremux convert --input IMG_001.jpg
 ```
 
 第二条命令要求输入是支持的 Motion Photo。仅凭扩展名不能判断是否支持。
+
+### 目标预设（`--target`）
+
+只选择输出目标，由 XDRemux 根据已识别的源资源使用现有转换路径：
+
+```bash
+xdremux convert --input capture.jpg --target apple
+xdremux convert --input capture.jpg --target google
+xdremux convert --input capture.heic --target oppo
+xdremux batch --input-dir originals/ --output-dir converted/ --target android-standard --resume
+```
+
+| 目标 | 当前转换路径 |
+| --- | --- |
+| `apple` | Motion Photo 输出 Apple HEIC+MOV 文件对；ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `android-standard`（别名 `standard`、`google`） | 同一个公开 Motion Photo 1.0 目标。三个名字共用规划与输出字节。规范本身不是播放器。此前 Google Photos 播放部分样本的记录缺少验证本次构建所需的设备型号、应用版本和输出标识，因此消费者状态仍为 `unknown`。ProXDR 静态照片输出标准 ISO HDR HEIC。 |
+| `samsung` | 公开 Motion Photo。SEF 和第二路自动播放视频留出并写明。HEIC 结果把顶层 `mpvd` 放在文件末尾，使用普通 32 位 size，载荷一直到文件尾。 |
+| `oppo` | 公开 JPEG 实况，并沿用源文件中的 `OpCamera`。追踪过的 Photos 17.10.62 和 25.17.35 需要 JPEG，HEIF 输入回退到通用 HEIF 实况。一加和 realme 使用这个目标。 |
+| `vivo` | 原样保留包含两段 vivo UUID 的 JPEG 单文件样本，其他 JPEG 可用原视频写成单文件。追踪过的 Albums 10.0.10.42 需要 JPEG，Gallery 3.2.10.4 使用独立 MP4。HEIF 输入回退到通用 HEIF 实况。 |
+| `xiaomi` | 写入 `MotionPhotoVersion=1` 的公开 JPEG 实况。已查 Gallery 4.3.1.15-global 的实况读取器需要 JPEG，HEIF 输入回退到通用 HEIF 实况。 |
+| `huawei` | 已有的 OpenHarmony 文件：HEIC 静帧加追加的 MP4。`com.openharmony.covertime` 是大端 float32 毫秒，`videoId` 只沿用源文件。HEIC 前缀、视频字节和已有的 `v6` 尾保持不变。其他实况输入经确认后回退到 Android Motion Photo 1.0。鸿蒙相册播放尚未验证。 |
+| `honor` | 确认后使用通用 Android 回退方案。荣耀文档说明部分机型可播放本机拍摄和特定方式共享的实况。XDRemux 输出的兼容性尚未验证。 |
+
+`convert` 和 `batch` 会在写入前显示实际实况格式。已查目标相册不支持源主图容器时，回退保留主图容器和视频字节。HEIF 使用通用 HEIF 写入器，JPEG 使用通用 JPEG 写入器。提示会说明目标相册播放是尚未确认，还是已查版本不支持。终端回答 `y`，或传入 `--accept-unverified-target`。通用写入器遇到无法映射的资源会停止。
+
+同时指定 `--motion-target` 和 `--target` 时，显式实况格式优先。例如 `--target oppo --motion-target google-heic` 会按明确指定的 HEIF 格式输出。明确选择 `google-jpeg` 且使用 OPPO、vivo 或小米预设时，符合色彩准入条件的 HEIF 主图可在接受损失提示后转为 8 位 sRGB JPEG。视频字节保留，Gain Map 会丢弃，不支持的 HDR 传输曲线会被拒绝。无法生成显式指定的格式时停止转换。`--live-photo-output` 和 `--oppo-compatible` 在未指定 `--target` 时继续可用。指定平台时，Apple 编辑仍要求 `--target apple`。
 
 ### Google Motion Photo 输出（`convert` 和 `batch`）
 
@@ -200,6 +227,7 @@ OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust �
 
 ```bash
 xdremux batch --input-dir photo_dump/ --recursive --output-dir converted/
+xdremux batch --input-dir photo_dump/ --output-dir android/ --target google --resume --json
 xdremux batch --input-dir photo_dump/ --output-dir google/ --motion-target google-jpeg --resume --json
 xdremux batch --input photo.heic --output-dir google/ --motion-target google-heic --motion-video-compat preserve --resume
 ```
@@ -214,6 +242,7 @@ xdremux batch --input photo.heic --output-dir google/ --motion-target google-hei
 | `--input-dir DIR` | 添加一个目录，可重复。 |
 | `--recursive` | 默认关闭，启用后进入输入子目录。 |
 | `--output-dir DIR` | 省略时，在源文件旁生成带 `.xdremux` 后缀的输出。 |
+| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei\|honor` | 选择平台/厂商预设。混合 Android Motion Photo 批处理会按每张主图的实际 JPEG 或 HEIC 编码选择输出。 |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
 | `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |

@@ -18,6 +18,8 @@ mod execution;
 mod product_policy;
 mod provisional_guided_filter;
 mod source_profile;
+mod target;
+mod target_support;
 
 use std::collections::BTreeSet;
 
@@ -108,6 +110,10 @@ pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
 };
+pub use target::{ConversionTarget, TargetAssetKind, TargetCapabilities};
+pub use target_support::{
+    explicit_jpeg_preflight, target_preflight, EvidenceLevel, SupportClaim, TargetPreflight,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputIntent {
@@ -175,6 +181,8 @@ impl std::str::FromStr for LivePhotoOutput {
 pub enum MotionOutputTarget {
     ApplePair,
     ApplePvt,
+    /// Resolve to the matching Google container after inspecting the still bytes.
+    GoogleAuto,
     GoogleJpeg,
     GoogleHeic,
 }
