@@ -23,7 +23,7 @@ Motion Photo 走 Live Photo 路径。普通单幅 JPEG 不是双层源文件。
 | `bt2020-hlg` | HEIF | BT.2020 HLG |
 | `.jpg` 或 `.jpeg` 目标 | 双层 JPEG | 基础色彩信息加 ISO 21496-1 增益映射参数 |
 
-`batch` 只输出 HEIF。
+对于 ProXDR 静态照片，`batch` 输出 HEIF。
 
 ## 转换保留的源信息
 
@@ -48,7 +48,9 @@ JPEG 重建中，没有 alternate ICC 时，即使 `use_base_colour_space` 为�
 
 两个执行器都不会自行改变转换。注册载体中的映射扩展已能从文件解析并原样保留，但不能直接输入 `AdditionalMapping`：文件中的标量 LUT 没有声明该执行器所需的输出分量与域语义。显示目标也不会从设备读取。
 
-UWA 于 2024 年 3 月发布的征求意见稿在表 23 和表 24 中将基础图像与合成图像的额外映射描述为标志位和字节载荷。第 10 节列出了应用映射的阶段，具体采样顺序、通道解释、输入域和插值规则仍不明确。表 25 中基础图像 APP8 的提供者字段为单字节，表 27 中增强图像的对应字段为双字节。使用这些规则进行渲染或确认 APP8 互操作性前，仍需对照正式标准和独立生产者样本验证。[UWA 征求意见稿](https://www.theuwa.com/new-detail/358)
+GB/T 48347—2026 采信 T/UWA 028.1—2024。表 16 和表 17 规定精度标志、九个矩阵系数和一个三维标量查找表，使用 16 位或 32 位浮点格式。第 10.2.3 和 10.2.6 节说明基本图像与提取的可选择图像应用映射的阶段。相关表格和过程未规定标量查找表的采样顺序、输入域、通道关联和插值规则。第 10 章规定按 GB/T 46269.1—2025 进行目标显示器的 HDR 显示适配。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB) [显示适配标准](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=74075E2E20B1C2A3CDC429E6B51FA668)
+
+GB/T 48347—2026 表 21 和表 23 规定两种 JPEG APP8 记录的提供者代码和提供者定向代码均为大端 16 位。表 21 的第一个偏移从基本图像的 APP8 标记开始计算，第二个偏移排除 JFIF 以外的 APP 数据。表 28 描述了 HEIF 的注册 `it35` 载荷。实现采用这些字段，并按输出布局检查两个 JPEG 偏移。APP8 互操作性仍需用独立生产者的文件验证。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
 
 因此，启用的注册基本图像映射或合成图像映射会阻止文件像素重建。结构验证和 HEIF 重封装仍可保留它。JPEG 导出若会丢弃启用的映射，必须选择 `--jpeg-registered-metadata`。JSON 验证分别报告基本图像映射、合成图像映射、动态元数据与显示适配；`parsed-not-applied` 不表示已经支持像素渲染。
 
@@ -78,6 +80,8 @@ xdremux validate output.jpg --semantic --json
 ```
 
 安装外部工具后，独立 ISO/JPEG 增益映射检查会运行。该检查要求独立读取器报告相同参数，并解码出完全相同的线性输出。工具缺失时检查会跳过并给出提示。
+
+Google libultrahdr v1.5.1 已用三星样本 `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg` 通过此检查。它对原样本和重新封装的 JPEG 报告了相同的增益图参数，并将两者解码为逐字节一致的线性 RGBA 半精度浮点数据。该检查覆盖 ISO APP2 和 MPF。注册 APP8 和随目标显示器变化的 HDR 渲染仍待独立验证。[libultrahdr 源码](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
 当前编码配置下的实测误差：
 

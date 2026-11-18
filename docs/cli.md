@@ -107,7 +107,7 @@ xdremux convert --input IMG_001.jpg
 xdremux convert --input IMG_001.heic --output IMG_001_hdr.jpg
 ```
 
-JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。请求这些组合时，转换会在发布前失败。`batch` 只输出 HEIF。
+JPEG 输出要求方向为单位变换，且不能携带显式 BT.2020 配置、OPPO 相机尾部数据或 Apple 编辑资源。请求这些组合时，转换会在发布前失败。对于 ProXDR 静态照片，`batch` 输出 HEIF。
 
 文件若带有标准双层 HEIF 图但没有厂商扩展块，会通过标准图路径读取。这包括较早的 XDRemux HEIF 输出，以及其他生产者生成的 ISO 21496-1 文件。输出 HEIF 时，压缩基础图像、源色调映射载荷与压缩增益图分块保留字节和精度，包括 10 位及 12 位 HEVC 源。重封装要求分块尺寸一致、hvcC 配置一致、压缩色彩声明相容，且保留方向变换顺序。无法保真的布局会被拒绝。请选择与源编码一致的 `--hdr-profile bt2020-pq` 或 `bt2020-hlg`：默认的 `compatible` 布局声明 BT.2020 PQ，并拒绝声明其他编码的源文件。`--oppo-compatible` 需要 ProXDR 源文件。
 

@@ -23,7 +23,7 @@ A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dua
 | `bt2020-hlg` | HEIF | BT.2020 HLG |
 | `.jpg` or `.jpeg` destination | Two-image JPEG | Base colorimetry plus the ISO 21496-1 gain-map parameters |
 
-`batch` writes HEIF output only.
+For ProXDR stills, `batch` writes HEIF output.
 
 ## Source facts the conversion keeps
 
@@ -48,7 +48,9 @@ Two pure executors are available to code that already holds typed inputs. Neithe
 
 Neither executor changes a conversion on its own. The registered file mapping extension is decoded and preserved, but cannot be passed directly to `AdditionalMapping`: its scalar LUT payload does not declare the vector-channel and domain semantics required by that executor. A display target is not read from a device.
 
-The March 2024 UWA consultation draft gives the base and combined additional mappings a flag and a byte payload in Tables 23 and 24. Section 10 names the stages that consume the mappings. These sections leave the sample order, channel interpretation, input domain and interpolation unspecified. Table 25 also lists one-byte APP8 provider fields for the base image, while Table 27 lists two-byte fields for the enhanced image. Verify the registered layout against the published standard and independent producer files before using those rules for rendering or claiming APP8 interoperability. [UWA consultation draft](https://www.theuwa.com/new-detail/358)
+GB/T 48347—2026 adopts T/UWA 028.1—2024. Tables 16 and 17 specify a precision flag, nine matrix coefficients, and a cubic scalar LUT in binary16 or binary32. Sections 10.2.3 and 10.2.6 identify the base and combined mapping stages. The tables and process descriptions provide no sample order, input domain, channel binding, or interpolation rule for the scalar LUT. Section 10 directs target-dependent HDR display adaptation to GB/T 46269.1—2025. [Still-image standard record](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB) [Display adaptation standard record](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=74075E2E20B1C2A3CDC429E6B51FA668)
+
+GB/T 48347—2026 Tables 21 and 23 specify big-endian 16-bit provider and oriented-provider codes for both JPEG APP8 records. Table 21 measures the first offset from the base APP8 marker and the second with APP data other than JFIF excluded. Table 28 describes the registered HEIF `it35` payload. The implementation uses these fields and checks both JPEG offsets against the output layout. An independent registered APP8 producer file is still needed to verify interoperability. [Still-image standard record](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
 
 An enabled registered base or combined mapping therefore stops file pixel reconstruction. Structural validation and HEIF remux can preserve it. JPEG export requires `--jpeg-registered-metadata` when dropping the carrier would drop an enabled mapping. JSON validation reports base mapping, combined mapping, dynamic metadata, and display adaptation separately; `parsed-not-applied` does not establish rendered-pixel support.
 
@@ -78,6 +80,8 @@ xdremux validate output.jpg --semantic --json
 ```
 
 The independent ISO/JPEG gain-map check runs when the external tool is installed. It requires that the independent reader reports the same parameters and decodes to identical linear output. The check skips with a message when the tool is absent.
+
+Google libultrahdr v1.5.1 passed this check on the Samsung fixture `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg`. Its CLI reported the same gain-map parameters for the fixture and the repackaged JPEG, and decoded both to byte-identical linear RGBA half-floats. This exercises ISO APP2 and MPF. Independent verification of registered APP8 and target-dependent HDR rendering remains open. [libultrahdr source](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
 Measured limits for the current encoding configuration:
 
