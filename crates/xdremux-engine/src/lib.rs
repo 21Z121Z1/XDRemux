@@ -179,6 +179,30 @@ pub enum MotionOutputTarget {
     GoogleHeic,
 }
 
+/// Video-container handling for Google Motion Photo exports. Neither mode
+/// transcodes or changes encoded video/audio samples.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MotionVideoCompatibility {
+    /// Copy the complete video container unchanged, regardless of its brand.
+    #[default]
+    Preserve,
+    /// Request LibLivePhoto's in-place `ftyp` major-brand relabel to `mp42`.
+    /// QuickTime (`qt  `) and already-`mp42` containers stay unchanged.
+    RelabelMp42,
+}
+
+impl std::str::FromStr for MotionVideoCompatibility {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "preserve" => Ok(Self::Preserve),
+            "relabel-mp42" => Ok(Self::RelabelMp42),
+            _ => Err("video compatibility must be preserve or relabel-mp42"),
+        }
+    }
+}
+
 impl std::str::FromStr for MotionOutputTarget {
     type Err = &'static str;
 
