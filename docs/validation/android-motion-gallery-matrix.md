@@ -56,15 +56,15 @@ Android `apksig` 8.7.3 已验证 APK 签名。三星 15.1.03.4 通过 v2 验签�
 
 下表区分本地核验的字节与镜像条目。从 APKPure 下载的三星 15.1.03.4 和 OPPO 25.17.35 与 APKMirror 文件摘要一致。三星已复查 `com.samsung.android.motionphoto.utils.ex.d.c`、JPEG 路径 `d.d` 和 HEIF box 循环 `ex.a.d`。OPPO 的 `MediaItemExtKt.isOlivePhoto` 会同时检查 olive 标记与 JPEG MIME。其余静态结论沿用 #97 已有的追踪。
 
-| 包名 | 版本 | 页面列出的 APK SHA-256 和来源 |
+| 包名 | 版本 | APK SHA-256、已验证的签名证书 SHA-256 和来源 |
 | --- | --- | --- |
-| `com.sec.android.gallery3d` | 15.1.03.4 (1510300004) | `b99d44e31c8d198590d06090010827c38773f7a9d6560dee59ad8aaa4ceae453` [APK 页面](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-gallery/samsung-gallery-15-1-03-4-release/samsung-gallery-15-1-03-4-android-apk-download/) [APKPure](https://d.apkpure.com/b/APK/com.sec.android.gallery3d?versionCode=1510300004) |
+| `com.sec.android.gallery3d` | 15.1.03.4 (1510300004) | APK `b99d44e31c8d198590d06090010827c38773f7a9d6560dee59ad8aaa4ceae453`，签名证书 `34df0e7a9f1cf1892e45c056b4973cd81ccf148a4050d11aea4ac5a65f900a42`。[APK 页面](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-gallery/samsung-gallery-15-1-03-4-release/samsung-gallery-15-1-03-4-android-apk-download/) [APKPure](https://d.apkpure.com/b/APK/com.sec.android.gallery3d?versionCode=1510300004) |
 | `com.miui.gallery` | 4.3.1.15-global (4030115) | `a726fed034edada620ff5a4e04f102080455e824c2246a5ff9368b1082d5559a` [APK 页面](https://www.apkmirror.com/apk/xiaomi-inc/miui-gallery/xiaomi-gallery-4-3-1-15-global-release/xiaomi-gallery-4-3-1-15-global-android-apk-download/) |
 | `com.miui.gallery` | 4.3.1.20-global (4030120) | `0a5667969593f9df0c0faefca6cd19847074144a363d36d84f89cb0e4c7fca70`. 内嵌证书 SHA-256 为 `c9009d01ebf9f5d0302bc71b2fe9aa9a47a432bba17308a3111b75d7b2149025`。[APK 来源](https://mobileosupdates.com/apps/com.miui.gallery/4030120) |
 | `com.coloros.gallery3d` | 17.10.62 (170100620) | `5118e681fa41b00e9417b3f0a9b45bac3793fa2ca8bdbd5f69e6c8cbb60a9e4c` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-17-10-62-release/oppo-photos-17-10-62-android-apk-download/) |
-| `com.coloros.gallery3d` | 25.17.35 (25017035) | `e270085d137a4dccc75e2f20f4b05c4a8dabaafe9d628461d145c18d08aef2f2` [APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-25-17-35-release/oppo-photos-25-17-35-android-apk-download/) |
+| `com.coloros.gallery3d` | 25.17.35 (25017035) | APK `e270085d137a4dccc75e2f20f4b05c4a8dabaafe9d628461d145c18d08aef2f2`，签名证书 `64aafaf1d5bc9155a9e417a849e4f8eda1d0d1341667c28ed7c443c76f820b9a`。[APK 页面](https://www.apkmirror.com/apk/coloros/oppo-photos/oppo-photos-25-17-35-release/oppo-photos-25-17-35-android-apk-download/) |
 | `com.vivo.gallery` | 10.0.10.42 (100010042) | `6cb8edea5d750d0c1544d3fd7e79dd04fc388933ee14bf289b77234bc02ffe73` [APK 页面](https://www.apkmirror.com/apk/vivo-co-ltd/vivo-gallery/vivo-albums-10-0-10-42-release/vivo-albums-10-0-10-42-android-apk-download/) |
-| `com.vivo.gallery` | 3.2.10.4 (30210004) | 已下载并复算 `94b5f58b40af41bb29eaed18a01cf03146486a6130c92b7a0877c140299241db`。内嵌证书 SHA-256 与 10.0.10.42 页面一致。[APKPure](https://d.apkpure.com/b/APK/com.vivo.gallery?versionCode=30210004) |
+| `com.vivo.gallery` | 3.2.10.4 (30210004) | APK `94b5f58b40af41bb29eaed18a01cf03146486a6130c92b7a0877c140299241db`，签名证书 `bcc35d4d3606f154f0402ab7634e8490c0b244c2675c3c6238986987024f0c02` 与 10.0.10.42 页面一致。[APKPure](https://d.apkpure.com/b/APK/com.vivo.gallery?versionCode=30210004) |
 | `com.hihonor.photos` | 150.1.1.300 候选 | 两个第三方条目的下载地址均返回 HTML。从已记录机型的设备提取主 APK 和各 split APK，记录系统版本、包名、versionCode、签名证书和文件 SHA-256。[候选条目一](https://www.962.net/azsoft/620612.html) [候选条目二](https://www.fxxz.com/azsoft/733991.html) |
 | `com.hihonor.photos` | 152.0.10.794 (1520010794) | gnacho/gallery 记录了从荣耀 Magic V5 提取的 APK，报告 SHA-256 `2e8a8a89d6a9910210986935e4c01f46d3d6190936b9771520e3a13492e6ee86`。该记录未附原 APK 或签名证书，公开实现也没有复现荣耀的实况资源匹配路径。[版本报告](https://github.com/gnacho/gallery/blob/1529935f70e6d13deee98c876edf9d1a0139052e/analysis/latest/report.md#L7) [实况功能记录](https://github.com/gnacho/gallery/blob/1529935f70e6d13deee98c876edf9d1a0139052e/analysis/implementation-map.json#L658) |
 
@@ -98,7 +98,7 @@ xdremux convert --input /tmp/xdremux-gallery-test/apple/samsung.heic \
 
 ## 实机检查项目
 
-每个文件记录：设备型号、系统版本、屏幕 HDR 设置、相册名称及版本、输入用例、输出目标、视频兼容策略、输出 SHA-256 和传输方法。原始文件与转换后文件分开测试。在 Google Photos、OPPO 相册和已安装的三星相册中，分别记录：
+为每个文件记录设备型号、系统版本、屏幕 HDR 设置、相册名称及版本、输入用例、输出目标、视频兼容策略、输出 SHA-256 和传输方法。分别在 Google Photos、三星、小米、OPPO、vivo、荣耀及 HarmonyOS 相册中测试原片、目标产物和同编码的通用回退产物，并记录以下结果。
 
 1. **导入与识别：**是否识别为一张实况照片，而不是静态照片、重复照片或照片加独立视频；记录实况标记或交互入口。
 2. **播放：**是否能够播放预期时长，是否卡顿、旋转错误、无声或编码不兼容；对比静态照片呈现时间附近的视频帧。
