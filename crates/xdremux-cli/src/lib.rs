@@ -2272,17 +2272,25 @@ mod tests {
     }
 
     #[test]
-    fn destination_target_is_one_option_on_convert_and_batch() {
+    fn destination_target_accepts_explicit_motion_format_on_convert_and_batch() {
         for command in ["convert", "batch"] {
-            let parsed = parse(&[command, "--input", "capture.heic", "--target", "google"]);
-            let target = match parsed.command {
-                RootCommand::Convert(args) => args.target,
-                RootCommand::Batch(args) => args.target,
+            let parsed = parse(&[
+                command,
+                "--input",
+                "capture.heic",
+                "--target",
+                "google",
+                "--motion-target",
+                "google-heic",
+            ]);
+            let (target, motion_target) = match parsed.command {
+                RootCommand::Convert(args) => (args.target, args.motion_target),
+                RootCommand::Batch(args) => (args.target, args.motion_target),
                 _ => unreachable!(),
             };
             assert_eq!(target, Some(ConversionTarget::AndroidStandard));
+            assert_eq!(motion_target, Some(MotionOutputTarget::GoogleHeic));
             for conflicting in [
-                ["--motion-target", "google-heic"],
                 ["--live-photo-output", "pvt"],
                 ["--oppo-compatible", ""],
             ] {
