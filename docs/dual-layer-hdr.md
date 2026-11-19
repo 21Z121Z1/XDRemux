@@ -87,6 +87,10 @@ xdremux validate output.jpg --semantic --json
 
 Google libultrahdr v1.5.1 已用三星样本 `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg` 通过此检查。它对原样本和重新封装的 JPEG 报告了相同的增益图参数，并将两者解码为逐字节一致的线性 RGBA 半精度浮点数据。该检查覆盖 ISO APP2 和 MPF。注册 APP8 和随目标显示器变化的 HDR 渲染仍待独立验证。[libultrahdr 源码](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
+Google libultrahdr v2.0.2 独立读取了 `fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic` 的兼容 HEIF 输出，以及以 `--hdr-profile bt2020-hlg` 重封装得到的 HEIF。`ultrahdr_app -m 1 -j FILE -P` 报告的增益图参数完全一致。两份文件经 `-o 0 -O 4` 解码得到逐字节一致的线性 RGBA 半精度浮点数据，SHA-256 为 `fd9d623d9387ad13cf01de275b3b8be5f990674794caf2fb97e424ea2313a151`。HLG 重封装文件也通过 XDRemux 的语义和 HDR 解码校验。[libultrahdr v2.0.2 源码](https://github.com/google/libultrahdr/tree/e5f5a022fe96fc4dc2ee35c19f733a50df807abe)
+
+同一外部编码器生成的两份 96×64 ISO HEIF 通过了 XDRemux 的 `validate --semantic`。基图 `nclx` 分别为 `[1, 1, 1]` 和 `[9, 1, 9]`。显式 BT.2020 重封装均在写入前停止，因为该配置要求基图使用带 sRGB 传递函数的 sRGB 或 Display P3 编码。第一份样本 SHA-256 为 `9bf210138313a49563207eb89b54801352a7878e93b96b665716110a6a8505a3`，BT.2020 样本 SHA-256 为 `8e6de139ad975e796583a96e8c3ee4dc04fc694303e717ce6ec9778d58430139`。[HEIF 编码器 API](https://github.com/google/libultrahdr/blob/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/docs/api_changes_v1.5_to_v2.0.md)
+
 另检查了公开相机原图的 JPEG 注册载体。DCFever 的两份原图早于 GB/T 48347—2026 在 2026 年 9 月发布。Fotopolis 的两份原图拍摄于同年 10 月。
 
 | 相机原图 | 文件 SHA-256 | 观察到的布局 |

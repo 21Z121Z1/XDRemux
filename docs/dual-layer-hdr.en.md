@@ -87,6 +87,10 @@ The independent ISO/JPEG gain-map check runs when the external tool is installed
 
 Google libultrahdr v1.5.1 passed this check on the Samsung fixture `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg`. Its CLI reported the same gain-map parameters for the fixture and the repackaged JPEG, and decoded both to byte-identical linear RGBA half-floats. This exercises ISO APP2 and MPF. Independent verification of registered APP8 and target-dependent HDR rendering remains open. [libultrahdr source](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
+Google libultrahdr v2.0.2 independently read the HEIF gain-map parameters for the compatible output of `fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic` and its `--hdr-profile bt2020-hlg` remux. `ultrahdr_app -m 1 -j FILE -P` reported identical parameters. Decoding each with `-o 0 -O 4` produced byte-identical linear RGBA half-floats, with SHA-256 `fd9d623d9387ad13cf01de275b3b8be5f990674794caf2fb97e424ea2313a151`. XDRemux also passed semantic and decoded HDR validation on the HLG remux. [libultrahdr v2.0.2 source](https://github.com/google/libultrahdr/tree/e5f5a022fe96fc4dc2ee35c19f733a50df807abe)
+
+The same external encoder generated two 96×64 ISO HEIFs that XDRemux accepted with `validate --semantic`. Their base items used `nclx` `[1, 1, 1]` and `[9, 1, 9]`, respectively. Both explicit BT.2020 remuxes stopped before writing because the profile's base-image admission requires the supported sRGB or Display P3 encoding with the sRGB transfer. The baseline example SHA-256 is `9bf210138313a49563207eb89b54801352a7878e93b96b665716110a6a8505a3`. The BT.2020 example SHA-256 is `8e6de139ad975e796583a96e8c3ee4dc04fc694303e717ce6ec9778d58430139`. [HEIF encoder API](https://github.com/google/libultrahdr/blob/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/docs/api_changes_v1.5_to_v2.0.md)
+
 Publicly available camera originals were checked for the registered JPEG carrier. The two DCFever captures predate the September 2026 release of GB/T 48347—2026. The two Fotopolis captures are from October 2026.
 
 | Camera original | File SHA-256 | Observed layout |
