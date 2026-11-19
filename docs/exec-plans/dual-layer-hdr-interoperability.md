@@ -65,9 +65,13 @@ Extend the existing Rust media pipeline to produce and inspect richer dual-layer
 - [x] A. Checked tone-map, static HDR, and registered metadata payloads. Semantic validation reads final bytes and rejects invalid versions, denominators, channel counts, color declarations, lengths, and associations.
 - [x] B. Explicit HEIF PQ and HLG profiles with common coded dimensions and ordered rotation/mirror transforms. The existing compatibility layout remains the default.
 - [x] C. Relative linear BT.2020 reconstruction from final-file decoded resources, independent numeric references, compressed SDR preservation, and failure preservation checks. Display adaptation is separate.
-- [ ] D. Static HDR and registered dynamic carriers round-trip in the Rust assembly API. The readers preserve packed statistics, target parameters, curves, splines, saturation values, and matrix/LUT payloads. GB/T 48347—2026 §10 delegates target-display adaptation to GB/T 46269.1—2025. Applying the registered scalar LUT still requires its domain, ordering, channel binding, and interpolation rules.
+- [x] D. Static HDR and registered dynamic carriers round-trip in the Rust assembly API. The readers preserve packed statistics, target parameters, curves, splines, saturation values, and matrix/LUT payloads. Pixel reconstruction rejects an enabled registered mapping whose execution semantics are unresolved.
 - [x] E. Dual-JFIF output has association, offset, and final-file decode tests. GB/T 48347—2026 Table 21 defines the offset without APP data other than JFIF. Google libultrahdr independently verifies ISO APP2 and MPF. A registered APP8 producer file is still needed.
 - [x] F. The English and Chinese CLI contracts describe export, semantic validation, decoded reconstruction, and unsupported source combinations. Native/device acceptance remains a separate evidence layer.
+
+### Rendering follow-up
+
+GB/T 48347—2026 §10 delegates target-display adaptation to GB/T 46269.1—2025. Full target-dependent rendering requires a separate implementation and reference renders. Applying the registered scalar LUT also requires a definition of its domain, node order, channel binding, and interpolation. Until those rules are established, the supported operations are metadata preservation and reconstruction of profiles whose enabled mappings can be evaluated.
 
 ## Acceptance criteria
 
