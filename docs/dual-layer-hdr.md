@@ -50,7 +50,7 @@ JPEG 重建中，没有 alternate ICC 时，即使 `use_base_colour_space` 为�
 
 GB/T 48347—2026 采信 T/UWA 028.1—2024。表 16 和表 17 规定精度标志、九个矩阵系数和一个三维标量查找表，使用 16 位或 32 位浮点格式。第 10.2.3 和 10.2.6 节说明基本图像与提取的可选择图像应用映射的阶段。相关表格和过程未规定标量查找表的采样顺序、输入域、通道关联和插值规则。第 10 章规定按 GB/T 46269.1—2025 进行目标显示器的 HDR 显示适配。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB) [显示适配标准](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=74075E2E20B1C2A3CDC429E6B51FA668)
 
-GB/T 48347—2026 表 21 和表 23 规定两种 JPEG APP8 记录的提供者代码和提供者定向代码均为大端 16 位。表 21 的第一个偏移从基本图像的 APP8 标记开始计算，第二个偏移排除 JFIF 以外的 APP 数据。表 28 描述了 HEIF 的注册 `it35` 载荷。实现采用这些字段，并按输出布局检查两个 JPEG 偏移。APP8 互操作性仍需用独立生产者的文件验证。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
+GB/T 48347—2026 表 21 和表 23 规定两种 JPEG APP8 记录的提供者代码和提供者定向代码均为大端 16 位。表 21 的第一个偏移从基本图像的 APP8 标记开始计算，第二个偏移排除 JFIF 以外的 APP 数据。表 28 描述了 HEIF 的注册 `it35` 载荷。实现采用这些字段，并按输出布局检查两个 JPEG 偏移。完整的 APP8 互操作性验证仍需独立生产者给出能通过全部检查的文件。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
 
 附录 C.5 展示了一项 `tmap`、两幅按序引用的源图像和一项未关联的 `it35`。文件只有一组以主图为基本图像的该结构，且只有一项没有引用、符合注册双图身份的元数据时，XDRemux 可以读取它。文件已有显式引用时按其关联读取。HEIF 写入器将保留的元数据写入一次，再用 `cdsc` 关联到新的 `tmap`。[静态图像标准](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
 
@@ -96,6 +96,18 @@ Google libultrahdr v1.5.1 已用三星样本 `fixtures/motion-photo/samsung/jpeg
 | 华为 Pura 90s Pro Max，Fotopolis 264014、264011 | `217189324b3de28da1859a84fb137c1ed5a2c678110f348b44437b124928abaa`、`4a65f9c75cbc9dbb9d1e5bc252d5c6e3c81cd7aae731dd151b82b2a354cb40f7` | 两份原图的两幅 JPEG 均使用 `ITUT35` APP5 和 `0x0006`。均未发现 ISO APP2 或 MPF。以第一处 APP5 标记为起点，原始偏移到达第二幅 JPEG 的 APP5 标记。[相机原图](https://www.fotopolis.pl/opinie/recenzje/39939-fotograficzne-mozliwosci-ktore-zmiescisz-w-kieszeni-sprawdzamy-aparaty-huawei-pura-90s-pro-max-w-podrozy) |
 
 Libultrahdr 通过 ISO APP2 将 Pura 90 原图识别为 Ultra HDR。XDRemux 的规范格式校验器拒绝该文件的尾部。只取两幅 JPEG 后，校验器仍拒绝第二偏移。对本地诊断副本修正偏移后，发现母版显示记录先列三项 x 坐标，再列三项 y 坐标。按表 18 交错排列坐标后，校验器报告动态载荷尾部或填充异常。原图保存在仓库外。ISO 读取通过和 APP8 头部一致只验证了各自的读取范围，注册载荷互操作和渲染仍待验证。
+
+OpenHarmony 提供了独立测试样本和载体读取源码。其 JPEG 读取器用第一个 APP8 偏移定位增益图，并将第二个偏移写入日志。第二个偏移仍需独立校验。下表使用 OpenHarmony 提交 `d4fd420d088aacb7401ccb7d7d5bce1ad3967e56` 的原始样本。[OpenHarmony JPEG 读取器](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/plugins/common/libs/image/libextplugin/src/hdr/hdr_helper.cpp#L159-L199)
+
+| OpenHarmony 样本 | 文件 SHA-256 | XDRemux 结果 |
+| --- | --- | --- |
+| `HdrVivid.jpg` | `39280746144cd5af36906f57902226de2a112efcae82cae147602d48029b1bfc` | 两幅图的 `ITUT35` APP8 都使用 `0x0007`。原始偏移到达第 824420 字节。MPF 给出的增强图像起点为第 824440 字节。[样本](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/HdrVivid.jpg) |
+| `hdr_media_type_test.jpg` | `ee95ce874d4a9a105301d5cdb3c8984ec4a651d6ed9cfe9cc5cd73691a743b9e` | 两个 APP8 偏移均符合成品的图像边界。该文件声明 28 字节的静态记录，但所有原色和白点坐标为零，HDR 元数据校验拒绝该数据。[样本](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/hdr_media_type_test.jpg) |
+| `test_heif_hdr.heic` | `0c76cd66ca775fc348558b54452888d603efd418b5070392b35550a97baaa931` | HEIF 增益图结构校验通过。第 28 项通过 `cdsc` 关联到 `tmap` 第 27 项。独立调用 HDR 元数据读取时因母版色度被拒绝。独立调用 ISO 语义校验时因 `gainMapMin[0]` 分母为零被拒绝。[样本](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/test_heif_hdr.heic) |
+
+分别从两份 JPEG 样本取出原始 53 字节动态区段，省略静态记录后单独解码。两份样本都读出两个目标 PQ 码值（3078 和 2080）、每个目标的两段样条，以及两项饱和度增益。用解析字段重新打包，能分别逐字节重建原区段。该检查独立验证了动态元数据的编解码，像素适配仍待验证。
+
+OpenHarmony 的 `Picture` 实现将 HDR 合成交给运行时加载的平台 VPE 函数。独立设备验证可导入带注册载体的原片及重封装结果，通过 Image Kit 读取各自的增益图和合成 HDR 像素，然后在两个已校准的 HDR 显示目标上测量原片和输出以验证适配。记录系统构建、峰值亮度、传递函数及像素或亮度计实测数据。UWA 通过申请表向会员提供参考代码。[OpenHarmony 合成调用](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/frameworks/innerkitsimpl/utils/src/vpe_utils.cpp#L134-L156) [华为 Image Kit 指南](https://developer.huawei.com/consumer/en/doc/HarmonyOS-Guides/image-hdr-decoding-c/) [UWA 参考资源](https://theuwa.com/tech/faq_en.html)
 
 当前编码配置下的实测误差：
 
