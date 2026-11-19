@@ -80,6 +80,8 @@ The Xiaomi APKPure latest endpoint returned `ep-miuigallery-v15240103` (99999990
 
 LibLivePhoto also parses its own bounded Honor `LIVE_` and backward TLV variants. Its parser checks video extents and rejects ambiguous candidates, and can expose `HiHonor_OfflineData` scene mode. Those contracts are separate from the unpinned ZLC gallery trace and do not establish recognition of XDRemux outputs. [LibLivePhoto Honor reader](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/crates/liblivephoto/src/vendor/honor.rs#L48)
 
+Honor Club serves a separate 1024×1024 JPEG and MP4 for a preview marked as a motion photo in the post (attachment `36037915`). The JPEG ends at EOI and has no appended video, `LIVE_` trailer, or camera-model EXIF. The separate MP4 contains `ftyp`, `moov`, `free` and `mdat`. The respective SHA-256 values are `61345d9378aa0b6f2ab065b66b1dde9e00221e2bddd9fdb9e463d7ca935329f7` and `1d0a8353998ae22ea96d5209d87429a454deb222178d5ef6c5e647e22af8ed7c`. This records the web preview. A camera original is still needed to confirm the layout read by Honor Gallery. [Honor Club post](https://club.honor.com/cn/thread-30499759-1-1.html)
+
 ## Package preparation
 
 ```bash

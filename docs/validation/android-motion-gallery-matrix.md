@@ -80,6 +80,8 @@ Android `apksig` 8.7.3 已验证 APK 签名。三星 15.1.03.4 通过 v2 验签�
 
 LibLivePhoto 另有带边界检查的荣耀 `LIVE_` 及反向 TLV 读取器，检查视频范围、拒绝歧义，并可读取 `HiHonor_OfflineData` 的场景模式。该读取契约与 ZLC 未固定版本的相册追踪分别记录，XDRemux 产物的相册识别仍待验证。 [LibLivePhoto 荣耀读取器](https://github.com/21Z121Z1/LibLivePhoto/blob/9328a0502bb2318b05d255ed83652c7d7c7d3b4c/crates/liblivephoto/src/vendor/honor.rs#L48)
 
+荣耀俱乐部对帖子中标记为动态照片的一组预览（附件 `36037915`）分别提供 1024×1024 JPEG 和 MP4。JPEG 在 EOI 处结束，没有附带视频、`LIVE_` 尾部或相机型号 EXIF。独立 MP4 含 `ftyp`、`moov`、`free` 和 `mdat`。SHA-256 分别为 `61345d9378aa0b6f2ab065b66b1dde9e00221e2bddd9fdb9e463d7ca935329f7` 和 `1d0a8353998ae22ea96d5209d87429a454deb222178d5ef6c5e647e22af8ed7c`。此记录覆盖网页预览，仍需相机原片确认荣耀图库读取的布局。[荣耀俱乐部帖子](https://club.honor.com/cn/thread-30499759-1-1.html)
+
 ## 准备测试文件
 
 ```bash

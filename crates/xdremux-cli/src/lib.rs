@@ -2290,10 +2290,7 @@ mod tests {
             };
             assert_eq!(target, Some(ConversionTarget::AndroidStandard));
             assert_eq!(motion_target, Some(MotionOutputTarget::GoogleHeic));
-            for conflicting in [
-                ["--live-photo-output", "pvt"],
-                ["--oppo-compatible", ""],
-            ] {
+            for conflicting in [["--live-photo-output", "pvt"], ["--oppo-compatible", ""]] {
                 let mut args = vec![
                     "xdremux",
                     command,
