@@ -14,7 +14,7 @@ XDRemux 通过 Rust `xdremux` CLI 提供 Apple 编辑功能。Rust 负责产品�
 
 | `convert` 或 `batch` 选项 | 请求的结果 |
 | --- | --- |
-| `--apple-styles` | 为 ProXDR 照片生成摄影风格和推理所得的纹理风格。 |
+| `--apple-styles` | 为受支持的 ProXDR 静态照片和 Apple 实况照片输出生成摄影风格与纹理风格。 |
 | `--apple-portrait` | 生成包含完整语义资源集的 Apple 人像。 |
 | `--apple-portrait-oppo` | 使用 OPPO 深度与已有源蒙版生成 Apple 人像，不调用 Vision。 |
 | `--apple-cinematic` | 为普通视频生成实验性的待预处理电影元数据。详见[电影效果指南](cinematic.md)。 |
@@ -45,6 +45,18 @@ ImageIO 辅助资源检查只报告具体观测结果，包括 ISO Gain Map、�
 Rust 根据源文件生成风格，负责约束搜索、key 1 与 plist 合成、资源图、验证和发布。适配器提供框架观测和编码操作。
 
 研究生成器、模型实验、供体诊断和 RAW 实验仍属于研究工具，不定义另一套运行时或公开转换方式。
+
+### 从 Motion Photo 生成实况照片
+
+```bash
+xdremux convert --input OPPO_MOTION.jpg --apple-styles --motion-target apple-pvt --output Live.pvt
+```
+
+macOS 上的单文件 `convert` 可通过 Apple 适配器输出 HEIC/MOV 文件对或 PVT。转换后的封面须包含 ISO HDR Gain Map，运动视频须可解码，且首帧时间为零、各帧时间戳可精确表示。批处理与 Android Motion Photo 输出会拒绝此组合。
+
+XDRemux 将运动视频的每个展示帧解码为缩小的线性 BT.2020 图像，按帧生成 Apple Log Linear Thumbnail 和色调曲线，并为整段视频使用同一个曝光尺度。参考图、色调曲线及标准纹理状态按原视频时间写入。输出保留原始压缩视频和音频样本及其展示时间。封面沿用静态照片的风格生成器。
+
+仓库的[无头「照片」检查](../scripts/apple/check_live_photo_styles.py)在 macOS 27.3 上使用公开的 ColorOS 16 HLG 样本，验证整段视频的 Tone、Color 响应和带音频的 Main10 HLG 编辑导出。启用摄影风格后，该样本的高光码值降低。「照片」可以读取视频纹理状态。关闭摄影风格时，单独启用 Glowy 未产生可测的运动帧变化。「照片」交互控件、保存后重新打开以及显示亮度仍需在设备上验证。
 
 ### 同一开关生成纹理风格
 

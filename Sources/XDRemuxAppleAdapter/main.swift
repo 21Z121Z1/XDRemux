@@ -261,6 +261,7 @@ private struct AdapterResponse: Encodable {
     let imageProperties: ImageProperties?
     let semanticMasks: [VisionSemanticMaskFacts]?
     let styleProperties: StylePropertiesFacts?
+    let liveStyleVideo: LiveStyleVideoFacts?
     let videoToolboxMain10: VideoToolboxMain10Facts?
     let sceneClassification: VisionSceneClassificationFacts?
     let cinematicEnvelope: CinematicEnvelopeFacts?
@@ -274,6 +275,7 @@ private struct AdapterResponse: Encodable {
         imageProperties: ImageProperties?,
         semanticMasks: [VisionSemanticMaskFacts]?,
         styleProperties: StylePropertiesFacts? = nil,
+        liveStyleVideo: LiveStyleVideoFacts? = nil,
         videoToolboxMain10: VideoToolboxMain10Facts? = nil,
         sceneClassification: VisionSceneClassificationFacts? = nil,
         cinematicEnvelope: CinematicEnvelopeFacts? = nil,
@@ -286,6 +288,7 @@ private struct AdapterResponse: Encodable {
         self.imageProperties = imageProperties
         self.semanticMasks = semanticMasks
         self.styleProperties = styleProperties
+        self.liveStyleVideo = liveStyleVideo
         self.videoToolboxMain10 = videoToolboxMain10
         self.sceneClassification = sceneClassification
         self.cinematicEnvelope = cinematicEnvelope
@@ -300,6 +303,7 @@ private struct AdapterResponse: Encodable {
         case imageProperties = "image_properties"
         case semanticMasks = "semantic_masks"
         case styleProperties = "style_properties"
+        case liveStyleVideo = "live_style_video"
         case videoToolboxMain10 = "video_toolbox_main10"
         case sceneClassification = "scene_classification"
         case cinematicEnvelope = "cinematic_envelope"
@@ -836,6 +840,16 @@ private func encodedResponse(for input: Data) throws -> Data {
                 inputPath: inputPath,
                 readbackPath: outputPath
             )
+        )
+    case "observe-live-style-video":
+        guard let input = request.inputPath, !input.isEmpty,
+              let output = request.outputPath, !output.isEmpty else {
+            fail("observe-live-style-video requires input_path and output_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion, capabilities: nil, auxiliary: nil,
+            gainMap: nil, imageProperties: nil, semanticMasks: nil,
+            liveStyleVideo: try observeLiveStyleVideo(inputPath: input, outputPath: output)
         )
     case "videotoolbox-encode-main10":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,

@@ -21,43 +21,33 @@ class RustArtifactLifecycleTests(unittest.TestCase):
 
     def test_styles_transaction_validates_the_final_artifact_before_publication(self) -> None:
         source = (RUNTIME / "apple_styles.rs").read_text(encoding="utf-8")
-        # Native readback tests also validate their decoded outputs. Only the
-        # production transaction determines publication ordering.
-        source = source.partition("\n#[cfg(test)]\nmod tests {")[0]
+        # Still and Live Photo conversion share the assembly and final
+        # validation. Follow the caller's data flow across that boundary.
+        conversion = source.split("pub(crate) fn convert_file(", 1)[1].split("\nstruct StyleCarrier", 1)[0]
+        assembly = source.split("\nfn assemble_on_base(", 1)[1].split("\nfn note_system_carrier(", 1)[0]
         for marker in (
             "tempdir_in(parent)",
-            "assemble_photographic_styles_heif",
-            "validate_gain_map_structure",
             "AtomicFilePublisher::new(output.to_path_buf())",
-            "publisher.publish_bytes(",
         ):
-            self.assertIn(marker, source)
+            self.assertIn(marker, conversion)
+        self.assertIn("assemble_photographic_styles_heif", assembly)
 
-        validations = list(
-            re.finditer(
-                r"validate_gain_map_structure\(&(?P<artifact>[A-Za-z_][A-Za-z0-9_]*)\)",
-                source,
-            )
-        )
-        publications = list(
-            re.finditer(
-                r"publisher\.publish_bytes\((?P<artifact>[A-Za-z_][A-Za-z0-9_]*)\)",
-                source,
-            )
-        )
-        self.assertTrue(validations, "Styles must validate the final HEIF artifact")
-        self.assertTrue(publications, "Styles must publish through AtomicFilePublisher")
+        returned = re.search(r"Ok\((?P<artifact>\w+)\)\s*}\s*$", assembly)
+        self.assertIsNotNone(returned, "Styles assembly must return the validated file")
+        artifact = returned.group("artifact")
+        validation = assembly.index(f"validate_gain_map_structure(&{artifact})")
+        self.assertLess(assembly.index("crate::apple_texture::generate("), validation)
+        self.assertLess(validation, returned.start())
+        self.assertLess(assembly.index("validate_maker_apple_properties("), returned.start())
 
-        final_validation = validations[-1]
-        final_publication = publications[-1]
-        self.assertEqual(
-            final_validation.group("artifact"),
-            final_publication.group("artifact"),
-            "Styles must publish the same final artifact that passed structural validation",
+        validated = re.search(
+            r"let (?P<artifact>\w+) = assemble_on_base\([\s\S]*?\)\?;", conversion
         )
+        self.assertIsNotNone(validated, "The conversion must propagate validation errors")
+        publication = conversion.index(f"publisher.publish_bytes({validated.group('artifact')})")
         self.assertLess(
-            final_validation.start(),
-            final_publication.start(),
+            validated.end(),
+            publication,
             "Styles must validate the final artifact before publication",
         )
         self.assertNotIn("XDRemuxAppleFeatures", source)

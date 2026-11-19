@@ -4,6 +4,8 @@ mod android_motion_photo;
 #[cfg(target_os = "macos")]
 mod apple_adapter;
 #[cfg(target_os = "macos")]
+mod apple_live_styles;
+#[cfg(target_os = "macos")]
 mod apple_styles;
 #[cfg(target_os = "macos")]
 mod apple_texture;
@@ -749,6 +751,7 @@ impl PortableRuntime {
             input.as_ref(),
             output.as_ref(),
             xdremux_engine::LivePhotoOutput::Pair,
+            None,
         )
     }
 
@@ -759,6 +762,38 @@ impl PortableRuntime {
         input: impl AsRef<Path>,
         output: impl AsRef<Path>,
         request: ConversionRequest,
+    ) -> Result<LivePhotoFileReceipt> {
+        self.convert_requested_live_photo(source, input.as_ref(), output.as_ref(), request, None)
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn convert_apple_live_styles_file(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        request: ConversionRequest,
+    ) -> Result<LivePhotoFileReceipt> {
+        let enrich = |still: &[u8], movie: &[u8]| {
+            apple_live_styles::build_pair(self, executable.as_ref(), still, movie)
+        };
+        self.convert_requested_live_photo(
+            source,
+            input.as_ref(),
+            output.as_ref(),
+            request,
+            Some(&enrich),
+        )
+    }
+
+    fn convert_requested_live_photo(
+        &self,
+        source: &[u8],
+        input: &Path,
+        output: &Path,
+        request: ConversionRequest,
+        enrich: Option<&live_photo::PairEnricher<'_>>,
     ) -> Result<LivePhotoFileReceipt> {
         if request.hdr_profile != HdrExportProfile::Compatible {
             return Err(RuntimeError::new(
@@ -772,19 +807,24 @@ impl PortableRuntime {
                 "OPPO-compatible output applies to ProXDR still images and cannot be combined with Motion Photo conversion",
             ));
         }
-        if request.apple_features.any() {
+        let features = request.apple_features;
+        if features.portrait
+            || features.cinematic
+            || features.photographic_styles != enrich.is_some()
+        {
             return Err(RuntimeError::new(
                 "Motion Photo conversion",
-                "Apple Portrait and Photographic Styles intents apply to ProXDR still images and cannot be combined with Motion Photo conversion",
+                "Apple editing intent does not match this Live Photo conversion path",
             ));
         }
         live_photo::convert_motion_photo_file(
             &self.jpeg,
             &self.heif,
             source,
-            input.as_ref(),
-            output.as_ref(),
+            input,
+            output,
             request.live_photo_output,
+            enrich,
         )
     }
 

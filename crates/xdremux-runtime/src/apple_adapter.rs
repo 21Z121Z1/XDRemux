@@ -50,12 +50,38 @@ pub struct AppleStylePropertiesFacts {
     pub readback_written: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AppleLiveStyleVideo {
+    pub track_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub frames: Vec<AppleVideoTime>,
+    pub end: AppleVideoTime,
+    pub aac: Vec<AppleLiveStyleAac>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AppleLiveStyleAac {
+    pub track_id: u32,
+    pub frames_per_packet: u32,
+    pub channel_count: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub(super) struct AppleVideoTime {
+    pub value: i64,
+    pub timescale: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleVideoToolboxMain10Facts {
     pub width: u32,
     pub height: u32,
     pub annex_b_length: usize,
     pub hvcc_length: usize,
+    pub frame_lengths: Option<Vec<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,6 +102,7 @@ pub(super) struct AppleVideoToolboxMain10Encode<'a> {
     /// Bits per RGB component in the input file. Styles sends 16-bit Apple Log codes.
     pub component_bits: u32,
     pub quality: f64,
+    pub frame_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -513,10 +540,30 @@ impl AppleAdapterClient {
         scene_scores_from_wire(response.scene_classification)
     }
 
-    /// Ask VideoToolbox for the one Apple-specific codec primitive required by
-    /// the Styles graph. Raster ownership, resource selection, and HEIF graph
-    /// assembly remain in Rust; this operation only writes the framework's
-    /// Annex-B and hvcC outputs to caller-provided staging paths.
+    /// Observe decoded motion frames and native timing for the Styles overlay.
+    pub(super) fn observe_live_style_video(
+        &self,
+        input: &Path,
+        output: &Path,
+    ) -> Result<AppleLiveStyleVideo> {
+        #[derive(Deserialize)]
+        struct Response {
+            schema_version: u32,
+            live_style_video: AppleLiveStyleVideo,
+        }
+        let request = serde_json::json!({
+            "schema_version": APPLE_ADAPTER_SCHEMA_VERSION,
+            "operation": "observe-live-style-video",
+            "input_path": input_path(input)?,
+            "output_path": input_path(output)?,
+        });
+        let bytes = self.invoke(request.to_string().as_bytes(), APPLE_COMPUTE_TIMEOUT)?;
+        let response: Response = serde_json::from_slice(&bytes)
+            .map_err(|error| RuntimeError::external("Apple video observation", error))?;
+        validate_schema(response.schema_version)?;
+        Ok(response.live_style_video)
+    }
+
     pub(super) fn videotoolbox_encode_main10(
         &self,
         encode: &AppleVideoToolboxMain10Encode<'_>,
@@ -568,6 +615,7 @@ impl AppleAdapterClient {
                 raw_component_bits: encode.component_bits,
                 quality: encode.quality,
                 hvcc_path: input_path(encode.output_hvcc)?,
+                frame_count: encode.frame_count,
             },
         };
         let request = serde_json::to_vec(&wire_request)
@@ -576,16 +624,27 @@ impl AppleAdapterClient {
         let response: VideoToolboxMain10Response = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
         validate_schema(response.schema_version)?;
+        if encode.frame_count.is_some()
+            && (response.video_toolbox_main10.color_primaries.as_deref() != Some("ITU_R_2020")
+                || response.video_toolbox_main10.ycbcr_matrix.as_deref() != Some("ITU_R_2020"))
+        {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "the sequenced video output did not preserve Rec.2020 coding",
+            ));
+        }
         let facts = AppleVideoToolboxMain10Facts {
             width: response.video_toolbox_main10.width,
             height: response.video_toolbox_main10.height,
             annex_b_length: response.video_toolbox_main10.annex_b_length,
             hvcc_length: response.video_toolbox_main10.hvcc_length,
+            frame_lengths: response.video_toolbox_main10.frame_lengths,
         };
         if facts.width != encode.width
             || facts.height != encode.height
             || facts.annex_b_length == 0
             || facts.hvcc_length == 0
+            || facts.frame_lengths.as_ref().map(Vec::len) != encode.frame_count
         {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
@@ -1396,6 +1455,8 @@ struct VideoToolboxMain10Wire {
     raw_component_bits: u32,
     quality: f64,
     hvcc_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frame_count: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1650,6 +1711,9 @@ struct VideoToolboxMain10WireResponse {
     height: u32,
     annex_b_length: usize,
     hvcc_length: usize,
+    frame_lengths: Option<Vec<usize>>,
+    color_primaries: Option<String>,
+    ycbcr_matrix: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

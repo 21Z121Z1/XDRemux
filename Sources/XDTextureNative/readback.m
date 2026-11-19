@@ -31,8 +31,8 @@ int xdremux_texture_readback(const char *inputPath, const char *outputPath) {
                 report[@"asset_class"] = NSStringFromClass([asset class]);
                 if ([asset respondsToSelector:NSSelectorFromString(@"loadWithOptions:error:")]) report[@"load"] = Call(asset, @"loadWithOptions:error:", @[@{}, [NSValue valueWithPointer:&error]]);
                 report[@"capabilities"] = Call(asset, @"capabilities", @[]);
-                report[@"PhotographicStyleV2"] = Call(asset, @"hasCapability:", @[@"PhotographicStyleV2"]);
-                report[@"PhotographicStyle"] = Call(asset, @"hasCapability:", @[@"PhotographicStyle"]);
+                // Admission uses the semantic and texture properties decoded
+                // below. Neutrino capability arguments differ between macOS builds.
                 if ([asset respondsToSelector:NSSelectorFromString(@"imageProperties")]) {
                     id properties = Call(asset, @"imageProperties", @[]);
                     report[@"native_image_properties"] = [properties description] ?: @"nil";

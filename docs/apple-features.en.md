@@ -14,7 +14,7 @@ The portable Rust core retains Linux, Windows, and macOS tests. These checks do 
 
 | `convert` or `batch` option | Requested result |
 | --- | --- |
-| `--apple-styles` | Photographic Styles and inferred Texture Styles for a ProXDR still. |
+| `--apple-styles` | Photographic Styles and Texture Styles for supported ProXDR stills and Apple Live Photo output. |
 | `--apple-portrait` | Apple Portrait with the complete semantic resource set. |
 | `--apple-portrait-oppo` | Apple Portrait from OPPO depth and available source masks, without Vision. |
 | `--apple-cinematic` | Experimental pending Cinematic metadata for ordinary video. See the [Cinematic guide](cinematic.en.md). |
@@ -45,6 +45,18 @@ New adapter operations must return the framework facts or results that Rust need
 Rust owns source-dependent style generation, constrained search, key 1 and plist synthesis, resource graphs, validation, and publication. The adapter supplies framework observations and encoding operations.
 
 Research producers, model experiments, donor diagnostics, and RAW experiments remain research tools. They do not define another runtime or public conversion path.
+
+### Live Photos from Motion Photos
+
+```bash
+xdremux convert --input OPPO_MOTION.jpg --apple-styles --motion-target apple-pvt --output Live.pvt
+```
+
+Single-file `convert` supports Apple pair and PVT output on macOS with the Apple adapter. The source must produce a cover with an ISO HDR Gain Map and a decodable motion complement with exact frame times starting at zero. Batch and Android Motion Photo outputs reject this combination.
+
+XDRemux decodes the source motion complement into a small linear-light BT.2020 image for each presentation time. It generates an Apple Log Linear Thumbnail and a tone curve for each frame, with a common exposure scale for the clip. Those resources and the neutral Texture state are timed to the original video. The output retains the original compressed video and audio samples and their presentation times. The cover uses the still-image Styles generator.
+
+On macOS 27.3, the repository's [headless Photos check](../scripts/apple/check_live_photo_styles.py) uses the public ColorOS 16 HLG fixture. It verifies Tone and Color response over the clip and an edited Main10 HLG export with audio. Enabling Photographic Styles reduces highlight codes in this fixture. Photos reads the motion Texture state. With Photographic Styles disabled, Glowy produced no measured change on this motion complement. Interactive Photos controls, save/reopen, and display brightness require separate device verification.
 
 ### Texture Styles from the same switch
 
