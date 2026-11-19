@@ -1,3 +1,5 @@
+use std::sync::{Mutex, OnceLock};
+
 use libheif_rs::{
     Channel, ColorPrimaries, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue,
     EncoderQuality, HeifContext, Image, ImageHandle, LibHeif, MatrixCoefficients, RgbChroma,
@@ -21,6 +23,22 @@ const HVCC: FourCC = FourCC::new(*b"hvcC");
 const GRID: FourCC = FourCC::new(*b"grid");
 const DIMG: FourCC = FourCC::new(*b"dimg");
 
+pub(super) fn checked_libheif() -> Result<&'static LibHeif> {
+    // libheif owns one plugin registry per process. Keep it alive across
+    // parallel encodes, decodes and metadata reads, including context teardown.
+    static LIBHEIF: OnceLock<LibHeif> = OnceLock::new();
+    static INIT: Mutex<()> = Mutex::new(());
+    if let Some(lib) = LIBHEIF.get() {
+        return Ok(lib);
+    }
+    let _init = INIT.lock().map_err(CodecError::libheif)?;
+    if let Some(lib) = LIBHEIF.get() {
+        return Ok(lib);
+    }
+    let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+    Ok(LIBHEIF.get_or_init(|| lib))
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LibHeifProvider;
 
@@ -43,6 +61,7 @@ impl LibHeifProvider {
                 "normalized decode requires one or three channels",
             ));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
         let mut options = DecodingOptions::new()
@@ -55,7 +74,6 @@ impl LibHeifProvider {
         } else {
             ColorSpace::Rgb(RgbChroma::HdrRgbLe)
         };
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
         let image = lib
             .decode(&handle, space, Some(options))
             .map_err(CodecError::libheif)?;
@@ -126,6 +144,7 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Err(CodecError::invalid("HEIF resource input is empty"));
         }
+        checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
@@ -154,10 +173,10 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Err(CodecError::invalid("HEIF item decode input is empty"));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        self.decode_handle(&lib, &handle, format)
+        self.decode_handle(lib, &handle, format)
     }
 
     pub fn verified_encoder_layouts() -> [GainMapCodecLayout; 3] {
@@ -169,7 +188,7 @@ impl LibHeifProvider {
     }
 
     pub fn capability_inventory(&self) -> Result<CapabilityInventory> {
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+        let lib = checked_libheif()?;
         if lib
             .encoder_descriptors(1, Some(CompressionFormat::Hevc), None)
             .is_empty()
@@ -261,6 +280,7 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Err(CodecError::invalid("HEIF decode input is empty"));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
@@ -277,7 +297,6 @@ impl LibHeifProvider {
             admitted_nclx_sdr(&handle)?
         };
         let matrix = source_rgb_matrix(&handle)?;
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
         let mut coded_options = DecodingOptions::new()
             .ok_or_else(|| CodecError::invalid("cannot allocate HEIF decoding options"))?;
         coded_options.set_convert_hdr_to_8bit(false);
@@ -360,6 +379,7 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Ok(None);
         }
+        checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
@@ -374,12 +394,12 @@ impl LibHeifProvider {
         if request.data.is_empty() {
             return Err(CodecError::invalid("HEIF decode input is empty"));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(&request.data).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
             .map_err(CodecError::libheif)?;
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        self.decode_handle(&lib, &handle, request.format)
+        self.decode_handle(lib, &handle, request.format)
     }
 
     fn decode_handle(
@@ -530,6 +550,7 @@ fn encode_tile_container(
     origin_x: u32,
     origin_y: u32,
 ) -> Result<Vec<u8>> {
+    let lib = checked_libheif()?;
     let mut image = match request.raster.format {
         RasterPixelFormat::Mono8 => {
             Image::new(request.tile_size, request.tile_size, ColorSpace::Monochrome)
@@ -596,7 +617,6 @@ fn encode_tile_container(
         }
     }
 
-    let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
     let mut encoder = lib
         .encoder_for_format(CompressionFormat::Hevc)
         .map_err(CodecError::libheif)?;
@@ -1345,7 +1365,7 @@ mod tests {
             xdremux_metadata::identify_sdr_color_space(Some(&icc), None).unwrap(),
             xdremux_metadata::SdrColorSpace::DisplayP3
         );
-        let lib = libheif_rs::LibHeif::new_checked().unwrap();
+        let lib = checked_libheif().unwrap();
         let ycc = lib
             .decode(
                 &handle,
@@ -1512,7 +1532,7 @@ mod tests {
                 pixel[2] = 40;
             }
         }
-        let lib = LibHeif::new_checked().unwrap();
+        let lib = checked_libheif().unwrap();
         let mut encoder = lib.encoder_for_format(CompressionFormat::Hevc).unwrap();
         encoder.set_quality(EncoderQuality::Lossy(80)).unwrap();
         let mut context = HeifContext::new().unwrap();
