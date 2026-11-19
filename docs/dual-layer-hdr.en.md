@@ -87,12 +87,13 @@ The independent ISO/JPEG gain-map check runs when the external tool is installed
 
 Google libultrahdr v1.5.1 passed this check on the Samsung fixture `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg`. Its CLI reported the same gain-map parameters for the fixture and the repackaged JPEG, and decoded both to byte-identical linear RGBA half-floats. This exercises ISO APP2 and MPF. Independent verification of registered APP8 and target-dependent HDR rendering remains open. [libultrahdr source](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
 
-Two publicly available camera originals were checked for the registered JPEG carrier. Both captures predate the September 2026 release of GB/T 48347—2026.
+Publicly available camera originals were checked for the registered JPEG carrier. The two DCFever captures predate the September 2026 release of GB/T 48347—2026. The two Fotopolis captures are from October 2026.
 
 | Camera original | File SHA-256 | Observed layout |
 | --- | --- | --- |
 | Huawei Pura 90 Pro Max, DCFever 33253 | `75dede756cbce0026d6e505c233c00451b1b985f46fb527b9cdb562b1a86ec3c` | Both images use `ITUT35` APP8 with oriented-provider code `0x0007`. The raw offset reaches the enhanced SOI. The reduced offset excludes the 28-byte APP8 and the 18-byte JFIF APP0 that immediately follows it. An opaque `VLDMAGIC` tail follows the two JPEG images. [Camera original](https://www.dcfever.com/phones/viewsamples.php?picture=33253) |
 | Huawei Pura 80 Ultra, DCFever 31923 | `a26adb6f4cddff91f3e8196cfe276d27f0a34836fab4c960c2aa9283cc4f17e3` | Both images use `ITUT35` APP5 with oriented-provider code `0x0006`. [Camera original](https://www.dcfever.com/phones/viewsamples.php?picture=31923) |
+| Huawei Pura 90s Pro Max, Fotopolis 264014 and 264011 | `217189324b3de28da1859a84fb137c1ed5a2c678110f348b44437b124928abaa`, `4a65f9c75cbc9dbb9d1e5bc252d5c6e3c81cd7aae731dd151b82b2a354cb40f7` | Both JPEG images in each original use `ITUT35` APP5 and `0x0006`. Neither original contains ISO APP2 or MPF. Measured from the first APP5 marker, the raw offset reaches the APP5 marker of the second JPEG. [Camera originals](https://www.fotopolis.pl/opinie/recenzje/39939-fotograficzne-mozliwosci-ktore-zmiescisz-w-kieszeni-sprawdzamy-aparaty-huawei-pura-90s-pro-max-w-podrozy) |
 
 Libultrahdr recognizes the Pura 90 original as Ultra HDR via ISO APP2. XDRemux's canonical validator rejects the tail, then rejects the reduced offset when given just the two JPEG images. In local diagnostic copies, correcting the offset exposes a mastering-display record with all three x values followed by all three y values. Interleaving those coordinates according to Table 18 exposes an unexpected dynamic payload tail or padding. The camera bytes are kept outside the repository. Registered-payload interoperability and rendered pixels remain unverified.
 
