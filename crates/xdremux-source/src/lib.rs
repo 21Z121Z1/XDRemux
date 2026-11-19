@@ -74,14 +74,11 @@ pub fn motion_still_encoding(data: &[u8], asset: &SourceAsset) -> Option<MotionS
     if box_size < 16 || box_size > bytes.len() {
         return None;
     }
-    let brands = bytes.get(8..12).into_iter().chain(
-        bytes
-            .get(16..box_size)?
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|brand| brand.as_slice()),
-    );
+    let (compatible, _) = bytes.get(16..box_size)?.as_chunks::<4>();
+    let brands = bytes
+        .get(8..12)
+        .into_iter()
+        .chain(compatible.iter().map(|brand| brand.as_slice()));
     if brands.into_iter().any(|brand| {
         brand == &b"heic"[..]
             || brand == &b"heix"[..]

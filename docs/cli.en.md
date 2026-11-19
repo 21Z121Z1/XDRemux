@@ -135,14 +135,17 @@ xdremux batch --input-dir originals/ --output-dir converted/ --target android-st
 | Target | Current route |
 | --- | --- |
 | `apple` | Apple Live Photo HEIC+MOV for Motion Photo; standard ISO HDR HEIC for ProXDR stills. |
-| `android-standard`, `google` | Android Motion Photo with its existing JPEG/HEIC primary image and preserved video; standard ISO HDR HEIC for ProXDR stills. |
-| `samsung` | The same standards-based Android route; a Samsung-native SEF writer is not enabled. |
-| `oppo` | The standards-based Android Motion Photo writer (preserve-only video); OPPO Gallery compatibility for ProXDR stills. |
-| `vivo`, `xiaomi`, `huawei` | Reserved names. No writer is enabled; conversion fails explicitly. |
+| `android-standard` (aliases `standard` and `google`) | One public Motion Photo 1.0 target. The names share the same plan and the same output bytes. The specification is not a player. A historical Google Photos playback note lacks the device model, app version, and output identity needed to verify this build; its consumer status remains `unknown`. ProXDR stills use standard ISO HDR HEIC. |
+| `samsung` | Public Motion Photo. SEF and a secondary autoplay stream are left out and named. A HEIC result keeps top-level `mpvd` last, with a normal 32-bit size whose payload runs to EOF. |
+| `oppo` | Public JPEG Motion Photo with any source `OpCamera` fields. The traced Photos 17.10.62 and 25.17.35 readers require JPEG. A HEIF input falls back to public HEIF Motion Photo. OnePlus and realme use this target. |
+| `vivo` | Preserves combined JPEG samples with both vivo UUID sections, or writes a combined JPEG with the original video. The traced Albums 10.0.10.42 reader requires JPEG. Gallery 3.2.10.4 uses a separate MP4. A HEIF input falls back to public HEIF Motion Photo. |
+| `xiaomi` | Public JPEG Motion Photo using `MotionPhotoVersion=1`. The reviewed Gallery 4.3.1.15-global needs JPEG for its motion reader, so a HEIF input falls back to public HEIF Motion Photo. |
+| `huawei` | An existing OpenHarmony file: HEIC still plus an appended MP4, with `com.openharmony.covertime` as a big-endian float32 in milliseconds and a source `videoId`. The HEIC prefix, video bytes, and any `v6` trailer stay unchanged. Other Motion Photo inputs fall back to Android Motion Photo 1.0 after confirmation. Harmony gallery playback remains unverified. |
+| `honor` | Uses the Android standard fallback after confirmation. Honor documents playback of device-captured and certain shared files. Compatibility of XDRemux outputs remains unverified. |
 
-`--target` works on both `convert` and `batch`. It replaces choosing a separate platform, still-image extension, and Motion Photo writer manually. JPEG Motion Photos remain JPEG, and HEIC Motion Photos remain HEIC: the current writer cannot transcode the still into another format without losing preservation guarantees. Unsupported vendor resources fail closed; a target name alone does not establish native gallery recognition, HDR activation, or sharing behavior. The reported working `preserve` playback on OPPO applies only to the tested files. No native Samsung or OPPO Motion Photo writer is claimed.
+`convert` and `batch` print the actual Motion Photo route before publication. If a reviewed gallery lacks support for the source container, the fallback keeps the source still container and movie bytes. HEIF uses the public HEIF writer and JPEG uses the public JPEG writer. The warning explains that playback on the requested platform remains unverified or unsupported on the reviewed build. Answer `y` at a terminal or pass `--accept-unverified-target`. The public writer refuses unmapped resources.
 
-For backward compatibility, the existing `--motion-target`, `--live-photo-output`, and `--oppo-compatible` options remain available when `--target` is absent. They cannot be combined with `--target`. Apple editing flags remain explicit advanced requests and require `--target apple` if a target is supplied. A supplied target never implicitly enables experimental Portrait, Styles, or Cinematic inference.
+`--motion-target` takes precedence when given with `--target`. For example, `--target oppo --motion-target google-heic` keeps the explicit HEIF format. An explicit `google-jpeg` with the OPPO, vivo or Xiaomi preset can transcode an admitted HEIF still to an 8-bit sRGB JPEG after a loss warning. The movie stays byte-for-byte, the gain map is dropped, and unsupported HDR transfers are rejected. A combination the writer cannot produce fails without changing the output format. `--live-photo-output` and `--oppo-compatible` remain available when `--target` is absent. Apple editing still requires `--target apple` if a platform is supplied.
 
 ### Google Motion Photo output (`convert` and `batch`)
 
@@ -263,7 +266,7 @@ Normal directory discovery selects HEIC, HEIF, JPG, and JPEG candidates. `--appl
 | `--input-dir DIR` | Adds one directory. Repeatable. |
 | `--recursive` | Disabled by default. Descends into input directories. |
 | `--output-dir DIR` | Without this option, generated outputs are beside their sources with an `.xdremux` suffix. |
-| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei` | Selects a platform/vendor preset. For mixed Android Motion Photo batches, selects JPEG or HEIC per input. |
+| `--target apple\|android-standard\|google\|samsung\|oppo\|vivo\|xiaomi\|huawei\|honor` | Selects a platform/vendor preset. For mixed Android Motion Photo batches, selects JPEG or HEIC per input. |
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | Motion Photo destination. Default is Apple pair. Google writes one `*.xdremuxMP.jpg` or `*.xdremuxMP.heic` file without transcoding the still image. |
 | `--motion-video-compat preserve` | Google targets only. Optional; `preserve` is the sole mode and is the default. No brand rewrite or transcode. |
 | `--jobs N` | Positive integer. Defaults to available parallelism, capped at `4`, with fallback `1`. |

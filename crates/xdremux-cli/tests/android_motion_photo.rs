@@ -4,7 +4,12 @@ use std::path::{Path, PathBuf};
 
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions, TargetProfile, WritePolicy};
 
-fn run_with_args(args: Vec<OsString>) -> (u8, String, String) {
+fn run_with_args(mut args: Vec<OsString>) -> (u8, String, String) {
+    if args.iter().any(|arg| arg == "--target")
+        && !args.iter().any(|arg| arg == "--accept-unverified-target")
+    {
+        args.push("--accept-unverified-target".into());
+    }
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = xdremux_cli::run_from(args, &mut stdout, &mut stderr);

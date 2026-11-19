@@ -335,6 +335,67 @@ pub fn identify_sdr_color_space(
     Err(invalid(&format!("SDR color encoding is unsupported or ICC and nclx contradict each other; expected sRGB or Display P3 with the sRGB transfer function; nclx={nclx:?}; {}",mismatches.join("; "))))
 }
 
+/// Convert 8-bit RGB samples described only by an admitted nclx space into sRGB.
+/// sRGB codes stay unchanged. Display P3 uses the CMM's Display P3 profile.
+pub fn sdr_nclx_rgb8_to_srgb8(space: SdrColorSpace, rgb: &[u8]) -> Result<Vec<u8>> {
+    if !rgb.len().is_multiple_of(3) {
+        return Err(invalid("RGB sample length is not a multiple of 3"));
+    }
+    if space == SdrColorSpace::Srgb {
+        return Ok(rgb.to_vec());
+    }
+    let mut source = ColorProfile::new_display_p3();
+    source.cicp = None;
+    let mut destination = ColorProfile::new_srgb();
+    destination.cicp = None;
+    let options = TransformOptions {
+        rendering_intent: RenderingIntent::RelativeColorimetric,
+        allow_use_cicp_transfer: false,
+        prefer_fixed_point: false,
+        ..Default::default()
+    };
+    let transform = source
+        .create_transform_8bit(Layout::Rgb, &destination, Layout::Rgb, options)
+        .map_err(|error| {
+            invalid(&format!(
+                "cannot build Display P3 to sRGB transform: {error}"
+            ))
+        })?;
+    let mut output = vec![0u8; rgb.len()];
+    transform
+        .transform(rgb, &mut output)
+        .map_err(|error| invalid(&format!("Display P3 to sRGB transform failed: {error}")))?;
+    Ok(output)
+}
+
+/// Convert 8-bit RGB samples that are encoded by `icc` into sRGB.
+/// The profile's own tables are used. sRGB is not assumed from the primaries tag alone.
+pub fn sdr_icc_rgb8_to_srgb8(icc: &[u8], rgb: &[u8]) -> Result<Vec<u8>> {
+    if !rgb.len().is_multiple_of(3) {
+        return Err(invalid("RGB sample length is not a multiple of 3"));
+    }
+    identify_sdr_color_space(Some(icc), None)?;
+    let mut source = ColorProfile::new_from_slice(icc)
+        .map_err(|error| invalid(&format!("cannot read SDR ICC: {error}")))?;
+    source.cicp = None;
+    let mut destination = ColorProfile::new_srgb();
+    destination.cicp = None;
+    let options = TransformOptions {
+        rendering_intent: RenderingIntent::RelativeColorimetric,
+        allow_use_cicp_transfer: false,
+        prefer_fixed_point: false,
+        ..Default::default()
+    };
+    let transform = source
+        .create_transform_8bit(Layout::Rgb, &destination, Layout::Rgb, options)
+        .map_err(|error| invalid(&format!("cannot build SDR ICC to sRGB transform: {error}")))?;
+    let mut output = vec![0u8; rgb.len()];
+    transform
+        .transform(rgb, &mut output)
+        .map_err(|error| invalid(&format!("SDR ICC to sRGB transform failed: {error}")))?;
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

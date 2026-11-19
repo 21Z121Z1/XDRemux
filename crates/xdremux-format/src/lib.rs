@@ -6,7 +6,7 @@ pub mod hevc;
 pub mod jpeg;
 pub mod mpf;
 pub use codec::ChromaSampling;
-pub use hevc::{parse_hvcc_profile, HevcDecoderConfigurationProfile};
+pub use hevc::{hvcc_vui_color, parse_hvcc_profile, HevcDecoderConfigurationProfile, HevcVuiColor};
 pub use jpeg::{
     probe_frame_profile as probe_jpeg_frame_profile, scan_jpeg_image_at, scan_jpeg_images,
     JpegComponent, JpegFrameProfile, JpegImage, JpegScan, JpegSegment,

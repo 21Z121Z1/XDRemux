@@ -146,7 +146,7 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
             "实况照片输出目标：Apple 文件对、PVT 或 Google JPEG/HEIC 单文件；Google 路径不隐式转码。"
         }
         ("convert", "target") | ("batch", "target") => {
-            "目标平台或厂商：apple、android-standard、google、samsung、oppo、vivo、xiaomi、huawei；依据实际源资源选择已验证的转换路径。"
+            "目标：apple、android-standard（别名 standard 和 google，同一规划）、samsung、oppo、vivo、xiaomi、huawei、honor。厂商目标会写出文件；私有字段只沿用源文件里已有的内容。"
         }
         ("batch", "motion_target") => {
             "批量实况照片输出目标：Google JPEG/HEIC 单文件；未指定时保留 Apple 文件对或 PVT 输出。"
@@ -155,6 +155,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         ("convert", "motion_video_compat") => "Google 视频容器策略：仅支持原样保留，不转码。",
         ("batch", "motion_video_compat") => "批量 Google 视频容器策略：仅支持原样保留，不转码。",
         ("convert", "motion_report_json") => "向标准输出写入完整的 Google Motion Photo 资源处置和验证 JSON 报告。",
+        ("convert", "accept_unverified_target") | ("batch", "accept_unverified_target") => {
+            "在非交互运行中接受「目标相册版本可能不支持，且未经真机验证」的警告。不能启用尚不存在的编码器。"
+        }
         (_, "apple_portrait") => "利用 Vision 语义保留完整的 Apple Portrait 编辑资源。",
         (_, "apple_portrait_oppo") => {
             "使用 OPPO 景深及已有遮罩，不使用 Vision；人像效果受限（macOS）。"
