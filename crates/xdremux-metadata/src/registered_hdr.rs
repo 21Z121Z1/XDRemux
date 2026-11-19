@@ -628,6 +628,43 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_metadata_round_trips_an_openharmony_fixture() {
+        // hdr_media_type_test.jpg at OpenHarmony image framework d4fd420d088a.
+        // The enhanced APP8 record starts its dynamic payload at byte 216523.
+        let payload = [
+            0x01, 0x73, 0x98, 0xc0, 0x2b, 0xfa, 0x21, 0xf0, 0x1a, 0xb6, 0x7b, 0x1d, 0xc8, 0x00,
+            0x52, 0x8e, 0x19, 0x9f, 0x06, 0x64, 0xcc, 0xb3, 0x2f, 0xec, 0x57, 0xb7, 0xad, 0xeb,
+            0xfc, 0x10, 0x5b, 0x61, 0x5a, 0xae, 0x00, 0x0a, 0x51, 0xc7, 0xb2, 0x50, 0xff, 0xd9,
+            0x96, 0x65, 0xfd, 0x89, 0xe4, 0x20, 0x78, 0x7f, 0xa0, 0x00, 0x00,
+        ];
+        let decoded = DynamicHdrMetadata::parse(&payload).unwrap();
+        assert_eq!(
+            decoded.statistics(),
+            DynamicHdrStatistics {
+                minimum_maxrgb_pq: 1849,
+                average_maxrgb_pq: 2240,
+                variance_maxrgb_pq: 703,
+                maximum_maxrgb_pq: 2593,
+            }
+        );
+        let [higher, lower] = decoded.tone_mappings() else {
+            panic!("the fixture contains two display targets");
+        };
+        assert_eq!(higher.target_maximum_luminance_pq, 3078);
+        assert_eq!(lower.target_maximum_luminance_pq, 2080);
+        assert_eq!((higher.splines.len(), lower.splines.len()), (2, 2));
+        assert_eq!(decoded.saturation_gains(), &[0, 0]);
+
+        let encoded = DynamicHdrMetadata::from_parts(
+            decoded.statistics(),
+            decoded.tone_mappings().to_vec(),
+            decoded.saturation_gains().to_vec(),
+        )
+        .unwrap();
+        assert_eq!(encoded.as_bytes(), &payload);
+    }
+
+    #[test]
     fn dynamic_parameters_are_decoded_without_losing_packed_source() {
         let mut packed = Vec::new();
         let mut pos = 0;
