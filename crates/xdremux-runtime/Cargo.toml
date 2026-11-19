@@ -12,7 +12,7 @@ sha2 = "=0.11.1"
 tempfile = "=3.27.0"
 quick-xml = "=0.42.0"
 jpeg-encoder = "=0.7.1"
-uuid = { version = "=1.29.0", features = ["v4"] }
+uuid = { version = "=1.29.2", features = ["v4"] }
 xdremux-classification = { path = "../xdremux-classification" }
 xdremux-codec = { path = "../xdremux-codec" }
 xdremux-container = { path = "../xdremux-container" }
