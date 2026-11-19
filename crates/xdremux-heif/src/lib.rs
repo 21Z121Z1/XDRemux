@@ -4,6 +4,7 @@ mod canonical;
 mod data_information;
 mod direct;
 pub mod error;
+mod hdr_metadata;
 mod native;
 mod orientation;
 mod semantic;
@@ -20,7 +21,8 @@ pub use error::{HeifError, Result};
 // Canonical portable final-file assembly. It consumes an ordinary source HEIF
 // directly, replaces an existing canonical gain-map graph when present, and
 // does not depend on an externally generated intermediate graph.
-pub use native::{HdrGainMapProfile, IsoGainMapAssembly};
+pub use hdr_metadata::{extract_hdr_metadata, HdrMetadataProvenance, SourceHdrMetadata};
+pub use native::{HdrGainMapProfile, HdrMetadataAssembly, IsoGainMapAssembly};
 pub use orientation::{primary_coded_geometry, PrimaryCodedGeometry};
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use style_reconstruction::{
@@ -33,9 +35,10 @@ pub use texture::{
     TEXTURE_METADATA_URI,
 };
 pub use validation::{
-    primary_sdr_color_space, validate_gain_map_semantics, validate_gain_map_structure,
-    validate_hdr_gain_map_profile, GainMapSemantics, GainMapStructure, HdrOutputColor,
-    HdrProfileSemantics,
+    derived_tmap_payload, extract_gain_map_hevc_resources, primary_icc_profile,
+    primary_image_item_id, primary_sdr_color_space, validate_gain_map_semantics,
+    validate_gain_map_structure, validate_hdr_gain_map_profile, GainMapHevcResources,
+    GainMapSemantics, GainMapStructure, HdrOutputColor, HdrProfileSemantics,
 };
 
 pub fn assemble_iso_gain_map_heif(

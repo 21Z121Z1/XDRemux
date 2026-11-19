@@ -298,6 +298,7 @@ fn hdr_gain_map(
             },
             tmap_payload: &tmap,
             xmp_payload: &xmp,
+            hdr_metadata: None,
         },
     )
     .map_err(|e| RuntimeError::external("source-preserving scene HEIF", e))?;

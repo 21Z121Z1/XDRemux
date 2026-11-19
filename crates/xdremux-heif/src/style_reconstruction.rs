@@ -253,7 +253,7 @@ fn standalone_auxiliary(source: &[u8], meta: &ParsedMeta, id: u32, hdlr: &[u8]) 
 /// Source-independent byte representation of the compressed SDR image tree and
 /// its properties. Location offsets and association flags do not affect pixels.
 pub fn primary_image_signature(source: &[u8]) -> Result<Vec<u8>> {
-    let roots = parse_boxes(source, 0..source.len())?;
+    let roots = xdremux_format::isobmff::scan_top_level_boxes(source)?.boxes;
     let root = roots
         .iter()
         .find(|r| r.kind == FourCC::new(*b"meta"))
@@ -471,6 +471,17 @@ mod tests {
                 .all(|a| a.property_index == 1));
         }
         assert!(!primary_image_signature(&source).unwrap().is_empty());
+    }
+    #[test]
+    fn primary_signature_uses_the_container_boundary_before_an_opaque_tail() {
+        let mut source = fixture();
+        source.extend(make_box(FourCC::new(*b"mdat"), b"coded media").unwrap());
+        let expected = primary_image_signature(&source).unwrap();
+        source.extend_from_slice(b"\0\0\0\x01vendor opaque tail");
+        assert_eq!(primary_image_signature(&source).unwrap(), expected);
+        // A broken box before media is not an opaque tail.
+        source[..4].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert!(primary_image_signature(&source).is_err());
     }
     #[test]
     fn reconstruction_auxiliary_uri_rejects_prefixed_roles() {

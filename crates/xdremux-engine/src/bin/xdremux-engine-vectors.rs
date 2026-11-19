@@ -1,7 +1,7 @@
 use xdremux_engine::{
     plan_conversion, AppleFeatureRequest, CapabilityInventory, ConversionAnalysis,
     ConversionRequest, GainMapChannels, GainMapCodec, GainMapCodecLayout, GainMapSourceProfile,
-    GainMapStorageProfile, OperationCapability,
+    GainMapStorageProfile, OperationCapability, SourceHdrMetadataFacts,
 };
 use xdremux_format::ChromaSampling;
 
@@ -30,6 +30,7 @@ fn analysis(
                 chroma_bit_depth: bit_depth,
             },
         },
+        hdr_metadata: SourceHdrMetadataFacts::default(),
     }
 }
 

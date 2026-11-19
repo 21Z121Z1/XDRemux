@@ -314,6 +314,7 @@ fn assemble_jpeg_gain_map(
             gain_map: direct,
             tmap_payload: &tmap_payload,
             xmp_payload: &xmp_payload,
+            hdr_metadata: None,
         },
     )
     .map_err(|error| RuntimeError::external("Ultra HDR native HEIF assembly", error))?;

@@ -6,9 +6,16 @@ use quick_xml::XmlVersion;
 
 use crate::{MetadataError, Result};
 
-const ISO_NAMESPACE: &[u8] = b"urn:iso:std:iso:ts:21496:-1\0";
+const ISO_NAMESPACE: &[u8] = xdremux_format::dual_jpeg::ISO_GAIN_MAP_APP2_IDENTIFIER;
 const XMP_CONTEXT: &str = "Ultra HDR hdrgm XMP";
 const ISO_CONTEXT: &str = "ISO 21496-1 JPEG metadata";
+/// ISO 21496-1 APP2 payload for the primary image: the four-byte version.
+///
+/// The primary image declares only that the file carries the metadata; the
+/// parameters stay with the gain-map image.
+pub const fn iso_gain_map_base_app2_payload() -> [u8; 4] {
+    [0, 0, 0, 0]
+}
 const MAX_XMP_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +51,22 @@ impl UltraHdrGainMapMetadata {
             return Ok(payload);
         }
         crate::iso21496::make_tmap_from_log_metadata(self, use_base_colour_space)
+    }
+
+    /// ISO 21496-1 APP2 payload for the gain-map image, excluding the namespace.
+    ///
+    /// This is the same checked payload as the HEIF tone-map item without the
+    /// container version byte. Only the application-space flag is resolved.
+    pub fn to_iso_app2_payload(&self, use_base_colour_space: bool) -> Result<Vec<u8>> {
+        self.validate()?;
+        if let Some(source) = &self.iso_payload {
+            let mut payload = source.clone();
+            payload[4] = (payload[4] & !0x40) | if use_base_colour_space { 0x40 } else { 0 };
+            decode_iso_payload(&payload)?;
+            return Ok(payload);
+        }
+        let tmap = crate::iso21496::make_tmap_from_log_metadata(self, use_base_colour_space)?;
+        Ok(tmap[1..].to_vec())
     }
 
     /// XMP is a floating-point compatibility projection; the ISO rationals

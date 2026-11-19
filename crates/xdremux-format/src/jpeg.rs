@@ -277,6 +277,278 @@ pub fn probe_frame_profile(data: &[u8]) -> Result<JpegFrameProfile> {
     Err(invalid("no SOF segment found"))
 }
 
+/// One JPEG segment in file order. Entropy-coded scan data is not a segment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegSegment {
+    pub marker: u8,
+    /// Range of the marker prefix and, when the marker carries one, its length
+    /// field and payload.
+    pub range: std::ops::Range<usize>,
+    /// Payload range. Standalone markers have an empty payload at the end of
+    /// `range`.
+    pub payload: std::ops::Range<usize>,
+}
+
+/// One entropy-coded scan between its Start Of Scan header and the next marker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegScan {
+    /// Range from the Start Of Scan marker prefix to the end of the entropy
+    /// data. The terminating marker is not included.
+    pub range: std::ops::Range<usize>,
+    /// Restart markers observed inside the entropy-coded data.
+    pub restart_marker_count: usize,
+}
+
+/// One complete JPEG image inside a byte buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegImage {
+    /// Range from the Start Of Image marker through the End Of Image marker.
+    pub range: std::ops::Range<usize>,
+    pub frame: JpegFrameProfile,
+    pub segments: Vec<JpegSegment>,
+    pub scans: Vec<JpegScan>,
+}
+
+const ICC_APP2_IDENTIFIER: &[u8] = b"ICC_PROFILE\0";
+
+impl JpegImage {
+    /// Reassemble the ICC profile carried in APP2 chunks.
+    ///
+    /// Chunk order, chunk count, duplicate sequence numbers and truncation are
+    /// checked. A caller that needs the profile must not guess a missing chunk.
+    pub fn icc_profile(&self, data: &[u8]) -> Result<Option<Vec<u8>>> {
+        let mut chunks: Vec<(u8, u8, &[u8])> = Vec::new();
+        for segment in &self.segments {
+            if segment.marker != 0xe2 {
+                continue;
+            }
+            let payload = data
+                .get(segment.payload.clone())
+                .ok_or_else(|| invalid("ICC APP2 payload is outside the image"))?;
+            let Some(rest) = payload.strip_prefix(ICC_APP2_IDENTIFIER) else {
+                continue;
+            };
+            if rest.len() < 2 {
+                return Err(invalid("ICC APP2 chunk is shorter than its header"));
+            }
+            chunks.push((rest[0], rest[1], &rest[2..]));
+        }
+        if chunks.is_empty() {
+            return Ok(None);
+        }
+        let declared = chunks[0].1;
+        if declared == 0 {
+            return Err(invalid("ICC APP2 declares zero chunks"));
+        }
+        if usize::from(declared) != chunks.len() {
+            return Err(invalid(format!(
+                "ICC APP2 declares {declared} chunks but the image carries {}",
+                chunks.len()
+            )));
+        }
+        let mut ordered = vec![None; usize::from(declared)];
+        for (sequence, count, payload) in chunks {
+            if count != declared {
+                return Err(invalid("ICC APP2 chunks disagree on their count"));
+            }
+            if sequence == 0 || sequence > declared {
+                return Err(invalid("ICC APP2 sequence number is out of range"));
+            }
+            let slot = &mut ordered[usize::from(sequence) - 1];
+            if slot.replace(payload).is_some() {
+                return Err(invalid("ICC APP2 repeats a sequence number"));
+            }
+        }
+        let mut profile = Vec::new();
+        for chunk in ordered {
+            let chunk = chunk.ok_or_else(|| invalid("ICC APP2 is missing a chunk"))?;
+            profile.extend_from_slice(chunk);
+        }
+        Ok(Some(profile))
+    }
+
+    pub fn end_of_image(&self) -> usize {
+        self.range.end
+    }
+}
+
+fn read_marker(data: &[u8], offset: usize) -> Result<(u8, usize)> {
+    if data.get(offset) != Some(&0xff) {
+        return Err(invalid(format!(
+            "expected marker prefix at offset {offset}"
+        )));
+    }
+    let mut cursor = offset
+        .checked_add(1)
+        .ok_or_else(|| FormatError::overflow("JPEG marker offset"))?;
+    while data.get(cursor) == Some(&0xff) {
+        cursor = cursor
+            .checked_add(1)
+            .ok_or_else(|| FormatError::overflow("JPEG fill bytes"))?;
+    }
+    let marker = *data
+        .get(cursor)
+        .ok_or_else(|| truncated(cursor, 1, data.len()))?;
+    Ok((marker, cursor + 1))
+}
+
+/// Advance past entropy-coded data to the next real marker.
+///
+/// Stuffed `FF 00` bytes and restart markers belong to the scan. A literal
+/// `FF D9` byte pair can only appear inside entropy data as `FF 00 D9`, so a
+/// raw search for the end marker would truncate the scan.
+fn scan_entropy(data: &[u8], offset: usize) -> Result<(usize, usize)> {
+    let mut cursor = offset;
+    let mut restarts = 0;
+    while cursor < data.len() {
+        if data[cursor] != 0xff {
+            cursor += 1;
+            continue;
+        }
+        let mut next = cursor + 1;
+        while data.get(next) == Some(&0xff) {
+            next += 1;
+        }
+        let marker = *data
+            .get(next)
+            .ok_or_else(|| truncated(next, 1, data.len()))?;
+        match marker {
+            0x00 => cursor = next + 1,
+            0xd0..=0xd7 => {
+                restarts += 1;
+                cursor = next + 1;
+            }
+            _ => return Ok((cursor, restarts)),
+        }
+    }
+    Err(invalid(
+        "entropy-coded data ends without a marker or End Of Image",
+    ))
+}
+
+fn scan_image_at(data: &[u8], start: usize) -> Result<JpegImage> {
+    if data.get(start..start + 2) != Some(&[0xff, 0xd8]) {
+        return Err(invalid(format!(
+            "expected a Start Of Image marker at offset {start}"
+        )));
+    }
+    let mut segments = vec![JpegSegment {
+        marker: 0xd8,
+        range: start..start + 2,
+        payload: start + 2..start + 2,
+    }];
+    let mut scans = Vec::new();
+    let mut frame = None;
+    let mut cursor = start + 2;
+    loop {
+        let marker_start = cursor;
+        let (marker, after_marker) = read_marker(data, marker_start)?;
+        if marker == 0x00 {
+            return Err(invalid("stuffed byte outside entropy-coded data"));
+        }
+        if marker == 0xd9 {
+            segments.push(JpegSegment {
+                marker,
+                range: marker_start..after_marker,
+                payload: after_marker..after_marker,
+            });
+            let Some(frame) = frame else {
+                return Err(invalid("End Of Image precedes any Start Of Frame"));
+            };
+            return Ok(JpegImage {
+                range: start..after_marker,
+                frame,
+                segments,
+                scans,
+            });
+        }
+        if marker == 0x01 || marker == 0xd8 || (0xd0..=0xd7).contains(&marker) {
+            segments.push(JpegSegment {
+                marker,
+                range: marker_start..after_marker,
+                payload: after_marker..after_marker,
+            });
+            cursor = after_marker;
+            continue;
+        }
+        let segment_length = usize::from(read_u16_be(data, after_marker)?);
+        if segment_length < 2 {
+            return Err(invalid(format!(
+                "marker 0x{marker:02x} declares invalid segment length {segment_length}"
+            )));
+        }
+        let payload_start = after_marker + 2;
+        let payload_end = after_marker
+            .checked_add(segment_length)
+            .ok_or_else(|| FormatError::overflow("JPEG segment end"))?;
+        if payload_end > data.len() {
+            return Err(truncated(
+                payload_start,
+                segment_length.saturating_sub(2),
+                data.len(),
+            ));
+        }
+        if marker == 0xda {
+            if frame.is_none() {
+                return Err(invalid("Start Of Scan precedes any Start Of Frame"));
+            }
+            let (entropy_end, restart_marker_count) = scan_entropy(data, payload_end)?;
+            scans.push(JpegScan {
+                range: marker_start..entropy_end,
+                restart_marker_count,
+            });
+            segments.push(JpegSegment {
+                marker,
+                range: marker_start..payload_end,
+                payload: payload_start..payload_end,
+            });
+            cursor = entropy_end;
+            continue;
+        }
+        if is_sof_marker(marker) {
+            if frame.is_some() {
+                return Err(invalid("image declares more than one Start Of Frame"));
+            }
+            frame = Some(parse_sof(data, marker, payload_start, payload_end)?);
+        }
+        segments.push(JpegSegment {
+            marker,
+            range: marker_start..payload_end,
+            payload: payload_start..payload_end,
+        });
+        cursor = payload_end;
+    }
+}
+
+/// Index the JPEG image that starts at `start`.
+///
+/// Use this when a container appends non-JPEG data after the images, such as a
+/// Motion Photo video. The returned range ends exactly after the End Of Image
+/// marker, so a caller can continue at `image.range.end`.
+pub fn scan_jpeg_image_at(data: &[u8], start: usize) -> Result<JpegImage> {
+    scan_image_at(data, start)
+}
+
+/// Index every complete JPEG image in a byte buffer.
+///
+/// Images must be contiguous and each must end with an End Of Image marker.
+/// Trailing bytes that are not another image, a scan that runs past the buffer,
+/// and a missing End Of Image are errors: a writer that rewrites offsets must
+/// never guess an image boundary.
+pub fn scan_jpeg_images(data: &[u8]) -> Result<Vec<JpegImage>> {
+    let mut images = Vec::new();
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let image = scan_image_at(data, offset)?;
+        offset = image.range.end;
+        images.push(image);
+    }
+    if images.is_empty() {
+        return Err(invalid("buffer contains no JPEG image"));
+    }
+    Ok(images)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378,6 +650,172 @@ mod tests {
         assert!(probe_frame_profile(&data).is_err());
         data.extend_from_slice(&[0x02, 0x03, 0x04, 0x05]);
         assert!(probe_frame_profile(&data).is_err());
+    }
+
+    fn segment(marker: u8, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0xff, marker];
+        bytes.extend_from_slice(&u16::try_from(payload.len() + 2).unwrap().to_be_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn frame_header(width: u16, height: u16, components: &[(u8, u8, u8, u8)]) -> Vec<u8> {
+        let mut payload = vec![8];
+        payload.extend_from_slice(&height.to_be_bytes());
+        payload.extend_from_slice(&width.to_be_bytes());
+        payload.push(u8::try_from(components.len()).unwrap());
+        for (id, horizontal, vertical, table) in components {
+            payload.push(*id);
+            payload.push((horizontal << 4) | vertical);
+            payload.push(*table);
+        }
+        segment(0xc0, &payload)
+    }
+
+    fn scan_header() -> Vec<u8> {
+        segment(0xda, &[1, 1, 0, 0, 63, 0])
+    }
+
+    fn gray_jpeg(entropy: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0xff, 0xd8];
+        bytes.extend_from_slice(&segment(0xe0, b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0"));
+        bytes.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        bytes.extend_from_slice(&scan_header());
+        bytes.extend_from_slice(entropy);
+        bytes.extend_from_slice(&[0xff, 0xd9]);
+        bytes
+    }
+
+    #[test]
+    fn indexes_one_image_with_its_segments_and_scan() {
+        let bytes = gray_jpeg(&[0x12, 0x34, 0x56]);
+        let images = scan_jpeg_images(&bytes).unwrap();
+        assert_eq!(images.len(), 1);
+        let image = &images[0];
+        assert_eq!(image.range, 0..bytes.len());
+        assert_eq!(image.end_of_image(), bytes.len());
+        assert_eq!(
+            image.segments.iter().map(|s| s.marker).collect::<Vec<_>>(),
+            vec![0xd8, 0xe0, 0xc0, 0xda, 0xd9]
+        );
+        assert_eq!(image.scans.len(), 1);
+        assert_eq!(image.scans[0].restart_marker_count, 0);
+        assert_eq!(image.frame.width, 8);
+        assert_eq!(image.frame.height, 4);
+        assert_eq!(
+            &bytes[image.segments[1].payload.clone()],
+            b"JFIF\0\x01\x01\0\0\x01\0\x01\0\0"
+        );
+    }
+
+    #[test]
+    fn entropy_stuffing_and_restart_markers_do_not_end_the_image() {
+        // FF 00 is a stuffed byte, FF D0..D7 are restart markers, and the only
+        // real End Of Image marker is the last one.
+        let entropy = [
+            0x01, 0xff, 0x00, 0x02, 0xff, 0xd0, 0x03, 0xff, 0x00, 0xd9, 0x04,
+        ];
+        let bytes = gray_jpeg(&entropy);
+        let images = scan_jpeg_images(&bytes).unwrap();
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].range.end, bytes.len());
+        assert_eq!(images[0].scans[0].restart_marker_count, 1);
+    }
+
+    #[test]
+    fn progressive_images_keep_every_scan() {
+        let mut bytes = vec![0xff, 0xd8];
+        bytes.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        bytes.extend_from_slice(&scan_header());
+        bytes.extend_from_slice(&[0x11, 0x22]);
+        bytes.extend_from_slice(&scan_header());
+        bytes.extend_from_slice(&[0x33, 0x44]);
+        bytes.extend_from_slice(&[0xff, 0xd9]);
+        let images = scan_jpeg_images(&bytes).unwrap();
+        assert_eq!(images[0].scans.len(), 2);
+        assert_eq!(images[0].range.end, bytes.len());
+    }
+
+    #[test]
+    fn concatenated_images_report_their_own_boundaries() {
+        let first = gray_jpeg(&[0x01]);
+        let second = gray_jpeg(&[0x02, 0x03]);
+        let mut bytes = first.clone();
+        bytes.extend_from_slice(&second);
+        let images = scan_jpeg_images(&bytes).unwrap();
+        assert_eq!(images.len(), 2);
+        assert_eq!(images[0].range, 0..first.len());
+        assert_eq!(images[1].range, first.len()..bytes.len());
+    }
+
+    #[test]
+    fn a_missing_end_marker_or_trailing_byte_is_rejected() {
+        let bytes = gray_jpeg(&[0x01]);
+        assert!(scan_jpeg_images(&bytes[..bytes.len() - 2]).is_err());
+        let mut trailing = bytes.clone();
+        trailing.push(0x00);
+        assert!(scan_jpeg_images(&trailing).is_err());
+        assert!(scan_jpeg_images(&[]).is_err());
+        assert!(scan_jpeg_images(&[0x00, 0x00]).is_err());
+    }
+
+    #[test]
+    fn a_scan_that_runs_past_the_buffer_is_rejected() {
+        let mut bytes = vec![0xff, 0xd8];
+        bytes.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        bytes.extend_from_slice(&scan_header());
+        bytes.extend_from_slice(&[0x01, 0x02]);
+        assert!(scan_jpeg_images(&bytes).is_err());
+    }
+
+    fn icc_chunk(sequence: u8, count: u8, payload: &[u8]) -> Vec<u8> {
+        let mut body = b"ICC_PROFILE\0".to_vec();
+        body.push(sequence);
+        body.push(count);
+        body.extend_from_slice(payload);
+        segment(0xe2, &body)
+    }
+
+    #[test]
+    fn reassembles_icc_chunks_in_sequence_order() {
+        let mut bytes = vec![0xff, 0xd8];
+        bytes.extend_from_slice(&icc_chunk(2, 2, b"second"));
+        bytes.extend_from_slice(&icc_chunk(1, 2, b"first-"));
+        bytes.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        bytes.extend_from_slice(&scan_header());
+        bytes.extend_from_slice(&[0x01, 0xff, 0xd9]);
+        let images = scan_jpeg_images(&bytes).unwrap();
+        assert_eq!(
+            images[0].icc_profile(&bytes).unwrap(),
+            Some(b"first-second".to_vec())
+        );
+        let plain = gray_jpeg(&[0x01]);
+        assert_eq!(
+            scan_jpeg_images(&plain).unwrap()[0]
+                .icc_profile(&plain)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_incomplete_or_repeated_icc_chunks() {
+        let mut missing = vec![0xff, 0xd8];
+        missing.extend_from_slice(&icc_chunk(1, 2, b"only"));
+        missing.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        missing.extend_from_slice(&scan_header());
+        missing.extend_from_slice(&[0x01, 0xff, 0xd9]);
+        let images = scan_jpeg_images(&missing).unwrap();
+        assert!(images[0].icc_profile(&missing).is_err());
+
+        let mut repeated = vec![0xff, 0xd8];
+        repeated.extend_from_slice(&icc_chunk(1, 2, b"a"));
+        repeated.extend_from_slice(&icc_chunk(1, 2, b"b"));
+        repeated.extend_from_slice(&frame_header(8, 4, &[(1, 1, 1, 0)]));
+        repeated.extend_from_slice(&scan_header());
+        repeated.extend_from_slice(&[0x01, 0xff, 0xd9]);
+        let images = scan_jpeg_images(&repeated).unwrap();
+        assert!(images[0].icc_profile(&repeated).is_err());
     }
 
     #[test]

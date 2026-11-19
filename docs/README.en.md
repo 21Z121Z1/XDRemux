@@ -19,6 +19,7 @@ Use the [project README](../README.en.md) to build the CLI and run a first conve
 | Document | Content |
 | --- | --- |
 | [Architecture](architecture.en.md) | Implementation owners and media contracts. |
+| [Dual-layer HDR conversion](dual-layer-hdr.en.md) | Supported sources and outputs, preserved source facts, and open items. |
 | [Development and builds](development.en.md) | Rust workspace, Apple adapter, app, and packaging. |
 | [Testing policy](quality/testing.en.md) | Required evidence and the limits of each test layer. |
 | [Regression and sample checks](quality/evals.en.md) | Reusable checks and real-file verification. |

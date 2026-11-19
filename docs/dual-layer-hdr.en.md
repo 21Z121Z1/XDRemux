@@ -1,0 +1,149 @@
+# Dual-layer HDR conversion
+
+English | [简体中文](dual-layer-hdr.md)
+
+This page states what XDRemux converts today for dual-layer HDR stills, which source facts it keeps, and which work is not implemented. It separates verified behavior from planned behavior. [CLI reference](cli.en.md) documents the commands.
+
+## Supported sources
+
+| Source | Detection | Notes |
+| --- | --- | --- |
+| ProXDR HEIC from OPPO, OnePlus, or realme | The vendor extension block and its manifest | Local HDR and Ultra HDR families |
+| Standalone ISO 21496-1 dual-layer HEIF | A canonical `tmap` graph and no vendor extension block | Includes an earlier XDRemux HEIF output |
+| Two-image JPEG | The `MPF` index and the ISO APP2 carriers | Validation only, not conversion |
+
+A Motion Photo takes the Live Photo path. A plain single-image JPEG is not a dual-layer source.
+
+## Supported outputs
+
+| Output | Container | Derived-image declaration |
+| --- | --- | --- |
+| `compatible` | HEIF | BT.2020 PQ with the existing consumer layout |
+| `bt2020-pq` | HEIF | BT.2020 PQ |
+| `bt2020-hlg` | HEIF | BT.2020 HLG |
+| `.jpg` or `.jpeg` destination | Two-image JPEG | Base colorimetry plus the ISO 21496-1 gain-map parameters |
+
+For ProXDR stills, `batch` writes HEIF output.
+
+## Source facts the conversion keeps
+
+- The compressed SDR base keeps its bytes on both HEIF paths. A JPEG destination decodes it and re-encodes it.
+- A standalone ISO HEIF converted to HEIF retains the Gain Map's compressed tiles, hvcC bytes, tile order, sampling, bit depth, and dimensions. The final file is checked against those source resources. Generated 10- and 12-bit HEVC vectors exercise this path without reducing precision or requiring a Gain Map encoder.
+- ProXDR conversion and a JPEG destination use the existing eight-bit Gain Map encoder. JPEG output re-encodes both images; those samples are not bit-exact.
+- The gain-map operation metadata is preserved. A standalone ISO source keeps its exact tone-map payload bytes. A ProXDR source keeps the operation its vendor float view declares.
+- `mdcv`, `clli`, and registered `it35` carriers are copied only when the source associates them with the derived HDR image. Two carriers that declare the same value must agree. An absent value stays absent. Optional registered matrix/3D LUT extension bytes are decoded with bounds checks and retained exactly.
+- A JPEG destination keeps the base ICC profile and the Exif payload.
+
+The conversion re-reads the published bytes before publication. It checks the structure, the carriers (including actual opt-in APP8 declaration offsets and enhanced payload), and the declared profile. JPEG output must decode both images. HEIF remux compares every compressed Gain Map resource without decoding or re-encoding it; pixel decoding is a separate validation operation.
+
+For JPEG reconstruction, a missing alternate ICC selects the base application primaries even when `use_base_colour_space` is zero. A present alternate ICC is validated. When selected for application, its supported BT.709, Display P3 D65, or BT.2020 primaries govern the linear gain operation before conversion to BT.2020. No colour space is inferred from the Gain Map compression matrix.
+
+## Mapping and luminance executors
+
+Two pure executors are available to code that already holds typed inputs. Neither one reads a file.
+
+`AdditionalMapping` applies a three-by-three matrix and then an optional three-dimensional LUT. The matrix runs first in `f64` and keeps negative intermediate values. Each component is then normalized by the LUT domain. Nodes are stored with the first component fastest, and the eight nodes of the containing cell are weighted by their fractional parts. A value outside the domain is rejected by default, or clamped when the caller selects that policy. The fixed vectors cover neutral white, a non-neutral color, the red-fastest axis order, an interior sample of a three-node edge, and a non-unit domain.
+
+`AbsoluteDisplayTarget` gives relative linear `1.0` a luminance through a caller-declared reference white. A component above the peak or below the black level is clamped and counted. `relative_linear_to_pq` encodes the calibrated luminance as PQ. Fixed vectors cover 100, 203, 1,000, and 10,000 cd/m².
+
+Neither executor changes a conversion on its own. The registered file mapping extension is decoded and preserved, but cannot be passed directly to `AdditionalMapping`: its scalar LUT payload does not declare the vector-channel and domain semantics required by that executor. A display target is not read from a device.
+
+GB/T 48347—2026 adopts T/UWA 028.1—2024. Tables 16 and 17 specify a precision flag, nine matrix coefficients, and a cubic scalar LUT in binary16 or binary32. Sections 10.2.3 and 10.2.6 identify the base and combined mapping stages. The tables and process descriptions provide no sample order, input domain, channel binding, or interpolation rule for the scalar LUT. Section 10 directs target-dependent HDR display adaptation to GB/T 46269.1—2025. [Still-image standard record](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB) [Display adaptation standard record](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=74075E2E20B1C2A3CDC429E6B51FA668)
+
+GB/T 48347—2026 Tables 21 and 23 specify big-endian 16-bit provider and oriented-provider codes for both JPEG APP8 records. Table 21 measures the first offset from the base APP8 marker and the second with APP data other than JFIF excluded. Table 28 describes the registered HEIF `it35` payload. The implementation uses these fields and checks both JPEG offsets against the output layout. Full interoperability still needs a producer file that passes the complete validation. [Still-image standard record](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
+
+Annex C.5 shows a single `tmap` with two ordered source images and an unlinked `it35` item. XDRemux reads this form when the file contains one such group rooted at the primary image and one unreferenced item with the registered two-image identity. Explicit item references determine association when present. The HEIF writer emits the preserved metadata once, linked to the new `tmap` by `cdsc`. [Still-image standard record](https://std.samr.gov.cn/gb/search/gbDetailed?id=5CB12E0EFB5B2034E06397BE0A0A34FB)
+
+An enabled registered base or combined mapping therefore stops file pixel reconstruction. Structural validation and HEIF remux can preserve it. JPEG export requires `--jpeg-registered-metadata` when dropping the carrier would drop an enabled mapping. JSON validation reports base mapping, combined mapping, dynamic metadata, and display adaptation separately; `parsed-not-applied` does not establish rendered-pixel support.
+
+`DynamicHdrMetadata::from_parts` packs caller-supplied statistics, up to two display-target sets, base curves, spline pieces, and saturation gains. It checks each field's bit width and conditional presence. This provides checked authoring without generating measurements or tone-mapping parameters.
+
+A regression uses scenario 6 from T/UWA 005.3-1—2023 Table A.2, packed according to GB/T 48347—2026 Table 19. It checks the encoded display target, curve parameters, both splines, and saturation gains, then reproduces the input bytes. The display test prescribes how to derive expected luminance for that historical video standard, so this vector verifies metadata handling and leaves pixel adaptation open. [UWA display test standard](https://www.uhd-world-association.com/wp-content/uploads/2024/10/UWA-_8-TUWA-005.3-1-2023-HDR-Video-Technology-Part-3-1-Technical-Requirements-and-Test-Methods-Display-Device.pdf)
+
+## Verification
+
+Run the focused checks from the repository root:
+
+```bash
+cargo test -p xdremux-runtime --test hdr_metadata_wiring
+cargo test -p xdremux-runtime --test jpeg_export
+cargo test -p xdremux-runtime --test jpeg_validation
+cargo test -p xdremux-runtime --test jpeg_registered
+cargo test -p xdremux-runtime --test iso_heif_source
+cargo test -p xdremux-runtime --test hevc_gain_map_preservation
+cargo test -p xdremux-cli --test jpeg_output
+cargo test -p xdremux-cli --test iso_heif_source
+cargo test -p xdremux-codec --test dual_jpeg
+```
+
+`xdremux validate` reports the published file:
+
+```bash
+xdremux validate output.heic --hdr-profile bt2020-hlg --semantic --decode-hdr --json
+xdremux validate output.jpg --semantic --json
+```
+
+The independent ISO/JPEG gain-map check runs when the external tool is installed. It requires that the independent reader reports the same parameters and decodes to identical linear output. The check skips with a message when the tool is absent.
+
+Google libultrahdr v1.5.1 passed this check on the Samsung fixture `fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg`. Its CLI reported the same gain-map parameters for the fixture and the repackaged JPEG, and decoded both to byte-identical linear RGBA half-floats. This exercises ISO APP2 and MPF. Independent verification of registered APP8 and target-dependent HDR rendering remains open. [libultrahdr source](https://github.com/google/libultrahdr/tree/a8166d65171aef43cb4bc211538ee6619a9af680)
+
+Google libultrahdr v2.0.2 independently read the HEIF gain-map parameters for the compatible output of `fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic` and its `--hdr-profile bt2020-hlg` remux. `ultrahdr_app -m 1 -j FILE -P` reported identical parameters. Decoding each with `-o 0 -O 4` produced byte-identical linear RGBA half-floats, with SHA-256 `fd9d623d9387ad13cf01de275b3b8be5f990674794caf2fb97e424ea2313a151`. XDRemux also passed semantic and decoded HDR validation on the HLG remux. [libultrahdr v2.0.2 source](https://github.com/google/libultrahdr/tree/e5f5a022fe96fc4dc2ee35c19f733a50df807abe)
+
+The same external encoder generated two 96×64 ISO HEIFs that XDRemux accepted with `validate --semantic`. Their base items used `nclx` `[1, 1, 1]` and `[9, 1, 9]`, respectively. Both explicit BT.2020 remuxes stopped before writing because the profile's base-image admission requires the supported sRGB or Display P3 encoding with the sRGB transfer. The baseline example SHA-256 is `9bf210138313a49563207eb89b54801352a7878e93b96b665716110a6a8505a3`. The BT.2020 example SHA-256 is `8e6de139ad975e796583a96e8c3ee4dc04fc694303e717ce6ec9778d58430139`. [HEIF encoder API](https://github.com/google/libultrahdr/blob/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/docs/api_changes_v1.5_to_v2.0.md)
+
+Publicly available camera originals were checked for the registered JPEG carrier. The two DCFever captures predate the September 2026 release of GB/T 48347—2026. The two Fotopolis captures are from October 2026.
+
+| Camera original | File SHA-256 | Observed layout |
+| --- | --- | --- |
+| Huawei Pura 90 Pro Max, DCFever 33253 | `75dede756cbce0026d6e505c233c00451b1b985f46fb527b9cdb562b1a86ec3c` | Both images use `ITUT35` APP8 with oriented-provider code `0x0007`. The raw offset reaches the enhanced SOI. The reduced offset excludes the 28-byte APP8 and the 18-byte JFIF APP0 that immediately follows it. An opaque `VLDMAGIC` tail follows the two JPEG images. [Camera original](https://www.dcfever.com/phones/viewsamples.php?picture=33253) |
+| Huawei Pura 80 Ultra, DCFever 31923 | `a26adb6f4cddff91f3e8196cfe276d27f0a34836fab4c960c2aa9283cc4f17e3` | Both images use `ITUT35` APP5 with oriented-provider code `0x0006`. [Camera original](https://www.dcfever.com/phones/viewsamples.php?picture=31923) |
+| Huawei Pura 90s Pro Max, Fotopolis 264014 and 264011 | `217189324b3de28da1859a84fb137c1ed5a2c678110f348b44437b124928abaa`, `4a65f9c75cbc9dbb9d1e5bc252d5c6e3c81cd7aae731dd151b82b2a354cb40f7` | Both JPEG images in each original use `ITUT35` APP5 and `0x0006`. Neither original contains ISO APP2 or MPF. Measured from the first APP5 marker, the raw offset reaches the APP5 marker of the second JPEG. [Camera originals](https://www.fotopolis.pl/opinie/recenzje/39939-fotograficzne-mozliwosci-ktore-zmiescisz-w-kieszeni-sprawdzamy-aparaty-huawei-pura-90s-pro-max-w-podrozy) |
+
+Libultrahdr recognizes the Pura 90 original as Ultra HDR via ISO APP2. XDRemux's canonical validator rejects the tail, then rejects the reduced offset when given just the two JPEG images. In local diagnostic copies, correcting the offset exposes a mastering-display record with all three x values followed by all three y values. Interleaving those coordinates according to Table 18 exposes an unexpected dynamic payload tail or padding. The camera bytes are kept outside the repository. Registered-payload interoperability and rendered pixels remain unverified.
+
+OpenHarmony ships independent fixtures and source for reading these carriers. Its JPEG reader obtains the gain map using the first APP8 offset and logs the second offset. The latter therefore still needs separate verification. The following results use the original OpenHarmony fixture bytes at revision `d4fd420d088aacb7401ccb7d7d5bce1ad3967e56`. [OpenHarmony JPEG reader](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/plugins/common/libs/image/libextplugin/src/hdr/hdr_helper.cpp#L159-L199)
+
+| OpenHarmony fixture | File SHA-256 | XDRemux result |
+| --- | --- | --- |
+| `HdrVivid.jpg` | `39280746144cd5af36906f57902226de2a112efcae82cae147602d48029b1bfc` | Both `ITUT35` APP8 records use `0x0007`. The raw offset reaches byte 824420. The enhanced image starts at byte 824440 in the MPF index. [Fixture](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/HdrVivid.jpg) |
+| `hdr_media_type_test.jpg` | `ee95ce874d4a9a105301d5cdb3c8984ec4a651d6ed9cfe9cc5cd73691a743b9e` | Both APP8 offsets match the published image boundaries. The declared 28-byte static record has zero primary and white-point coordinates, which the HDR metadata validator rejects. [Fixture](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/hdr_media_type_test.jpg) |
+| `test_heif_hdr.heic` | `0c76cd66ca775fc348558b54452888d603efd418b5070392b35550a97baaa931` | HEIF Gain Map structure passes. Item 28 links to `tmap` item 27 with `cdsc`. Direct HDR metadata extraction rejects the mastering chromaticity. Direct ISO semantic validation rejects the zero denominator in `gainMapMin[0]`. [Fixture](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/test/resource/image/images/test_heif_hdr.heic) |
+
+For each of the two JPEG fixtures, a diagnostic read passed the unmodified 53-byte dynamic section to the decoder with the static record omitted. It recovered two target PQ codes (3078 and 2080), two splines per target, and two saturation gains. Packing the decoded fields reproduced all 53 bytes in both cases. This verifies dynamic metadata handling independently of the carrier errors above. Pixel adaptation remains unverified.
+
+The OpenHarmony `Picture` implementation delegates HDR composition to a platform VPE function resolved at runtime. An independent device check can import a registered source and its remux, read both Gain Maps and composed HDR pixels with Image Kit, then measure the original and remux on two calibrated HDR display targets to verify adaptation. Record the build, peak luminance, transfer function and pixel or light-meter measurements. UWA provides reference code to members via an application form. [OpenHarmony composition call](https://github.com/openharmony/multimedia_image_framework/blob/d4fd420d088aacb7401ccb7d7d5bce1ad3967e56/frameworks/innerkitsimpl/utils/src/vpe_utils.cpp#L134-L156) [Huawei Image Kit guide](https://developer.huawei.com/consumer/en/doc/HarmonyOS-Guides/image-hdr-decoding-c/) [UWA reference resources](https://theuwa.com/tech/faq_en.html)
+
+Measured limits for the current encoding configuration:
+
+| Comparison | Mean | Maximum |
+| --- | --- | --- |
+| JPEG base re-encode drift from the source base | below 2 of 255 | below 24 of 255 |
+| JPEG export against the HEIF export of the same source | 0.19 percent relative | 1.3 percent at the 99th percentile |
+| HEIF profile change through compressed Gain Map remux | 0 | 0 |
+
+These values describe one fixed encoding configuration. They are not a general quality guarantee.
+
+## Limits and open items
+
+- The reconstruction output is relative linear BT.2020. The absolute-luminance executor needs a caller-declared reference white; no conversion supplies one.
+- PQ and HLG tags declare an encoding. They do not prove display adaptation, tone mapping, or device presentation.
+- Dynamic metadata is parsed into PQ-coded content statistics, target-display parameters, optional base-curve and spline fields, and saturation gains. Exact source bytes are retained. Parameter decoding is not display adaptation: the complete target-dependent tone-mapping algorithm is not implemented.
+- A JPEG destination requires identity orientation and a normal Exif orientation.
+- A JPEG destination requires the gain operation to run in the base application space. A source that declares the alternate space is refused.
+- A JPEG destination cannot carry an explicit BT.2020 profile, the OPPO camera tail, or Apple editing resources.
+- The registered JPEG APP8 pair is written only on request (`--jpeg-registered-metadata`) and only when the source supplies enhanced registered metadata. A source without it is refused, rather than publishing a base declaration with no enhanced record. The reduced-view offset follows a documented rule that an independent producer sample has not confirmed yet.
+- The opt-in flag writes the registered metadata carriers. The JPEG writer uses the source's base Exif and ICC when present and omits alternate ICC. Full GB/T 48347—2026 §9.2 distribution-format conformance remains unverified.
+- The Gain Map encoder currently accepts eight-bit rasters. A standalone HEVC Gain Map uses compressed-resource remux for HEIF output, including higher precision; a JPEG destination explicitly selects eight-bit quantization and uses the JPEG encoder without requiring a HEVC Gain Map encoder. Generated mono and RGB 10/12-bit sources cover both destinations.
+- HEIF remux currently requires uniform coded tile dimensions, identical hvcC bytes, and compatible full-range BT.601 Gain Map compression declarations. Other layouts fail rather than being reinterpreted. Changing alternate application primaries requires a verified pixel/mapping conversion and is refused by this remux path.
+- Registered matrix/3D LUT sections can be read from and round-tripped through HEIF `it35` and JPEG APP8. Precision, finite values, sizes, and cube dimensions are validated. Their rendering semantics are not established, so the conversion preserves them without applying them to pixels; no implicit RGB-vector interpretation or LUT domain is invented.
+- No device evidence is recorded here. Gallery recognition, Photos editing, and display behavior are outside these checks.
+
+## Code ownership
+
+| Concern | Crate |
+| --- | --- |
+| Container facts, carrier extraction, HEIF assembly | `crates/xdremux-heif` |
+| JPEG index, `MPF`, two-image assembly | `crates/xdremux-format` |
+| Source analysis, conversion, published-file checks | `crates/xdremux-runtime` |
+| Request, container, and profile policy | `crates/xdremux-engine` |
+| Decoding, encoding, and Gain Map tiles | `crates/xdremux-codec` |

@@ -9,6 +9,7 @@ half = "2.7"
 sha2 = "=0.11.1"
 serde = { version = "1", features = ["derive"] }
 xdremux-format = { path = "../xdremux-format" }
+xdremux-metadata = { path = "../xdremux-metadata" }
 
 [lints]
 workspace = true
