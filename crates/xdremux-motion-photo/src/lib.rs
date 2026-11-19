@@ -1,9 +1,11 @@
 #![forbid(unsafe_code)]
 //! XDRemux consumer boundary. Portable format code belongs to LibLivePhoto.
+mod apple_style_movie;
 mod geometry;
 mod payload;
 mod publication;
 
+pub use apple_style_movie::{add_apple_live_style_tracks, AppleLiveStyleAac, AppleLiveStyleFrames};
 pub use liblivephoto::*;
 // Temporary source compatibility for existing XDRemux callers. These vendor
 // facts are not part of the stable LibLivePhoto facade.

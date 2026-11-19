@@ -159,7 +159,7 @@ The following options are available to both `convert` and `batch`.
 | `--oppo-compatible` | Requests OPPO Gallery output for a ProXDR still. Motion Photo items reject this request. |
 | `--apple-portrait` | Requests the complete Apple Portrait resource set, including Vision semantics. |
 | `--apple-portrait-oppo` | Uses OPPO depth and available masks. Requires macOS ImageIO and Core Image. Effects are reduced. |
-| `--apple-styles` | Generates Photographic Styles and inferred Texture Styles on macOS 27. Requires supported ProXDR source data. |
+| `--apple-styles` | Generates Photographic Styles and Texture Styles on macOS 27. Supports ProXDR stills and single-file `convert` for compatible Motion Photos with Apple output. |
 | `--apple-cinematic` | Generates pending Cinematic metadata for ordinary video on macOS 27. Experimental. |
 | `--focal-length-35mm MM` | Requires `--apple-cinematic`. Overrides automatic recorded-metadata or GeoCalib focal selection. |
 | `--cinematic-camera-estimate PATH` | `convert` only. Supplies explicit source-bound camera observations below explicit focal input and above automatic selection. |
@@ -224,7 +224,15 @@ This profile generates no skin, teeth, or glasses masks and makes no Vision requ
 
 The profile still requires public ImageIO and Core Image APIs on macOS. It is not a Linux or Windows Portrait writer. Photos editing depends on the consumer and OS version.
 
-`--apple-portrait` requests the complete resource set with Vision semantics. `--apple-styles` requests Photographic Styles. These image features require supported ProXDR stills and the necessary source resources. Missing required OPPO depth or source data causes failure before publication.
+`--apple-portrait` requests the complete resource set with Vision semantics for supported ProXDR stills. Missing required OPPO depth or source data causes failure before publication.
+
+### Apple Styles on a Motion Photo
+
+```bash
+xdremux convert --input motion.jpg --apple-styles --motion-target apple-pvt --output motion.pvt
+```
+
+Use `apple-pair` to write a HEIC and MOV pair. The motion Styles path requires an ISO HDR Gain Map on the converted cover and the macOS Apple adapter. Batch and Android output reject Motion Photo Styles. See [Apple editing features](apple-features.en.md#live-photos-from-motion-photos) for timing, HDR, and Texture behavior.
 
 ## `batch`
 

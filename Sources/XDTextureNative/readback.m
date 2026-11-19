@@ -22,7 +22,7 @@ int xdremux_texture_readback(const char *inputPath, const char *outputPath) {
                 report[@"ImageIO_auxiliary"] = auxiliary; CFRelease(imageSource);
             }
             dlopen("/System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore", RTLD_NOW | RTLD_LOCAL);
-            dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging", RTLD_NOW | RTLD_LOCAL);
+            void *photoImaging = dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging", RTLD_NOW | RTLD_LOCAL);
             id source = Call(NSClassFromString(@"NUSourceDefinition"), @"imageSourceDefinitionWithURL:options:", @[[NSURL fileURLWithPath:@(inputPath)], @{}]);
             NSError *error = nil;
             id asset = Call(NSClassFromString(@"NUAssetLoader"), @"loadAssetWithSourceDefinition:options:error:", @[source, @{}, [NSValue valueWithPointer:&error]]);
@@ -31,8 +31,11 @@ int xdremux_texture_readback(const char *inputPath, const char *outputPath) {
                 report[@"asset_class"] = NSStringFromClass([asset class]);
                 if ([asset respondsToSelector:NSSelectorFromString(@"loadWithOptions:error:")]) report[@"load"] = Call(asset, @"loadWithOptions:error:", @[@{}, [NSValue valueWithPointer:&error]]);
                 report[@"capabilities"] = Call(asset, @"capabilities", @[]);
-                report[@"PhotographicStyleV2"] = Call(asset, @"hasCapability:", @[@"PhotographicStyleV2"]);
-                report[@"PhotographicStyle"] = Call(asset, @"hasCapability:", @[@"PhotographicStyle"]);
+                Class capabilityClass = NSClassFromString(@"NUAssetCapability");
+                id capability = Call(capabilityClass, @"photographicStyle", @[]);
+                report[@"PhotographicStyle"] = capability ? Call(asset, @"hasCapability:", @[capability]) : @NO;
+                NSNumber *(*styleVersion)(id) = photoImaging ? dlsym(photoImaging, "PIPhotographicStyleVersionForAsset") : NULL;
+                report[@"PhotographicStyleV2"] = @(styleVersion && [styleVersion(asset) integerValue] == 2);
                 if ([asset respondsToSelector:NSSelectorFromString(@"imageProperties")]) {
                     id properties = Call(asset, @"imageProperties", @[]);
                     report[@"native_image_properties"] = [properties description] ?: @"nil";

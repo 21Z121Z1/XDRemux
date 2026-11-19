@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod apple_live_styles;
 mod style_reconstruction;
 pub use style_reconstruction::{
     plan_style_display, plan_style_reconstruction, StyleDisplayPlan, StyleReconstructionPlan,
@@ -43,6 +44,9 @@ pub use apple_auxiliary::{
     AppleMetadataValue, APPLE_DEPTH_BLUR_EFFECT_NAMESPACE, APPLE_DEPTH_DATA_NAMESPACE,
     APPLE_PORTRAIT_EFFECTS_MATTE_NAMESPACE, APPLE_PORTRAIT_LIGHTING_EFFECT_NAMESPACE,
     APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE,
+};
+pub use apple_live_styles::{
+    apple_live_frame_style, apple_live_texture_metadata, AppleLiveFrameStyle,
 };
 pub use apple_photographic_styles::{
     apple_log_decode, apple_log_encode, apple_style_apply_global_tone_curve,
