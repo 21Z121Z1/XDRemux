@@ -175,7 +175,7 @@ Google 目标通过 LibLivePhoto 的 `plan → execute` 写入器输出一个自
 | `--jpeg-registered-metadata` | 在双层 JPEG 中写入成对的注册 APP8 载体。需要源文件注册元数据及 `.jpg` 或 `.jpeg` 目标。简化视图偏移尚未由独立生产者样本确认。 |
 | `--apple-portrait` | 请求完整 Apple 人像资源集，包括 Vision 语义资源。 |
 | `--apple-portrait-oppo` | 使用 OPPO 深度和已有有效蒙版，仍需 macOS ImageIO 与 Core Image，人像效果有所减少。 |
-| `--apple-styles` | 在 macOS 27 上生成摄影风格和推理得到的纹理风格，需要支持的 ProXDR 源数据。 |
+| `--apple-styles` | 在 macOS 27 上为受支持的 ProXDR 照片生成摄影风格与纹理风格。单文件 `convert` 也可用于受支持的 Motion Photo 转 Apple 实况。 |
 | `--apple-cinematic` | 在 macOS 27 上为普通视频生成待处理的电影效果元数据，属于实验性功能。 |
 | `--focal-length-35mm MM` | 需要 `--apple-cinematic`，覆盖自动记录元数据或 GeoCalib 焦距选择。 |
 | `--cinematic-camera-estimate PATH` | 仅用于 `convert`。提供绑定源视频的显式相机观测，优先级低于显式焦距、高于自动选择。 |
@@ -242,7 +242,15 @@ OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust �
 
 此模式仍需 macOS 上公开的 ImageIO 和 Core Image API，不能在 Linux 或 Windows 上写入人像资源。Photos 编辑行为取决于消费端和系统版本。
 
-`--apple-portrait` 请求含 Vision 语义的完整资源集，`--apple-styles` 请求摄影风格。这些照片功能需要支持的 ProXDR 静态照片及相应源资源。缺少必需的 OPPO 深度或源数据时，在发布前失败。
+`--apple-portrait` 为受支持的 ProXDR 静态照片请求含 Vision 语义的完整资源集。缺少必需的 OPPO 深度或源数据时，在发布前失败。
+
+### Motion Photo 的 Apple 风格
+
+```bash
+xdremux convert --input motion.jpg --apple-styles --motion-target apple-pvt --output motion.pvt
+```
+
+使用 `apple-pair` 可输出 HEIC 和 MOV 文件对。实况风格需要封面包含 ISO HDR Gain Map，并使用 macOS Apple 适配器。批处理和 Android 输出会拒绝 Motion Photo 风格。时间戳、HDR 和纹理处理范围见 [Apple 编辑功能](apple-features.md#从-motion-photo-生成实况照片)。
 
 ## `batch`
 

@@ -494,6 +494,8 @@ fn product_conversion_report(
     Ok(report)
 }
 
+pub(crate) type PairEnricher<'a> = dyn Fn(&[u8], &[u8]) -> Result<(Vec<u8>, Vec<u8>)> + 'a;
+
 pub(crate) fn convert_motion_photo_file(
     jpeg: &ZuneJpegProvider,
     heif: &LibHeifProvider,
@@ -501,6 +503,7 @@ pub(crate) fn convert_motion_photo_file(
     input: &Path,
     output_image: &Path,
     format: LivePhotoOutput,
+    enrich: Option<&PairEnricher<'_>>,
 ) -> Result<LivePhotoFileReceipt> {
     let photo = MotionPhoto::parse(Input::SingleFile(source), ParseOptions::compatible())
         .map_err(|error| RuntimeError::external("Motion Photo analysis", error))?;
@@ -594,13 +597,18 @@ pub(crate) fn convert_motion_photo_file(
     )
     .map_err(|error| RuntimeError::external("Live Photo MOV", error))?;
     let had_gain_map = still.had_gain_map;
+    let (still_bytes, movie) = match enrich {
+        Some(enrich) => enrich(&still.bytes, &movie)?,
+        None => (still.bytes, movie),
+    };
     let (image_path, video_path, package, conversion_report) = if format == LivePhotoOutput::Pvt {
         let pair = pair_publication::check_pair(
-            &still.bytes,
+            &still_bytes,
             &movie,
             primary_video,
             &content_identifier,
             presentation,
+            enrich.is_some(),
         )?;
         let conversion_report =
             product_conversion_report(&photo, &content_identifier, had_gain_map)?;
@@ -613,11 +621,12 @@ pub(crate) fn convert_motion_photo_file(
         )
     } else {
         let pair = pair_publication::CheckedPair::check(
-            still.bytes,
+            still_bytes,
             movie,
             primary_video,
             &content_identifier,
             presentation,
+            enrich.is_some(),
         )?;
         let conversion_report =
             product_conversion_report(&photo, &content_identifier, had_gain_map)?;

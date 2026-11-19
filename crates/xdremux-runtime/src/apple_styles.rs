@@ -138,9 +138,6 @@ pub(crate) fn convert_file(
         .prefix(".xdremux-styles-")
         .tempdir_in(parent)
         .map_err(|error| RuntimeError::external("Photographic Styles staging", error))?;
-    let base_path = staging.path().join("base.heic");
-    let semantic_scaffold_path = staging.path().join("semantic-scaffold.heic");
-
     // Build the standard HDR base in memory so an in-place Styles conversion
     // cannot publish an intermediate file. The request is intentionally
     // feature-neutral: this operation owns the Styles graph separately.
@@ -165,11 +162,107 @@ pub(crate) fn convert_file(
     } else {
         product_base
     };
-    fs::write(&base_path, &base)
-        .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
+    let maximum_stops = if let Some(encoded) = &system_encoded {
+        encoded.content_headroom.log2()
+    } else {
+        prepared
+            .scale
+            .per_channel_gain_map_max
+            .iter()
+            .copied()
+            .chain(std::iter::once(prepared.scale.gain_map_max))
+            .fold(f64::NEG_INFINITY, f64::max) as f32
+    };
+    let scene = system_encoded
+        .as_mut()
+        .map(|encoded| {
+            encoded.submitted_scene.take().ok_or_else(|| {
+                RuntimeError::new(
+                    "Photographic Styles system HDR",
+                    "submitted scene was already consumed",
+                )
+            })
+        })
+        .transpose()?;
     profile_stage(&mut profile, "base_conversion");
-
     let adapter = AppleAdapterClient::new(executable.as_ref().to_path_buf());
+    let assembled = assemble_on_base(
+        runtime,
+        &adapter,
+        StyleCarrier {
+            bytes: &base,
+            scene,
+            maximum_stops,
+            report: carrier_report.as_deref(),
+        },
+        staging.path(),
+        &mut profile,
+    )?;
+    if let Some(encoded) = &system_encoded {
+        if let Err(error) = crate::system_heif_hdr::record_after_styles(
+            &adapter,
+            &staging.path().join("final-styles.heic"),
+            &encoded.report_path,
+            &encoded.reference_f32_path,
+            &encoded.reference_f16_path,
+        ) {
+            return Err(note_system_carrier(carrier_report.as_deref(), error));
+        }
+    }
+
+    profile_stage(&mut profile, "final_validation");
+    let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
+    let published = publisher.publish_bytes(assembled)?;
+    profile_stage(&mut profile, "publication");
+    Ok(PhotographicStylesFileReceipt { output: published })
+}
+
+struct StyleCarrier<'a> {
+    bytes: &'a [u8],
+    scene: Option<SceneLinearPair>,
+    maximum_stops: f32,
+    report: Option<&'a Path>,
+}
+
+pub(crate) fn build_live_still(
+    runtime: &PortableRuntime,
+    adapter: &AppleAdapterClient,
+    base: &[u8],
+    staging: &Path,
+) -> Result<Vec<u8>> {
+    let gain = xdremux_heif::validate_gain_map_semantics(base).map_err(|error| {
+        RuntimeError::external("Live Photo Styles requires a valid ISO HDR still", error)
+    })?;
+    let maximum_stops = gain
+        .metadata
+        .gain_map_max
+        .into_iter()
+        .fold(f64::NEG_INFINITY, f64::max);
+    assemble_on_base(
+        runtime,
+        adapter,
+        StyleCarrier {
+            bytes: base,
+            scene: None,
+            maximum_stops: maximum_stops as f32,
+            report: None,
+        },
+        staging,
+        &mut None,
+    )
+}
+
+fn assemble_on_base(
+    runtime: &PortableRuntime,
+    adapter: &AppleAdapterClient,
+    carrier: StyleCarrier<'_>,
+    staging: &Path,
+    profile: &mut Option<Instant>,
+) -> Result<Vec<u8>> {
+    let base_path = staging.join("base.heic");
+    let semantic_scaffold_path = staging.join("semantic-scaffold.heic");
+    fs::write(&base_path, carrier.bytes)
+        .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
     if !adapter.supports_photographic_styles()? {
         return Err(RuntimeError::new(
             "Photographic Styles adapter",
@@ -186,7 +279,7 @@ pub(crate) fn convert_file(
     )?;
     let semantic_masks = adapter
         .vision_semantic_mattes(&base_path, &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES, None)
-        .map_err(|error| note_system_carrier(carrier_report.as_deref(), error))?;
+        .map_err(|error| note_system_carrier(carrier.report, error))?;
     let mut semantic_payloads = Vec::with_capacity(APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len());
     for role in APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES {
         let matte = semantic_masks.get(&role).ok_or_else(|| {
@@ -229,17 +322,17 @@ pub(crate) fn convert_file(
         RuntimeError::external("Photographic Styles semantic scaffold read", error)
     })?;
     let semantic_base = xdremux_heif::transplant_apple_semantic_auxiliary_heif(
-        &base,
+        carrier.bytes,
         &semantic_scaffold,
         APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
     )
     .map_err(|error| {
         note_system_carrier(
-            carrier_report.as_deref(),
+            carrier.report,
             RuntimeError::external("Photographic Styles semantic graph", error),
         )
     })?;
-    profile_stage(&mut profile, "semantic_production");
+    profile_stage(profile, "semantic_production");
     runtime
         .heif
         .extract_primary_hevc_resource(&semantic_base)
@@ -249,40 +342,18 @@ pub(crate) fn convert_file(
     })?;
     xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
         note_system_carrier(
-            carrier_report.as_deref(),
+            carrier.report,
             RuntimeError::external("Photographic Styles source Gain Map structure", error),
         )
     })?;
-    profile_stage(&mut profile, "resource_prepare");
-    let scene_rasters = if let Some(encoded) = system_encoded.as_mut() {
-        let pair = encoded.submitted_scene.take().ok_or_else(|| {
-            RuntimeError::new(
-                "Photographic Styles system HDR",
-                "submitted scene was already consumed",
-            )
-        })?;
-        derive_style_scene_from_pair(
-            pair,
-            encoded.content_headroom.log2(),
-            LINEAR_THUMBNAIL_MAX_SIZE,
-        )?
-    } else {
-        let pair = scene_linear_pair(
-            &adapter,
-            &semantic_base,
-            staging.path(),
-            LINEAR_THUMBNAIL_MAX_SIZE,
-        )?;
-        let maximum_stops = prepared
-            .scale
-            .per_channel_gain_map_max
-            .iter()
-            .copied()
-            .chain(std::iter::once(prepared.scale.gain_map_max))
-            .fold(f64::NEG_INFINITY, f64::max);
-        derive_style_scene_from_pair(pair, maximum_stops as f32, LINEAR_THUMBNAIL_MAX_SIZE)?
+    profile_stage(profile, "resource_prepare");
+    let pair = match carrier.scene {
+        Some(scene) => scene,
+        None => scene_linear_pair(adapter, &semantic_base, staging, LINEAR_THUMBNAIL_MAX_SIZE)?,
     };
-    profile_stage(&mut profile, "scene_derivation");
+    let scene_rasters =
+        derive_style_scene_from_pair(pair, carrier.maximum_stops, LINEAR_THUMBNAIL_MAX_SIZE)?;
+    profile_stage(profile, "scene_derivation");
     let display_thumbnail = linear_thumbnail_raster(&scene_rasters)?;
     let (width, height, data) = xdremux_codec::undo_heif_rgb16(
         &display_thumbnail.data,
@@ -307,15 +378,15 @@ pub(crate) fn convert_file(
         data,
     };
     let linear_thumbnail = encode_linear_thumbnail(
-        &adapter,
-        staging.path(),
+        adapter,
+        staging,
         &linear_thumbnail_raster,
         LINEAR_THUMBNAIL_QUALITY,
     )?;
-    profile_stage(&mut profile, "thumbnail_encode");
+    profile_stage(profile, "thumbnail_encode");
 
     let style_data = source_derived_style_data(&scene_rasters)?;
-    profile_stage(&mut profile, "key1_fit");
+    profile_stage(profile, "key1_fit");
     let global_tone_curve = scene_rasters.global_tone_curve.data.clone();
     let statistics = style_scene_statistics(&scene_rasters, &semantic_masks)?;
     let storage_orientation = u8::try_from(storage_orientation).map_err(|_| {
@@ -376,13 +447,13 @@ pub(crate) fn convert_file(
         face_exposure_boost,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles metadata", error))?;
-    profile_stage(&mut profile, "style_metadata");
+    profile_stage(profile, "style_metadata");
 
     // Validate the exact Rust-owned key-1 resource at the private consumer
     // boundary before assembling the final file. The adapter cannot choose
     // style data or alter the property-list policy.
     adapter.semantic_style_properties_facts(&style_properties, &style_data)?;
-    profile_stage(&mut profile, "native_style_properties");
+    profile_stage(profile, "native_style_properties");
 
     let (style_delta_payload, style_delta_hvcc) = verified_neutral_style_delta()?;
 
@@ -406,20 +477,19 @@ pub(crate) fn convert_file(
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
         .map_err(|error| {
             note_system_carrier(
-                carrier_report.as_deref(),
+                carrier.report,
                 RuntimeError::external("Rust Photographic Styles graph", error),
             )
         })?;
-    let styles_path = staging.path().join("styles-for-texture.heic");
+    let styles_path = staging.join("styles-for-texture.heic");
     fs::write(&styles_path, &assembled)
         .map_err(|error| RuntimeError::external("Texture source staging", error))?;
-    profile_stage(&mut profile, "style_assembly");
-    let assembled =
-        crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?;
-    profile_stage(&mut profile, "texture_generation");
+    profile_stage(profile, "style_assembly");
+    let assembled = crate::apple_texture::generate(adapter, &styles_path, &assembled, staging)?;
+    profile_stage(profile, "texture_generation");
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
         note_system_carrier(
-            carrier_report.as_deref(),
+            carrier.report,
             RuntimeError::external("Photographic Styles HDR structural validation", error),
         )
     })?;
@@ -427,7 +497,7 @@ pub(crate) fn convert_file(
     // Inspect the exact final bytes, not the intermediate scaffold or the
     // coefficient plist. An older adapter that ignores the additive metadata
     // request must fail here before it can replace an existing output.
-    let final_path = staging.path().join("final-styles.heic");
+    let final_path = staging.join("final-styles.heic");
     fs::write(&final_path, &assembled).map_err(|error| {
         RuntimeError::external("Photographic Styles final metadata staging", error)
     })?;
@@ -437,23 +507,7 @@ pub(crate) fn convert_file(
         &final_properties.maker_apple_integer_dictionaries,
     )?;
 
-    if let Some(encoded) = &system_encoded {
-        if let Err(error) = crate::system_heif_hdr::record_after_styles(
-            &adapter,
-            &final_path,
-            &encoded.report_path,
-            &encoded.reference_f32_path,
-            &encoded.reference_f16_path,
-        ) {
-            return Err(note_system_carrier(carrier_report.as_deref(), error));
-        }
-    }
-
-    profile_stage(&mut profile, "final_validation");
-    let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
-    let published = publisher.publish_bytes(assembled)?;
-    profile_stage(&mut profile, "publication");
-    Ok(PhotographicStylesFileReceipt { output: published })
+    Ok(assembled)
 }
 
 fn note_system_carrier(report: Option<&Path>, error: RuntimeError) -> RuntimeError {
@@ -522,6 +576,7 @@ fn encode_linear_thumbnail(
         height: raster.height,
         bytes_per_row: raster.bytes_per_row,
         component_bits: 16,
+        frame_count: None,
         quality,
     })?;
     let annex_b = fs::read(&annex_b_path).map_err(|error| {
@@ -563,7 +618,7 @@ fn encode_linear_thumbnail(
     })
 }
 
-fn single_idr_payload(annex_b: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn single_idr_payload(annex_b: &[u8]) -> Result<Vec<u8>> {
     let mut starts = Vec::new();
     let mut index = 0;
     while index + 3 < annex_b.len() {
@@ -577,6 +632,7 @@ fn single_idr_payload(annex_b: &[u8]) -> Result<Vec<u8>> {
             index += 1;
         }
     }
+    let mut payload = Vec::new();
     for (position, (offset, prefix_length)) in starts.iter().copied().enumerate() {
         let start = offset + prefix_length;
         let end = starts
@@ -595,9 +651,10 @@ fn single_idr_payload(annex_b: &[u8]) -> Result<Vec<u8>> {
                 "VideoToolbox IDR NAL exceeds the ISO item length range",
             )
         })?;
-        let mut payload = Vec::with_capacity(4 + end - start);
         payload.extend_from_slice(&length.to_be_bytes());
         payload.extend_from_slice(&annex_b[start..end]);
+    }
+    if !payload.is_empty() {
         return Ok(payload);
     }
     Err(RuntimeError::new(
@@ -963,7 +1020,11 @@ pub(crate) fn scene_linear_pair(
     })
 }
 
-fn scene_rgb_from_native(bytes: &[u8], width: usize, height: usize) -> Result<SceneLinearRgb> {
+pub(crate) fn scene_rgb_from_native(
+    bytes: &[u8],
+    width: usize,
+    height: usize,
+) -> Result<SceneLinearRgb> {
     let row_bytes = width
         .checked_mul(16)
         .ok_or_else(|| RuntimeError::new("scene color management", "native row size overflows"))?;

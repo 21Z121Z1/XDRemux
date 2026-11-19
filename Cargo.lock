@@ -963,6 +963,7 @@ dependencies = [
  "liblivephoto",
  "serde_json",
  "tempfile",
+ "xdremux-format",
 ]
 
 [[package]]

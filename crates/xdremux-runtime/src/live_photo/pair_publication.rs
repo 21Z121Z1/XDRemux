@@ -23,6 +23,7 @@ impl CheckedPair {
         source_movie: &[u8],
         expected_identifier: &str,
         expected_presentation: MediaTime,
+        has_style_overlay: bool,
     ) -> Result<Self> {
         check_pair(
             &still,
@@ -30,6 +31,7 @@ impl CheckedPair {
             source_movie,
             expected_identifier,
             expected_presentation,
+            has_style_overlay,
         )?;
         Ok(Self { still, movie })
     }
@@ -41,6 +43,7 @@ pub(super) fn check_pair<'a>(
     source_movie: &[u8],
     expected_identifier: &str,
     expected_presentation: MediaTime,
+    has_style_overlay: bool,
 ) -> Result<MotionPhoto<'a>> {
     let pair = MotionPhoto::parse(Input::ApplePair { still, movie }, ParseOptions::strict())
         .map_err(|error| RuntimeError::external("Live Photo pair validation", error))?;
@@ -65,7 +68,22 @@ pub(super) fn check_pair<'a>(
         .map_err(|error| RuntimeError::external("source Motion Photo media validation", error))?;
     let output_media = apple::media_payloads(movie)
         .map_err(|error| RuntimeError::external("Live Photo media validation", error))?;
-    if source_media != output_media {
+    // The derived style payload is one appended mdat. Compare all source
+    // media payloads before it, in source order, including the audio.
+    let existing_output_media = if has_style_overlay {
+        output_media
+            .split_last()
+            .map(|(_, existing)| existing)
+            .ok_or_else(|| {
+                RuntimeError::new(
+                    "Live Photo media validation",
+                    "missing Styles overlay media",
+                )
+            })?
+    } else {
+        output_media.as_slice()
+    };
+    if source_media != existing_output_media {
         return Err(RuntimeError::new(
             "Live Photo media validation",
             "compressed video/audio mdat payload changed during MOV remux",
@@ -284,7 +302,7 @@ mod tests {
 
     fn checked_fixture() -> CheckedPair {
         let (still, movie, source_movie, time) = fixture_pair();
-        CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time).unwrap()
+        CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time, false).unwrap()
     }
 
     #[test]
@@ -292,7 +310,8 @@ mod tests {
         let (still, movie, source_movie, time) = fixture_pair();
         let still_allocation = still.as_ptr();
         let movie_allocation = movie.as_ptr();
-        let pair = CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time).unwrap();
+        let pair =
+            CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time, false).unwrap();
         assert_eq!(pair.still.as_ptr(), still_allocation);
         assert_eq!(pair.movie.as_ptr(), movie_allocation);
     }
@@ -300,13 +319,22 @@ mod tests {
     #[test]
     fn constructor_rejects_malformed_or_unexpected_pair_facts() {
         let (still, movie, source_movie, time) = fixture_pair();
-        CheckedPair::check(vec![0], movie.clone(), &source_movie, IDENTIFIER, time).unwrap_err();
+        CheckedPair::check(
+            vec![0],
+            movie.clone(),
+            &source_movie,
+            IDENTIFIER,
+            time,
+            false,
+        )
+        .unwrap_err();
         let error = CheckedPair::check(
             still.clone(),
             movie.clone(),
             &source_movie,
             "another identifier",
             time,
+            false,
         )
         .unwrap_err();
         assert!(error.to_string().contains("pairing identifier changed"));
@@ -316,6 +344,7 @@ mod tests {
             &source_movie,
             IDENTIFIER,
             MediaTime::new(time.value + 1, time.timescale).unwrap(),
+            false,
         )
         .unwrap_err();
         assert!(error
@@ -332,7 +361,8 @@ mod tests {
             .find(|header| header.kind.as_bytes() == b"mdat")
             .unwrap();
         source_movie[mdat.data_start] ^= 1;
-        let error = CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time).unwrap_err();
+        let error =
+            CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time, false).unwrap_err();
         assert!(error
             .to_string()
             .contains("compressed video/audio mdat payload changed"));
@@ -427,7 +457,7 @@ mod tests {
         assert_eq!(fs::read(&video).unwrap(), movie);
         let (_, _, source_movie, time) = fixture_pair();
         let recovered = publish(
-            CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time).unwrap(),
+            CheckedPair::check(still, movie, &source_movie, IDENTIFIER, time, false).unwrap(),
             &directory.path().join("recovered.heic"),
         )
         .unwrap();

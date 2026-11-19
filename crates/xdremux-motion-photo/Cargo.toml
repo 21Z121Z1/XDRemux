@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 liblivephoto = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "9328a0502bb2318b05d255ed83652c7d7c7d3b4c", features = ["xdremux-compat"] }
+xdremux-format = { path = "../xdremux-format" }
 tempfile = "=3.27.0"
 
 [dev-dependencies]

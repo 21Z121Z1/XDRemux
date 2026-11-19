@@ -106,7 +106,7 @@ struct ProductConversionArgs {
     /// Use OPPO depth and available masks without Vision; reduced portrait effects (macOS).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_styles", "apple_cinematic"])]
     apple_portrait_oppo: bool,
-    /// Generate Photographic Styles and inferred Texture Styles for a ProXDR still (macOS 27).
+    /// Generate Photographic Styles and Texture Styles for supported stills and Live Photos (macOS 27).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_cinematic"])]
     apple_styles: bool,
     /// Infer pending Cinematic editing metadata for ordinary video (macOS 27).
@@ -1349,8 +1349,16 @@ fn run_convert(
                     return 1;
                 }
             };
-            if apple_portrait || apple_styles {
-                let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
+            if apple_portrait {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(
+                        language,
+                        "error: Apple Portrait requires a ProXDR still",
+                        "错误：Apple Portrait 需要 ProXDR 静态照片"
+                    )
+                );
                 return 1;
             }
             if let Some(destination) = arguments.target {
@@ -1432,8 +1440,40 @@ fn run_convert(
             }
             let output = output
                 .unwrap_or_else(|| default_motion_photo_output(&input, request.live_photo_output));
-            match runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
-            {
+            let converted = if apple_styles {
+                #[cfg(target_os = "macos")]
+                {
+                    match resolve_apple_adapter_executable() {
+                        Ok(adapter) => runtime.convert_apple_live_styles_file(
+                            &adapter, &source, &input, &output, request,
+                        ),
+                        Err(error) => {
+                            let _ = writeln!(
+                                stderr,
+                                "{}",
+                                message!(language, "error: {error}", "错误：{error}")
+                            );
+                            return 1;
+                        }
+                    }
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(
+                            language,
+                            "error: Live Photo Styles requires the Apple adapter",
+                            "错误：实况风格需要 Apple 适配器"
+                        )
+                    );
+                    return 1;
+                }
+            } else {
+                runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
+            };
+            match converted {
                 Ok(receipt) => {
                     let omitted = receipt.omitted_resource_count();
                     if omitted > 0 {

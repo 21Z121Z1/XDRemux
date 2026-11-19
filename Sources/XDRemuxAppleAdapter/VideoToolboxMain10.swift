@@ -14,6 +14,7 @@ struct VideoToolboxMain10Request: Decodable {
     let rawComponentBits: UInt32
     let quality: Double
     let hvccPath: String
+    let frameCount: Int?
 
     enum CodingKeys: String, CodingKey {
         case rawWidth = "raw_width"
@@ -22,6 +23,7 @@ struct VideoToolboxMain10Request: Decodable {
         case rawComponentBits = "raw_component_bits"
         case quality
         case hvccPath = "hvcc_path"
+        case frameCount = "frame_count"
     }
 }
 
@@ -37,6 +39,7 @@ struct VideoToolboxMain10Facts: Encodable {
     let colorPrimaries: String?
     let transferFunction: String?
     let yCbCrMatrix: String?
+    let frameLengths: [Int]?
 
     enum CodingKeys: String, CodingKey {
         case width
@@ -49,11 +52,13 @@ struct VideoToolboxMain10Facts: Encodable {
         case colorPrimaries = "color_primaries"
         case transferFunction = "transfer_function"
         case yCbCrMatrix = "ycbcr_matrix"
+        case frameLengths = "frame_lengths"
     }
 }
 
 private final class Main10EncoderState {
     var annexB = Data()
+    var frameLengths: [Int] = []
     var hvcc = Data()
     var wroteParameterSets = false
     var error: String?
@@ -234,6 +239,7 @@ private let main10CompressionCallback: VTCompressionOutputCallback = {
         state.hvcc = hvcc
     }
     do {
+        let start = state.annexB.count
         let nalUnitHeaderLength: Int32
         if !state.wroteParameterSets {
             nalUnitHeaderLength = try appendMain10ParameterSets(
@@ -265,16 +271,17 @@ private let main10CompressionCallback: VTCompressionOutputCallback = {
             nalUnitHeaderLength: nalUnitHeaderLength,
             to: &state.annexB
         )
+        state.frameLengths.append(state.annexB.count - start)
     } catch {
         state.error = error.localizedDescription
     }
 }
 
-private func attachMain10ColorTags(_ buffer: CVPixelBuffer) {
+private func attachMain10ColorTags(_ buffer: CVPixelBuffer, videoLog: Bool) {
     let tags: [(CFString, CFString)] = [
-        (kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2),
+        (kCVImageBufferColorPrimariesKey, videoLog ? kCVImageBufferColorPrimaries_ITU_R_2020 : kCVImageBufferColorPrimaries_ITU_R_709_2),
         (kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2),
-        (kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_601_4),
+        (kCVImageBufferYCbCrMatrixKey, videoLog ? kCVImageBufferYCbCrMatrix_ITU_R_2020 : kCVImageBufferYCbCrMatrix_ITU_R_601_4),
     ]
     for (key, value) in tags {
         CVBufferSetAttachment(buffer, key, value, .shouldPropagate)
@@ -290,7 +297,8 @@ private func makeMain10PixelBuffer(
     data: Data,
     width: Int,
     height: Int,
-    bytesPerRow: Int
+    bytesPerRow: Int,
+    videoLog: Bool
 ) throws -> CVPixelBuffer {
     guard width > 0, height > 0, width % 2 == 0, height % 2 == 0 else {
         throw main10Error("raw RGB16 raster geometry must be non-zero and even")
@@ -359,7 +367,7 @@ private func makeMain10PixelBuffer(
     }
     CVPixelBufferUnlockBaseAddress(sourceBuffer, [])
     sourceLocked = false
-    attachMain10ColorTags(sourceBuffer)
+    attachMain10ColorTags(sourceBuffer, videoLog: videoLog)
 
     let encodedAttributes: CFDictionary = [
         kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
@@ -382,7 +390,7 @@ private func makeMain10PixelBuffer(
     guard let encodedBuffer else {
         throw main10Error("CVPixelBufferCreate returned nil")
     }
-    attachMain10ColorTags(encodedBuffer)
+    attachMain10ColorTags(encodedBuffer, videoLog: videoLog)
     var transfer: VTPixelTransferSession?
     try checkMain10Status(
         VTPixelTransferSessionCreate(
@@ -427,18 +435,18 @@ func encodeVideoToolboxMain10(
         throw main10Error("raw RGB16 raster geometry overflows")
     }
     let data = try Data(contentsOf: URL(fileURLWithPath: inputPath), options: [.mappedIfSafe])
-    let pixelBuffer = try makeMain10PixelBuffer(
-        data: data,
-        width: width,
-        height: height,
-        bytesPerRow: bytesPerRow
-    )
+    let count = configuration.frameCount ?? 1
+    let videoLog = configuration.frameCount != nil
+    let frameSize = bytesPerRow * height
+    guard count > 0, frameSize > 0, count <= Int.max / frameSize, data.count == frameSize * count else {
+        throw main10Error("RGB16 sequence length does not match its frame layout")
+    }
     let state = Main10EncoderState()
     let encoderSpecification: CFDictionary = [
         kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: true,
     ] as CFDictionary
     let imageBufferAttributes: CFDictionary = [
-        kCVPixelBufferPixelFormatTypeKey: CVPixelBufferGetPixelFormatType(pixelBuffer),
+        kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
         kCVPixelBufferWidthKey: width,
         kCVPixelBufferHeightKey: height,
         kCVPixelBufferIOSurfacePropertiesKey: [:],
@@ -501,7 +509,7 @@ func encodeVideoToolboxMain10(
     _ = VTSessionSetProperty(
         session,
         key: kVTCompressionPropertyKey_ColorPrimaries,
-        value: kCVImageBufferColorPrimaries_ITU_R_709_2
+        value: videoLog ? kCVImageBufferColorPrimaries_ITU_R_2020 : kCVImageBufferColorPrimaries_ITU_R_709_2
     )
     _ = VTSessionSetProperty(
         session,
@@ -511,7 +519,7 @@ func encodeVideoToolboxMain10(
     _ = VTSessionSetProperty(
         session,
         key: kVTCompressionPropertyKey_YCbCrMatrix,
-        value: kCVImageBufferYCbCrMatrix_ITU_R_601_4
+        value: videoLog ? kCVImageBufferYCbCrMatrix_ITU_R_2020 : kCVImageBufferYCbCrMatrix_ITU_R_601_4
     )
 
     try checkMain10Status(
@@ -521,18 +529,26 @@ func encodeVideoToolboxMain10(
     let frameProperties: CFDictionary = [
         kVTEncodeFrameOptionKey_ForceKeyFrame: true,
     ] as CFDictionary
-    try checkMain10Status(
-        VTCompressionSessionEncodeFrame(
-            session,
-            imageBuffer: pixelBuffer,
-            presentationTimeStamp: CMTime(value: 0, timescale: 1),
-            duration: CMTime(value: 1, timescale: 1),
-            frameProperties: frameProperties,
-            sourceFrameRefcon: nil,
-            infoFlagsOut: nil
-        ),
-        "VTCompressionSessionEncodeFrame failed"
-    )
+    // These timestamps only order independent compressed samples. Rust binds
+    // them to the original presentation timeline when it builds the MOV.
+    for index in 0..<count {
+        try autoreleasepool {
+            let start = index * frameSize
+            let pixelBuffer = try makeMain10PixelBuffer(
+                data: data.subdata(in: start..<(start + frameSize)), width: width, height: height,
+                bytesPerRow: bytesPerRow, videoLog: videoLog
+            )
+            try checkMain10Status(
+                VTCompressionSessionEncodeFrame(
+                    session, imageBuffer: pixelBuffer,
+                    presentationTimeStamp: CMTime(value: Int64(index), timescale: videoLog ? 30 : 1),
+                    duration: CMTime(value: 1, timescale: videoLog ? 30 : 1),
+                    frameProperties: frameProperties, sourceFrameRefcon: nil, infoFlagsOut: nil
+                ),
+                "VTCompressionSessionEncodeFrame failed"
+            )
+        }
+    }
     try checkMain10Status(
         VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid),
         "VTCompressionSessionCompleteFrames failed"
@@ -540,8 +556,8 @@ func encodeVideoToolboxMain10(
     if let error = state.error {
         throw main10Error(error)
     }
-    guard !state.annexB.isEmpty else {
-        throw main10Error("VideoToolbox produced no HEVC data")
+    guard !state.annexB.isEmpty, state.frameLengths.count == count else {
+        throw main10Error("VideoToolbox did not encode every requested frame")
     }
     guard !state.hvcc.isEmpty else {
         throw main10Error("VideoToolbox format description did not expose an hvcC atom")
@@ -560,6 +576,7 @@ func encodeVideoToolboxMain10(
         encoderID: encoderID,
         colorPrimaries: state.colorPrimaries,
         transferFunction: state.transferFunction,
-        yCbCrMatrix: state.yCbCrMatrix
+        yCbCrMatrix: state.yCbCrMatrix,
+        frameLengths: videoLog ? state.frameLengths : nil
     )
 }
