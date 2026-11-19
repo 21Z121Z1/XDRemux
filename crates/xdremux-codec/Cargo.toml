@@ -9,6 +9,7 @@ libheif-rs = { version = "=3.0.0", default-features = false, features = ["v1_17"
 zune-jpeg = "=0.5.15"
 xdremux-engine = { path = "../xdremux-engine" }
 xdremux-format = { path = "../xdremux-format" }
+xdremux-metadata = { path = "../xdremux-metadata" }
 
 [dev-dependencies]
 xdremux-heif = { path = "../xdremux-heif" }

@@ -1,6 +1,7 @@
 //! Google Motion Photo output is a separate, fail-closed publication route.
 //! The Apple pair/PVT route is intentionally unchanged.
 
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -11,11 +12,15 @@ use quick_xml::reader::NsReader;
 
 use xdremux_engine::{MotionOutputTarget, MotionVideoCompatibility};
 use xdremux_motion_photo::{
-    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, ParseOptions,
-    PreservationEvidence, ResourceRole, TargetProfile, WritePolicy,
+    ConversionReport, Disposition, Input, MediaTime, MotionPhoto, PairingMetadata, ParseOptions,
+    PreservationEvidence, ResourceConversion, ResourceRole, TargetProfile, UnmappedPolicy,
+    WritePolicy,
 };
 use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 
+use crate::vendor_motion_metadata::{
+    carry_vendor_metadata, VendorMetadataCarry, VendorMetadataReport,
+};
 use crate::{Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +31,11 @@ pub struct AndroidMotionPhotoFileReceipt {
     pub resources: Vec<AndroidMotionResourceAudit>,
     pub video_compatibility: MotionVideoCompatibility,
     pub video_brand_changed: bool,
+    pub vendor_metadata: VendorMetadataReport,
+    /// Resources the plan explicitly left out of the published file.
+    pub omitted_resource_count: usize,
+    /// The still was decoded from HEIC and encoded as 8-bit sRGB JPEG.
+    pub still_sdr_jpeg: bool,
 }
 
 /// Caller-owned, explicitly associated Apple Live Photo input files.
@@ -68,6 +78,7 @@ fn same_presentation_time(source: Option<MediaTime>, output: Option<MediaTime>) 
 
 /// Resolve an automatic Android writer using the actual parsed still span.
 /// This selects a container; it does not transcode still images or video.
+/// An automatic Android writer preserves the source still container.
 pub fn resolve_motion_output_target(
     target: MotionOutputTarget,
     source: &[u8],
@@ -149,16 +160,20 @@ pub(crate) fn convert_android_motion_photo_file_with_policy(
     output: &Path,
     target: MotionOutputTarget,
     compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
 ) -> Result<AndroidMotionPhotoFileReceipt> {
     convert_android_motion_photo(
         Input::SingleFile(source),
+        source,
         &[input],
         output,
         target,
         compatibility,
+        carry,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn convert_android_motion_photo_pair_file(
     still: &[u8],
     movie: &[u8],
@@ -167,22 +182,27 @@ pub(crate) fn convert_android_motion_photo_pair_file(
     output: &Path,
     target: MotionOutputTarget,
     compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
 ) -> Result<AndroidMotionPhotoFileReceipt> {
     convert_android_motion_photo(
         Input::ApplePair { still, movie },
+        still,
         &[still_path, movie_path],
         output,
         target,
         compatibility,
+        carry,
     )
 }
 
 fn convert_android_motion_photo(
     source: Input<'_>,
+    marker_source: &[u8],
     inputs: &[&Path],
     output: &Path,
     target: MotionOutputTarget,
     compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
 ) -> Result<AndroidMotionPhotoFileReceipt> {
     validate_android_output_path(output, target)?;
     let (target_profile, _, expected_mime) = profile(target)?;
@@ -214,18 +234,43 @@ fn convert_android_motion_photo(
             ));
         }
     }
+    if carry.destination == "huawei" {
+        return convert_huawei_harmony_file(marker_source, output, compatibility, carry);
+    }
     let photo = MotionPhoto::parse(source, ParseOptions::compatible())
         .map_err(|error| RuntimeError::external("Android Motion Photo analysis", error))?;
     photo
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
-    let plan = photo.plan(target_profile, WritePolicy::default());
-    if !plan.can_execute() {
-        return Err(RuntimeError::new(
-            "Android Motion Photo plan",
-            plan.compatibility().blockers.join("; "),
-        ));
+    if matches!(carry.destination, "oppo" | "vivo" | "xiaomi") && photo.still().mime != "image/jpeg"
+    {
+        return republish_heic_as_sdr_jpeg(
+            &photo,
+            marker_source,
+            inputs,
+            output,
+            compatibility,
+            carry,
+        );
     }
+    if carry.destination == "vivo" {
+        if vivo_native_single_file(&photo) {
+            return publish_preserved_vivo_source(
+                marker_source,
+                &photo,
+                output,
+                compatibility,
+                carry,
+            );
+        }
+        return publish_vivo_combined(marker_source, &photo, output, compatibility, carry);
+    }
+    let (plan, omitted_unmapped) = plan_public_motion(&photo, target_profile, carry)?;
+    let omitted_resource_count = omitted_unmapped.len();
+    let omitted_ids = omitted_unmapped
+        .iter()
+        .map(|(id, _)| *id)
+        .collect::<HashSet<_>>();
     let composed = plan
         .execute()
         .map_err(|error| RuntimeError::external("Android Motion Photo execution", error))?;
@@ -239,8 +284,8 @@ fn convert_android_motion_photo(
             "writer returned an unexpected output graph instead of one self-contained file",
         ));
     }
-    let bytes = &composed.files[0].bytes;
-    let checked = MotionPhoto::parse(Input::SingleFile(bytes), ParseOptions::strict())
+    let mut bytes = composed.files[0].bytes.clone();
+    let checked = MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict())
         .map_err(|error| RuntimeError::external("Android Motion Photo strict reparse", error))?;
     checked
         .validate()
@@ -260,7 +305,8 @@ fn convert_android_motion_photo(
         ));
     }
     verify_auxiliary_images(&photo, &checked)?;
-    verify_preserved_resources(&photo, &checked, &composed.report)?;
+    let preserved_left_out =
+        verify_preserved_resources(&photo, &checked, &composed.report, carry.leave_out_unmapped)?;
     if hdr_gain_map_xmp_signature(&photo)? != hdr_gain_map_xmp_signature(&checked)? {
         return Err(RuntimeError::new(
             "Android HDR metadata verification",
@@ -303,24 +349,77 @@ fn convert_android_motion_photo(
                 .collect(),
         })
         .collect::<Vec<_>>();
+    let blocks_publication = |id: Option<usize>, disposition: &str| {
+        if id.is_some_and(|id| omitted_ids.contains(&id))
+            && matches!(disposition, "Unmapped" | "Dropped")
+        {
+            return false;
+        }
+        matches!(disposition, "Unmapped" | "Dropped" | "TranscodeRequired")
+    };
     if resources.iter().any(|item| {
         item.operations.is_empty()
-            || item.operations.iter().any(|op| {
-                matches!(
-                    op.disposition.as_str(),
-                    "Unmapped" | "Dropped" | "TranscodeRequired"
-                )
-            })
+            || item
+                .operations
+                .iter()
+                .any(|op| blocks_publication(Some(item.id), &op.disposition))
     }) || composed.report.resources.iter().any(|entry| {
-        matches!(
-            entry.disposition,
-            Disposition::Unmapped | Disposition::Dropped | Disposition::TranscodeRequired
+        blocks_publication(
+            entry.resource.map(|id| id.0),
+            &format!("{:?}", entry.disposition),
         )
     }) {
         return Err(RuntimeError::new(
             "Android Motion Photo verification",
             "resource audit contains unrepresented or dropped source resources",
         ));
+    }
+
+    let source_xmp = photo
+        .xmp_bytes()
+        .map_err(|error| RuntimeError::external("source Motion Photo XMP", error))?;
+    let mut vendor_metadata = carry_vendor_metadata(
+        marker_source,
+        source_xmp.as_deref(),
+        &mut bytes,
+        original_movie.len(),
+        carry,
+    )?;
+    vendor_metadata
+        .not_carried
+        .extend(omitted_unmapped.into_iter().map(|(_, note)| note));
+    vendor_metadata.not_carried.extend(preserved_left_out);
+    if vendor_metadata.video_byte_length != u64::try_from(original_movie.len()).unwrap_or(u64::MAX)
+    {
+        return Err(RuntimeError::new(
+            "vendor metadata",
+            "vendor metadata report does not name the preserved video length",
+        ));
+    }
+    let carried = MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict())
+        .map_err(|error| RuntimeError::external("vendor metadata reparse", error))?;
+    carried
+        .validate()
+        .map_err(|error| RuntimeError::external("vendor metadata validation", error))?;
+    let carried_movie = carried
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vendor metadata video", error))?;
+    if carried_movie != original_movie
+        || !same_presentation_time(photo.presentation_time(), carried.presentation_time())
+        || hdr_gain_map_xmp_signature(&photo)? != hdr_gain_map_xmp_signature(&carried)?
+        || carried
+            .resources()
+            .filter(|resource| resource.role == ResourceRole::PrimaryMotionVideo)
+            .count()
+            != 1
+    {
+        return Err(RuntimeError::new(
+            "vendor metadata",
+            "copying source vendor attributes changed the video, presentation time, gain map, or video count",
+        ));
+    }
+    if carry.destination == "samsung" && is_heif_file(&bytes) {
+        samsung_top_level_mpvd_reaches_eof(&bytes)?;
     }
 
     let parent = output
@@ -334,7 +433,7 @@ fn convert_android_motion_photo(
     let mut staging = tempfile::NamedTempFile::new_in(parent)
         .map_err(|error| RuntimeError::external("Android Motion Photo staging", error))?;
     staging
-        .write_all(bytes)
+        .write_all(&bytes)
         .and_then(|()| staging.as_file().sync_all())
         .map_err(|error| RuntimeError::external("Android Motion Photo durable write", error))?;
     staging.persist_noclobber(output).map_err(|error| {
@@ -349,7 +448,816 @@ fn convert_android_motion_photo(
         resources,
         video_compatibility: compatibility,
         video_brand_changed: false,
+        vendor_metadata,
+        omitted_resource_count,
+        still_sdr_jpeg: false,
     })
+}
+
+fn republish_heic_as_sdr_jpeg(
+    photo: &MotionPhoto<'_>,
+    marker_source: &[u8],
+    inputs: &[&Path],
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG video", error))?
+        .to_vec();
+    let presentation = photo.presentation_time();
+    let still = photo
+        .still_bytes()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG still", error))?;
+    let jpeg = crate::heic_sdr_jpeg::encode_sdr_jpeg(still)
+        .or_else(|_| crate::heic_sdr_jpeg::encode_sdr_jpeg(marker_source))?;
+    let parts = MotionPhoto::parse(
+        Input::Parts {
+            still: &jpeg,
+            movie: &video,
+            presentation,
+        },
+        ParseOptions::compatible(),
+    )
+    .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion", error))?;
+    parts
+        .validate()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion validation", error))?;
+    let plan = parts.plan(
+        TargetProfile::AndroidJpeg,
+        WritePolicy {
+            unmapped: UnmappedPolicy::DropExplicitly,
+            ..WritePolicy::default()
+        },
+    );
+    if !plan.can_execute() {
+        return Err(RuntimeError::new(
+            "HEIC SDR JPEG",
+            plan.compatibility().blockers.join("; "),
+        ));
+    }
+    let composed = plan
+        .execute()
+        .map_err(|error| RuntimeError::external("HEIC SDR JPEG motion execute", error))?;
+    if composed.files.len() != 1 || !composed.files[0].bytes.ends_with(&video) {
+        return Err(RuntimeError::new(
+            "HEIC SDR JPEG",
+            "the JPEG Motion Photo writer did not keep the source video as one suffix",
+        ));
+    }
+    let motion = composed
+        .files
+        .into_iter()
+        .next()
+        .map(|file| file.bytes)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "HEIC SDR JPEG",
+                "the JPEG Motion Photo writer returned no file",
+            )
+        })?;
+    let dropped = photo
+        .resources()
+        .filter(|resource| {
+            !matches!(
+                resource.role,
+                ResourceRole::PrimaryStill | ResourceRole::PrimaryMotionVideo
+            )
+        })
+        .count();
+    let mut receipt = convert_android_motion_photo(
+        Input::SingleFile(&motion),
+        &motion,
+        inputs,
+        output,
+        MotionOutputTarget::GoogleJpeg,
+        compatibility,
+        carry,
+    )?;
+    receipt.still_sdr_jpeg = true;
+    receipt.omitted_resource_count = receipt.omitted_resource_count.saturating_add(dropped);
+    receipt.vendor_metadata.not_carried.insert(
+        0,
+        format!(
+            "HEIC primary was decoded and encoded as 8-bit sRGB JPEG at quality {}; the embedded sRGB or Display P3 ICC was applied by this program, irot was applied to the pixels, and the source Orientation tag was not copied. HDR transfers are refused instead of clamping code values",
+            crate::heic_sdr_jpeg::JPEG_QUALITY
+        ),
+    );
+    receipt.vendor_metadata.not_carried.insert(
+        1,
+        "the gain map was not applied and was not copied; HDR display is lost".to_owned(),
+    );
+    receipt.vendor_metadata.not_carried.insert(
+        2,
+        "HEIF auxiliary items other than the primary still were not copied".to_owned(),
+    );
+    receipt
+        .vendor_metadata
+        .not_carried
+        .insert(3, "source video container bytes were preserved".to_owned());
+    receipt.vendor_metadata.not_carried.insert(
+        4,
+        "EXIF Make, Model, DateTime, DateTimeOriginal, and DateTimeDigitized were copied when present; JPEG Orientation is 1 because irot was applied; other EXIF was not copied".to_owned(),
+    );
+    Ok(receipt)
+}
+
+pub(crate) fn convert_huawei_harmony_file(
+    source: &[u8],
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    let Some(motion) = crate::harmony_motion::parse_harmony_motion(source) else {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "this file is not a HEIC still plus an appended MP4 with com.openharmony.covertime and com.openharmony.videoId. Those source fields, starttime, deferredVideoEnhanceFlag, and a v6 trailer are not invented. The Android gallery 11.0.19.478 JPEG plus 40-byte tail is not this target's output",
+        ));
+    };
+    validate_android_output_path(output, MotionOutputTarget::GoogleHeic)?;
+    if fs::symlink_metadata(output).is_ok() {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "output already exists; refusing to overwrite the source or unknown provenance",
+        ));
+    }
+    let movie = &source[motion.video_start..motion.video_start + motion.movie_bytes];
+    if source
+        .windows(movie.len())
+        .filter(|window| *window == movie)
+        .count()
+        != 1
+    {
+        return Err(RuntimeError::new(
+            "Harmony motion photo",
+            "the appended movie is not a single range, so the file is not published",
+        ));
+    }
+    let mut carried = vec![
+        format!("com.openharmony.covertime={}", motion.cover_time_ms),
+        format!("com.openharmony.videoId={}", motion.video_id),
+    ];
+    let mut not_carried = vec![
+        "videoId is a source field and was not generated as a pairing identifier".to_owned(),
+        "covertime is the source big-endian float32 in milliseconds and is not the Android seekTo pair".to_owned(),
+        "Harmony gallery import and playback were not verified; the downstream reader writes an Apple Live Photo instead".to_owned(),
+        "photoAccessHelper in that app selects the original HEIC and does not create a moving-photo asset".to_owned(),
+        "the Android gallery 11.0.19.478 40-byte tail is not this output".to_owned(),
+    ];
+    if let Some(start) = &motion.start_time_text {
+        carried.push(format!("com.openharmony.starttime={start}"));
+        not_carried.push(
+            "starttime is copied as source text and is not used as a playback duration".to_owned(),
+        );
+    } else {
+        not_carried.push("starttime was absent and was not invented".to_owned());
+    }
+    match motion.deferred_video_enhance {
+        Some(value) => carried.push(format!("com.openharmony.deferredVideoEnhanceFlag={value}")),
+        None => {
+            not_carried.push("deferredVideoEnhanceFlag was absent and was not invented".to_owned())
+        }
+    }
+    if motion.trailer.is_empty() {
+        not_carried.push("no bytes follow the appended MP4; a v6 trailer was not added".to_owned());
+    } else {
+        let prefix = String::from_utf8_lossy(&motion.trailer[..motion.trailer.len().min(8)]);
+        not_carried.push(format!(
+            "the source trailer is {} bytes, starts with {prefix:?}, and stays after the MP4; ASCII LIVE_ inside it is not the Android length field",
+            motion.trailer.len()
+        ));
+    }
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: carry.container.to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes: carried,
+        namespace_absent: false,
+        not_carried,
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(source),
+        video_byte_length: u64::try_from(motion.movie_bytes + motion.trailer.len())
+            .unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Harmony motion photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Harmony motion photo staging", error))?;
+    staging
+        .write_all(source)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Harmony motion photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Harmony motion photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: ConversionReport {
+            target: TargetProfile::PreserveSource,
+            resources: vec![ResourceConversion {
+                resource: None,
+                disposition: Disposition::Preserved,
+                reason: "HEIC prefix, appended MP4, and any source trailer are unchanged"
+                    .to_owned(),
+            }],
+            evidence: vec![PreservationEvidence::SourceBytesEqual],
+            pairing: PairingMetadata::default(),
+        },
+        resources: vec![
+            AndroidMotionResourceAudit {
+                id: 0,
+                source_role: "PrimaryStill".to_owned(),
+                mime: "image/heic".to_owned(),
+                vendor_role: None,
+                byte_length: u64::try_from(motion.video_start).unwrap_or(u64::MAX),
+                operations: vec![AndroidMotionResourceOperation {
+                    disposition: "Preserved".to_owned(),
+                    reason: "HEIC still bytes, including HDR and auxiliary items, are unchanged"
+                        .to_owned(),
+                }],
+            },
+            AndroidMotionResourceAudit {
+                id: 1,
+                source_role: "MotionVideo".to_owned(),
+                mime: "video/mp4".to_owned(),
+                vendor_role: None,
+                byte_length: u64::try_from(motion.movie_bytes + motion.trailer.len())
+                    .unwrap_or(u64::MAX),
+                operations: vec![AndroidMotionResourceOperation {
+                    disposition: "Preserved".to_owned(),
+                    reason: "appended MP4 and its source trailer keep their original encoding"
+                        .to_owned(),
+                }],
+            },
+        ],
+        video_compatibility: compatibility,
+        video_brand_changed: false,
+        vendor_metadata,
+        omitted_resource_count: 0,
+        still_sdr_jpeg: false,
+    })
+}
+
+/// Android `com.android.gallery3d` 11.0.19.478 tail. `--target huawei` does not
+/// call this. Harmony output is the OpenHarmony HEIC container.
+#[allow(dead_code)]
+fn publish_huawei_live_photo(
+    source_bytes: &[u8],
+    photo: &MotionPhoto<'_>,
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    if photo.asset().sources.len() != 1 {
+        return Err(RuntimeError::new(
+            "Huawei live photo",
+            "the 40-byte tail was checked on one file whose video is a trailing range. A separate still and movie are not concatenated",
+        ));
+    }
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("Huawei live photo video", error))?;
+    let mut positions = Vec::new();
+    let mut search = 0usize;
+    while let Some(offset) = source_bytes[search..]
+        .windows(video.len())
+        .position(|window| window == video)
+    {
+        positions.push(search + offset);
+        search += offset + 1;
+        if positions.len() > 1 {
+            break;
+        }
+    }
+    if positions.len() != 1 {
+        return Err(RuntimeError::new(
+            "Huawei live photo",
+            "the preserved video is not a single range in the source file",
+        ));
+    }
+    let at = positions[0];
+    if at + video.len() != source_bytes.len() {
+        return Err(RuntimeError::new(
+            "Huawei live photo",
+            "bytes after the motion video are outside the LIVE_ length and are not dropped",
+        ));
+    }
+    let info =
+        crate::huawei_live_photo::play_info_for_preserved_video(video, photo.presentation_time())?;
+    let bytes = crate::huawei_live_photo::assemble(
+        &source_bytes[..at],
+        video,
+        info.start_ms,
+        info.duration_ms,
+    )?;
+    let plan = photo.plan(
+        TargetProfile::PreserveSource,
+        xdremux_motion_photo::WritePolicy::default(),
+    );
+    if !plan.can_execute() {
+        return Err(RuntimeError::new(
+            "Huawei live photo",
+            plan.compatibility().blockers.join("; "),
+        ));
+    }
+    let resources = photo
+        .resources()
+        .map(|resource| AndroidMotionResourceAudit {
+            id: resource.id.0,
+            source_role: format!("{:?}", resource.role),
+            mime: resource.mime.clone(),
+            vendor_role: resource.vendor_role.clone(),
+            byte_length: resource.extents.iter().map(|extent| extent.length()).sum(),
+            operations: vec![AndroidMotionResourceOperation {
+                disposition: "Preserved".to_owned(),
+                reason: "prefix and video bytes are unchanged; a 40-byte tail was appended"
+                    .to_owned(),
+            }],
+        })
+        .collect();
+    let mut not_carried = info.notes;
+    not_carried.push(format!(
+        "play info is {}:{} ms; DEFAULT_COVER_FRAME is not written",
+        info.start_ms, info.duration_ms
+    ));
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: carry.container.to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes: Vec::new(),
+        namespace_absent: true,
+        not_carried,
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(&bytes),
+        video_byte_length: u64::try_from(video.len()).unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo staging", error))?;
+    staging
+        .write_all(&bytes)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Android Motion Photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Android Motion Photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: plan.report().clone(),
+        resources,
+        video_compatibility: compatibility,
+        video_brand_changed: false,
+        vendor_metadata,
+        omitted_resource_count: 0,
+        still_sdr_jpeg: false,
+    })
+}
+
+fn vivo_native_single_file(photo: &MotionPhoto<'_>) -> bool {
+    photo.asset().sources.len() == 1
+        && photo.still().mime == "image/jpeg"
+        && photo
+            .vivo_media_extensions()
+            .ok()
+            .flatten()
+            .is_some_and(|extensions| {
+                extensions.stream_box_extent.is_some() && extensions.footer.is_some()
+            })
+}
+
+fn publish_vivo_combined(
+    marker_source: &[u8],
+    photo: &MotionPhoto<'_>,
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    if photo.asset().sources.len() != 1 || photo.still().mime != "image/jpeg" {
+        return Err(vivo_still_reencode_blocked(photo));
+    }
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo video", error))?;
+    let mut compose_carry = carry;
+    compose_carry.leave_out_unmapped = true;
+    let (plan, omitted_unmapped) =
+        plan_public_motion(photo, TargetProfile::AndroidJpeg, compose_carry)?;
+    let omitted_resource_count = omitted_unmapped.len();
+    let composed = plan
+        .execute()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo execution", error))?;
+    if composed.files.len() != 1 || !composed.files[0].bytes.ends_with(video) {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the public JPEG writer did not keep the source video as one suffix",
+        ));
+    }
+    let mut bytes = composed.files[0].bytes.clone();
+    let carried = crate::vendor_motion_metadata::write_vivo_camera_reference(
+        marker_source,
+        &mut bytes,
+        video.len(),
+    )?;
+    if !bytes.ends_with(video) {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "adding the VCamera reference moved the preserved video",
+        ));
+    }
+    let (presentation_us, remainder) = match photo.presentation_time() {
+        Some(time) => crate::vivo_combined::presentation_us(time.value, time.timescale)?,
+        None => (0, 0),
+    };
+    let cover = crate::vivo_combined::cover_from_presentation_us(presentation_us)?;
+    let video_start =
+        crate::vivo_combined::insert_extinfo_before_video(&mut bytes, video, cover.image_time)?;
+    if video_start + 8 > bytes.len() || &bytes[video_start + 4..video_start + 8] != b"ftyp" {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "file size minus the video length does not land on ftyp",
+        ));
+    }
+    if bytes.len() - video.len() != video_start {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "Padding 0 requires videoStart = file size - Item:Length",
+        ));
+    }
+    let checked = MotionPhoto::parse(Input::SingleFile(&bytes), ParseOptions::strict())
+        .map_err(|error| RuntimeError::external("vivo Motion Photo readback", error))?;
+    let checked_video = checked
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo readback video", error))?;
+    if checked_video != video
+        || hdr_gain_map_xmp_signature(photo)? != hdr_gain_map_xmp_signature(&checked)?
+    {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined file changed the preserved video or the gain-map XMP",
+        ));
+    }
+    let text = String::from_utf8_lossy(&bytes[..video_start]);
+    if !text.contains("MotionPhoto=\"1\"") && !text.contains("MotionPhoto='1'") {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined JPEG does not contain MotionPhoto=1",
+        ));
+    }
+    if !text.contains("Padding=\"0\"") {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the combined JPEG does not keep Item:Padding=0",
+        ));
+    }
+    let resources = photo
+        .resources()
+        .map(|resource| AndroidMotionResourceAudit {
+            id: resource.id.0,
+            source_role: format!("{:?}", resource.role),
+            mime: resource.mime.clone(),
+            vendor_role: resource.vendor_role.clone(),
+            byte_length: resource.extents.iter().map(|extent| extent.length()).sum(),
+            operations: plan
+                .report()
+                .resources
+                .iter()
+                .filter(|entry| entry.resource == Some(resource.id))
+                .map(|entry| AndroidMotionResourceOperation {
+                    disposition: format!("{:?}", entry.disposition),
+                    reason: entry.reason.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+    let mut not_carried = omitted_unmapped
+        .into_iter()
+        .map(|(_, note)| note)
+        .collect::<Vec<_>>();
+    not_carried.push(format!(
+        "{}; reported cover is {} ms",
+        cover.note, cover.cover_ms
+    ));
+    if remainder != 0 {
+        not_carried.push(format!(
+            "presentation time was truncated to {presentation_us} us; {remainder} timescale ticks remain"
+        ));
+    }
+    not_carried.push(
+        "ExtInfo is the motionphoto type marker plus imageTime before the video; no per-shot hash, firstFrame, or watermark stream was added"
+            .to_owned(),
+    );
+    not_carried.push(
+        "10.0.10.42 is the Y04s/W20 package, not an S60/W10 device, and Path.D plus the feature switch were not device-verified"
+            .to_owned(),
+    );
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: "vivo-combined-jpeg-mp4".to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes: carried,
+        namespace_absent: false,
+        not_carried,
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(&bytes),
+        video_byte_length: u64::try_from(video.len()).unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo staging", error))?;
+    staging
+        .write_all(&bytes)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Android Motion Photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Android Motion Photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: plan.report().clone(),
+        resources,
+        video_compatibility: compatibility,
+        vendor_metadata,
+        video_brand_changed: false,
+        omitted_resource_count,
+        still_sdr_jpeg: false,
+    })
+}
+
+fn vivo_still_reencode_blocked(photo: &MotionPhoto<'_>) -> RuntimeError {
+    let plan = photo.plan(
+        TargetProfile::AndroidJpeg,
+        xdremux_motion_photo::WritePolicy::default(),
+    );
+    let detail = plan
+        .report()
+        .resources
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry.disposition,
+                Disposition::TranscodeRequired | Disposition::Unmapped | Disposition::Dropped
+            )
+        })
+        .map(|entry| format!("{:?}: {}", entry.disposition, entry.reason))
+        .collect::<Vec<_>>()
+        .join("; ");
+    RuntimeError::new(
+        "vivo Motion Photo",
+        format!(
+            "HEIC Motion Photo is not supported by Albums 10.0.10.42 (Y04s/W20 overseas proxy, not S60; XmpUtil requires JPEG SOI) or Gallery 3.2.10.4 (sidecar only, no combined fallback). The 10.0 path needs a JPEG still plus the preserved MP4. Publication stopped before still transcoding, which would drop or rewrite resources: {detail}"
+        ),
+    )
+}
+
+fn publish_preserved_vivo_source(
+    source_bytes: &[u8],
+    photo: &MotionPhoto<'_>,
+    output: &Path,
+    compatibility: MotionVideoCompatibility,
+    carry: VendorMetadataCarry,
+) -> Result<AndroidMotionPhotoFileReceipt> {
+    if photo.asset().sources.len() != 1 || photo.still().mime != "image/jpeg" {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "public vivo samples are one JPEG file with an appended MP4. A different still or a separate movie is not re-encoded into that layout, because the source has no vivo UUID shell to keep",
+        ));
+    }
+    let video = photo
+        .motion_video_bytes()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo video", error))?;
+    let extensions = photo
+        .vivo_media_extensions()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo UUID extensions", error))?;
+    let Some(extensions) = extensions else {
+        return Err(vivo_layout_missing());
+    };
+    if extensions.stream_box_extent.is_none() || extensions.footer.is_none() {
+        return Err(vivo_layout_missing());
+    }
+    let plan = photo.plan(
+        TargetProfile::PreserveSource,
+        xdremux_motion_photo::WritePolicy::default(),
+    );
+    if !plan.can_execute() {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            plan.compatibility().blockers.join("; "),
+        ));
+    }
+    let composed = plan
+        .execute()
+        .map_err(|error| RuntimeError::external("vivo Motion Photo preserve", error))?;
+    if composed.files.len() != 1 || composed.files[0].bytes.as_slice() != source_bytes {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "preserving the source layout did not return the original file bytes",
+        ));
+    }
+    if source_bytes
+        .windows(video.len())
+        .filter(|window| *window == video)
+        .count()
+        != 1
+    {
+        return Err(RuntimeError::new(
+            "vivo Motion Photo",
+            "the preserved file does not contain exactly one copy of the source video",
+        ));
+    }
+    let resources = photo
+        .resources()
+        .map(|resource| AndroidMotionResourceAudit {
+            id: resource.id.0,
+            source_role: format!("{:?}", resource.role),
+            mime: resource.mime.clone(),
+            vendor_role: resource.vendor_role.clone(),
+            byte_length: resource.extents.iter().map(|extent| extent.length()).sum(),
+            operations: composed
+                .report
+                .resources
+                .iter()
+                .filter(|entry| entry.resource == Some(resource.id))
+                .map(|entry| AndroidMotionResourceOperation {
+                    disposition: format!("{:?}", entry.disposition),
+                    reason: entry.reason.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+    let namespace = b"http://ns.vivo.com/photos/1.0/camera/";
+    let namespace_present = source_bytes
+        .windows(namespace.len())
+        .any(|window| window == namespace);
+    let carried_attributes = [
+        "VCamera:VMotionPhotoVersion",
+        "VCamera:VMotionPhotoSource",
+        "VCamera:VMediaKitVersion",
+    ]
+    .into_iter()
+    .filter(|name| {
+        source_bytes
+            .windows(name.len())
+            .any(|window| window == name.as_bytes())
+    })
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+    let vendor_metadata = VendorMetadataReport {
+        destination: carry.destination.to_owned(),
+        container: carry.container.to_owned(),
+        native_vendor_claim: false,
+        gallery_verified: false,
+        carried_attributes,
+        namespace_absent: !namespace_present,
+        not_carried: vec![
+            "application/livePhoto-meta is kept only when the source MP4 already contains it; none was added".to_owned(),
+            "the repeated sample live-photo token and EStream digest were not synthesized".to_owned(),
+        ],
+        gaps: carry.gaps.iter().map(|gap| (*gap).to_owned()).collect(),
+        exif_identifier_present: crate::vendor_motion_metadata::exif_identifier_present(source_bytes),
+        video_byte_length: u64::try_from(video.len()).unwrap_or(u64::MAX),
+    };
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo output directory", error))?;
+    let mut staging = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external("Android Motion Photo staging", error))?;
+    staging
+        .write_all(source_bytes)
+        .and_then(|()| staging.as_file().sync_all())
+        .map_err(|error| RuntimeError::external("Android Motion Photo durable write", error))?;
+    staging.persist_noclobber(output).map_err(|error| {
+        RuntimeError::external(
+            "Android Motion Photo non-overwriting publication",
+            error.error,
+        )
+    })?;
+    Ok(AndroidMotionPhotoFileReceipt {
+        output: output.to_path_buf(),
+        conversion_report: composed.report,
+        resources,
+        video_compatibility: compatibility,
+        video_brand_changed: false,
+        vendor_metadata,
+        omitted_resource_count: 0,
+        still_sdr_jpeg: false,
+    })
+}
+
+fn vivo_layout_missing() -> RuntimeError {
+    RuntimeError::new(
+        "vivo Motion Photo",
+        "this source has no vivoMediaEStream and vivoMediaExtInfo pair to preserve, so those boxes are not invented and no file is published. Repository vivo samples stay single-file JPEG+MP4. Gallery 3.2.10.4 can also play a separate MP4 found through MediaExtra live_photo and the file name, then setDataSource on that whole file; that old path does not require a sidecar or a device-database row. application/livePhoto-meta is kept only when the source MP4 already has it. The repeated sample token and EStream digest are not written. Cross-source output is not accepted yet",
+    )
+}
+
+fn plan_public_motion<'a>(
+    photo: &'a MotionPhoto<'_>,
+    target_profile: TargetProfile,
+    carry: VendorMetadataCarry,
+) -> Result<(
+    xdremux_motion_photo::ConversionPlan<'a, 'a>,
+    Vec<(usize, String)>,
+)> {
+    let strict = photo.plan(target_profile, WritePolicy::default());
+    if strict.can_execute() || !carry.leave_out_unmapped {
+        if !strict.can_execute() {
+            return Err(RuntimeError::new(
+                "Android Motion Photo plan",
+                strict.compatibility().blockers.join("; "),
+            ));
+        }
+        return Ok((strict, Vec::new()));
+    }
+    let blockers = strict.compatibility().blockers.clone();
+    let only_unmapped = !blockers.is_empty()
+        && blockers
+            .iter()
+            .all(|blocker| blocker.starts_with("target cannot express resource "));
+    let unmapped = photo
+        .resources()
+        .filter(|resource| {
+            strict.report().resources.iter().any(|entry| {
+                entry.resource == Some(resource.id) && entry.disposition == Disposition::Unmapped
+            })
+        })
+        .collect::<Vec<_>>();
+    let safe_to_leave_out = only_unmapped
+        && !unmapped.is_empty()
+        && unmapped.iter().all(|resource| {
+            !matches!(
+                resource.role,
+                ResourceRole::PrimaryStill
+                    | ResourceRole::PrimaryMotionVideo
+                    | ResourceRole::AuxiliaryImage
+            )
+        });
+    if !safe_to_leave_out {
+        return Err(RuntimeError::new(
+            "Android Motion Photo plan",
+            blockers.join("; "),
+        ));
+    }
+    let notes = unmapped
+        .iter()
+        .map(|resource| {
+            let bytes = resource.extents.iter().map(|extent| extent.length()).sum::<u64>();
+            (
+                resource.id.0,
+                format!(
+                    "resource {} ({:?}, {}, {} bytes, {}) has no public Motion Photo mapping and was left out",
+                    resource.id.0,
+                    resource.vendor_role,
+                    resource.mime,
+                    bytes,
+                    resource.provenance.evidence
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let plan = photo.plan(
+        target_profile,
+        WritePolicy {
+            unmapped: UnmappedPolicy::DropExplicitly,
+            ..WritePolicy::default()
+        },
+    );
+    if !plan.can_execute() {
+        return Err(RuntimeError::new(
+            "Android Motion Photo plan",
+            plan.compatibility().blockers.join("; "),
+        ));
+    }
+    Ok((plan, notes))
 }
 
 fn verify_auxiliary_images(source: &MotionPhoto<'_>, target: &MotionPhoto<'_>) -> Result<()> {
@@ -400,7 +1308,9 @@ fn verify_preserved_resources(
     source: &MotionPhoto<'_>,
     target: &MotionPhoto<'_>,
     report: &ConversionReport,
-) -> Result<()> {
+    leave_out_unmapped: bool,
+) -> Result<Vec<String>> {
+    let mut left_out = Vec::new();
     for resource in source.resources() {
         let operations = report
             .resources
@@ -434,16 +1344,26 @@ fn verify_preserved_resources(
         let matching = target
             .resources()
             .filter(|item| same_kind(item))
-            .nth(ordinal)
-            .ok_or_else(|| {
-                RuntimeError::new(
-                    "Android Motion Photo resource verification",
-                    format!(
-                        "preserved resource {} is missing from the output",
-                        resource.id.0
-                    ),
-                )
-            })?;
+            .nth(ordinal);
+        let Some(matching) = matching else {
+            if leave_out_vendor_record(leave_out_unmapped, resource) {
+                left_out.push(format!(
+                    "resource {} ({:?}, {}, {}) was not kept in the public Motion Photo container",
+                    resource.id.0,
+                    resource.vendor_role,
+                    resource.mime,
+                    resource.provenance.evidence
+                ));
+                continue;
+            }
+            return Err(RuntimeError::new(
+                "Android Motion Photo resource verification",
+                format!(
+                    "preserved resource {} is missing from the output",
+                    resource.id.0
+                ),
+            ));
+        };
         let mut before = Vec::new();
         let mut after = Vec::new();
         source
@@ -453,6 +1373,16 @@ fn verify_preserved_resources(
             .extract(matching, &mut after)
             .map_err(|error| RuntimeError::external("output preserved resource", error))?;
         if before != after {
+            if leave_out_vendor_record(leave_out_unmapped, resource) {
+                left_out.push(format!(
+                    "resource {} ({:?}, {}, {}) changed and was not kept as a vendor-private record",
+                    resource.id.0,
+                    resource.vendor_role,
+                    resource.mime,
+                    resource.provenance.evidence
+                ));
+                continue;
+            }
             return Err(RuntimeError::new(
                 "Android Motion Photo resource verification",
                 format!(
@@ -462,7 +1392,60 @@ fn verify_preserved_resources(
             ));
         }
     }
-    Ok(())
+    Ok(left_out)
+}
+
+fn is_heif_file(bytes: &[u8]) -> bool {
+    bytes.len() > 12 && &bytes[4..8] == b"ftyp"
+}
+
+/// Samsung 15.1.03.4 `ex.a.d` returns the `mpvd` payload start and the caller
+/// then reads through EOF. A normal 32-bit size must make that payload the
+/// rest of the file, so `mpvd` is the last top-level box.
+fn samsung_top_level_mpvd_reaches_eof(data: &[u8]) -> Result<()> {
+    let mut offset = 0usize;
+    while offset + 8 <= data.len() {
+        let size = u32::from_be_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+        if size < 8 {
+            return Err(RuntimeError::new(
+                "Samsung HEIF Motion Photo",
+                "a top-level box uses size 0 or 1; Samsung 15.1.03.4 does not handle those forms",
+            ));
+        }
+        let end = offset.checked_add(size).ok_or_else(|| {
+            RuntimeError::new("Samsung HEIF Motion Photo", "top-level box size overflows")
+        })?;
+        if end > data.len() {
+            return Err(RuntimeError::new(
+                "Samsung HEIF Motion Photo",
+                "a top-level box extends past the file",
+            ));
+        }
+        if &data[offset + 4..offset + 8] == b"mpvd" {
+            if end != data.len() {
+                return Err(RuntimeError::new(
+                    "Samsung HEIF Motion Photo",
+                    "mpvd is not the last top-level box, so its payload would not run to EOF",
+                ));
+            }
+            return Ok(());
+        }
+        offset = end;
+    }
+    Err(RuntimeError::new(
+        "Samsung HEIF Motion Photo",
+        "no top-level mpvd box was found",
+    ))
+}
+
+fn leave_out_vendor_record(
+    leave_out_unmapped: bool,
+    resource: &xdremux_motion_photo::Resource,
+) -> bool {
+    leave_out_unmapped
+        && (resource.role == ResourceRole::Unknown
+            || resource.role == ResourceRole::UnknownVideo
+            || resource.provenance.evidence.starts_with("Samsung SEF"))
 }
 
 /// Compare gain-map XMP properties by namespace and local name, not by the

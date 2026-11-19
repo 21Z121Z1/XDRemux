@@ -12,7 +12,10 @@ mod batch_checkpoint;
 mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
+mod harmony_motion;
 mod hdr_look;
+mod heic_sdr_jpeg;
+mod huawei_live_photo;
 mod live_photo;
 mod live_photo_package;
 mod oppo_portrait;
@@ -22,6 +25,8 @@ mod style_reconstruction;
 #[cfg(target_os = "macos")]
 mod system_heif_hdr;
 mod validation;
+mod vendor_motion_metadata;
+mod vivo_combined;
 #[cfg(target_os = "macos")]
 pub use style_reconstruction::{reconstruct_styles_hdr, reconstruct_styles_hdr_with_display};
 
@@ -38,6 +43,7 @@ pub use batch_checkpoint::{
 };
 #[cfg(target_os = "macos")]
 pub use cinematic_camera::CinematicFocalLengthSource;
+pub use harmony_motion::is_harmony_motion_photo;
 
 #[cfg(target_os = "macos")]
 pub fn validate_apple_styles_file(
@@ -65,6 +71,7 @@ pub use validation::{
     GainMapValidationProfile, IsoHdrSemanticsReport, IsoHdrValidationReport,
     LivePhotoValidationReport, ValidationReport,
 };
+pub use vendor_motion_metadata::{VendorMetadataCarry, VendorMetadataReport};
 pub use xdremux_heif::PhotographicStylesAssembly;
 
 use std::error::Error;
@@ -811,6 +818,29 @@ impl PortableRuntime {
         request: ConversionRequest,
         compatibility: xdremux_engine::MotionVideoCompatibility,
     ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.convert_android_motion_photo_file_with_carry(
+            source,
+            input,
+            output,
+            target,
+            request,
+            compatibility,
+            VendorMetadataCarry::legacy(),
+        )
+    }
+
+    /// Public Motion Photo output, plus vendor attributes copied from the source.
+    #[allow(clippy::too_many_arguments)]
+    pub fn convert_android_motion_photo_file_with_carry(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
         self.validate_android_motion_request(request)?;
         android_motion_photo::convert_android_motion_photo_file_with_policy(
             source,
@@ -818,6 +848,23 @@ impl PortableRuntime {
             output.as_ref(),
             target,
             compatibility,
+            carry,
+        )
+    }
+
+    /// Keep an existing OpenHarmony HEIC motion file, or stop without writing.
+    pub fn convert_huawei_harmony_file(
+        &self,
+        source: &[u8],
+        output: impl AsRef<Path>,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
+        android_motion_photo::convert_huawei_harmony_file(
+            source,
+            output.as_ref(),
+            compatibility,
+            carry,
         )
     }
 
@@ -831,6 +878,26 @@ impl PortableRuntime {
         request: ConversionRequest,
         compatibility: xdremux_engine::MotionVideoCompatibility,
     ) -> Result<AndroidMotionPhotoFileReceipt> {
+        self.convert_android_motion_photo_pair_file_with_carry(
+            pair,
+            output,
+            target,
+            request,
+            compatibility,
+            VendorMetadataCarry::legacy(),
+        )
+    }
+
+    /// Apple pair input with the same vendor-metadata policy as a single file.
+    pub fn convert_android_motion_photo_pair_file_with_carry(
+        &self,
+        pair: AndroidMotionPhotoPairSource<'_>,
+        output: impl AsRef<Path>,
+        target: xdremux_engine::MotionOutputTarget,
+        request: ConversionRequest,
+        compatibility: xdremux_engine::MotionVideoCompatibility,
+        carry: VendorMetadataCarry,
+    ) -> Result<AndroidMotionPhotoFileReceipt> {
         self.validate_android_motion_request(request)?;
         android_motion_photo::convert_android_motion_photo_pair_file(
             pair.still,
@@ -840,6 +907,7 @@ impl PortableRuntime {
             output.as_ref(),
             target,
             compatibility,
+            carry,
         )
     }
 

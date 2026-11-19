@@ -1,8 +1,9 @@
 use libheif_rs::{
     color_profile_types, Channel, ColorProfileRaw, ColorSpace, CompressionFormat,
-    EncoderParameterValue, EncoderQuality, HeifContext, Image, LibHeif, RgbChroma,
+    EncoderParameterValue, EncoderQuality, HeifContext, Image, RgbChroma,
 };
 
+use super::libheif::checked_libheif;
 use crate::{CodecError, LibHeifProvider, PrimaryHeifEncodeRequest, RasterPixelFormat, Result};
 
 // Little CMS generated IEC 61966-2-1 sRGB profile. Untagged JPEG RGB defaults
@@ -36,6 +37,7 @@ impl LibHeifProvider {
             }
         }
 
+        let lib = checked_libheif()?;
         let mut image = Image::new(
             request.raster.width,
             request.raster.height,
@@ -67,7 +69,6 @@ impl LibHeifProvider {
             .set_color_profile_raw(&profile)
             .map_err(CodecError::libheif)?;
 
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
         let mut encoder = lib
             .encoder_for_format(CompressionFormat::Hevc)
             .map_err(CodecError::libheif)?;
@@ -195,7 +196,7 @@ mod tests {
             (handle.width(), handle.height()),
             (source.width, source.height)
         );
-        let lib = LibHeif::new_checked().unwrap();
+        let lib = checked_libheif().unwrap();
         let decoded = lib
             .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
             .unwrap();

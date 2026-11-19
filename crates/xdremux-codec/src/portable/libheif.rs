@@ -1,6 +1,9 @@
+use std::sync::{Mutex, OnceLock};
+
 use libheif_rs::{
-    Channel, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue, EncoderQuality,
-    HeifContext, Image, ImageHandle, LibHeif, RgbChroma,
+    Channel, ColorPrimaries, ColorSpace, CompressionFormat, DecodingOptions, EncoderParameterValue,
+    EncoderQuality, HeifContext, Image, ImageHandle, LibHeif, MatrixCoefficients, RgbChroma,
+    TransferCharacteristics,
 };
 use xdremux_engine::{
     CapabilityInventory, GainMapChannels, GainMapCodec, GainMapCodecLayout,
@@ -8,7 +11,7 @@ use xdremux_engine::{
     RasterDecoderCapabilities,
 };
 use xdremux_format::isobmff::{parse_boxes, parse_meta_box, scan_top_level_boxes, META};
-use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
+use xdremux_format::{hvcc_vui_color, parse_hvcc_profile, ChromaSampling, FourCC};
 
 use crate::{
     CodecError, EncodedGainMapTiles, EncodedHevcResource, EncodedHevcTile,
@@ -17,6 +20,24 @@ use crate::{
 
 const HVC1: FourCC = FourCC::new(*b"hvc1");
 const HVCC: FourCC = FourCC::new(*b"hvcC");
+const GRID: FourCC = FourCC::new(*b"grid");
+const DIMG: FourCC = FourCC::new(*b"dimg");
+
+pub(super) fn checked_libheif() -> Result<&'static LibHeif> {
+    // libheif owns one plugin registry per process. Keep it alive across
+    // parallel encodes, decodes and metadata reads, including context teardown.
+    static LIBHEIF: OnceLock<LibHeif> = OnceLock::new();
+    static INIT: Mutex<()> = Mutex::new(());
+    if let Some(lib) = LIBHEIF.get() {
+        return Ok(lib);
+    }
+    let _init = INIT.lock().map_err(CodecError::libheif)?;
+    if let Some(lib) = LIBHEIF.get() {
+        return Ok(lib);
+    }
+    let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+    Ok(LIBHEIF.get_or_init(|| lib))
+}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LibHeifProvider;
@@ -40,6 +61,7 @@ impl LibHeifProvider {
                 "normalized decode requires one or three channels",
             ));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
         let mut options = DecodingOptions::new()
@@ -52,7 +74,6 @@ impl LibHeifProvider {
         } else {
             ColorSpace::Rgb(RgbChroma::HdrRgbLe)
         };
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
         let image = lib
             .decode(&handle, space, Some(options))
             .map_err(CodecError::libheif)?;
@@ -123,6 +144,7 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Err(CodecError::invalid("HEIF resource input is empty"));
         }
+        checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
@@ -151,10 +173,10 @@ impl LibHeifProvider {
         if source.is_empty() {
             return Err(CodecError::invalid("HEIF item decode input is empty"));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
         let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        self.decode_handle(&lib, &handle, format)
+        self.decode_handle(lib, &handle, format)
     }
 
     pub fn verified_encoder_layouts() -> [GainMapCodecLayout; 3] {
@@ -166,7 +188,7 @@ impl LibHeifProvider {
     }
 
     pub fn capability_inventory(&self) -> Result<CapabilityInventory> {
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+        let lib = checked_libheif()?;
         if lib
             .encoder_descriptors(1, Some(CompressionFormat::Hevc), None)
             .is_empty()
@@ -246,16 +268,138 @@ impl LibHeifProvider {
         })
     }
 
+    /// Decode the primary item as 8-bit sRGB for a disclosed SDR JPEG.
+    ///
+    /// Pixels come from the coded YCbCr planes. This program applies one
+    /// admitted sRGB or Display P3 transform. libheif's interleaved RGB is
+    /// only a witness: on a build without LCMS it matches the YCbCr codes,
+    /// and on a build with LCMS it should match that one transform. Neither
+    /// result is transformed again. `irot` is applied. The source Orientation
+    /// tag is not returned.
+    pub fn decode_sdr_display_rgb8(&self, source: &[u8]) -> Result<Raster8> {
+        if source.is_empty() {
+            return Err(CodecError::invalid("HEIF decode input is empty"));
+        }
+        let lib = checked_libheif()?;
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context
+            .primary_image_handle()
+            .map_err(CodecError::libheif)?;
+        refuse_signaled_hdr_transfer(&handle, source)?;
+        let icc = handle.color_profile_raw().map(|profile| profile.data);
+        let space = if let Some(profile) = icc.as_deref() {
+            xdremux_metadata::identify_sdr_color_space(Some(profile), None).map_err(|error| {
+                CodecError::unsupported(format!(
+                    "primary ICC is not an admitted sRGB or Display P3 SDR profile: {error}"
+                ))
+            })?
+        } else {
+            admitted_nclx_sdr(&handle)?
+        };
+        let matrix = source_rgb_matrix(&handle)?;
+        let mut coded_options = DecodingOptions::new()
+            .ok_or_else(|| CodecError::invalid("cannot allocate HEIF decoding options"))?;
+        coded_options.set_convert_hdr_to_8bit(false);
+        let preferred = handle
+            .preferred_decoding_colorspace()
+            .map_err(CodecError::libheif)?;
+        let ColorSpace::YCbCr(chroma) = preferred else {
+            return Err(CodecError::unsupported(
+                "primary is not YCbCr; refusing to treat an RGB decode tag as sRGB",
+            ));
+        };
+        let coded_image = lib
+            .decode(&handle, ColorSpace::YCbCr(chroma), Some(coded_options))
+            .map_err(CodecError::libheif)?;
+        let coded = ycbcr_full_range_rgb(&coded_image, matrix)?;
+        let mut witness_options = DecodingOptions::new()
+            .ok_or_else(|| CodecError::invalid("cannot allocate HEIF decoding options"))?;
+        witness_options.set_convert_hdr_to_8bit(false);
+        let witness_image = lib
+            .decode(
+                &handle,
+                ColorSpace::Rgb(RgbChroma::Rgb),
+                Some(witness_options),
+            )
+            .map_err(CodecError::libheif)?;
+        if witness_image.width() != coded_image.width()
+            || witness_image.height() != coded_image.height()
+        {
+            return Err(CodecError::unsupported(
+                "libheif RGB size does not match the YCbCr decode",
+            ));
+        }
+        let witness_plane = witness_image
+            .planes()
+            .interleaved
+            .ok_or_else(|| CodecError::invalid("decoded RGB witness has no interleaved plane"))?;
+        if witness_plane.bits_per_pixel != 8 {
+            return Err(CodecError::unsupported(
+                "decoded primary is not 8-bit; refusing to shift HDR or wide samples into JPEG",
+            ));
+        }
+        let witness = copy_plane_to_raster(
+            witness_plane.data,
+            witness_plane.stride,
+            witness_image.width(),
+            witness_image.height(),
+            3,
+        )?;
+        let transformed = match (icc.as_deref(), space) {
+            (Some(profile), _) => xdremux_metadata::sdr_icc_rgb8_to_srgb8(profile, &coded)
+                .map_err(|error| {
+                    CodecError::unsupported(format!(
+                        "the embedded ICC could not be applied to sRGB: {error}"
+                    ))
+                })?,
+            (None, xdremux_metadata::SdrColorSpace::DisplayP3) => {
+                xdremux_metadata::sdr_nclx_rgb8_to_srgb8(space, &coded).map_err(|error| {
+                    CodecError::unsupported(format!(
+                        "Display P3 nclx could not be applied to sRGB: {error}"
+                    ))
+                })?
+            }
+            (None, xdremux_metadata::SdrColorSpace::Srgb) => coded.clone(),
+        };
+        confirm_one_srgb_transform(&coded, &transformed, &witness)?;
+        Raster8::new(
+            coded_image.width(),
+            coded_image.height(),
+            usize::try_from(coded_image.width())
+                .ok()
+                .and_then(|width| width.checked_mul(3))
+                .ok_or_else(|| CodecError::invalid("decoded RGB row size overflows"))?,
+            RasterPixelFormat::Rgb8,
+            transformed,
+        )
+    }
+
+    /// Raw Exif item from the primary image, including the HEIF four-byte TIFF offset.
+    pub fn primary_exif_payload(&self, source: &[u8]) -> Result<Option<Vec<u8>>> {
+        if source.is_empty() {
+            return Ok(None);
+        }
+        checked_libheif()?;
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context
+            .primary_image_handle()
+            .map_err(CodecError::libheif)?;
+        Ok(handle
+            .all_metadata()
+            .into_iter()
+            .find_map(|item| (item.item_type.0 == *b"Exif").then_some(item.raw_data)))
+    }
+
     fn decode_heif(&self, request: &HeifRasterDecodeRequest) -> Result<Raster8> {
         if request.data.is_empty() {
             return Err(CodecError::invalid("HEIF decode input is empty"));
         }
+        let lib = checked_libheif()?;
         let context = HeifContext::read_from_bytes(&request.data).map_err(CodecError::libheif)?;
         let handle = context
             .primary_image_handle()
             .map_err(CodecError::libheif)?;
-        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        self.decode_handle(&lib, &handle, request.format)
+        self.decode_handle(lib, &handle, request.format)
     }
 
     fn decode_handle(
@@ -406,6 +550,7 @@ fn encode_tile_container(
     origin_x: u32,
     origin_y: u32,
 ) -> Result<Vec<u8>> {
+    let lib = checked_libheif()?;
     let mut image = match request.raster.format {
         RasterPixelFormat::Mono8 => {
             Image::new(request.tile_size, request.tile_size, ColorSpace::Monochrome)
@@ -472,7 +617,6 @@ fn encode_tile_container(
         }
     }
 
-    let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
     let mut encoder = lib
         .encoder_for_format(CompressionFormat::Hevc)
         .map_err(CodecError::libheif)?;
@@ -594,6 +738,259 @@ fn fill_rgb_planes(
         }
     }
     Ok(())
+}
+
+fn admitted_nclx_sdr(handle: &libheif_rs::ImageHandle) -> Result<xdremux_metadata::SdrColorSpace> {
+    let Some(profile) = handle.color_profile_nclx() else {
+        return Err(CodecError::unsupported(
+            "primary has no ICC or nclx color description; refusing to assume sRGB",
+        ));
+    };
+    if profile.full_range_flag() != 1 {
+        return Err(CodecError::unsupported(
+            "primary nclx is not full range; refusing to expand limited-range codes into JPEG",
+        ));
+    }
+    let primaries = match profile.color_primaries() {
+        ColorPrimaries::ITU_R_BT_709_5 => 1,
+        ColorPrimaries::SMPTE_EG_432_1 => 12,
+        _ => {
+            return Err(CodecError::unsupported(
+                "primary nclx primaries are not sRGB or Display P3; refusing to label those pixels as sRGB",
+            ));
+        }
+    };
+    if profile.transfer_characteristics() != TransferCharacteristics::IEC_61966_2_1 {
+        return Err(CodecError::unsupported(
+            "primary nclx transfer is not sRGB; refusing to relabel those code values",
+        ));
+    }
+    xdremux_metadata::identify_sdr_color_space(None, Some([primaries, 13, 0])).map_err(|error| {
+        CodecError::unsupported(format!(
+            "primary nclx is not an admitted SDR encoding: {error}"
+        ))
+    })
+}
+
+fn refuse_signaled_hdr_transfer(handle: &ImageHandle, source: &[u8]) -> Result<()> {
+    if let Some(profile) = handle.color_profile_nclx() {
+        if hdr_transfer(profile.transfer_characteristics() as u8) {
+            return Err(CodecError::unsupported(
+                "primary nclx uses an HDR transfer; refusing to clamp those code values into an 8-bit JPEG",
+            ));
+        }
+    }
+    let Some(hvcc) = primary_hvcc_payload(source)? else {
+        return Ok(());
+    };
+    let stored = parse_hvcc_profile(&hvcc).map_err(CodecError::format)?;
+    if stored.luma_bit_depth != 8 || stored.chroma_bit_depth != 8 {
+        return Err(CodecError::unsupported(
+            "primary HEVC is not 8-bit; refusing to shift those samples into an 8-bit JPEG",
+        ));
+    }
+    match hvcc_vui_color(&hvcc).map_err(CodecError::format)? {
+        Some(color) if hdr_transfer(color.transfer) => Err(CodecError::unsupported(
+            "primary HEVC VUI uses an HDR transfer; refusing to clamp those code values into an 8-bit JPEG",
+        )),
+        Some(_) | None => Ok(()),
+    }
+}
+
+fn hdr_transfer(transfer: u8) -> bool {
+    matches!(transfer, 8 | 9 | 10 | 14 | 15 | 16 | 18)
+}
+
+fn primary_hvcc_payload(source: &[u8]) -> Result<Option<Vec<u8>>> {
+    let top = scan_top_level_boxes(source).map_err(CodecError::format)?;
+    let Some(meta_header) = top.boxes.iter().find(|header| header.kind == META) else {
+        return Ok(None);
+    };
+    let meta = parse_meta_box(source, meta_header).map_err(CodecError::format)?;
+    let mut item_id = meta.primary_item_id;
+    if meta
+        .iinf
+        .entries
+        .iter()
+        .any(|item| item.item_id == item_id && item.item_type == Some(GRID))
+    {
+        item_id = meta
+            .iref
+            .as_ref()
+            .and_then(|iref| {
+                iref.entries
+                    .iter()
+                    .find(|entry| entry.kind == DIMG && entry.from_item_id == meta.primary_item_id)
+            })
+            .and_then(|entry| entry.to_item_ids.first().copied())
+            .ok_or_else(|| {
+                CodecError::unsupported(
+                    "primary grid has no tile item; refusing to skip the bitstream transfer",
+                )
+            })?;
+    }
+    let Some(entry) = meta
+        .ipma
+        .entries
+        .iter()
+        .find(|entry| entry.item_id == item_id)
+    else {
+        return Ok(None);
+    };
+    let Some(property) = entry.associations.iter().find_map(|association| {
+        meta.properties.iter().find(|property| {
+            property.index == u32::from(association.property_index) && property.kind == HVCC
+        })
+    }) else {
+        return Ok(None);
+    };
+    let raw = source
+        .get(property.box_range.clone())
+        .ok_or_else(|| CodecError::format("primary hvcC is outside the file"))?;
+    let headers = parse_boxes(raw, 0..raw.len()).map_err(CodecError::format)?;
+    let header = headers
+        .iter()
+        .find(|header| header.kind == HVCC)
+        .ok_or_else(|| CodecError::format("primary hvcC property has no hvcC box"))?;
+    let payload = raw
+        .get(header.payload_range())
+        .ok_or_else(|| CodecError::format("primary hvcC payload is outside its box"))?;
+    if payload.is_empty() {
+        return Err(CodecError::format("primary hvcC payload is empty"));
+    }
+    Ok(Some(payload.to_vec()))
+}
+
+#[derive(Clone, Copy)]
+enum RgbFromYcbcr {
+    Bt601,
+    Bt709,
+}
+
+fn source_rgb_matrix(handle: &ImageHandle) -> Result<RgbFromYcbcr> {
+    let Some(profile) = handle.color_profile_nclx() else {
+        return Ok(RgbFromYcbcr::Bt601);
+    };
+    if profile.full_range_flag() != 1 {
+        return Err(CodecError::unsupported(
+            "primary nclx is not full range; refusing to expand limited-range codes into JPEG",
+        ));
+    }
+    match profile.matrix_coefficients() {
+        MatrixCoefficients::ITU_R_BT_601_6
+        | MatrixCoefficients::ITU_R_BT_470_6_System_B_G
+        | MatrixCoefficients::Unspecified => Ok(RgbFromYcbcr::Bt601),
+        MatrixCoefficients::ITU_R_BT_709_5 => Ok(RgbFromYcbcr::Bt709),
+        _ => Err(CodecError::unsupported(
+            "primary nclx matrix is not BT.601 or BT.709; refusing to invent RGB coefficients",
+        )),
+    }
+}
+
+fn ycbcr_full_range_rgb(image: &Image, matrix: RgbFromYcbcr) -> Result<Vec<u8>> {
+    let planes = image.planes();
+    let y = planes
+        .y
+        .ok_or_else(|| CodecError::invalid("decoded YCbCr image has no Y plane"))?;
+    let cb = planes
+        .cb
+        .ok_or_else(|| CodecError::invalid("decoded YCbCr image has no Cb plane"))?;
+    let cr = planes
+        .cr
+        .ok_or_else(|| CodecError::invalid("decoded YCbCr image has no Cr plane"))?;
+    if y.bits_per_pixel != 8 || cb.bits_per_pixel != 8 || cr.bits_per_pixel != 8 {
+        return Err(CodecError::unsupported(
+            "decoded primary is not 8-bit; refusing to shift HDR or wide samples into JPEG",
+        ));
+    }
+    let width = y.width as usize;
+    let height = y.height as usize;
+    if width == 0 || height == 0 || cb.width == 0 || cb.height == 0 {
+        return Err(CodecError::invalid("decoded YCbCr plane is empty"));
+    }
+    let mut rgb = vec![0u8; width * height * 3];
+    for row in 0..height {
+        for col in 0..width {
+            let yv = y.data[row * y.stride + col] as f32;
+            let chroma_x = col * cb.width as usize / width;
+            let chroma_y = row * cb.height as usize / height;
+            let cbv = cb.data[chroma_y * cb.stride + chroma_x] as f32 - 128.0;
+            let crv = cr.data[chroma_y * cr.stride + chroma_x] as f32 - 128.0;
+            let (red, green, blue) = match matrix {
+                RgbFromYcbcr::Bt601 => (
+                    yv + 1.402 * crv,
+                    yv - 0.344_136 * cbv - 0.714_136 * crv,
+                    yv + 1.772 * cbv,
+                ),
+                RgbFromYcbcr::Bt709 => (
+                    yv + 1.5748 * crv,
+                    yv - 0.187_324 * cbv - 0.468_124 * crv,
+                    yv + 1.8556 * cbv,
+                ),
+            };
+            let at = (row * width + col) * 3;
+            rgb[at] = red.round().clamp(0.0, 255.0) as u8;
+            rgb[at + 1] = green.round().clamp(0.0, 255.0) as u8;
+            rgb[at + 2] = blue.round().clamp(0.0, 255.0) as u8;
+        }
+    }
+    Ok(rgb)
+}
+
+fn confirm_one_srgb_transform(coded: &[u8], transformed: &[u8], witness: &[u8]) -> Result<()> {
+    if coded.len() != transformed.len()
+        || coded.len() != witness.len()
+        || !coded.len().is_multiple_of(3)
+    {
+        return Err(CodecError::invalid(
+            "color planes do not have the same RGB length",
+        ));
+    }
+    let pixels = coded.len() / 3;
+    let step = (pixels / 4096).max(1);
+    let mut samples = 0usize;
+    let mut coded_differs = 0usize;
+    let mut witness_is_coded = 0usize;
+    let mut witness_is_transformed = 0usize;
+    for index in (0..pixels).step_by(step) {
+        samples += 1;
+        let at = index * 3;
+        let coded_delta = max_channel_delta(&coded[at..at + 3], &transformed[at..at + 3]);
+        let witness_coded = max_channel_delta(&witness[at..at + 3], &coded[at..at + 3]);
+        let witness_transformed = max_channel_delta(&witness[at..at + 3], &transformed[at..at + 3]);
+        if coded_delta > 2 {
+            coded_differs += 1;
+        }
+        if witness_coded <= 2 {
+            witness_is_coded += 1;
+        }
+        if witness_transformed <= 4 {
+            witness_is_transformed += 1;
+        }
+    }
+    let explains_coded = witness_is_coded * 100 / samples >= 90;
+    let explains_transform = witness_is_transformed * 100 / samples >= 90;
+    let transform_changes_codes = coded_differs * 20 > samples;
+    let explained = if transform_changes_codes {
+        explains_coded || explains_transform
+    } else {
+        explains_coded
+    };
+    if explained {
+        return Ok(());
+    }
+    Err(CodecError::unsupported(
+        "libheif RGB matches neither the YCbCr code values nor one sRGB transform; refusing to guess which conversion already ran",
+    ))
+}
+
+fn max_channel_delta(left: &[u8], right: &[u8]) -> i32 {
+    left.iter()
+        .zip(right)
+        .map(|(a, b)| i32::from(*a) - i32::from(*b))
+        .map(i32::abs)
+        .max()
+        .unwrap_or(0)
 }
 
 fn copy_plane_to_raster(
@@ -934,5 +1331,233 @@ mod tests {
         assert_eq!(decoded.width, 512);
         assert_eq!(decoded.height, 512);
         assert_eq!(decoded.format, RasterPixelFormat::Rgb8);
+    }
+
+    #[test]
+    fn samsung_ultra_hdr_primary_decodes_as_full_range_srgb() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic");
+        let data = std::fs::read(path).expect("samsung heic fixture");
+        let decoded = LibHeifProvider::new()
+            .decode_sdr_display_rgb8(&data)
+            .expect("Display P3 primary should become sRGB");
+        assert_eq!(decoded.width, 3000);
+        assert_eq!(decoded.height, 4000);
+        let count = (decoded.data.len() / 3) as u64;
+        let mut sum = [0u64; 3];
+        let mut max = 0u8;
+        for pixel in decoded.data.as_chunks::<3>().0 {
+            sum[0] += u64::from(pixel[0]);
+            sum[1] += u64::from(pixel[1]);
+            sum[2] += u64::from(pixel[2]);
+            max = max.max(pixel[0]).max(pixel[1]).max(pixel[2]);
+        }
+        assert!(sum[1] / count > 20, "primary looks clamped dark");
+        assert!(max > 200);
+        assert_samsung_primary_matches_independent_srgb(&data, &decoded);
+    }
+
+    fn assert_samsung_primary_matches_independent_srgb(source: &[u8], claimed: &Raster8) {
+        let context = libheif_rs::HeifContext::read_from_bytes(source).unwrap();
+        let handle = context.primary_image_handle().unwrap();
+        let icc = handle.color_profile_raw().unwrap().data;
+        assert_eq!(
+            xdremux_metadata::identify_sdr_color_space(Some(&icc), None).unwrap(),
+            xdremux_metadata::SdrColorSpace::DisplayP3
+        );
+        let lib = checked_libheif().unwrap();
+        let ycc = lib
+            .decode(
+                &handle,
+                libheif_rs::ColorSpace::YCbCr(libheif_rs::Chroma::C420),
+                None,
+            )
+            .unwrap();
+        let planes = ycc.planes();
+        let y = planes.y.unwrap();
+        let cb = planes.cb.unwrap();
+        let cr = planes.cr.unwrap();
+        let width = ycc.width() as usize;
+        let height = ycc.height() as usize;
+        let mut coded = vec![0u8; width * height * 3];
+        for row in 0..height {
+            for col in 0..width {
+                let yv = y.data[row * y.stride + col] as f32;
+                let cbv = cb.data[(row / 2) * cb.stride + col / 2] as f32 - 128.0;
+                let crv = cr.data[(row / 2) * cr.stride + col / 2] as f32 - 128.0;
+                let at = (row * width + col) * 3;
+                coded[at] = (yv + 1.402 * crv).round().clamp(0.0, 255.0) as u8;
+                coded[at + 1] = (yv - 0.344136 * cbv - 0.714136 * crv)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+                coded[at + 2] = (yv + 1.772 * cbv).round().clamp(0.0, 255.0) as u8;
+            }
+        }
+        let independent = xdremux_metadata::sdr_icc_rgb8_to_srgb8(&icc, &coded).unwrap();
+        let irot = source
+            .windows(4)
+            .position(|window| window == b"irot")
+            .unwrap();
+        assert_eq!(
+            source[irot + 4],
+            3,
+            "fixture irot is 270 degrees anti-clockwise"
+        );
+        assert_eq!(claimed.width, 3000);
+        assert_eq!(
+            claimed.height, 4000,
+            "display size, not the coded 4000x3000"
+        );
+        let mut sampled = 0usize;
+        let mut moved = 0usize;
+        let mut close = 0usize;
+        let mut max_independent = 0i32;
+        for (index, pixel) in claimed.data.as_chunks::<3>().0.iter().enumerate() {
+            if index % 64 != 0 {
+                continue;
+            }
+            sampled += 1;
+            let coded_px = &coded[index * 3..index * 3 + 3];
+            let other = &independent[index * 3..index * 3 + 3];
+            let coded_delta = pixel
+                .iter()
+                .zip(coded_px)
+                .map(|(a, b)| (*a as i32 - *b as i32).abs())
+                .max()
+                .unwrap();
+            let independent_delta = pixel
+                .iter()
+                .zip(other)
+                .map(|(a, b)| (*a as i32 - *b as i32).abs())
+                .max()
+                .unwrap();
+            if coded_delta > 2 {
+                moved += 1;
+            }
+            if independent_delta <= 2 {
+                close += 1;
+            }
+            max_independent = max_independent.max(independent_delta);
+        }
+        // Pillow 13 LittleCMS, relative colorimetric, on this file's ICC.
+        // These are not the product's own return values.
+        let pillow = [
+            (0u32, 0u32, [144, 138, 117]),
+            (100, 100, [148, 143, 130]),
+            (1500, 2000, [139, 200, 252]),
+            (2999, 3999, [202, 201, 181]),
+        ];
+        for (x, y, expected) in pillow {
+            let index = (y as usize * claimed.width as usize + x as usize) * 3;
+            let actual = &claimed.data[index..index + 3];
+            let coded_px = &coded[index..index + 3];
+            let delta = actual
+                .iter()
+                .zip(expected)
+                .map(|(a, b)| i32::from(*a).abs_diff(b))
+                .max()
+                .unwrap();
+            assert!(
+                delta <= 1,
+                "{x},{y} product {actual:?} is not the LittleCMS sRGB {expected:?}"
+            );
+            if (x, y) == (1500, 2000) {
+                assert!(
+                    (coded_px[0] as i32 - actual[0] as i32).abs() >= 10,
+                    "saturated pixel was left as Display P3 codes {coded_px:?}"
+                );
+            }
+        }
+        assert!(
+            moved * 10 > sampled,
+            "decoded RGB still matches Display P3 code values; sampled {sampled}, moved {moved}"
+        );
+        assert!(
+            close * 100 / sampled >= 99,
+            "decoded RGB misses the independent ICC transform; {close}/{sampled}, max {max_independent}"
+        );
+        assert!(
+            max_independent <= 8,
+            "max independent delta {max_independent}"
+        );
+    }
+
+    #[test]
+    fn pq_and_hlg_vui_are_refused_before_a_jpeg_exists() {
+        let encoded = tiny_rgb_heic();
+        let untouched = LibHeifProvider::new()
+            .decode_sdr_display_rgb8(&encoded)
+            .expect_err("VUI sRGB without ICC or nclx");
+        let untouched = untouched.to_string();
+        assert!(
+            untouched.contains("ICC") || untouched.contains("nclx"),
+            "{untouched}"
+        );
+        for (transfer, label) in [(16u8, "PQ"), (18u8, "HLG")] {
+            let patched = patch_sps_transfer(&encoded, transfer);
+            let error = LibHeifProvider::new()
+                .decode_sdr_display_rgb8(&patched)
+                .expect_err(label);
+            let message = error.to_string();
+            assert!(
+                message.contains("HDR"),
+                "{label} was not refused: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn unspecified_vui_transfer_is_not_treated_as_srgb() {
+        let encoded = patch_sps_transfer(&tiny_rgb_heic(), 2);
+        let error = LibHeifProvider::new()
+            .decode_sdr_display_rgb8(&encoded)
+            .expect_err("unspecified transfer");
+        let message = error.to_string();
+        assert!(
+            message.contains("ICC") || message.contains("nclx") || message.contains("sRGB"),
+            "{message}"
+        );
+        assert!(!message.contains("JPEG"), "{message}");
+    }
+
+    fn tiny_rgb_heic() -> Vec<u8> {
+        let mut image = Image::new(16, 16, ColorSpace::Rgb(RgbChroma::Rgb)).unwrap();
+        image.create_plane(Channel::Interleaved, 16, 16, 8).unwrap();
+        {
+            let planes = image.planes_mut();
+            let plane = planes.interleaved.unwrap();
+            for pixel in plane.data.chunks_mut(3) {
+                pixel[0] = 220;
+                pixel[1] = 20;
+                pixel[2] = 40;
+            }
+        }
+        let lib = checked_libheif().unwrap();
+        let mut encoder = lib.encoder_for_format(CompressionFormat::Hevc).unwrap();
+        encoder.set_quality(EncoderQuality::Lossy(80)).unwrap();
+        let mut context = HeifContext::new().unwrap();
+        context.encode_image(&image, &mut encoder, None).unwrap();
+        context.write_to_bytes().unwrap()
+    }
+
+    fn patch_sps_transfer(bytes: &[u8], transfer: u8) -> Vec<u8> {
+        // libheif 1.17 / x265 writes this 16x16 Main Still Picture SPS with
+        // transfer 13 at a fixed byte pair. Replacing those two bytes keeps
+        // the NAL length and does not add an emulation-prevention sequence.
+        let original = [0xe0, 0x21, 0xa0, 0xc0];
+        let offset = bytes
+            .windows(original.len())
+            .position(|window| window == original)
+            .expect("encoder SPS transfer bytes moved; the VUI patch is no longer aligned");
+        let (first, second) = match transfer {
+            16 => (0x22, 0x00),
+            18 => (0x22, 0x40),
+            2 => (0x20, 0x40),
+            _ => panic!("unexpected transfer {transfer}"),
+        };
+        let mut patched = bytes.to_vec();
+        patched[offset + 1] = first;
+        patched[offset + 2] = second;
+        patched
     }
 }
