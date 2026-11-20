@@ -88,7 +88,7 @@ struct PhotoCategorizationView: View {
                 Image(systemName: "stop.fill")
             }
             .help("取消")
-            .disabled(!viewModel.isBusy)
+            .disabled(!viewModel.canCancel)
 
             Button(action: viewModel.revealResults) {
                 Image(systemName: "folder.badge.magnifyingglass")
@@ -137,6 +137,7 @@ struct PhotoCategorizationView: View {
         case .ready: return "扫描完成"
         case .copying: return "正在复制 \(viewModel.completedCount)/\(viewModel.items.count)"
         case .completed: return "分类完成"
+        case .cancelling: return AppStrings.waitingForCancellation
         case .cancelled: return "已取消"
         case .failed(let message): return message
         }

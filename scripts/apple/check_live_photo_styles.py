@@ -107,19 +107,49 @@ def convert(options, temp, env, name, target, styled):
     return cover, cover.with_suffix(".mov")
 
 
+def batch_styled(options, temp, env, target):
+    args = (options.cli, "batch", "--input", FIXTURE, "--output-dir", temp / f"batch-{target}",
+            "--motion-target", target, "--json")
+    plain = json.loads(run(*args, env=env))["successes"][0]
+    styled = json.loads(run(*args, "--apple-styles", "--resume", env=env))["successes"][0]
+    plain_paths = [Path(path).resolve(strict=True) for path in plain["outputs"]]
+    styled_paths = [Path(path).resolve(strict=True) for path in styled["outputs"]]
+    require(styled["status"] == "converted" and styled_paths != plain_paths,
+            "plain Live Photo provenance authorized a batch Styles request")
+    resumed = json.loads(run(*args, "--apple-styles", "--resume", env=env))["successes"][0]
+    resumed_paths = [Path(path).resolve(strict=True) for path in resumed["outputs"]]
+    require(resumed["status"] == "skipped-existing" and resumed_paths == styled_paths,
+            "batch Styles resume did not reuse its own validated output")
+
+    output = Path(styled["outputs"][0])
+    cover = output / (output.stem + ".heic") if target == "apple-pvt" else output
+    report = json.loads(run(options.cli, "validate", "--json", output, env=env))
+    require(report["valid"] and report["kind"] == "live-photo", "batch returned invalid Styles output")
+    if target == "apple-pvt":
+        child = output / "unwanted"
+        rejected = subprocess.run([options.cli, "hdr-look", cover, "--output-dir", child],
+                                  env=env, capture_output=True, timeout=30)
+        require(rejected.returncode != 0 and not child.exists(),
+                "HDR Look allowed an output directory inside an existing PVT")
+        after = json.loads(run(options.cli, "validate", "--json", output, env=env))
+        require(after["valid"], "HDR Look changed the existing package")
+    return cover, cover.with_suffix(".mov")
+
+
 def check(options, temp):
     probe = compile_probe(temp)
     env = dict(os.environ, XDREMUX_APPLE_ADAPTER=str(options.adapter))
     _, unstyled_path = convert(options, temp, env, "base", "apple-pair", False)
     cover, movie_path = convert(options, temp, env, "styled", "apple-pvt", True)
     _, pair_path = convert(options, temp, env, "pair", "apple-pair", True)
+    batch_results = [batch_styled(options, temp, env, target) for target in ("apple-pair", "apple-pvt")]
     base = probe_movie(options.ffprobe, unstyled_path)
     movie = probe_movie(options.ffprobe, movie_path)
     pair = probe_movie(options.ffprobe, pair_path)
     video = main_track(movie, "video")
     timeline = pts(movie, video)
     require(hlg(video) and len(timeline) == 89, "converted primary video lost HLG or frames")
-    for result in (movie, pair):
+    for result in (movie, pair, *(probe_movie(options.ffprobe, path) for _, path in batch_results)):
         for kind in ("video", "audio"):
             require(
                 compressed_packets(result, main_track(result, kind)) == compressed_packets(base, main_track(base, kind)),
@@ -149,6 +179,8 @@ def check(options, temp):
     off, neutral = render(enabled=False), render()
     glowy = render(enabled=False, texture="Glowy")
     preview(probe, pair_path.with_suffix(".heic"), pair_path, timeline, tone=0.25)
+    for batch_cover, batch_movie in batch_results:
+        preview(probe, batch_cover, batch_movie, timeline, tone=0.25)
     export = temp / "edited.mov"
     run(probe, cover, movie_path, "0.25", "0.1", "1", "-", export)
     saved = probe_movie(options.ffprobe, export)

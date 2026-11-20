@@ -95,6 +95,29 @@ def check(path, baseline, adapter, directory):
 WRAPPER = r'''#!/usr/bin/env python3
 import json,os,shutil,subprocess,sys
 from pathlib import Path
+
+def describe_statistics_failure(request):
+    if request['operation'] != 'texture-statistics':
+        return
+    details = {'operation': 'texture-statistics', 'effect': request['texture']['effect']}
+    try:
+        report = json.loads(Path(request['output_path']).read_text())
+    except (OSError, ValueError):
+        report = None
+    if isinstance(report, dict):
+        stage = report.get('stage')
+        if isinstance(stage, str):
+            details['stage'] = stage[:80]
+        exception = report.get('exception')
+        if isinstance(exception, dict):
+            for name, key, limit in [('name', 'exception', 120), ('reason', 'reason', 400)]:
+                value = exception.get(name)
+                if isinstance(value, str):
+                    details[key] = value[:limit]
+    else:
+        details['report'] = 'unavailable'
+    print('Texture native failure ' + json.dumps(details), file=sys.stderr, flush=True)
+
 adapter=os.environ['XDREMUX_REAL_TEXTURE_ADAPTER']
 evidence=Path(os.environ['XDREMUX_TEXTURE_OBSERVATIONS'])
 child=subprocess.Popen([adapter,'--persistent-json-lines'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=sys.stderr)
@@ -103,8 +126,15 @@ try:
   request=json.loads(line); operation=request['operation']
   if os.environ.get('XDREMUX_TEXTURE_INJECT_FAILURE') == operation:
    sys.stderr.write('injected native statistics failure for publication regression\n');sys.exit(73)
-  child.stdin.write(line);child.stdin.flush();response=child.stdout.readline()
-  if not response: sys.exit(child.wait())
+  try:
+   child.stdin.write(line);child.stdin.flush()
+  except BrokenPipeError:
+   response = b''
+  else:
+   response = child.stdout.readline()
+  if not response:
+   describe_statistics_failure(request)
+   sys.exit(child.wait())
   if operation in {'texture-infer','texture-statistics','texture-readback'}:
    root=Path(request['texture']['context_path']) if operation=='texture-statistics' else Path(request['output_path']) if operation=='texture-infer' else Path(request['output_path']).parent
    if (root/'carrier-production.json').is_file():

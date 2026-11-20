@@ -975,6 +975,7 @@ dependencies = [
  "quick-xml",
  "rustix",
  "ruzstd",
+ "same-file",
  "serde",
  "serde_json",
  "sha2",

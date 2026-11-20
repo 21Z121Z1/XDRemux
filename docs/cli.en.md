@@ -278,15 +278,17 @@ Normal directory discovery selects HEIC, HEIF, JPG, and JPEG candidates. `--appl
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | Motion Photo destination. Default is Apple pair. Google writes one `*.xdremuxMP.jpg` or `*.xdremuxMP.heic` file without transcoding the still image. |
 | `--motion-video-compat preserve` | Google targets only. Optional; `preserve` is the sole mode and is the default. No brand rewrite or transcode. |
 | `--jobs N` | Positive integer. Defaults to available parallelism, capped at `4`, with fallback `1`. |
-| `--checkpoint FILE` | Selects the checkpoint base path. The stored filename appends `.motion-photo`. |
+| `--checkpoint FILE` | Selects the checkpoint base path. The v4 journal appends `.motion-photo.v4`. Older `.motion-photo` files are read-only. |
 | `--resume` | Reuses completed Apple or Google Motion Photo work only when provenance and output identity match, then retries remaining items. |
 | `--skip-existing` | Applies the same provenance checks before reusing existing Motion Photo output. |
 | `--categorize` | Publishes converted assets directly into classification folders. |
 | `--json` | Writes one structured receipt instead of human output. |
 
-The [product options](#product-options) also apply. `--resume` and `--skip-existing` require `--output-dir` or `--checkpoint`. Without an explicit checkpoint, `--output-dir` stores `.xdremux-motion-photo-checkpoint.jsonl`.
+The [product options](#product-options) also apply. `--resume` and `--skip-existing` require `--output-dir` or `--checkpoint`. Without an explicit checkpoint, `--output-dir` stores `.xdremux-motion-photo-checkpoint.jsonl.v4`.
 
-Checkpoint reuse is a Motion Photo feature. It is not a general promise to skip any existing HDR or video output. The checkpoint schema is version 3; older Apple pair/PVT records remain readable. Google entries identify the target, video policy, and complete output SHA-256. Resume verifies source size/hash, recorded output path/hash, and strict parsing. A different video policy plans another filename. An existing altered output fails without overwrite; a missing output can be regenerated at its recorded path. `--apple-cinematic` rejects `--resume`, `--skip-existing`, `--checkpoint`, and `--categorize`.
+The v4 Motion Photo journal binds the source SHA-256, output route, format, editing intent, and the digests of all published members. The journal protects inputs and output paths from aliasing and accepts one writer per journal. A prepared entry records the exact staged members before publication. On resume, an exact published result can be committed without encoding again. A partial, uncommitted pair can be completed using its verified staging files. Conflicting entries remain in place. Legacy ordinary Apple pair/PVT and Google checkpoints retain their prior provenance checks. A plain Live Photo record cannot satisfy a Styles request.
+
+On macOS, both `convert` and `batch` support `--apple-styles` for Motion Photos going to Apple pairs or PVT. Batch can keep both the plain and Styles variants in the same output directory. When a journal write fails after a verified publication, the batch reports a failure with `published_unrecorded` and the observed `published_outputs`. The next `--resume` reconciles the prepared entry. `--apple-cinematic` rejects `--resume`, `--skip-existing`, `--checkpoint`, and `--categorize`.
 
 Google targets reject ProXDR stills, incompatible JPEG/HEIC source containers, and unmapped vendor resources individually. `google-avif` and AVIF directory discovery are not supported. Batch does not infer an Apple HEIC+MOV pair from adjacent filenames; use `convert --motion-video` to supply an explicit pair.
 
@@ -305,6 +307,8 @@ xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run --jso
 `--input PATH` is repeatable and required at least once. `--output-dir DIR` is required. Input directories are scanned recursively. `--dry-run` reports the plan without publishing files. `--json` produces a structured receipt.
 
 The command copies assets into folders by asset type and primary capture mode. A validated Live Photo still and MOV are one asset. Explicit symbolic-link inputs are rejected. Directory discovery skips symbolic links and PVT directories.
+
+The JSON preview includes a `plan_id`. Supply it as `--require-plan ID` on the copy command with the same inputs and destination to reject a changed source, layout, or plan before copying. The App uses this check and invalidates the preview when its inputs or destination change.
 
 ## `inspect`
 
@@ -339,7 +343,7 @@ A two-image JPEG is checked for two complete images, an MPF index that reaches b
 
 PVT validation also checks the XML plist's string version and unambiguous regular member files. It rejects missing, nested, symbolic-link, duplicate, or malformed members without changing them. This check is structural validation, not Photos import.
 
-`validate STYLES_OUTPUT --apple-styles` additionally requires native Photographic Styles and Texture readback on macOS 27. The app uses this check before it skips an existing Styles output. A plain HDR file fails the feature check.
+`validate STYLES_OUTPUT --apple-styles` additionally requires native Photographic Styles and Texture readback on macOS 27. The app uses this check before it skips an existing static Styles output. For an existing flat Live Photo pair or PVT it asks for a new path. A plain HDR file fails the feature check.
 
 ## Cinematic video on macOS
 

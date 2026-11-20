@@ -84,6 +84,17 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Record native runner environment
+        if: needs.changes.outputs.product == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            sw_vers
+            uname -m
+            xcodebuild -version
+          } | tee artifacts/product-integration/macos-environment.log
+
       - name: Run exact-HEAD completion gate
         shell: bash
         env:

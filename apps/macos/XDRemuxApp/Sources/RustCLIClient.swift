@@ -57,8 +57,19 @@ enum RustCLIClient {
         }
     }
 
+    struct CategorizationResult: Sendable {
+        let items: [PhotoCategorizationItem]
+        let planID: String?
+    }
+
     private struct CategorizeReceipt: Decodable {
         let items: [CategorizeItem]
+        let planID: String?
+
+        enum CodingKeys: String, CodingKey {
+            case items
+            case planID = "plan_id"
+        }
     }
 
     private struct CategorizeItem: Decodable {
@@ -141,7 +152,7 @@ enum RustCLIClient {
                 inputs: group,
                 outputDirectory: URL(fileURLWithPath: key),
                 dryRun: true
-            ))
+            ).items)
         }
         var seen = Set<String>()
         return items.filter { seen.insert($0.id).inserted }
@@ -150,9 +161,10 @@ enum RustCLIClient {
     static func categorize(
         inputs: [URL],
         outputDirectory: URL,
-        dryRun: Bool
-    ) throws -> [PhotoCategorizationItem] {
-        guard !inputs.isEmpty else { return [] }
+        dryRun: Bool,
+        expectedPlan: String? = nil
+    ) throws -> CategorizationResult {
+        guard !inputs.isEmpty else { return CategorizationResult(items: [], planID: nil) }
         var arguments = ["categorize"]
         for input in inputs {
             arguments.append(contentsOf: ["--input", input.path])
@@ -160,6 +172,9 @@ enum RustCLIClient {
         arguments.append(contentsOf: ["--output-dir", outputDirectory.path, "--json"])
         if dryRun {
             arguments.append("--dry-run")
+        }
+        if let expectedPlan {
+            arguments.append(contentsOf: ["--require-plan", expectedPlan])
         }
 
         let result = try run(arguments, allowNonZeroOutput: true)
@@ -175,7 +190,7 @@ enum RustCLIClient {
                 detail.isEmpty ? "无法解析 Rust CLI 分类回执：\(error)" : detail
             )
         }
-        return try receipt.items.map(makeCategorizationItem(from:))
+        return try CategorizationResult(items: receipt.items.map(makeCategorizationItem(from:)), planID: receipt.planID)
     }
 
     static func hdrLook(inputs: [URL], outputDirectory: URL?, headroom: Int) throws -> HDRLookReceipt {

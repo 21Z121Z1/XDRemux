@@ -1,11 +1,18 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::os::fd::AsFd;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
-use std::sync::{mpsc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use rustix::event::{poll, PollFd, PollFlags, Timespec};
+use rustix::fs::{fcntl_getfl, fcntl_setfl, OFlags};
+use rustix::process::{kill_process_group, Pid, Signal};
 
 use serde::{Deserialize, Serialize};
 use xdremux_engine::{
@@ -24,6 +31,8 @@ const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
+const PIPE_POLL_INTERVAL: Duration = Duration::from_millis(25);
+const PROCESS_REAP_BUDGET: Duration = Duration::from_millis(250);
 const MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;
 const MAX_APPLE_ADAPTER_DIAGNOSTIC_BYTES: usize = 64 * 1024;
 const MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;
@@ -137,11 +146,101 @@ enum AdapterStreamEvent {
 }
 
 struct AppleAdapterSession {
-    child: Child,
+    child: Option<Child>,
+    stop_reading: Arc<AtomicBool>,
     stdin: Option<ChildStdin>,
     responses: mpsc::Receiver<AdapterStreamEvent>,
     stdout_reader: Option<JoinHandle<()>>,
     stderr_reader: Option<JoinHandle<Vec<u8>>>,
+}
+
+fn nonblocking(pipe: &impl AsFd) -> io::Result<()> {
+    Ok(fcntl_setfl(pipe, fcntl_getfl(pipe)? | OFlags::NONBLOCK)?)
+}
+
+fn wait_for_pipe(pipe: &impl AsFd, events: PollFlags, timeout: Duration) -> io::Result<()> {
+    let timeout = Timespec {
+        tv_sec: timeout.as_secs() as _,
+        tv_nsec: timeout.subsec_nanos().into(),
+    };
+    match poll(&mut [PollFd::new(pipe, events)], Some(&timeout)) {
+        Ok(_) | Err(rustix::io::Errno::INTR) => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+struct AdapterPipe<R> {
+    pipe: R,
+    stop: Arc<AtomicBool>,
+    final_reads: usize,
+}
+
+impl<R: Read + AsFd> Read for AdapterPipe<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        loop {
+            let stopping = self.stop.load(Ordering::Acquire);
+            if stopping {
+                // Retain small diagnostics already buffered before the child exited.
+                if self.final_reads == 0 {
+                    return Ok(0);
+                }
+                self.final_reads -= 1;
+            }
+            match self.pipe.read(buffer) {
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    if stopping {
+                        return Ok(0);
+                    }
+                    wait_for_pipe(&self.pipe, PollFlags::IN, PIPE_POLL_INTERVAL)?;
+                }
+                result => return result,
+            }
+        }
+    }
+}
+
+fn write_request(stdin: &mut ChildStdin, request: &[u8], deadline: Instant) -> io::Result<()> {
+    for mut chunk in [request, b"\n"] {
+        while !chunk.is_empty() {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "request write timed out",
+                ));
+            }
+            match stdin.write(chunk) {
+                Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+                Ok(count) => chunk = &chunk[count..],
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    wait_for_pipe(stdin, PollFlags::OUT, remaining)?;
+                }
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(error),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn stop_adapter_child(mut child: Child) -> Option<ExitStatus> {
+    if let Some(group) = Pid::from_raw(child.id() as i32) {
+        let _ = kill_process_group(group, Signal::KILL);
+    }
+    let _ = child.kill();
+    let deadline = Instant::now() + PROCESS_REAP_BUDGET;
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(status)) => return Some(status),
+            Ok(None) => thread::sleep(Duration::from_millis(5)),
+            Err(_) => break,
+        }
+    }
+    // Reaping is still owned even if the kernel cannot stop the child promptly.
+    thread::spawn(move || {
+        let _ = child.wait();
+    });
+    None
 }
 
 impl AppleAdapterSession {
@@ -151,6 +250,7 @@ impl AppleAdapterSession {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .process_group(0)
             .spawn()
             .map_err(|error| RuntimeError::external("Apple adapter launch", error))?;
 
@@ -158,8 +258,7 @@ impl AppleAdapterSession {
         let (stdin, stdout, stderr) = match pipes {
             (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
             _ => {
-                let _ = child.kill();
-                let _ = child.wait();
+                stop_adapter_child(child);
                 return Err(RuntimeError::new(
                     "Apple adapter launch",
                     "persistent helper pipes are unavailable",
@@ -167,22 +266,40 @@ impl AppleAdapterSession {
             }
         };
 
-        let (sender, responses) = mpsc::channel();
+        if let Err(error) = nonblocking(&stdin)
+            .and_then(|()| nonblocking(&stdout))
+            .and_then(|()| nonblocking(&stderr))
+        {
+            stop_adapter_child(child);
+            return Err(RuntimeError::external("Apple adapter pipe setup", error));
+        }
+        let stop_reading = Arc::new(AtomicBool::new(false));
+        let stdout = AdapterPipe {
+            pipe: stdout,
+            stop: Arc::clone(&stop_reading),
+            final_reads: 16,
+        };
+        let stderr = AdapterPipe {
+            pipe: stderr,
+            stop: Arc::clone(&stop_reading),
+            final_reads: 16,
+        };
+        let (sender, responses) = mpsc::sync_channel(2);
         let stdout_reader = thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
             loop {
                 match read_bounded_adapter_frame(&mut reader) {
                     Ok(Some(frame)) => {
-                        if sender.send(AdapterStreamEvent::Frame(frame)).is_err() {
+                        if sender.try_send(AdapterStreamEvent::Frame(frame)).is_err() {
                             break;
                         }
                     }
                     Ok(None) => {
-                        let _ = sender.send(AdapterStreamEvent::Eof);
+                        let _ = sender.try_send(AdapterStreamEvent::Eof);
                         break;
                     }
                     Err(error) => {
-                        let _ = sender.send(AdapterStreamEvent::Error(error));
+                        let _ = sender.try_send(AdapterStreamEvent::Error(error));
                         break;
                     }
                 }
@@ -191,7 +308,8 @@ impl AppleAdapterSession {
         let stderr_reader = thread::spawn(move || read_bounded_diagnostic(stderr));
 
         Ok(Self {
-            child,
+            child: Some(child),
+            stop_reading,
             stdin: Some(stdin),
             responses,
             stdout_reader: Some(stdout_reader),
@@ -200,27 +318,39 @@ impl AppleAdapterSession {
     }
 
     fn is_running(&mut self) -> Result<bool> {
-        self.child
+        let Some(child) = self.child.as_mut() else {
+            return Ok(false);
+        };
+        if child
             .try_wait()
-            .map(|status| status.is_none())
-            .map_err(|error| RuntimeError::external("Apple adapter wait", error))
+            .map_err(|error| RuntimeError::external("Apple adapter wait", error))?
+            .is_none()
+        {
+            return Ok(true);
+        }
+        // Once reaped, this numeric PID no longer proves process-group ownership.
+        self.child.take();
+        Ok(false)
     }
 
     fn invoke(&mut self, executable: &Path, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
-        if let Err(error) = self
+        let deadline = Instant::now() + timeout;
+        let write = self
             .stdin
             .as_mut()
             .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "helper stdin is unavailable"))
-            .and_then(|stdin| {
-                stdin.write_all(request)?;
-                stdin.write_all(b"\n")?;
-                stdin.flush()
-            })
-        {
+            .and_then(|stdin| write_request(stdin, request, deadline));
+        if let Err(error) = write {
+            if error.kind() == io::ErrorKind::TimedOut {
+                return Err(self.timeout_error(executable, timeout));
+            }
             return Err(self.execution_error(format!("request write failed: {error}")));
         }
 
-        match self.responses.recv_timeout(timeout) {
+        match self
+            .responses
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        {
             Ok(AdapterStreamEvent::Frame(frame)) if !frame.is_empty() => Ok(frame),
             Ok(AdapterStreamEvent::Frame(_)) => {
                 Err(self.execution_error("adapter returned an empty response frame".to_owned()))
@@ -230,21 +360,23 @@ impl AppleAdapterSession {
             }
             Ok(AdapterStreamEvent::Eof) => Err(self
                 .execution_error("adapter closed stdout before returning a response".to_owned())),
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                self.abort();
-                Err(RuntimeError::new(
-                    "Apple adapter timeout",
-                    format!(
-                        "{} exceeded {} ms",
-                        executable.display(),
-                        timeout.as_millis()
-                    ),
-                ))
-            }
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(self.timeout_error(executable, timeout)),
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 Err(self.execution_error("adapter response channel disconnected".to_owned()))
             }
         }
+    }
+
+    fn timeout_error(&mut self, executable: &Path, timeout: Duration) -> RuntimeError {
+        self.abort();
+        RuntimeError::new(
+            "Apple adapter timeout",
+            format!(
+                "{} exceeded {} ms",
+                executable.display(),
+                timeout.as_millis()
+            ),
+        )
     }
 
     fn execution_error(&mut self, fallback: String) -> RuntimeError {
@@ -263,13 +395,8 @@ impl AppleAdapterSession {
 
     fn abort(&mut self) -> (Option<ExitStatus>, Vec<u8>) {
         self.stdin.take();
-        let status = match self.child.try_wait() {
-            Ok(Some(status)) => Some(status),
-            Ok(None) | Err(_) => {
-                let _ = self.child.kill();
-                self.child.wait().ok()
-            }
-        };
+        let status = self.child.take().and_then(stop_adapter_child);
+        self.stop_reading.store(true, Ordering::Release);
         if let Some(reader) = self.stdout_reader.take() {
             let _ = reader.join();
         }
@@ -2030,6 +2157,53 @@ done
         let launch_log = PathBuf::from(format!("{}.log", helper.display()));
         let launches = std::fs::read_to_string(launch_log).unwrap();
         assert_eq!(launches.lines().count(), 2);
+    }
+
+    #[test]
+    fn request_write_shares_the_response_deadline() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let executable = root.path().join("not-reading.sh");
+        fs::write(&executable, "#!/bin/sh\nsleep 2\n").unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+
+        let client = AppleAdapterClient::new(&executable);
+        let started = Instant::now();
+        let failure = client
+            .invoke(&vec![b'x'; 1024 * 1024], Duration::from_millis(70))
+            .unwrap_err();
+        assert!(
+            failure.to_string().contains("Apple adapter timeout"),
+            "{failure}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn protocol_failure_reaps_children_holding_helper_pipes() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let executable = root.path().join("inherited-pipes.sh");
+        fs::write(
+            &executable,
+            "#!/bin/sh\nread request\nprintf 'ready\\n'\nread request\nsleep 15 &\nprintf '\\n'\nwait\n",
+        )
+        .unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+
+        let client = AppleAdapterClient::new(&executable);
+        // Measure cleanup from a running session. Starting a shell under
+        // test-suite load must not consume the cleanup check's budget.
+        assert_eq!(client.invoke(b"{}", DEFAULT_TIMEOUT).unwrap(), b"ready");
+        let started = Instant::now();
+        let failure = client.invoke(b"{}", DEFAULT_TIMEOUT).unwrap_err();
+        assert!(failure.to_string().contains("empty response"), "{failure}");
+        assert!(
+            started.elapsed() < Duration::from_secs(8),
+            "helper cleanup waited for the descendant to close inherited pipes"
+        );
     }
 
     #[test]

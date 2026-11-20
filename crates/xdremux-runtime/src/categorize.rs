@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -49,6 +49,7 @@ pub struct CategorizeItemReceipt {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CategorizeReceipt {
+    pub plan_id: String,
     pub items: Vec<CategorizeItemReceipt>,
 }
 
@@ -217,14 +218,11 @@ fn companion_video(path: &Path) -> Option<PathBuf> {
     candidates.into_iter().next()
 }
 
-fn valid_live_photo_pair(image: &[u8], video_path: &Path) -> bool {
-    let Ok(video) = fs::read(video_path) else {
-        return false;
-    };
+fn valid_live_photo_pair(image: &[u8], video: &[u8]) -> bool {
     MotionPhoto::parse(
         Input::ApplePair {
             still: image,
-            movie: &video,
+            movie: video,
         },
         ParseOptions::strict(),
     )
@@ -255,18 +253,58 @@ pub(crate) fn classification_relative_directory(source: &Path) -> Result<PathBuf
 fn fingerprint_path(path: &Path) -> Result<ResourceFingerprint> {
     let mut file = File::open(path)
         .map_err(|error| RuntimeError::external("categorization fingerprint open", error))?;
+    fingerprint_copy(&mut file, io::sink())
+}
+
+fn fingerprint_copy(
+    source: &mut impl Read,
+    mut destination: impl Write,
+) -> Result<ResourceFingerprint> {
     let mut digest = Sha256::new();
     let mut buffer = vec![0_u8; COPY_BUFFER_BYTES];
     loop {
-        let read = file
+        let read = source
             .read(&mut buffer)
             .map_err(|error| RuntimeError::external("categorization fingerprint read", error))?;
         if read == 0 {
             break;
         }
+        destination
+            .write_all(&buffer[..read])
+            .map_err(|error| RuntimeError::external("categorization staging copy", error))?;
         digest.update(&buffer[..read]);
     }
     Ok(ResourceFingerprint::new(digest.finalize().to_vec()))
+}
+
+fn fingerprint_plan(
+    items: &[PhotoAssetCategorizationItem],
+    sources: &BTreeMap<PathBuf, ResourceFingerprint>,
+) -> String {
+    let mut digest = Sha256::new();
+    for item in items {
+        let source = &sources[&item.source];
+        let disposition = match item.disposition {
+            PhotoAssetCategorizationDisposition::Copy => b"copy".as_slice(),
+            PhotoAssetCategorizationDisposition::Duplicate => b"duplicate".as_slice(),
+        };
+        for field in [
+            item.asset_id.as_bytes(),
+            item.source.as_os_str().as_encoded_bytes(),
+            item.destination.as_os_str().as_encoded_bytes(),
+            role_name(item.role).as_bytes(),
+            disposition,
+            source.as_bytes(),
+        ] {
+            digest.update((field.len() as u64).to_le_bytes());
+            digest.update(field);
+        }
+    }
+    digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn prepare_categorization(inputs: &[PathBuf]) -> Result<PreparedCategorization> {
@@ -289,8 +327,16 @@ fn prepare_categorization(inputs: &[PathBuf]) -> Result<PreparedCategorization> 
             .map_err(|error| RuntimeError::external("categorization input read", error))?;
         let companion = companion_video(&primary);
         let inferred = inferred_asset_type(&bytes);
+        let mut companion_fingerprint = None;
         let asset = resolve_photo_asset(primary.clone(), companion, inferred, |_, video| {
-            valid_live_photo_pair(&bytes, video)
+            let Ok(movie) = fs::read(video) else {
+                return false;
+            };
+            if !valid_live_photo_pair(&bytes, &movie) {
+                return false;
+            }
+            companion_fingerprint = Some(ResourceFingerprint::new(Sha256::digest(&movie).to_vec()));
+            true
         });
         let classification = classify_user_comment_with_context(
             extract_user_comment(&bytes).as_deref(),
@@ -299,7 +345,15 @@ fn prepare_categorization(inputs: &[PathBuf]) -> Result<PreparedCategorization> 
         );
         let mut fingerprints = BTreeMap::new();
         for resource in &asset.resources {
-            let fingerprint = fingerprint_path(&resource.path)?;
+            let fingerprint = if resource.path == primary {
+                ResourceFingerprint::new(Sha256::digest(&bytes).to_vec())
+            } else if resource.role == PhotoResourceRole::PairedVideo {
+                companion_fingerprint
+                    .clone()
+                    .expect("validated companion was captured")
+            } else {
+                fingerprint_path(&resource.path)?
+            };
             source_fingerprints.insert(resource.path.clone(), fingerprint.clone());
             fingerprints.insert(resource.path.clone(), fingerprint);
         }
@@ -360,7 +414,11 @@ fn collect_existing_destinations(root: &Path) -> Result<BTreeMap<PathBuf, Resour
     Ok(existing)
 }
 
-fn stage_copy<'a>(item: &'a PhotoAssetCategorizationItem) -> Result<StagedCopy<'a>> {
+fn stage_copy<'a>(
+    item: &'a PhotoAssetCategorizationItem,
+    expected: &ResourceFingerprint,
+) -> Result<StagedCopy<'a>> {
+    crate::live_photo_package::validate_output_parent(&item.destination)?;
     let parent = item.destination.parent().ok_or_else(|| {
         RuntimeError::new(
             "categorization destination",
@@ -380,8 +438,13 @@ fn stage_copy<'a>(item: &'a PhotoAssetCategorizationItem) -> Result<StagedCopy<'
         .prefix(".xdremux-categorize-")
         .tempfile_in(parent)
         .map_err(|error| RuntimeError::external("categorization staging file", error))?;
-    io::copy(&mut source, temporary.as_file_mut())
-        .map_err(|error| RuntimeError::external("categorization staging copy", error))?;
+    let observed = fingerprint_copy(&mut source, temporary.as_file_mut())?;
+    if &observed != expected {
+        return Err(RuntimeError::new(
+            "categorization staging",
+            "source changed after planning; rescan",
+        ));
+    }
     temporary
         .as_file()
         .set_permissions(source_permissions)
@@ -393,9 +456,18 @@ fn stage_copy<'a>(item: &'a PhotoAssetCategorizationItem) -> Result<StagedCopy<'
     Ok(StagedCopy { item, temporary })
 }
 
-fn rollback_published(paths: &[PathBuf]) -> Option<String> {
+fn rollback_published(paths: &[(PathBuf, same_file::Handle)]) -> Option<String> {
     let mut failures = Vec::new();
-    for path in paths.iter().rev() {
+    for (path, published) in paths.iter().rev() {
+        if !fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+            || !same_file::Handle::from_path(path).is_ok_and(|current| current == *published)
+        {
+            failures.push(format!(
+                "{}: destination no longer belongs to this copy",
+                path.display()
+            ));
+            continue;
+        }
         if let Err(error) = fs::remove_file(path) {
             failures.push(format!("{}: {error}", path.display()));
         }
@@ -467,7 +539,7 @@ fn execute_asset(
         .collect::<Vec<_>>();
     let mut staged = Vec::with_capacity(copy_items.len());
     for item in &copy_items {
-        match stage_copy(item) {
+        match stage_copy(item, &source_fingerprints[&item.source]) {
             Ok(value) => staged.push(value),
             Err(error) => {
                 let detail = format!("asset staging aborted before publication: {error}");
@@ -492,16 +564,28 @@ fn execute_asset(
         let destination = staged_copy.item.destination.clone();
         match staged_copy.temporary.persist_noclobber(&destination) {
             Ok(file) => {
-                if let Err(error) = file.sync_all() {
+                let synced = file.sync_all();
+                let identity = same_file::Handle::from_file(file);
+                let issue = match (identity, synced) {
+                    (Ok(identity), Ok(())) => {
+                        published.push((destination, identity));
+                        continue;
+                    }
+                    (Ok(identity), Err(error)) => {
+                        published.push((destination.clone(), identity));
+                        error
+                    }
+                    (Err(error), _) => error,
+                };
+                {
                     let mut detail = format!(
-                        "asset publication sync failed for {}: {error}",
+                        "asset publication sync failed for {}: {issue}",
                         destination.display()
                     );
                     if let Some(rollback) = rollback_published(&published) {
                         detail.push_str("; ");
                         detail.push_str(&rollback);
                     }
-                    let _ = fs::remove_file(&destination);
                     return items
                         .iter()
                         .map(|candidate| match candidate.disposition {
@@ -516,7 +600,6 @@ fn execute_asset(
                         })
                         .collect();
                 }
-                published.push(destination);
             }
             Err(error) if error.error.kind() == io::ErrorKind::AlreadyExists => {
                 let source_fingerprint = source_fingerprints.get(&staged_copy.item.source);
@@ -597,6 +680,16 @@ impl PortableRuntime {
         output_root: impl AsRef<Path>,
         dry_run: bool,
     ) -> Result<CategorizeReceipt> {
+        self.categorize_files_with_plan(inputs, output_root, dry_run, None)
+    }
+
+    pub fn categorize_files_with_plan(
+        &self,
+        inputs: &[PathBuf],
+        output_root: impl AsRef<Path>,
+        dry_run: bool,
+        expected_plan: Option<&str>,
+    ) -> Result<CategorizeReceipt> {
         let output_root = output_root.as_ref();
         crate::live_photo_package::validate_output_parent(&output_root.join("planned-output"))?;
         let prepared = prepare_categorization(inputs)?;
@@ -608,12 +701,23 @@ impl PortableRuntime {
         )
         .map_err(|error| RuntimeError::external("categorization planning", error))?;
 
+        let plan_id = fingerprint_plan(&plan.items, &prepared.source_fingerprints);
+        if expected_plan.is_some_and(|expected| expected != plan_id) {
+            return Err(RuntimeError::new(
+                "categorization preview",
+                "plan changed; run a new preview before copying",
+            ));
+        }
+
         let mut grouped = BTreeMap::<String, Vec<&PhotoAssetCategorizationItem>>::new();
         for item in &plan.items {
             grouped.entry(item.asset_id.clone()).or_default().push(item);
         }
 
-        let mut receipt = CategorizeReceipt::default();
+        let mut receipt = CategorizeReceipt {
+            plan_id,
+            items: Vec::new(),
+        };
         for (asset_id, items) in grouped {
             let contract = prepared.contracts.get(&asset_id).ok_or_else(|| {
                 RuntimeError::new(

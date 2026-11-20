@@ -41,6 +41,8 @@ struct XDRemuxAppModelTests {
         try await testCategorizationPreviewCopyAndDuplicateRerun()
         try await testCategorizationDefaultsToEachSourceDirectory()
         try await testCategorizationCancellationKeepsCancelledState()
+        try await testConversionCancellationWaitsForActiveCommand()
+        try await testExistingPairCannotBypassConversion()
         try await testImportedRowsStartWithEmptyThumbnailState()
         try await testOutputCollisionsAreMarkedBeforeConversion()
         try await testOutputPlanFlagsInvalidExistingOutputAsOverwriteRisk()
@@ -163,6 +165,11 @@ struct XDRemuxAppModelTests {
     @MainActor
     private static func runConversion(_ model: XDRemuxViewModel) async throws {
         model.startConversion()
+        try await waitForConversion(model)
+    }
+
+    @MainActor
+    private static func waitForConversion(_ model: XDRemuxViewModel) async throws {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(10))
         while clock.now < deadline,
@@ -658,6 +665,28 @@ struct XDRemuxAppModelTests {
         try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("静态照片/人像/portrait.heic") }, "preview should show the mode destination")
         try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("静态照片/未分类/plain.jpg") }, "preview should show the unclassified destination")
 
+        let unconfirmedOutput = input.appendingPathComponent("new-output", isDirectory: true)
+        viewModel.outputDirectory = unconfirmedOutput
+        try expect(!viewModel.canCopy && viewModel.items.isEmpty, "a new output directory invalidates the preview")
+        viewModel.copyPlannedFiles()
+        try expect(!FileManager.default.fileExists(atPath: unconfirmedOutput.path), "stale preview must not write")
+        viewModel.outputDirectory = output
+        viewModel.scan()
+        try await waitForCategorization(viewModel)
+
+        let edited = input.appendingPathComponent("portrait.heic")
+        try Data("different-oplus_18-content".utf8).write(to: edited)
+        viewModel.copyPlannedFiles()
+        try await waitForCategorization(viewModel)
+        if case .failed = viewModel.state {
+            try expect(viewModel.failedCount == 0, "stale plan was rejected before any copy")
+        } else {
+            try expect(false, "a changed source must invalidate the Rust preview")
+        }
+        try expect(!FileManager.default.fileExists(atPath: output.path), "changed preview must fail before writing")
+        viewModel.scan()
+        try await waitForCategorization(viewModel)
+
         viewModel.copyPlannedFiles()
         try await waitForCategorization(viewModel)
         try expect(viewModel.state == .completed, "copy should complete")
@@ -681,8 +710,77 @@ struct XDRemuxAppModelTests {
         viewModel.outputDirectory = root.appendingPathComponent("output", isDirectory: true)
         viewModel.scan()
         viewModel.cancel()
-        try await Task.sleep(for: .milliseconds(50))
+        try expect(viewModel.isBusy && !viewModel.canScan, "cancellation must drain the owned scan")
+        try await waitForCategorization(viewModel)
         try expect(viewModel.state == .cancelled, "cancel should leave scanning in the cancelled state")
+    }
+
+    @MainActor
+    private static func testConversionCancellationWaitsForActiveCommand() async throws {
+        let script = #"""
+        test "$1" = convert
+        root="$(dirname "$0")"
+        touch "$root/entered"
+        for tick in $(seq 1 100); do
+            if test -f "$root/release"; then
+                printf 'converted' > "$5"
+                exit 0
+            fi
+            sleep 0.03
+        done
+        exit 2
+        """#
+        try await withCLI(script) { root in
+            let first = root.appendingPathComponent("first.heic")
+            let second = root.appendingPathComponent("second.heic")
+            try writeFile(first)
+            try writeFile(second)
+            let model = XDRemuxViewModel()
+            model.config.outputDirectory = root.appendingPathComponent("results")
+            model.config.skipExisting = false
+            model.config.maxConcurrentJobs = 1
+            model.queue = [first, second].map {
+                ConversionQueueItem(inputURL: $0, outputURL: $0)
+            }
+            let entered = root.appendingPathComponent("entered")
+            let release = root.appendingPathComponent("release")
+            defer { try? Data().write(to: release) }
+            model.startConversion()
+            try expect(model.isBusy && !model.canStart, "start must reserve the operation synchronously")
+            for _ in 0..<100 {
+                if FileManager.default.fileExists(atPath: entered.path) { break }
+                try await Task.sleep(for: .milliseconds(15))
+            }
+            try expect(FileManager.default.fileExists(atPath: entered.path), "first CLI must be running")
+            model.cancelTask()
+            try expect(model.state == .cancelling && !model.canEditQueue && !model.canStart,
+                       "running command still owns its queue after cancellation")
+            model.clearQueue()
+            model.startConversion()
+            try expect(model.queue.count == 2, "a draining queue must not be cleared or restarted")
+            try Data().write(to: release)
+            try await waitForConversion(model)
+            try expect(model.state == .cancelled, "drained operation must end cancelled")
+            try expect(model.queue.map(\.status) == [.converted, .cancelled],
+                       "keep a committed result and cancel unstarted work")
+        }
+    }
+
+    @MainActor
+    private static func testExistingPairCannotBypassConversion() async throws {
+        try await withCLI("exit 0") { root in
+            let source = root.appendingPathComponent("source.heic")
+            let existing = root.appendingPathComponent("existing.heic")
+            try writeFile(source)
+            try writeFile(existing)
+            try writeFile(existing.deletingPathExtension().appendingPathExtension("mov"))
+            try expect(
+                (try? XDRemuxViewModel.prepareOutputForConversionForTesting(
+                    inputURL: source, outputURL: existing, skipExisting: true
+                )) == nil,
+                "structural validator success must not authorize adoption of an unbound pair"
+            )
+        }
     }
 
     @MainActor
@@ -794,7 +892,7 @@ struct XDRemuxAppModelTests {
         viewModel.refreshOutputURLsForPendingItems()
 
         try expect(viewModel.queue.first?.outputURL == output, "output directory should map to the expected target path")
-        try expect(viewModel.queue.first?.outputPlanStatus == .willOverwriteExisting, "invalid existing output should be visible as overwrite risk")
+        try expect(viewModel.queue.first?.outputPlanStatus == .checksExistingOutput, "existing output validation belongs to the worker")
         try expect(viewModel.canStart, "overwrite risk should not block conversion because conversion can replace the target")
     }
 

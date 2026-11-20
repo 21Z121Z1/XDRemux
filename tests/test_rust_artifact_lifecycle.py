@@ -24,7 +24,7 @@ class RustArtifactLifecycleTests(unittest.TestCase):
         # Still and Live Photo conversion share the assembly and final
         # validation. Follow the caller's data flow across that boundary.
         conversion = source.split("pub(crate) fn convert_file(", 1)[1].split("\nstruct StyleCarrier", 1)[0]
-        assembly = source.split("\nfn assemble_on_base(", 1)[1].split("\nfn note_system_carrier(", 1)[0]
+        assembly = source.split("\nfn assemble_on_base(", 1)[1].split("\npub(super) fn validate_maker_apple_properties(", 1)[0]
         for marker in (
             "tempdir_in(parent)",
             "AtomicFilePublisher::new(output.to_path_buf())",
@@ -44,12 +44,11 @@ class RustArtifactLifecycleTests(unittest.TestCase):
             r"let (?P<artifact>\w+) = assemble_on_base\([\s\S]*?\)\?;", conversion
         )
         self.assertIsNotNone(validated, "The conversion must propagate validation errors")
-        publication = conversion.index(f"publisher.publish_bytes({validated.group('artifact')})")
-        self.assertLess(
-            validated.end(),
-            publication,
-            "Styles must validate the final artifact before publication",
-        )
+        result = conversion.index(f"Ok({validated.group('artifact')})", validated.end())
+        propagated = conversion.index("let assembled = result?;", result)
+        publication = conversion.index("publisher.publish_bytes(assembled)", propagated)
+        self.assertLess(result, propagated)
+        self.assertLess(propagated, publication, "Styles must propagate validation errors before publishing")
         self.assertNotIn("XDRemuxAppleFeatures", source)
         self.assertNotIn("xdremux_py", source)
 

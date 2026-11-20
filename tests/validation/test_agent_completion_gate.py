@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import runpy
@@ -10,7 +11,9 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from threading import Barrier
 import unittest
+from unittest.mock import patch
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -91,6 +94,21 @@ class CompletionGateTests(unittest.TestCase):
             self.passing_check("regression", "regression"),
             self.passing_check("functional", "functional"),
         ])
+
+    def test_concurrent_writers_publish_complete_receipts_without_sharing_stage(self) -> None:
+        write = runpy.run_path(str(GATE))["write_receipt"]
+        receipt = self.repo / "shared.json"
+        barrier = Barrier(2, timeout=5)
+        replace = Path.replace
+
+        def replace_together(source: Path, target: Path) -> Path:
+            barrier.wait()
+            return replace(source, target)
+
+        with patch.object(Path, "replace", replace_together), ThreadPoolExecutor(2) as pool:
+            list(pool.map(lambda marker: write(receipt, {"marker": marker}), ("first", "second")))
+        self.assertIn(json.loads(receipt.read_text())["marker"], {"first", "second"})
+        self.assertFalse(list(self.repo.glob("*.tmp")))
 
     def test_rust_product_requires_regression_and_functional_evidence(self) -> None:
         self.add_tracked_file("crates/xdremux-runtime/src/lib.rs")

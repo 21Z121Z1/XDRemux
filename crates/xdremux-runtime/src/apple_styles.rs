@@ -154,9 +154,6 @@ pub(crate) fn convert_file(
     } else {
         None
     };
-    let carrier_report = system_encoded
-        .as_ref()
-        .map(|encoded| encoded.report_path.clone());
     let base = if let Some(encoded) = system_encoded.as_mut() {
         std::mem::take(&mut encoded.bytes)
     } else {
@@ -186,29 +183,36 @@ pub(crate) fn convert_file(
         .transpose()?;
     profile_stage(&mut profile, "base_conversion");
     let adapter = AppleAdapterClient::new(executable.as_ref().to_path_buf());
-    let assembled = assemble_on_base(
-        runtime,
-        &adapter,
-        StyleCarrier {
-            bytes: &base,
-            scene,
-            maximum_stops,
-            report: carrier_report.as_deref(),
-        },
-        staging.path(),
-        &mut profile,
-    )?;
-    if let Some(encoded) = &system_encoded {
-        if let Err(error) = crate::system_heif_hdr::record_after_styles(
+    let result: Result<Vec<u8>> = (|| {
+        let assembled = assemble_on_base(
+            runtime,
             &adapter,
-            &staging.path().join("final-styles.heic"),
-            &encoded.report_path,
-            &encoded.reference_f32_path,
-            &encoded.reference_f16_path,
-        ) {
-            return Err(note_system_carrier(carrier_report.as_deref(), error));
+            StyleCarrier {
+                bytes: &base,
+                scene,
+                maximum_stops,
+            },
+            staging.path(),
+            &mut profile,
+        )?;
+        if let Some(encoded) = &mut system_encoded {
+            crate::system_heif_hdr::record_after_styles(
+                &adapter,
+                &staging.path().join("final-styles.heic"),
+                &mut encoded.report,
+                &encoded.reference_f32_path,
+                &encoded.reference_f16_path,
+            )?;
         }
+        Ok(assembled)
+    })();
+    if let Some(encoded) = &mut system_encoded {
+        if let Err(error) = &result {
+            encoded.report.styles_carrier_error = Some(error.to_string());
+        }
+        crate::system_heif_hdr::publish_styles_report(&encoded.report_path, &encoded.report)?;
     }
+    let assembled = result?;
 
     profile_stage(&mut profile, "final_validation");
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
@@ -221,7 +225,6 @@ struct StyleCarrier<'a> {
     bytes: &'a [u8],
     scene: Option<SceneLinearPair>,
     maximum_stops: f32,
-    report: Option<&'a Path>,
 }
 
 pub(crate) fn build_live_still(
@@ -245,7 +248,6 @@ pub(crate) fn build_live_still(
             bytes: base,
             scene: None,
             maximum_stops: maximum_stops as f32,
-            report: None,
         },
         staging,
         &mut None,
@@ -277,9 +279,11 @@ fn assemble_on_base(
         storage_orientation,
         SEMANTIC_MATTE_MAX_SIZE,
     )?;
-    let semantic_masks = adapter
-        .vision_semantic_mattes(&base_path, &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES, None)
-        .map_err(|error| note_system_carrier(carrier.report, error))?;
+    let semantic_masks = adapter.vision_semantic_mattes(
+        &base_path,
+        &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+        None,
+    )?;
     let mut semantic_payloads = Vec::with_capacity(APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len());
     for role in APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES {
         let matte = semantic_masks.get(&role).ok_or_else(|| {
@@ -326,12 +330,7 @@ fn assemble_on_base(
         &semantic_scaffold,
         APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
     )
-    .map_err(|error| {
-        note_system_carrier(
-            carrier.report,
-            RuntimeError::external("Photographic Styles semantic graph", error),
-        )
-    })?;
+    .map_err(|error| RuntimeError::external("Photographic Styles semantic graph", error))?;
     profile_stage(profile, "semantic_production");
     runtime
         .heif
@@ -341,10 +340,7 @@ fn assemble_on_base(
         RuntimeError::external("Photographic Styles primary coded geometry", error)
     })?;
     xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
-        note_system_carrier(
-            carrier.report,
-            RuntimeError::external("Photographic Styles source Gain Map structure", error),
-        )
+        RuntimeError::external("Photographic Styles source Gain Map structure", error)
     })?;
     profile_stage(profile, "resource_prepare");
     let pair = match carrier.scene {
@@ -475,12 +471,7 @@ fn assemble_on_base(
         linear_thumbnail_height: linear_thumbnail.height,
     };
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
-        .map_err(|error| {
-            note_system_carrier(
-                carrier.report,
-                RuntimeError::external("Rust Photographic Styles graph", error),
-            )
-        })?;
+        .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
     let styles_path = staging.join("styles-for-texture.heic");
     fs::write(&styles_path, &assembled)
         .map_err(|error| RuntimeError::external("Texture source staging", error))?;
@@ -488,10 +479,7 @@ fn assemble_on_base(
     let assembled = crate::apple_texture::generate(adapter, &styles_path, &assembled, staging)?;
     profile_stage(profile, "texture_generation");
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
-        note_system_carrier(
-            carrier.report,
-            RuntimeError::external("Photographic Styles HDR structural validation", error),
-        )
+        RuntimeError::external("Photographic Styles HDR structural validation", error)
     })?;
 
     // Inspect the exact final bytes, not the intermediate scaffold or the
@@ -508,13 +496,6 @@ fn assemble_on_base(
     )?;
 
     Ok(assembled)
-}
-
-fn note_system_carrier(report: Option<&Path>, error: RuntimeError) -> RuntimeError {
-    if let Some(report) = report {
-        crate::system_heif_hdr::record_carrier_error(report, &error.to_string());
-    }
-    error
 }
 
 pub(super) fn validate_maker_apple_properties(

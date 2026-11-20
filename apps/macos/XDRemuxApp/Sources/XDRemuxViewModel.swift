@@ -9,6 +9,7 @@ enum AppState: Equatable {
     case idle
     case scanning
     case processing
+    case cancelling
     case completed
     case cancelled
 }
@@ -43,7 +44,8 @@ enum ConversionQueueStatus: String, Sendable, Equatable {
 enum OutputPlanStatus: String, Sendable, Equatable {
     case ready
     case willOverwriteExisting
-    case skipsExistingValidOutput
+    case checksExistingOutput
+    case existingLivePhoto
     case duplicateOutput
     case overwritesInput
     case inputMissing
@@ -52,9 +54,9 @@ enum OutputPlanStatus: String, Sendable, Equatable {
 
     var blocksConversion: Bool {
         switch self {
-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage, .existingLivePhoto:
             return true
-        case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
+        case .ready, .willOverwriteExisting, .checksExistingOutput:
             return false
         }
     }
@@ -214,7 +216,7 @@ final class XDRemuxViewModel {
     }
 
     var isBusy: Bool {
-        state == .scanning || state == .processing
+        activeOperation != nil
     }
 
     var visibleErrors: [String] {
@@ -229,24 +231,42 @@ final class XDRemuxViewModel {
 
     private var processTask: Task<Void, Never>?
     private var importTask: Task<Void, Never>?
-    private var importGeneration = 0
+    private var activeOperation: UUID?
+
+    private func beginImport() -> UUID {
+        let operation = UUID()
+        activeOperation = operation
+        state = .scanning
+        currentFileName = "正在扫描 HEIC 文件..."
+        return operation
+    }
 
     func addFiles(from urls: [URL]) {
         guard canEditQueue else { return }
-        importTask?.cancel()
+        let operation = beginImport()
         importTask = Task { [weak self] in
-            _ = await self?.importFiles(from: urls)
+            _ = await self?.completeImport(from: urls, operation: operation)
         }
     }
 
     @discardableResult
     func importFiles(from urls: [URL]) async -> Int {
         guard canEditQueue else { return 0 }
-        importGeneration &+= 1
-        let generation = importGeneration
-        state = .scanning
-        currentFileName = "正在扫描 HEIC 文件..."
+        return await completeImport(from: urls, operation: beginImport())
+    }
 
+    private func completeImport(from urls: [URL], operation: UUID) async -> Int {
+        defer {
+            if activeOperation == operation {
+                activeOperation = nil
+                importTask = nil
+            }
+        }
+        guard state != .cancelling, !Task.isCancelled else {
+            state = .cancelled
+            currentFileName = AppStrings.statCancelled
+            return 0
+        }
         let classifiedURLs = await Task.detached(priority: .userInitiated) {
             let discovered = Self.collectHEICURLs(from: urls)
             let classifications: [String: PhotoClassification]
@@ -270,10 +290,10 @@ final class XDRemuxViewModel {
             }
         }.value
 
-        guard generation == importGeneration else { return 0 }
+        guard activeOperation == operation else { return 0 }
 
-        if Task.isCancelled {
-            state = queue.isEmpty ? .idle : .cancelled
+        if state == .cancelling || Task.isCancelled {
+            state = .cancelled
             currentFileName = "已取消扫描"
             return 0
         }
@@ -291,7 +311,7 @@ final class XDRemuxViewModel {
                 return ConversionQueueItem(
                     inputURL: inputURL,
                     outputURL: outputURL,
-                    outputPlanStatus: Self.outputPlanStatus(inputURL: inputURL, outputURL: outputURL, config: config),
+                    outputPlanStatus: Self.outputPlanStatus(inputURL: inputURL, outputURL: outputURL, config: config, assetType: classification.assetType),
                     captureMode: classification.mode,
                     assetType: classification.assetType,
                     classificationStatus: classification.status
@@ -309,19 +329,20 @@ final class XDRemuxViewModel {
         guard canStart else { return }
         retryFailed()
         resetCancelledToPending()
-        processTask?.cancel()
+        let operation = UUID()
+        activeOperation = operation
+        state = .processing
         processTask = Task { [weak self] in
-            await self?.runQueue()
+            await self?.runQueue(operation: operation)
         }
     }
 
     func cancelTask() {
         guard state == .processing || state == .scanning else { return }
+        state = .cancelling
+        currentFileName = AppStrings.waitingForCancellation
         importTask?.cancel()
         processTask?.cancel()
-        markPendingAsCancelled()
-        state = .cancelled
-        currentFileName = runningCount > 0 ? "正在等待当前文件结束..." : AppStrings.statCancelled
     }
 
     func acknowledgeCompletion() {
@@ -353,14 +374,14 @@ final class XDRemuxViewModel {
     }
 
     func retryFailed() {
-        guard canEditQueue || state == .idle || state == .completed || state == .cancelled else { return }
+        guard canEditQueue else { return }
         for index in queue.indices where queue[index].status == .failed {
             queue[index].status = .pending
             queue[index].errorMessage = nil
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
             queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode, assetType: queue[index].assetType)
-            queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
+            queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config, assetType: queue[index].assetType)
         }
         refreshOutputURLsAndPlansForEditableItems()
     }
@@ -430,7 +451,8 @@ final class XDRemuxViewModel {
             queue[index].outputPlanStatus = Self.outputPlanStatus(
                 inputURL: queue[index].inputURL,
                 outputURL: queue[index].outputURL,
-                config: config
+                config: config,
+                assetType: queue[index].assetType
             )
         }
         markDuplicateOutputPlans()
@@ -475,8 +497,21 @@ final class XDRemuxViewModel {
         )
     }
 
-    private func runQueue() async {
-        state = .processing
+    private func runQueue(operation: UUID) async {
+        guard activeOperation == operation else { return }
+        defer {
+            if activeOperation == operation {
+                activeOperation = nil
+                currentConcurrency = 0
+                processTask = nil
+            }
+        }
+        if Task.isCancelled {
+            markPendingAsCancelled()
+            state = .cancelled
+            currentFileName = AppStrings.statCancelled
+            return
+        }
         currentFileName = "准备转换 ProXDR HEIC..."
         refreshOutputURLsAndPlansForEditableItems()
         _ = markOutputCollisions()
@@ -487,9 +522,7 @@ final class XDRemuxViewModel {
         }
 
         guard !runnableItems.isEmpty else {
-            currentConcurrency = 0
             state = failedCount > 0 ? .completed : .idle
-            processTask = nil
             return
         }
 
@@ -537,6 +570,7 @@ final class XDRemuxViewModel {
 
             for await result in group {
                 active -= 1
+                guard activeOperation == operation else { continue }
                 apply(result, index: queueIndexByID[result.id])
 
                 if Task.isCancelled {
@@ -550,12 +584,9 @@ final class XDRemuxViewModel {
             }
         }
 
-        currentConcurrency = 0
-        processTask = nil
-
+        guard activeOperation == operation else { return }
         if Task.isCancelled {
             markPendingAsCancelled()
-            markRunningAsCancelled()
             state = .cancelled
             currentFileName = AppStrings.statCancelled
         } else {
@@ -571,7 +602,7 @@ final class XDRemuxViewModel {
         queue[index].status = result.status
         queue[index].errorMessage = result.errorMessage
         queue[index].finishedAt = result.finishedAt
-        currentFileName = queue[index].inputURL.lastPathComponent
+        if state == .processing { currentFileName = queue[index].inputURL.lastPathComponent }
     }
 
     @discardableResult
@@ -594,13 +625,6 @@ final class XDRemuxViewModel {
         }
     }
 
-    private func markRunningAsCancelled() {
-        for index in queue.indices where queue[index].status == .running {
-            queue[index].status = .cancelled
-            queue[index].finishedAt = Date()
-        }
-    }
-
     private func resetCancelledToPending() {
         for index in queue.indices where queue[index].status == .cancelled {
             queue[index].status = .pending
@@ -608,7 +632,7 @@ final class XDRemuxViewModel {
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
             queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode, assetType: queue[index].assetType)
-            queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
+            queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config, assetType: queue[index].assetType)
         }
         refreshOutputURLsAndPlansForEditableItems()
     }
@@ -640,7 +664,8 @@ final class XDRemuxViewModel {
                 let disposition = try prepareOutputForConversion(
                     inputURL: item.inputURL,
                     outputURL: item.outputURL,
-                    config: config
+                    config: config,
+                    assetType: item.assetType
                 )
                 if disposition == .skippedExistingValidOutput {
                     return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
@@ -785,16 +810,23 @@ final class XDRemuxViewModel {
         return keys
     }
 
+    nonisolated private static func existingLivePhotoBlocksOutput(_ output: URL, assetType: PhotoAssetType) -> Bool {
+        let companion = output.deletingPathExtension().appendingPathExtension("mov")
+        return pathEntryExists(companion) || (assetType == .livePhoto && pathEntryExists(output))
+    }
+
     nonisolated private static func outputPlanStatus(
         inputURL: URL,
         outputURL: URL,
-        config: ConversionConfig
+        config: ConversionConfig,
+        assetType: PhotoAssetType
     ) -> OutputPlanStatus {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: inputURL.path) else {
             return .inputMissing
         }
         if packageBlocksOutput(outputURL) { return .existingPackage }
+        if existingLivePhotoBlocksOutput(outputURL, assetType: assetType) { return .existingLivePhoto }
 
         let parentURL = outputURL.deletingLastPathComponent()
         var isDirectory: ObjCBool = false
@@ -806,10 +838,7 @@ final class XDRemuxViewModel {
             return .ready
         }
 
-        if config.skipExisting, AppConversionEngine.isValidOutput(outputURL, config: config) {
-            return .skipsExistingValidOutput
-        }
-        return .willOverwriteExisting
+        return config.skipExisting ? .checksExistingOutput : .willOverwriteExisting
     }
 
     nonisolated private static func outputPlanFailureMessage(for item: ConversionQueueItem) -> String {
@@ -824,7 +853,9 @@ final class XDRemuxViewModel {
             return "输出目录位置是文件，无法写入: \(item.outputURL.deletingLastPathComponent().path)"
         case .existingPackage:
             return "已有 PVT 包不能复用、替换或添加成员，请选择新的输出路径：\(item.outputURL.path)"
-        case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
+        case .existingLivePhoto:
+            return "无法确认已有实况的来源和转换选项，请选择新的输出路径：\(item.outputURL.path)"
+        case .ready, .willOverwriteExisting, .checksExistingOutput:
             return ""
         }
     }
@@ -832,11 +863,15 @@ final class XDRemuxViewModel {
     nonisolated private static func prepareOutputForConversion(
         inputURL: URL,
         outputURL: URL,
-        config: ConversionConfig
+        config: ConversionConfig,
+        assetType: PhotoAssetType = .staticPhoto
     ) throws -> OutputPreparationDisposition {
         let fileManager = FileManager.default
         if packageBlocksOutput(outputURL) {
             throw RustCLIClient.ClientError.unsupportedConfiguration("不能复用、替换或向已有 PVT 包内写入，请选择新的输出路径。")
+        }
+        if existingLivePhotoBlocksOutput(outputURL, assetType: assetType) {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("无法确认已有实况的来源和转换选项，请选择新的输出路径。")
         }
         guard pathKey(inputURL) != pathKey(outputURL) else {
             return .ready
