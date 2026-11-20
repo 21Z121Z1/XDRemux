@@ -112,10 +112,13 @@ def batch_styled(options, temp, env, target):
             "--motion-target", target, "--json")
     plain = json.loads(run(*args, env=env))["successes"][0]
     styled = json.loads(run(*args, "--apple-styles", "--resume", env=env))["successes"][0]
-    require(styled["status"] == "converted" and styled["outputs"] != plain["outputs"],
+    plain_paths = [Path(path).resolve(strict=True) for path in plain["outputs"]]
+    styled_paths = [Path(path).resolve(strict=True) for path in styled["outputs"]]
+    require(styled["status"] == "converted" and styled_paths != plain_paths,
             "plain Live Photo provenance authorized a batch Styles request")
     resumed = json.loads(run(*args, "--apple-styles", "--resume", env=env))["successes"][0]
-    require(resumed["status"] == "skipped-existing" and resumed["outputs"] == styled["outputs"],
+    resumed_paths = [Path(path).resolve(strict=True) for path in resumed["outputs"]]
+    require(resumed["status"] == "skipped-existing" and resumed_paths == styled_paths,
             "batch Styles resume did not reuse its own validated output")
 
     output = Path(styled["outputs"][0])

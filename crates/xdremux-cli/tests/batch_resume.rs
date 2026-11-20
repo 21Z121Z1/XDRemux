@@ -174,10 +174,14 @@ fn resume_reconciles_published_pair_when_commit_and_tail_are_interrupted() {
     fs::write(&checkpoint, torn).unwrap();
 
     let result = run(&output, true);
-    assert_eq!(
-        result["successes"][0]["outputs"],
-        first["successes"][0]["outputs"]
-    );
+    let resumed_outputs = result["successes"][0]["outputs"].as_array().unwrap();
+    assert_eq!(resumed_outputs.len(), 2);
+    for (path, expected) in resumed_outputs.iter().zip([&image, &video]) {
+        assert_eq!(
+            fs::canonicalize(path.as_str().unwrap()).unwrap(),
+            fs::canonicalize(expected).unwrap()
+        );
+    }
     assert_eq!(result["skipped_existing"], 1);
     assert!(fs::read(image).unwrap() == original_image);
     assert!(fs::read(video).unwrap() == original_video);
