@@ -297,7 +297,7 @@ struct BatchArgs {
     resume: bool,
     /// Durable Motion Photo checkpoint base path.
     ///
-    /// The compatibility state is stored at this path with `.motion-photo` appended.
+    /// The v4 journal is stored at this path with `.motion-photo.v4` appended.
     #[arg(long, value_name = "FILE")]
     checkpoint: Option<PathBuf>,
     /// File converted assets by asset type and primary capture mode.
