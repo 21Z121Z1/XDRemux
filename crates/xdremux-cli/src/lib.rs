@@ -2173,6 +2173,7 @@ fn run_batch(
         reuse_existing,
         categorize_output: arguments.categorize,
         cinematic_output: arguments.product.apple_cinematic,
+        photographic_styles: arguments.product.apple_styles,
         live_photo_output: match arguments.motion_target {
             Some(MotionOutputTarget::ApplePvt) => LivePhotoOutput::Pvt,
             Some(MotionOutputTarget::ApplePair) => LivePhotoOutput::Pair,
@@ -2263,6 +2264,8 @@ fn run_batch(
                     "input": path_json(&failure.input),
                     "output": path_json(&failure.output),
                     "error": failure.error.as_str(),
+                    "published_outputs": failure.published_outputs.iter().map(|path| path_json(path)).collect::<Vec<_>>(),
+                    "published_unrecorded": failure.published_unrecorded,
                 })
             })
             .collect::<Vec<_>>();
@@ -2337,6 +2340,24 @@ fn run_batch(
                     failure.error
                 )
             );
+            if !failure.published_outputs.is_empty() {
+                let paths = failure
+                    .published_outputs
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" + ");
+                let note = if failure.published_unrecorded {
+                    message!(
+                        language,
+                        "published; checkpoint commit failed",
+                        "已发布，检查点提交失败"
+                    )
+                } else {
+                    message!(language, "partial publication", "已部分发布")
+                };
+                let _ = writeln!(stderr, "{note}: {paths}");
+            }
         }
         let _ = writeln!(
             stdout,

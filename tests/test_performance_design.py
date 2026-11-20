@@ -72,7 +72,12 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
             "child.wait()",
         ):
             self.assertIn(marker, rust)
-        self.assertNotIn("POLL_INTERVAL", rust)
+        request = rust.split("    fn invoke(&mut self,", 1)[1].split("    fn timeout_error", 1)[0]
+        self.assertIn("write_request(stdin, request, deadline)", request)
+        self.assertIn("recv_timeout(deadline.saturating_duration_since(Instant::now()))", request)
+        self.assertNotIn("thread::sleep", request)
+        self.assertIn("wait_for_pipe(stdin, PollFlags::OUT, remaining)", rust)
+        self.assertIn("kill_process_group(group, Signal::KILL)", rust)
         for marker in (
             "--persistent-json-lines",
             "maxTransportFrameBytes",

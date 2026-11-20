@@ -29,7 +29,7 @@ xdremux-source = { path = "../xdremux-source" }
 ruzstd = "=0.9.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
-rustix = { version = "=1.1.6", features = ["fs", "process"] }
+rustix = { version = "=1.1.6", features = ["event", "fs", "process"] }
 
 [dev-dependencies]
 ruzstd = "=0.9.1"

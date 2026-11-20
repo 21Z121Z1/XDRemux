@@ -11,6 +11,7 @@ mod apple_styles;
 mod apple_texture;
 mod batch;
 mod batch_checkpoint;
+mod batch_transaction;
 mod categorize;
 #[cfg(target_os = "macos")]
 mod cinematic_camera;
@@ -40,10 +41,8 @@ pub use batch::{
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
     CinematicEnvelopeOptions, CinematicFocalLength,
 };
-pub use batch_checkpoint::{
-    motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
-    MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
-};
+pub use batch_checkpoint::{motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME};
+pub use batch_transaction::SCHEMA_VERSION as MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION;
 #[cfg(target_os = "macos")]
 pub use cinematic_camera::CinematicFocalLengthSource;
 pub use harmony_motion::is_harmony_motion_photo;
@@ -889,14 +888,7 @@ impl PortableRuntime {
         )
     }
 
-    fn convert_requested_live_photo(
-        &self,
-        source: &[u8],
-        input: &Path,
-        output: &Path,
-        request: ConversionRequest,
-        enrich: Option<&live_photo::PairEnricher<'_>>,
-    ) -> Result<LivePhotoFileReceipt> {
+    fn validate_live_photo_request(&self, request: ConversionRequest, styled: bool) -> Result<()> {
         if request.hdr_profile != HdrExportProfile::Compatible {
             return Err(RuntimeError::new(
                 "Motion Photo conversion",
@@ -910,15 +902,24 @@ impl PortableRuntime {
             ));
         }
         let features = request.apple_features;
-        if features.portrait
-            || features.cinematic
-            || features.photographic_styles != enrich.is_some()
-        {
+        if features.portrait || features.cinematic || features.photographic_styles != styled {
             return Err(RuntimeError::new(
                 "Motion Photo conversion",
                 "Apple editing intent does not match this Live Photo conversion path",
             ));
         }
+        Ok(())
+    }
+
+    fn convert_requested_live_photo(
+        &self,
+        source: &[u8],
+        input: &Path,
+        output: &Path,
+        request: ConversionRequest,
+        enrich: Option<&live_photo::PairEnricher<'_>>,
+    ) -> Result<LivePhotoFileReceipt> {
+        self.validate_live_photo_request(request, enrich.is_some())?;
         live_photo::convert_motion_photo_file(
             &self.jpeg,
             &self.heif,

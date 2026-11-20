@@ -15,8 +15,10 @@ use xdremux_source::{probe_bytes, SourceAsset};
 use crate::android_motion_photo::resolve_motion_output_target;
 use crate::batch_checkpoint::{
     canonical_or_absolute, source_signature, source_signature_path, validate_checkpoint_path,
-    AndroidCheckpointIdentity, CheckpointOutcome, MotionPhotoCheckpoint,
-    MotionPhotoCheckpointWriter, SourceSignature,
+    MotionPhotoCheckpoint, SourceSignature,
+};
+use crate::batch_transaction::{
+    journal_path, BatchJournal, MotionLayout, Publication, Stage, TransactionIndex, TransactionKey,
 };
 use crate::categorize::classification_relative_directory;
 use crate::vendor_motion_metadata::VendorMetadataCarry;
@@ -46,6 +48,7 @@ pub struct BatchPlanOptions {
     pub reuse_existing: bool,
     pub categorize_output: bool,
     pub cinematic_output: bool,
+    pub photographic_styles: bool,
     pub live_photo_output: LivePhotoOutput,
     /// Android targets use one MP-suffixed output, not an Apple pair.
     pub motion_target: Option<MotionOutputTarget>,
@@ -142,6 +145,8 @@ pub struct BatchFailure {
     pub input: PathBuf,
     pub output: PathBuf,
     pub error: String,
+    pub published_outputs: Vec<PathBuf>,
+    pub published_unrecorded: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -317,6 +322,7 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     }
     if let Some(path) = options.checkpoint_path.as_deref() {
         validate_checkpoint_path(path, inputs.iter().map(PathBuf::as_path))?;
+        validate_checkpoint_path(&journal_path(path), inputs.iter().map(PathBuf::as_path))?;
     }
     let checkpoint = if options.reuse_existing {
         match options.checkpoint_path.as_deref() {
@@ -326,6 +332,12 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     } else {
         None
     };
+    let transactions = options
+        .checkpoint_path
+        .as_deref()
+        .map(TransactionIndex::load)
+        .transpose()?
+        .unwrap_or_default();
     let mut reserved = inputs.iter().cloned().collect::<BTreeSet<_>>();
     let mut items = Vec::with_capacity(inputs.len());
 
@@ -337,7 +349,8 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
                 .as_ref()
                 .is_some_and(|bytes| is_harmony_motion_photo(bytes));
         let analysis = (google_target(options.motion_target).is_some()
-            || options.live_photo_output == LivePhotoOutput::Pvt)
+            || options.live_photo_output == LivePhotoOutput::Pvt
+            || options.reuse_existing)
             .then_some(file_bytes)
             .flatten()
             .and_then(|source| probe_bytes(&source).ok().map(|asset| (source, asset)));
@@ -378,26 +391,45 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
         }
         crate::live_photo_package::validate_output_parent(&parent.join("planned-output"))?;
 
-        let prior = match (checkpoint.as_ref(), android) {
-            (Some(state), Some(target)) => {
-                let signature = source_signature_path(input)?;
-                state
-                    .reusable_android_item(
-                        input,
-                        &signature,
-                        google_target_name(target),
-                        video_compatibility_name(options.motion_video_compatibility),
-                        destination_name(options.target),
-                    )?
-                    .map(|item| item.output)
-                    .filter(|output| {
-                        output.parent().is_some_and(|p| {
-                            canonical_or_absolute(&parent).ok().as_deref() == Some(p)
+        let transaction = if options.reuse_existing && motion {
+            let signature = source_signature_path(input)?;
+            let route = match android {
+                Some(target) => {
+                    android_route(target, options.motion_video_compatibility, options.target)
+                }
+                None => apple_route(format, options.photographic_styles),
+            };
+            let key = TransactionKey::new(input, &signature, route, &parent)?;
+            transactions.get(&key).map(|entry| entry.output.clone())
+        } else {
+            None
+        };
+        let prior = if transaction.is_some() {
+            transaction
+        } else {
+            match (checkpoint.as_ref(), android) {
+                (Some(state), Some(target)) => {
+                    let signature = source_signature_path(input)?;
+                    state
+                        .reusable_android_item(
+                            input,
+                            &signature,
+                            google_target_name(target),
+                            video_compatibility_name(options.motion_video_compatibility),
+                            destination_name(options.target),
+                        )?
+                        .map(|item| item.output)
+                        .filter(|output| {
+                            output.parent().is_some_and(|p| {
+                                canonical_or_absolute(&parent).ok().as_deref() == Some(p)
+                            })
                         })
-                    })
+                }
+                (Some(state), None) if !options.photographic_styles => {
+                    reusable_planned_output(state, input, &parent, format)?
+                }
+                _ => None,
             }
-            (Some(state), None) => reusable_planned_output(state, input, &parent, format)?,
-            _ => None,
         };
         if let Some(prior) = prior {
             let companion = if pvt || android.is_some() {
@@ -439,8 +471,9 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
             if candidate != *input
                 && !reserved.contains(&candidate)
                 && !reserved.contains(&companion)
-                && !candidate.exists()
-                && !companion.exists()
+                && fs::symlink_metadata(&candidate).is_err()
+                && fs::symlink_metadata(&companion).is_err()
+                && !transactions.reserves(&crate::batch_transaction::destination_path(&candidate)?)
             {
                 reserved.insert(candidate.clone());
                 reserved.insert(companion);
@@ -507,76 +540,173 @@ fn pair_matches_identifier(image: &Path, video: &Path, expected: &str) -> bool {
     .is_ok_and(|photo| photo.asset().pairing.identifier.as_deref() == Some(expected))
 }
 
-#[derive(Debug)]
-enum OwnedCheckpointOutcome {
-    Success(String),
-    SkippedExisting(String),
-    Failure(String),
+fn apple_route(format: LivePhotoOutput, photographic_styles: bool) -> String {
+    let container = match format {
+        LivePhotoOutput::Pair => "apple-pair",
+        LivePhotoOutput::Pvt => "apple-pvt",
+    };
+    if photographic_styles {
+        format!("{container}:styles")
+    } else {
+        container.to_owned()
+    }
 }
 
-#[derive(Debug)]
-struct BatchCheckpointEvent {
-    source: PathBuf,
-    image: PathBuf,
-    video: PathBuf,
-    package: Option<PathBuf>,
-    signature: SourceSignature,
-    outcome: OwnedCheckpointOutcome,
-    android: Option<AndroidCheckpointDetails>,
-}
-
-#[derive(Debug)]
-struct AndroidCheckpointDetails {
+fn android_route(
     target: MotionOutputTarget,
-    destination: Option<ConversionTarget>,
     compatibility: MotionVideoCompatibility,
-    output_sha256: Option<String>,
+    destination: Option<ConversionTarget>,
+) -> String {
+    format!(
+        "{}:{}:{}",
+        google_target_name(target),
+        video_compatibility_name(compatibility),
+        destination_name(destination).unwrap_or("legacy")
+    )
 }
 
-impl BatchCheckpointEvent {
-    fn append(
-        self,
-        writer: &mut Option<MotionPhotoCheckpointWriter>,
-        checkpoint_path: Option<&Path>,
-    ) -> Result<()> {
-        if writer.is_none() {
-            if let Some(path) = checkpoint_path {
-                *writer = Some(MotionPhotoCheckpointWriter::open(path)?);
-            }
-        }
-        let Some(writer) = writer.as_mut() else {
-            return Ok(());
-        };
-        let outcome = match &self.outcome {
-            OwnedCheckpointOutcome::Success(identifier) => CheckpointOutcome::Success(identifier),
-            OwnedCheckpointOutcome::SkippedExisting(identifier) => {
-                CheckpointOutcome::SkippedExisting(identifier)
-            }
-            OwnedCheckpointOutcome::Failure(error) => CheckpointOutcome::Failure(error),
-        };
-        if let Some(android) = self.android {
-            writer.append_android_item(
-                &self.source,
-                &self.image,
-                &self.signature,
-                AndroidCheckpointIdentity {
-                    target: google_target_name(android.target),
-                    compatibility: video_compatibility_name(android.compatibility),
-                    destination: destination_name(android.destination),
-                    output_sha256: android.output_sha256.as_deref(),
-                },
-                outcome,
-            )
+#[derive(Default, Debug)]
+struct PublicationProgress {
+    outputs: Vec<PathBuf>,
+    complete: bool,
+}
+
+struct MotionWork<'a> {
+    item: &'a BatchItem,
+    kind: BatchAssetKind,
+    layout: MotionLayout,
+    transaction: Option<(&'a BatchJournal, TransactionKey)>,
+    prior: Option<Publication>,
+}
+
+impl<'a> MotionWork<'a> {
+    fn new(
+        item: &'a BatchItem,
+        signature: &SourceSignature,
+        layout: MotionLayout,
+        route: String,
+        journal: Option<&'a BatchJournal>,
+    ) -> Result<Self> {
+        let mut prior = None;
+        let transaction = if let Some(journal) = journal {
+            let key = TransactionKey::new(
+                &item.input,
+                signature,
+                route,
+                crate::publication_parent(&item.output),
+            )?;
+            prior = journal.get(&key)?;
+            Some((journal, key))
         } else {
-            writer.append_item(
-                &self.source,
-                &self.image,
-                &self.video,
-                &self.signature,
-                self.package.as_deref(),
-                outcome,
-            )
+            None
+        };
+        let kind = if layout == MotionLayout::File {
+            BatchAssetKind::AndroidMotionPhoto
+        } else {
+            BatchAssetKind::LivePhoto
+        };
+        Ok(Self {
+            item,
+            kind,
+            layout,
+            transaction,
+            prior,
+        })
+    }
+
+    fn output_paths(&self) -> Vec<PathBuf> {
+        if self.layout == MotionLayout::Pair {
+            vec![
+                self.item.output.clone(),
+                self.item.output.with_extension("mov"),
+            ]
+        } else {
+            vec![self.item.output.clone()]
         }
+    }
+
+    fn receipt(
+        &self,
+        disposition: BatchSuccessDisposition,
+        omitted_resource_count: Option<usize>,
+    ) -> BatchSuccess {
+        BatchSuccess {
+            input: self.item.input.clone(),
+            outputs: self.output_paths(),
+            kind: self.kind,
+            disposition,
+            omitted_resource_count,
+        }
+    }
+
+    fn restore(
+        &self,
+        allow_reuse: bool,
+        progress: &mut PublicationProgress,
+    ) -> Result<Option<BatchSuccess>> {
+        let Some((journal, key)) = &self.transaction else {
+            return Ok(None);
+        };
+        let Some(prior) = &self.prior else {
+            return Ok(None);
+        };
+        if !allow_reuse {
+            if !prior.is_committed() {
+                return Err(RuntimeError::new(
+                    "Motion Photo transaction",
+                    "an incomplete publication exists for this request; run with --resume",
+                ));
+            }
+            return Ok(None);
+        }
+        if prior.output != crate::batch_transaction::destination_path(&self.item.output)? {
+            return Err(RuntimeError::new(
+                "Motion Photo transaction",
+                "checkpoint changed after batch planning; retry --resume",
+            ));
+        }
+        if !prior.publish(self.layout, &mut progress.outputs)? {
+            return Ok(None);
+        }
+        if !prior.is_committed() {
+            progress.complete = true;
+            journal.append(key, &prior.clone().committed())?;
+        }
+        prior.remove_staging();
+        Ok(Some(
+            self.receipt(BatchSuccessDisposition::SkippedExisting, None),
+        ))
+    }
+
+    fn convert(
+        &self,
+        progress: &mut PublicationProgress,
+        build: impl FnOnce(&Path) -> Result<usize>,
+    ) -> Result<BatchSuccess> {
+        let omitted = if let Some((journal, key)) = &self.transaction {
+            let stage = Stage::new(&self.item.output)?;
+            let omitted = build(&stage.output)?;
+            let publication = Publication::prepared(&self.item.output, self.layout, &stage)?;
+            journal.append(key, &publication)?;
+            let commit = (|| {
+                if !publication.publish(self.layout, &mut progress.outputs)? {
+                    return Err(RuntimeError::new(
+                        "Motion Photo transaction",
+                        "prepared stage is missing",
+                    ));
+                }
+                progress.complete = true;
+                journal.append(key, &publication.committed())
+            })();
+            if let Err(error) = commit {
+                stage.retain();
+                return Err(error);
+            }
+            omitted
+        } else {
+            build(&self.item.output)?
+        };
+        Ok(self.receipt(BatchSuccessDisposition::Converted, Some(omitted)))
     }
 }
 
@@ -584,7 +714,7 @@ impl BatchCheckpointEvent {
 struct BatchWorkResult {
     item: BatchItem,
     result: Result<BatchSuccess>,
-    checkpoint: Option<BatchCheckpointEvent>,
+    publication: PublicationProgress,
 }
 
 #[derive(Debug)]
@@ -603,12 +733,13 @@ fn process_batch_item_with_options(
     item: BatchItem,
     request: ConversionRequest,
     checkpoint: &MotionPhotoCheckpoint,
+    journal: Option<&BatchJournal>,
     options: &BatchExecutionOptions,
     apple_options: &BatchAppleOptions,
 ) -> BatchWorkResult {
     #[cfg(not(target_os = "macos"))]
     let _ = (apple_options.portrait_profile, &apple_options.cinematic);
-    let mut checkpoint_event = None;
+    let mut publication = PublicationProgress::default();
     let reuse_existing = options.reuse_existing;
     let apple_adapter_executable = options.apple_adapter_executable.as_deref();
     let motion_target = options.motion_target;
@@ -672,46 +803,32 @@ fn process_batch_item_with_options(
         {
             let signature = source_signature(&item.input, &source)?;
             let target = MotionOutputTarget::GoogleHeic;
-            let prior = if reuse_existing {
-                checkpoint.reusable_android_item(
+            let work = MotionWork::new(
+                &item,
+                &signature,
+                MotionLayout::File,
+                android_route(target, motion_video_compatibility, options.target),
+                journal,
+            )?;
+            if let Some(reused) = work.restore(reuse_existing, &mut publication)? {
+                return Ok(reused);
+            }
+            if reuse_existing {
+                let previous = checkpoint.reusable_android_item(
                     &item.input,
                     &signature,
                     google_target_name(target),
                     video_compatibility_name(motion_video_compatibility),
                     destination_name(options.target),
-                )?
-            } else {
-                None
-            };
-            if let Some(ref prior) = prior {
-                let current = fs::read(&item.output).ok();
-                let same_bytes = current.as_deref() == Some(source.as_slice());
-                let same_digest = source_signature_path(&item.output)
-                    .ok()
-                    .is_some_and(|signature| signature.sha256 == prior.sha256);
-                if prior.output == canonical_or_absolute(&item.output)? && same_bytes && same_digest
-                {
-                    checkpoint_event = Some(BatchCheckpointEvent {
-                        source: item.input.clone(),
-                        image: item.output.clone(),
-                        video: item.output.clone(),
-                        package: None,
-                        signature,
-                        outcome: OwnedCheckpointOutcome::SkippedExisting(String::new()),
-                        android: Some(AndroidCheckpointDetails {
-                            target,
-                            destination: options.target,
-                            compatibility: motion_video_compatibility,
-                            output_sha256: Some(prior.sha256.clone()),
-                        }),
-                    });
-                    return Ok(BatchSuccess {
-                        input: item.input.clone(),
-                        outputs: vec![item.output.clone()],
-                        kind: BatchAssetKind::AndroidMotionPhoto,
-                        disposition: BatchSuccessDisposition::SkippedExisting,
-                        omitted_resource_count: Some(0),
-                    });
+                )?;
+                if let Some(prior) = previous {
+                    let current = fs::read(&item.output).ok();
+                    if prior.output == canonical_or_absolute(&item.output)?
+                        && current.as_deref() == Some(source.as_slice())
+                        && signature.sha256 == prior.sha256
+                    {
+                        return Ok(work.receipt(BatchSuccessDisposition::SkippedExisting, Some(0)));
+                    }
                 }
             }
             if fs::symlink_metadata(&item.output).is_ok() {
@@ -720,33 +837,15 @@ fn process_batch_item_with_options(
                     "existing Harmony output does not match the preserved source; refusing to reuse or overwrite",
                 ));
             }
-            let receipt = runtime.convert_huawei_harmony_file(
-                &source,
-                &item.output,
-                motion_video_compatibility,
-                VendorMetadataCarry::from_target(ConversionTarget::Huawei),
-            )?;
-            let digest = source_signature_path(&receipt.output)?.sha256;
-            checkpoint_event = Some(BatchCheckpointEvent {
-                source: item.input.clone(),
-                image: receipt.output.clone(),
-                video: receipt.output.clone(),
-                package: None,
-                signature,
-                outcome: OwnedCheckpointOutcome::Success(String::new()),
-                android: Some(AndroidCheckpointDetails {
-                    target,
-                    destination: options.target,
-                    compatibility: motion_video_compatibility,
-                    output_sha256: Some(digest),
-                }),
-            });
-            return Ok(BatchSuccess {
-                input: item.input.clone(),
-                outputs: vec![receipt.output],
-                kind: BatchAssetKind::AndroidMotionPhoto,
-                disposition: BatchSuccessDisposition::Converted,
-                omitted_resource_count: Some(receipt.omitted_resource_count),
+            return work.convert(&mut publication, |destination| {
+                runtime
+                    .convert_huawei_harmony_file(
+                        &source,
+                        destination,
+                        motion_video_compatibility,
+                        VendorMetadataCarry::from_target(ConversionTarget::Huawei),
+                    )
+                    .map(|receipt| receipt.omitted_resource_count)
             });
         }
         let asset = probe_bytes(&source)
@@ -785,42 +884,33 @@ fn process_batch_item_with_options(
             SourceAsset::MotionPhoto { .. } => {
                 let signature = source_signature(&item.input, &source)?;
                 if let Some(target) = resolved_android {
-                    let prior = if reuse_existing {
-                        checkpoint.reusable_android_item(
+                    runtime.validate_android_motion_request(request)?;
+                    let work = MotionWork::new(
+                        &item,
+                        &signature,
+                        MotionLayout::File,
+                        android_route(target, motion_video_compatibility, options.target),
+                        journal,
+                    )?;
+                    if let Some(reused) = work.restore(reuse_existing, &mut publication)? {
+                        return Ok(reused);
+                    }
+                    if reuse_existing {
+                        let previous = checkpoint.reusable_android_item(
                             &item.input,
                             &signature,
                             google_target_name(target),
                             video_compatibility_name(motion_video_compatibility),
                             destination_name(options.target),
-                        )?
-                    } else {
-                        None
-                    };
-                    if let Some(ref prior) = prior {
-                        if prior.output == canonical_or_absolute(&item.output)?
-                            && matches_android_output(&item.output, &prior.sha256, target)
-                        {
-                            checkpoint_event = Some(BatchCheckpointEvent {
-                                source: item.input.clone(),
-                                image: item.output.clone(),
-                                video: item.output.clone(),
-                                package: None,
-                                signature,
-                                outcome: OwnedCheckpointOutcome::SkippedExisting(String::new()),
-                                android: Some(AndroidCheckpointDetails {
-                                    target,
-                                    destination: options.target,
-                                    compatibility: motion_video_compatibility,
-                                    output_sha256: Some(prior.sha256.clone()),
-                                }),
-                            });
-                            return Ok(BatchSuccess {
-                                input: item.input.clone(),
-                                outputs: vec![item.output.clone()],
-                                kind: BatchAssetKind::AndroidMotionPhoto,
-                                disposition: BatchSuccessDisposition::SkippedExisting,
-                                omitted_resource_count: None,
-                            });
+                        )?;
+                        if let Some(prior) = previous {
+                            if prior.output == canonical_or_absolute(&item.output)?
+                                && matches_android_output(&item.output, &prior.sha256, target)
+                            {
+                                return Ok(
+                                    work.receipt(BatchSuccessDisposition::SkippedExisting, None)
+                                );
+                            }
                         }
                     }
                     if fs::symlink_metadata(&item.output).is_ok() {
@@ -829,175 +919,128 @@ fn process_batch_item_with_options(
                             "existing Google Motion Photo has no matching source, target, video policy and output digest; refusing to reuse or overwrite",
                         ));
                     }
-                    let conversion = runtime.convert_android_motion_photo_file_with_carry(
-                        &source,
-                        &item.input,
-                        &item.output,
-                        target,
-                        request,
-                        motion_video_compatibility,
-                        options
-                            .target
-                            .map(|target| {
-                                VendorMetadataCarry::from_target(target.android_motion_destination(
-                                    resolved_android == Some(MotionOutputTarget::GoogleHeic),
-                                ))
-                            })
-                            .unwrap_or_else(VendorMetadataCarry::legacy),
-                    );
-                    let omitted = conversion
-                        .as_ref()
-                        .ok()
-                        .map(|receipt| receipt.omitted_resource_count);
-                    let result = conversion.and_then(|receipt| {
-                        let digest = source_signature_path(&receipt.output)?.sha256;
-                        Ok((receipt.output, digest))
-                    });
-                    let digest = result.as_ref().ok().map(|(_, digest)| digest.clone());
-                    checkpoint_event = Some(BatchCheckpointEvent {
-                        source: item.input.clone(),
-                        image: item.output.clone(),
-                        video: item.output.clone(),
-                        package: None,
-                        signature,
-                        outcome: match &result {
-                            Ok(_) => OwnedCheckpointOutcome::Success(String::new()),
-                            Err(error) => OwnedCheckpointOutcome::Failure(error.to_string()),
-                        },
-                        android: Some(AndroidCheckpointDetails {
-                            target,
-                            destination: options.target,
-                            compatibility: motion_video_compatibility,
-                            output_sha256: digest,
-                        }),
-                    });
-                    return result.map(|(output, _)| BatchSuccess {
-                        input: item.input.clone(),
-                        outputs: vec![output],
-                        kind: BatchAssetKind::AndroidMotionPhoto,
-                        disposition: BatchSuccessDisposition::Converted,
-                        omitted_resource_count: omitted,
+                    let carry = options
+                        .target
+                        .map(|destination| {
+                            VendorMetadataCarry::from_target(
+                                destination.android_motion_destination(
+                                    target == MotionOutputTarget::GoogleHeic,
+                                ),
+                            )
+                        })
+                        .unwrap_or_else(VendorMetadataCarry::legacy);
+                    return work.convert(&mut publication, |output| {
+                        runtime
+                            .convert_android_motion_photo_file_with_carry(
+                                &source,
+                                &item.input,
+                                output,
+                                target,
+                                request,
+                                motion_video_compatibility,
+                                carry,
+                            )
+                            .map(|receipt| receipt.omitted_resource_count)
                     });
                 }
-                if request.apple_features.photographic_styles {
+
+                let styles = request.apple_features.photographic_styles;
+                runtime.validate_live_photo_request(request, styles)?;
+                if styles {
+                    #[cfg(not(target_os = "macos"))]
                     return Err(RuntimeError::new(
-                        "Live Photo Styles",
-                        "batch Live Photo Styles requires the dedicated conversion path",
+                        "Apple capability",
+                        "Live Photo Styles requires the macOS Apple adapter",
                     ));
+                    #[cfg(target_os = "macos")]
+                    if apple_adapter_executable.is_none() {
+                        return Err(RuntimeError::new(
+                            "Apple capability",
+                            "Live Photo Styles requires a resolved Apple adapter",
+                        ));
+                    }
                 }
-                let package = (request.live_photo_output == LivePhotoOutput::Pvt)
-                    .then(|| item.output.clone());
-                let (output_image, output_video) = if package.is_some() {
+
+                let pvt = request.live_photo_output == LivePhotoOutput::Pvt;
+                let layout = if pvt {
+                    MotionLayout::Package
+                } else {
+                    MotionLayout::Pair
+                };
+                let work = MotionWork::new(
+                    &item,
+                    &signature,
+                    layout,
+                    apple_route(request.live_photo_output, styles),
+                    journal,
+                )?;
+                if let Some(reused) = work.restore(reuse_existing, &mut publication)? {
+                    return Ok(reused);
+                }
+                let (output_image, output_video) = if pvt {
                     let members = crate::live_photo_package::planned_members(&item.output)?;
                     (members.image, members.video)
                 } else {
                     (item.output.clone(), item.output.with_extension("mov"))
                 };
-                let output_paths = || match &package {
-                    Some(path) => vec![path.clone()],
-                    None => vec![output_image.clone(), output_video.clone()],
-                };
-                let exists = fs::symlink_metadata(&item.output).is_ok()
-                    || (package.is_none() && fs::symlink_metadata(&output_video).is_ok());
-                if reuse_existing {
-                    if let Some(prior) =
-                        checkpoint.reusable_item(&item.input, &signature, package.is_some())?
-                    {
+                if reuse_existing && !styles {
+                    if let Some(prior) = checkpoint.reusable_item(&item.input, &signature, pvt)? {
                         if prior.image == canonical_or_absolute(&output_image)?
                             && prior.video == canonical_or_absolute(&output_video)?
                             && prior.package
-                                == package.as_deref().map(canonical_or_absolute).transpose()?
-                        {
-                            let layout_matches = package.is_none()
+                                == pvt
+                                    .then(|| canonical_or_absolute(&item.output))
+                                    .transpose()?
+                            && (!pvt
                                 || crate::live_photo_package::read_members(&item.output).is_ok_and(
                                     |members| {
                                         members.image == output_image
                                             && members.video == output_video
                                     },
-                                );
-                            if layout_matches
-                                && pair_matches_identifier(
-                                    &output_image,
-                                    &output_video,
-                                    &prior.asset_identifier,
-                                )
-                            {
-                                checkpoint_event = Some(BatchCheckpointEvent {
-                                    source: item.input.clone(),
-                                    image: output_image.clone(),
-                                    video: output_video.clone(),
-                                    package: package.clone(),
-                                    signature,
-                                    outcome: OwnedCheckpointOutcome::SkippedExisting(
-                                        prior.asset_identifier,
-                                    ),
-                                    android: None,
-                                });
-                                return Ok(BatchSuccess {
-                                    input: item.input.clone(),
-                                    outputs: output_paths(),
-                                    kind: BatchAssetKind::LivePhoto,
-                                    disposition: BatchSuccessDisposition::SkippedExisting,
-                                    omitted_resource_count: None,
-                                });
-                            }
-                            if exists {
-                                return Err(RuntimeError::new("batch resume provenance",
-                                    "checkpoint matches the source, but the existing Live Photo output no longer matches its recorded container and asset identifier; refusing to overwrite"));
-                            }
+                                ))
+                            && pair_matches_identifier(
+                                &output_image,
+                                &output_video,
+                                &prior.asset_identifier,
+                            )
+                        {
+                            return Ok(work.receipt(BatchSuccessDisposition::SkippedExisting, None));
                         }
                     }
-                    if exists {
-                        return Err(RuntimeError::new("batch resume provenance",
-                            "existing Live Photo output has no matching source provenance; refusing to reuse or overwrite"));
-                    }
-                } else if exists {
+                }
+                if work
+                    .output_paths()
+                    .iter()
+                    .any(|path| fs::symlink_metadata(path).is_ok())
+                {
                     return Err(RuntimeError::new(
-                        "batch output",
-                        "Live Photo output already exists; refusing to overwrite",
+                        "batch resume provenance",
+                        "existing Live Photo output has no matching source, container and intent; refusing to reuse or overwrite",
                     ));
                 }
-
-                match runtime.convert_motion_photo_file_with_request(
-                    &source,
-                    &item.input,
-                    &item.output,
-                    request,
-                ) {
-                    Ok(converted) => {
-                        let omitted_resource_count = Some(converted.omitted_resource_count());
-                        checkpoint_event = Some(BatchCheckpointEvent {
-                            source: item.input.clone(),
-                            image: converted.image.clone(),
-                            video: converted.video.clone(),
-                            package: converted.package.clone(),
-                            signature,
-                            outcome: OwnedCheckpointOutcome::Success(
-                                converted.content_identifier.clone(),
-                            ),
-                            android: None,
-                        });
-                        Ok(BatchSuccess {
-                            input: item.input.clone(),
-                            outputs: converted.output_paths(),
-                            kind: BatchAssetKind::LivePhoto,
-                            disposition: BatchSuccessDisposition::Converted,
-                            omitted_resource_count,
-                        })
+                work.convert(&mut publication, |output| {
+                    #[cfg(target_os = "macos")]
+                    if styles {
+                        let adapter = apple_adapter_executable.expect("validated adapter");
+                        return runtime
+                            .convert_apple_live_styles_file(
+                                adapter,
+                                &source,
+                                &item.input,
+                                output,
+                                request,
+                            )
+                            .map(|receipt| receipt.omitted_resource_count());
                     }
-                    Err(error) => {
-                        checkpoint_event = Some(BatchCheckpointEvent {
-                            source: item.input.clone(),
-                            image: output_image,
-                            video: output_video,
-                            package,
-                            signature,
-                            outcome: OwnedCheckpointOutcome::Failure(error.to_string()),
-                            android: None,
-                        });
-                        Err(error)
-                    }
-                }
+                    runtime
+                        .convert_motion_photo_file_with_request(
+                            &source,
+                            &item.input,
+                            output,
+                            request,
+                        )
+                        .map(|receipt| receipt.omitted_resource_count())
+                })
             }
             SourceAsset::ProXdr { .. } => {
                 if google_target(motion_target).is_some() {
@@ -1081,31 +1124,19 @@ fn process_batch_item_with_options(
     BatchWorkResult {
         item,
         result,
-        checkpoint: checkpoint_event,
+        publication,
     }
 }
 
-fn finalize_work_result(
-    work: BatchWorkResult,
-    writer: &mut Option<MotionPhotoCheckpointWriter>,
-    checkpoint_path: Option<&Path>,
-) -> OrderedBatchOutcome {
-    let BatchWorkResult {
-        item,
-        mut result,
-        checkpoint,
-    } = work;
-    if let Some(event) = checkpoint {
-        if let Err(error) = event.append(writer, checkpoint_path) {
-            result = Err(error);
-        }
-    }
-    match result {
+fn finalize_work_result(work: BatchWorkResult) -> OrderedBatchOutcome {
+    match work.result {
         Ok(success) => OrderedBatchOutcome::Success(success),
         Err(error) => OrderedBatchOutcome::Failure(BatchFailure {
-            input: item.input,
-            output: item.output,
+            input: work.item.input,
+            output: work.item.output,
             error: error.to_string(),
+            published_outputs: work.publication.outputs,
+            published_unrecorded: work.publication.complete,
         }),
     }
 }
@@ -1179,6 +1210,8 @@ impl PortableRuntime {
                     output: options.checkpoint_path.clone().unwrap_or_default(),
                     error: "Cinematic video does not support Live Photo checkpoint/resume options"
                         .to_owned(),
+                    published_outputs: Vec::new(),
+                    published_unrecorded: false,
                 }],
             };
         }
@@ -1186,26 +1219,30 @@ impl PortableRuntime {
         if items.is_empty() {
             return BatchReceipt::default();
         }
-        let checkpoint = options
-            .checkpoint_path
-            .as_deref()
-            .map(|path| {
-                let protected = items
-                    .iter()
-                    .flat_map(|item| {
-                        [
-                            item.input.clone(),
-                            item.output.clone(),
-                            item.output.with_extension("mov"),
-                        ]
-                    })
-                    .collect::<Vec<_>>();
-                validate_checkpoint_path(path, protected.iter().map(PathBuf::as_path))?;
-                MotionPhotoCheckpoint::load(path)
-            })
-            .transpose();
-        let checkpoint = match checkpoint {
-            Ok(value) => value.unwrap_or_default(),
+        let checkpoint: Result<(MotionPhotoCheckpoint, Option<BatchJournal>)> = (|| {
+            let Some(path) = options.checkpoint_path.as_deref() else {
+                return Ok((MotionPhotoCheckpoint::default(), None));
+            };
+            let protected = items
+                .iter()
+                .flat_map(|item| {
+                    [
+                        item.input.clone(),
+                        item.output.clone(),
+                        item.output.with_extension("mov"),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            let journal = BatchJournal::new(path, protected)?;
+            let legacy = if options.reuse_existing {
+                MotionPhotoCheckpoint::load(path)?
+            } else {
+                MotionPhotoCheckpoint::default()
+            };
+            Ok((legacy, Some(journal)))
+        })();
+        let (checkpoint, journal) = match checkpoint {
+            Ok(value) => value,
             Err(error) => {
                 return BatchReceipt {
                     successes: Vec::new(),
@@ -1213,13 +1250,13 @@ impl PortableRuntime {
                         input: PathBuf::new(),
                         output: options.checkpoint_path.clone().unwrap_or_default(),
                         error: error.to_string(),
+                        published_outputs: Vec::new(),
+                        published_unrecorded: false,
                     }],
                 };
             }
         };
-
         let jobs = options.jobs.max(1).min(items.len());
-        let mut writer: Option<MotionPhotoCheckpointWriter> = None;
         let mut outcomes = (0..items.len()).map(|_| None).collect::<Vec<_>>();
         let apple_options = BatchAppleOptions {
             portrait_profile: apple_portrait_profile,
@@ -1233,14 +1270,11 @@ impl PortableRuntime {
                     item,
                     request,
                     &checkpoint,
+                    journal.as_ref(),
                     options,
                     &apple_options,
                 );
-                outcomes[index] = Some(finalize_work_result(
-                    work,
-                    &mut writer,
-                    options.checkpoint_path.as_deref(),
-                ));
+                outcomes[index] = Some(finalize_work_result(work));
             }
             return receipt_from_ordered(outcomes);
         }
@@ -1252,6 +1286,7 @@ impl PortableRuntime {
                 let sender = sender.clone();
                 let items = &items;
                 let checkpoint = &checkpoint;
+                let journal = journal.as_ref();
                 let next = &next;
                 let apple_options = &apple_options;
                 scope.spawn(move || {
@@ -1266,6 +1301,7 @@ impl PortableRuntime {
                             item,
                             request,
                             checkpoint,
+                            journal,
                             options,
                             apple_options,
                         );
@@ -1280,11 +1316,7 @@ impl PortableRuntime {
                 let (index, work) = receiver
                     .recv()
                     .expect("batch workers must return exactly one result per planned item");
-                outcomes[index] = Some(finalize_work_result(
-                    work,
-                    &mut writer,
-                    options.checkpoint_path.as_deref(),
-                ));
+                outcomes[index] = Some(finalize_work_result(work));
             }
         });
         receipt_from_ordered(outcomes)
@@ -1354,6 +1386,8 @@ mod tests {
                 input: PathBuf::from("b.heic"),
                 output: PathBuf::from("out/b.heic"),
                 error: "invalid".to_owned(),
+                published_outputs: Vec::new(),
+                published_unrecorded: false,
             }],
         };
         assert_eq!(receipt.processed(), 2);

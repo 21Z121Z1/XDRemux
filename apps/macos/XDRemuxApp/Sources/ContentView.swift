@@ -258,6 +258,8 @@ struct ContentView: View {
             return AppStrings.scanning
         case .processing:
             return AppStrings.converting
+        case .cancelling:
+            return AppStrings.waitingForCancellation
         case .completed:
             return counts.failed == 0 ? AppStrings.conversionFinished : AppStrings.conversionFinishedWithFailures
         case .cancelled:
@@ -1042,7 +1044,8 @@ private extension OutputPlanStatus {
         switch self {
         case .ready: return AppStrings.outputPlanReady
         case .willOverwriteExisting: return AppStrings.outputPlanOverwriteExisting
-        case .skipsExistingValidOutput: return AppStrings.outputPlanSkipExisting
+        case .checksExistingOutput: return AppStrings.outputPlanCheckExisting
+        case .existingLivePhoto: return AppStrings.outputPlanExistingLivePhoto
         case .duplicateOutput: return AppStrings.outputPlanDuplicate
         case .overwritesInput: return AppStrings.outputPlanOverwritesInput
         case .inputMissing: return AppStrings.outputPlanInputMissing
@@ -1057,9 +1060,9 @@ private extension OutputPlanStatus {
             return .secondary
         case .willOverwriteExisting:
             return .orange
-        case .skipsExistingValidOutput:
+        case .checksExistingOutput:
             return .secondary
-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage, .existingLivePhoto:
             return .red
         }
     }

@@ -74,16 +74,17 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
         .expect("converted MOV must have a ContentIdentifier");
     assert_eq!(image_id, video_id);
 
-    let checkpoint = output.join(DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME);
+    let checkpoint = output.join(format!("{DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME}.v4"));
     let checkpoint_text = fs::read_to_string(&checkpoint).unwrap();
     let mut lines = checkpoint_text.lines();
     let header: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
     assert_eq!(header["kind"], "header");
-    assert_eq!(header["schemaVersion"], 3);
+    assert_eq!(header["schema_version"], 4);
     let item: Value = serde_json::from_str(lines.last().unwrap()).unwrap();
-    assert_eq!(item["status"], "success");
-    assert_eq!(item["assetIdentifier"], image_id);
-    assert!(item["inputSHA256"]
+    assert_eq!(item["publication"]["committed"], true);
+    assert_eq!(item["publication"]["layout"], "pair");
+    assert_eq!(item["publication"]["sha256"].as_array().unwrap().len(), 2);
+    assert!(item["key"]["source_sha256"]
         .as_str()
         .is_some_and(|value| value.len() == 64));
 
@@ -98,9 +99,12 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
     assert_eq!(fs::read(&video).unwrap(), before_video);
 
     let checkpoint_text = fs::read_to_string(&checkpoint).unwrap();
-    let last: Value = serde_json::from_str(checkpoint_text.lines().last().unwrap()).unwrap();
-    assert_eq!(last["status"], "skipped_existing");
-    assert_eq!(last["assetIdentifier"], image_id);
+    let records = checkpoint_text.lines().collect::<Vec<_>>();
+    assert_eq!(
+        records.len(),
+        3,
+        "a successful reuse does not append another commit"
+    );
 
     fs::remove_dir_all(root).unwrap();
 }
@@ -116,7 +120,7 @@ fn checkpoint_cannot_append_to_a_source_hard_link() {
     .unwrap();
     fs::write(&source, &original).unwrap();
     let checkpoint = root.path().join("journal");
-    let actual = root.path().join("journal.motion-photo");
+    let actual = root.path().join("journal.motion-photo.v4");
     fs::hard_link(&source, actual).unwrap();
     let output = root.path().join("output");
     let mut stdout = Vec::new();
@@ -144,5 +148,49 @@ fn checkpoint_cannot_append_to_a_source_hard_link() {
     assert!(
         !output.exists(),
         "invalid checkpoint must fail before publication"
+    );
+}
+
+#[test]
+fn resume_reconciles_published_pair_when_commit_and_tail_are_interrupted() {
+    let root = tempfile::tempdir().unwrap();
+    let output = root.path().join("out");
+    let first = run(&output, false);
+    let outputs = first["successes"][0]["outputs"].as_array().unwrap();
+    let image = PathBuf::from(outputs[0].as_str().unwrap());
+    let video = PathBuf::from(outputs[1].as_str().unwrap());
+    let original_image = fs::read(&image).unwrap();
+    let original_video = fs::read(&video).unwrap();
+    let checkpoint = output.join(format!("{DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME}.v4"));
+    let journal = fs::read_to_string(&checkpoint).unwrap();
+    let mut lines = journal.lines();
+    let header = lines.next().unwrap();
+    let prepared = lines.next().unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(prepared).unwrap()["publication"]["committed"],
+        false
+    );
+    let torn = format!("{header}\n{prepared}\n{{\"kind\":\"publication\"");
+    fs::write(&checkpoint, torn).unwrap();
+
+    let result = run(&output, true);
+    assert_eq!(
+        result["successes"][0]["outputs"],
+        first["successes"][0]["outputs"]
+    );
+    assert_eq!(result["skipped_existing"], 1);
+    assert!(fs::read(image).unwrap() == original_image);
+    assert!(fs::read(video).unwrap() == original_video);
+    let repaired = fs::read_to_string(checkpoint).unwrap();
+    let records = repaired
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(records.len(), 3);
+    assert_eq!(records[2]["publication"]["committed"], true);
+    assert_eq!(
+        fs::read_dir(output).unwrap().count(),
+        3,
+        "only one pair and its journal"
     );
 }

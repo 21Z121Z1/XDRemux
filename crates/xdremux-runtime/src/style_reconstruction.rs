@@ -474,16 +474,25 @@ pub fn reconstruct_styles_hdr_with_display(
         .collect::<String>();
     let resources = extract_style_reconstruction_resources(&source)
         .map_err(|e| RuntimeError::external("embedded Styles resources", e))?;
-    let parent = output
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
+    let destination = output;
+    let parent = crate::publication_parent(destination);
+    if fs::symlink_metadata(destination).is_ok() {
+        return Err(error(format!(
+            "result directory already exists: {}",
+            destination.display()
+        )));
+    }
     fs::create_dir_all(parent).map_err(io)?;
-    fs::create_dir(output).map_err(io)?;
+    let staging = tempfile::Builder::new()
+        .prefix(".xdremux-styles-")
+        .tempdir_in(parent)
+        .map_err(io)?;
+    let output = staging.path().join("result");
+    fs::create_dir(&output).map_err(io)?;
     let run = (|| {
         let work = tempfile::Builder::new()
             .prefix(".styles-work-")
-            .tempdir_in(output)
+            .tempdir_in(&output)
             .map_err(io)?;
         let dir = work.path();
         fs::write(dir.join("styles.plist"), &resources.metadata).map_err(io)?;
@@ -715,10 +724,14 @@ pub fn reconstruct_styles_hdr_with_display(
         .map_err(io)?;
         Ok(report)
     })();
-    if run.is_err() {
-        let _ = fs::remove_dir_all(output);
+    let report = run?;
+    for entry in fs::read_dir(&output).map_err(io)? {
+        let path = entry.map_err(io)?.path();
+        fs::File::open(path).map_err(io)?.sync_all().map_err(io)?;
     }
-    run
+    crate::live_photo_package::validate_output_parent(&destination.join("planned-output"))?;
+    crate::live_photo_package::rename_exclusive(&output, destination).map_err(io)?;
+    Ok(report)
 }
 
 #[cfg(test)]

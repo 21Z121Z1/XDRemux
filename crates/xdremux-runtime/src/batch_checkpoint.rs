@@ -1,15 +1,14 @@
 use std::collections::BTreeMap;
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::{Result, RuntimeError};
 
-pub const MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
 pub const DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME: &str = ".xdremux-motion-photo-checkpoint.jsonl";
 const SOURCE_HASH_BUFFER_BYTES: usize = 64 * 1024;
 
@@ -68,13 +67,10 @@ pub struct SourceSignature {
     pub sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct CheckpointItem {
-    kind: String,
     #[serde(rename = "inputPath", alias = "input_path")]
     input_path: String,
-    #[serde(rename = "sourceRelativePath", alias = "relative_source_path", default)]
-    source_relative_path: Option<String>,
     #[serde(rename = "outputImagePath", alias = "output_image_path")]
     output_image_path: String,
     #[serde(
@@ -113,14 +109,10 @@ struct CheckpointItem {
     status: String,
     #[serde(rename = "inputSize", alias = "input_size", default)]
     input_size: Option<u64>,
-    #[serde(rename = "inputMtimeNs", alias = "input_mtime_ns", default)]
-    input_mtime_ns: Option<u64>,
     #[serde(rename = "inputSHA256", alias = "input_sha256", default)]
     input_sha256: Option<String>,
     #[serde(rename = "assetIdentifier", alias = "asset_identifier", default)]
     asset_identifier: Option<String>,
-    #[serde(default)]
-    error: Option<String>,
 }
 
 impl CheckpointItem {
@@ -298,163 +290,6 @@ pub(crate) struct ReusableMotionPhoto {
     pub asset_identifier: String,
 }
 
-pub(crate) enum CheckpointOutcome<'a> {
-    Success(&'a str),
-    SkippedExisting(&'a str),
-    Failure(&'a str),
-}
-
-impl CheckpointOutcome<'_> {
-    fn status(&self) -> &'static str {
-        match self {
-            Self::Success(_) => "success",
-            Self::SkippedExisting(_) => "skipped_existing",
-            Self::Failure(_) => "failure",
-        }
-    }
-
-    fn asset_identifier(&self) -> Option<&str> {
-        match self {
-            Self::Success(identifier) | Self::SkippedExisting(identifier) => Some(identifier),
-            Self::Failure(_) => None,
-        }
-    }
-
-    fn error(&self) -> Option<&str> {
-        match self {
-            Self::Failure(error) => Some(error),
-            Self::Success(_) | Self::SkippedExisting(_) => None,
-        }
-    }
-}
-
-pub(crate) struct MotionPhotoCheckpointWriter {
-    file: File,
-}
-
-pub(crate) struct AndroidCheckpointIdentity<'a> {
-    pub target: &'a str,
-    pub compatibility: &'a str,
-    pub destination: Option<&'a str>,
-    pub output_sha256: Option<&'a str>,
-}
-
-impl MotionPhotoCheckpointWriter {
-    pub(crate) fn open(path: &Path) -> Result<Self> {
-        crate::live_photo_package::validate_output_parent(path)?;
-        if let Some(parent) = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-        {
-            fs::create_dir_all(parent).map_err(|error| {
-                RuntimeError::external("Motion Photo checkpoint directory", error)
-            })?;
-        }
-        let new_file = !path.exists()
-            || fs::metadata(path)
-                .map(|value| value.len() == 0)
-                .unwrap_or(true);
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint open", error))?;
-        let mut writer = Self { file };
-        if new_file {
-            writer.append_json(&serde_json::json!({
-                "kind": "header",
-                "schemaVersion": MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
-            }))?;
-        }
-        Ok(writer)
-    }
-
-    fn append_json(&mut self, value: &serde_json::Value) -> Result<()> {
-        serde_json::to_writer(&mut self.file, value)
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?;
-        self.file
-            .write_all(b"\n")
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint append", error))?;
-        self.file
-            .flush()
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint flush", error))?;
-        self.file
-            .sync_all()
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint sync", error))
-    }
-
-    pub(crate) fn append_item(
-        &mut self,
-        source: &Path,
-        image: &Path,
-        video: &Path,
-        signature: &SourceSignature,
-        package: Option<&Path>,
-        outcome: CheckpointOutcome<'_>,
-    ) -> Result<()> {
-        let input = canonical_existing(source)?;
-        let output_image = canonical_or_absolute(image)?;
-        let output_video = canonical_or_absolute(video)?;
-        let item = CheckpointItem {
-            kind: "item".to_owned(),
-            input_path: path_string(&input),
-            source_relative_path: None,
-            output_image_path: path_string(&output_image),
-            output_video_path: Some(path_string(&output_video)),
-            output_package_path: package
-                .map(canonical_or_absolute)
-                .transpose()?
-                .as_deref()
-                .map(path_string),
-            output_target: None,
-            video_compatibility: None,
-            destination: None,
-            output_sha256: None,
-            status: outcome.status().to_owned(),
-            input_size: Some(signature.size),
-            input_mtime_ns: signature.mtime_ns,
-            input_sha256: Some(signature.sha256.clone()),
-            asset_identifier: outcome.asset_identifier().map(ToOwned::to_owned),
-            error: outcome.error().map(ToOwned::to_owned),
-        };
-        let value = serde_json::to_value(item)
-            .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?;
-        self.append_json(&value)
-    }
-
-    pub(crate) fn append_android_item(
-        &mut self,
-        source: &Path,
-        output: &Path,
-        signature: &SourceSignature,
-        identity: AndroidCheckpointIdentity<'_>,
-        outcome: CheckpointOutcome<'_>,
-    ) -> Result<()> {
-        let item = CheckpointItem {
-            kind: "item".to_owned(),
-            input_path: path_string(&canonical_existing(source)?),
-            source_relative_path: None,
-            output_image_path: path_string(&canonical_or_absolute(output)?),
-            output_video_path: None,
-            output_package_path: None,
-            output_target: Some(identity.target.to_owned()),
-            video_compatibility: Some(identity.compatibility.to_owned()),
-            destination: identity.destination.map(ToOwned::to_owned),
-            output_sha256: identity.output_sha256.map(ToOwned::to_owned),
-            status: outcome.status().to_owned(),
-            input_size: Some(signature.size),
-            input_mtime_ns: signature.mtime_ns,
-            input_sha256: Some(signature.sha256.clone()),
-            asset_identifier: None,
-            error: outcome.error().map(ToOwned::to_owned),
-        };
-        self.append_json(
-            &serde_json::to_value(item)
-                .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?,
-        )
-    }
-}
-
 pub fn motion_photo_checkpoint_path(
     output_dir: Option<&Path>,
     requested: Option<&Path>,
@@ -553,11 +388,25 @@ fn canonical_existing(path: &Path) -> Result<PathBuf> {
 }
 
 pub(crate) fn canonical_or_absolute(path: &Path) -> Result<PathBuf> {
-    if path.exists() {
-        return canonical_existing(path);
+    let absolute = std::path::absolute(path)
+        .map_err(|error| RuntimeError::external("batch provenance absolute path", error))?;
+    for ancestor in absolute.ancestors() {
+        match fs::canonicalize(ancestor) {
+            Ok(parent) => {
+                let relative = absolute
+                    .strip_prefix(ancestor)
+                    .expect("ancestor of this path");
+                return Ok(if relative.as_os_str().is_empty() {
+                    parent
+                } else {
+                    parent.join(relative)
+                });
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(RuntimeError::external("batch provenance path", error)),
+        }
     }
-    std::path::absolute(path)
-        .map_err(|error| RuntimeError::external("batch provenance absolute path", error))
+    Ok(absolute)
 }
 
 fn path_string(path: &Path) -> String {
@@ -583,6 +432,23 @@ mod tests {
         assert_eq!(streamed.size, u64::try_from(payload.len()).unwrap());
     }
 
+    fn write_legacy_pair(
+        checkpoint: &Path,
+        source: &Path,
+        image: &Path,
+        video: &Path,
+        sig: &SourceSignature,
+    ) {
+        let header = serde_json::json!({"kind":"header", "schemaVersion":3});
+        let item = serde_json::json!({
+            "kind":"item", "inputPath":canonical_existing(source).unwrap(),
+            "outputImagePath":canonical_existing(image).unwrap(),
+            "outputVideoPath":canonical_existing(video).unwrap(), "status":"success",
+            "inputSize":sig.size, "inputSHA256":sig.sha256, "assetIdentifier":"ASSET-ID",
+        });
+        fs::write(checkpoint, format!("{header}\n{item}\n")).unwrap();
+    }
+
     #[test]
     fn truncated_tail_record_never_grants_reuse() {
         let root = tempfile::tempdir().unwrap();
@@ -595,22 +461,10 @@ mod tests {
         let bytes = fs::read(&source).unwrap();
         let signature = source_signature(&source, &bytes).unwrap();
         let checkpoint = root.path().join("state.jsonl");
-        let mut writer = MotionPhotoCheckpointWriter::open(&checkpoint).unwrap();
-        writer
-            .append_item(
-                &source,
-                &image,
-                &video,
-                &signature,
-                None,
-                CheckpointOutcome::Success("ASSET-ID"),
-            )
-            .unwrap();
-        drop(writer);
-        let mut file = OpenOptions::new().append(true).open(&checkpoint).unwrap();
-        file.write_all(br#"{"kind":"item","inputPath":"broken""#)
-            .unwrap();
-        file.sync_all().unwrap();
+        write_legacy_pair(&checkpoint, &source, &image, &video, &signature);
+        let mut torn = fs::read(&checkpoint).unwrap();
+        torn.extend_from_slice(br#"{"kind":"item","inputPath":"broken""#);
+        fs::write(&checkpoint, torn).unwrap();
 
         let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
         let prior = loaded
@@ -633,18 +487,7 @@ mod tests {
         let original_bytes = fs::read(&source).unwrap();
         let original = source_signature(&source, &original_bytes).unwrap();
         let checkpoint = root.path().join("state.jsonl");
-        let mut writer = MotionPhotoCheckpointWriter::open(&checkpoint).unwrap();
-        writer
-            .append_item(
-                &source,
-                &image,
-                &video,
-                &original,
-                None,
-                CheckpointOutcome::Success("ASSET-ID"),
-            )
-            .unwrap();
-        drop(writer);
+        write_legacy_pair(&checkpoint, &source, &image, &video, &original);
 
         fs::write(&source, b"source-b").unwrap();
         let changed_bytes = fs::read(&source).unwrap();

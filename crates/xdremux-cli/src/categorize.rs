@@ -22,6 +22,9 @@ pub(crate) struct CategorizeArgs {
     /// Plan and report categorization without publishing files.
     #[arg(long)]
     dry_run: bool,
+    /// Copy only if inputs, fingerprints and destinations still match this preview ID.
+    #[arg(long, conflicts_with = "dry_run", value_name = "ID")]
+    require_plan: Option<String>,
     /// Emit one stable machine-readable JSON receipt.
     #[arg(long)]
     json: bool,
@@ -221,10 +224,11 @@ pub(crate) fn run(
         }
     };
 
-    let receipt = match PortableRuntime::new().categorize_files(
+    let receipt = match PortableRuntime::new().categorize_files_with_plan(
         &inputs,
         &arguments.output_dir,
         arguments.dry_run,
+        arguments.require_plan.as_deref(),
     ) {
         Ok(receipt) => receipt,
         Err(error) => {
@@ -256,6 +260,7 @@ pub(crate) fn run(
         let value = json!({
             "schema_version": CATEGORIZE_RECEIPT_SCHEMA_VERSION,
             "command": "categorize",
+            "plan_id": receipt.plan_id,
             "processed": receipt.processed(),
             "copied": receipt.copied(),
             "duplicates": receipt.duplicates(),
@@ -347,6 +352,7 @@ mod tests {
             inputs: vec![root.clone()],
             output_dir: root.clone(),
             dry_run: true,
+            require_plan: None,
             json: false,
         };
         assert_eq!(

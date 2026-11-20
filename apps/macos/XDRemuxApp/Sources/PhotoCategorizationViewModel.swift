@@ -7,6 +7,7 @@ enum PhotoCategorizationAppState: Equatable {
     case scanning
     case ready
     case copying
+    case cancelling
     case completed
     case cancelled
     case failed(String)
@@ -32,15 +33,25 @@ private final class CategorizationCancellationToken: @unchecked Sendable {
 @Observable
 @MainActor
 final class PhotoCategorizationViewModel {
-    var inputURLs: [URL] = []
-    var outputDirectory: URL?
+    private(set) var inputURLs: [URL] = []
+    var outputDirectory: URL? {
+        didSet {
+            if outputDirectory != oldValue, state == .ready {
+                preview.removeAll()
+                items.removeAll()
+                completedCount = 0
+                state = .idle
+            }
+        }
+    }
     var items: [PhotoCategorizationItem] = []
     var state: PhotoCategorizationAppState = .idle
     var completedCount = 0
 
     var canScan: Bool { !inputURLs.isEmpty && !isBusy }
-    var canCopy: Bool { state == .ready && items.contains { $0.disposition == .dryRun } }
-    var isBusy: Bool { state == .scanning || state == .copying }
+    var canCopy: Bool { state == .ready && !preview.isEmpty && items.contains { $0.disposition == .dryRun } }
+    var isBusy: Bool { operation != nil }
+    var canCancel: Bool { state == .scanning || state == .copying }
     var categorizedCount: Int { items.count { $0.classification.mode != nil } }
     var unclassifiedCount: Int { items.count { $0.classification.mode == nil } }
     var rootCount: Int { unclassifiedCount } // compatibility for older UI/tests
@@ -54,8 +65,8 @@ final class PhotoCategorizationViewModel {
         }.joined(separator: " · ")
     }
 
-    private var task: Task<Void, Never>?
-    private var cancellationToken: CategorizationCancellationToken?
+    private var operation: CategorizationCancellationToken?
+    private var preview: [PlannedRoot] = []
 
     func addInputs(_ urls: [URL]) {
         guard !isBusy else { return }
@@ -63,6 +74,7 @@ final class PhotoCategorizationViewModel {
         for url in urls where existing.insert(url.standardizedFileURL.path).inserted {
             inputURLs.append(url)
         }
+        preview.removeAll()
         items.removeAll()
         state = .idle
     }
@@ -71,6 +83,7 @@ final class PhotoCategorizationViewModel {
         guard !isBusy else { return }
         inputURLs.removeAll()
         outputDirectory = nil
+        preview.removeAll()
         items.removeAll()
         completedCount = 0
         state = .idle
@@ -78,95 +91,114 @@ final class PhotoCategorizationViewModel {
 
     func scan() {
         guard canScan else { return }
-        task?.cancel()
+        let token = CategorizationCancellationToken()
+        operation = token
         state = .scanning
+        preview.removeAll()
         completedCount = 0
         let inputs = inputURLs
-        let outputDirectory = outputDirectory
-        task = Task { [weak self] in
+        let destination = outputDirectory
+        Task { [weak self] in
             do {
-                let plan = try await Task.detached(priority: .userInitiated) {
-                    try Self.runCategorization(
-                        inputs: inputs,
-                        outputDirectory: outputDirectory,
-                        dryRun: true
+                let snapshot = try await Task.detached(priority: .userInitiated) {
+                    try Self.planCategorization(
+                        roots: Self.categorizationRoots(inputs: inputs, outputDirectory: destination),
+                        token: token
                     )
                 }.value
-                guard !Task.isCancelled else { return }
-                self?.items = plan
-                self?.state = .ready
+                guard let self, operation === token else { return }
+                operation = nil
+                if token.isCancelled {
+                    state = .cancelled
+                } else if outputDirectory != destination {
+                    items.removeAll()
+                    state = .idle
+                } else {
+                    preview = snapshot.roots
+                    items = snapshot.items
+                    state = .ready
+                }
             } catch {
-                self?.state = .failed(String(describing: error))
+                guard let self, operation === token else { return }
+                operation = nil
+                state = token.isCancelled ? .cancelled : .failed(String(describing: error))
             }
         }
     }
 
     func copyPlannedFiles() {
         guard canCopy else { return }
+        let token = CategorizationCancellationToken()
+        operation = token
         state = .copying
         completedCount = 0
-        let token = CategorizationCancellationToken()
-        cancellationToken = token
-        let planItems = items
-        let outputDirectory = outputDirectory
-        task = Task { [weak self] in
-            let results: [PhotoCategorizationItem] = await Task.detached(priority: .userInitiated) {
-                guard !token.isCancelled else { return [] as [PhotoCategorizationItem] }
-                do {
-                    return try Self.runCategorization(
-                        inputs: planItems
-                            .map(\.sourceURL)
-                            .filter(Self.isSupportedImage),
-                        outputDirectory: outputDirectory,
-                        dryRun: false
-                    )
-                } catch {
-                    return planItems.map { item in
-                        PhotoCategorizationItem(
-                            sourceURL: item.sourceURL,
-                            destinationURL: item.destinationURL,
-                            classification: item.classification,
-                            disposition: .failed,
-                            errorDescription: String(describing: error)
-                        )
-                    }
-                }
+        let plan = preview
+        Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                Self.copy(roots: plan, token: token)
             }.value
-            guard let self else { return }
-            let completedByID = Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
+            guard let self, operation === token else { return }
+            operation = nil
+            let completedByID = Dictionary(uniqueKeysWithValues: result.items.map { ($0.id, $0) })
             items = items.map { completedByID[$0.id] ?? $0 }
-            completedCount = results.count
+            completedCount = result.items.count
             if token.isCancelled {
                 state = .cancelled
+            } else if let error = result.error {
+                state = .failed(error)
             } else if items.contains(where: { $0.disposition == .failed }) {
                 state = .failed("部分文件复制失败")
             } else {
                 state = .completed
             }
-            cancellationToken = nil
         }
     }
 
-    nonisolated private static func runCategorization(
-        inputs: [URL],
-        outputDirectory: URL?,
-        dryRun: Bool
-    ) throws -> [PhotoCategorizationItem] {
-        let roots = categorizationRoots(inputs: inputs, outputDirectory: outputDirectory)
+    private struct PlannedRoot: Sendable {
+        let root: CategorizationRoot
+        let planID: String
+    }
+
+    nonisolated private static func planCategorization(
+        roots: [CategorizationRoot],
+        token: CategorizationCancellationToken
+    ) throws -> (roots: [PlannedRoot], items: [PhotoCategorizationItem]) {
+        var plans: [PlannedRoot] = []
         var items: [PhotoCategorizationItem] = []
-        for root in roots {
-            items.append(contentsOf: try RustCLIClient.categorize(
-                inputs: root.inputs,
-                outputDirectory: root.outputDirectory,
-                dryRun: dryRun
-            ))
-        }
         var seen = Set<String>()
-        return items.filter { seen.insert($0.id).inserted }
+        for root in roots {
+            if token.isCancelled { break }
+            let result = try RustCLIClient.categorize(
+                inputs: root.inputs, outputDirectory: root.outputDirectory, dryRun: true
+            )
+            guard let planID = result.planID else {
+                throw RustCLIClient.ClientError.unsupportedConfiguration("分类预览缺少计划标识。")
+            }
+            plans.append(PlannedRoot(root: root, planID: planID))
+            items.append(contentsOf: result.items.filter { seen.insert($0.id).inserted })
+        }
+        return (plans, items)
     }
 
-    nonisolated private static func isSupportedImage(_ url: URL) -> Bool {
-        ["heic", "heif", "jpg", "jpeg"].contains(url.pathExtension.lowercased())
+    nonisolated private static func copy(
+        roots: [PlannedRoot],
+        token: CategorizationCancellationToken
+    ) -> (items: [PhotoCategorizationItem], error: String?) {
+        var items: [PhotoCategorizationItem] = []
+        var seen = Set<String>()
+        for plan in roots {
+            if token.isCancelled { break }
+            do {
+                let result = try RustCLIClient.categorize(
+                    inputs: plan.root.inputs, outputDirectory: plan.root.outputDirectory,
+                    dryRun: false, expectedPlan: plan.planID
+                )
+                items.append(contentsOf: result.items.filter { seen.insert($0.id).inserted })
+            } catch {
+                return (items, String(describing: error))
+            }
+        }
+        return (items, nil)
     }
 
     private struct CategorizationRoot: Sendable {
@@ -197,9 +229,9 @@ final class PhotoCategorizationViewModel {
     }
 
     func cancel() {
-        cancellationToken?.cancel()
-        task?.cancel()
-        if isBusy { state = .cancelled }
+        guard canCancel, let operation else { return }
+        state = .cancelling
+        operation.cancel()
     }
 
     func revealResults() {

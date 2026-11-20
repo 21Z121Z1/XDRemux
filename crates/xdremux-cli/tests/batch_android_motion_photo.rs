@@ -117,11 +117,12 @@ fn google_jpeg_batch_preserves_movie_and_ultra_hdr_and_skips_by_provenance() {
     assert_eq!(first["successes"][0]["kind"], "motion-photo");
     assert_eq!(first["successes"][0]["omitted_resource_count"], 0);
 
-    let checkpoint = destination.join(".xdremux-motion-photo-checkpoint.jsonl");
+    let checkpoint = destination.join(".xdremux-motion-photo-checkpoint.jsonl.v4");
     let records = fs::read_to_string(&checkpoint).unwrap();
-    assert!(records.contains("\"outputTarget\":\"google-jpeg\""));
-    assert!(records.contains("\"outputSHA256\""));
-    assert!(!records.contains("\"outputVideoPath\""));
+    let last: Value = serde_json::from_str(records.lines().last().unwrap()).unwrap();
+    assert_eq!(last["key"]["route"], "google-jpeg:preserve:legacy");
+    assert_eq!(last["publication"]["layout"], "file");
+    assert_eq!(last["publication"]["sha256"].as_array().unwrap().len(), 1);
     let before = fs::read(destination.join("hdr.xdremuxMP.jpg")).unwrap();
     let (code, second, stderr) = run(&arguments);
     assert_eq!(code, 0, "{stderr}: {second}");

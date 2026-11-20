@@ -100,11 +100,11 @@ fn bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable() {
     ];
     assert_eq!(before, after, "resume must not rewrite proven outputs");
 
-    let checkpoint = output.join(".xdremux-motion-photo-checkpoint.jsonl");
+    let checkpoint = output.join(".xdremux-motion-photo-checkpoint.jsonl.v4");
     let state = fs::read_to_string(checkpoint).unwrap();
     assert!(
-        state.lines().count() >= 5,
-        "header + two success + two skip records expected"
+        state.lines().count() == 5,
+        "header + prepare and commit for each asset expected"
     );
 
     fs::remove_dir_all(root).unwrap();

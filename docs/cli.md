@@ -275,15 +275,17 @@ xdremux batch --input photo.heic --output-dir google/ --motion-target google-hei
 | `--motion-target apple-pair\|apple-pvt\|google-jpeg\|google-heic` | 选择 Motion Photo 目标，默认 Apple 文件对。Google 输出单个 `*.xdremuxMP.jpg` 或 `*.xdremuxMP.heic`，不转码静态照片。 |
 | `--motion-video-compat preserve` | 仅 Google 目标。可省略；`preserve` 是唯一模式且为默认值，不改写品牌或转码。 |
 | `--jobs N` | 必须为正整数。默认使用可用并行度，上限为 `4`，无法获取时使用 `1`。 |
-| `--checkpoint FILE` | 指定检查点基础路径，实际文件名追加 `.motion-photo`。 |
+| `--checkpoint FILE` | 指定检查点基础路径，v4 日志追加 `.motion-photo.v4`，旧 `.motion-photo` 文件只读。 |
 | `--resume` | 来源及输出身份匹配时复用已完成的 Apple 或 Google Motion Photo，再重试剩余项。 |
 | `--skip-existing` | 复用已有 Motion Photo 输出前执行相同的来源校验。 |
 | `--categorize` | 直接把转换结果发布到分类目录。 |
 | `--json` | 输出一份结构化回执，替代终端文本。 |
 
-[产品选项](#产品选项)同样适用。`--resume` 和 `--skip-existing` 要求同时指定 `--output-dir` 或 `--checkpoint`。未显式指定检查点时，文件位于输出目录中的 `.xdremux-motion-photo-checkpoint.jsonl`。
+[产品选项](#产品选项)同样适用。`--resume` 和 `--skip-existing` 须指定 `--output-dir` 或 `--checkpoint` 之一。未显式指定检查点时，日志位于输出目录中的 `.xdremux-motion-photo-checkpoint.jsonl.v4`。
 
-检查点复用只适用于 Motion Photo 转换，不保证跳过任意已有 HDR 或视频输出。检查点升级为版本 3，仍可读取旧的 Apple 文件对/PVT 记录。Google 记录包含输出目标、视频策略及完整输出 SHA-256。恢复时核验源大小与摘要、输出路径与摘要以及严格解析结果。变更视频策略后另选文件名；已有输出遭到修改则报错且不覆盖；输出缺失时可沿用记录中的路径重建。`--apple-cinematic` 拒绝 `--resume`、`--skip-existing`、`--checkpoint` 和 `--categorize`。
+Motion Photo v4 日志记录来源 SHA-256、目标路线、容器、编辑意图和全部输出成员的摘要。日志路径不能与输入或输出互为别名，同一日志只允许一个写入者。发布前先记录已验证的暂存成员。恢复时可以为完全匹配的已发布结果补记提交，或者用已验证的暂存文件补齐尚未提交的实况资源对。发现冲突时保留已有文件。旧普通 Apple 文件对、PVT 和 Google 日志沿用原有来源校验，普通实况记录无法满足风格请求。
+
+macOS 上的 `convert` 和 `batch` 都支持用 `--apple-styles` 为 Apple 文件对和 PVT 生成实况风格。批处理可以在同一目录保留普通版本和风格版本。若已有经过验证的输出但日志提交失败，回执记录 `published_unrecorded` 和实测的 `published_outputs`。再次使用 `--resume` 时会核对准备记录。`--apple-cinematic` 拒绝 `--resume`、`--skip-existing`、`--checkpoint` 和 `--categorize`。
 
 Google 目标逐项拒绝 ProXDR 静态照片、JPEG/HEIC 格式不匹配及无法保留厂商资源的输入。当前不支持 `google-avif`，目录扫描也不收集 AVIF。批处理不会根据同名文件推断 Apple HEIC+MOV 配对；须用 `convert --motion-video` 明确提供文件对。
 
@@ -298,6 +300,8 @@ Google 目标逐项拒绝 ProXDR 静态照片、JPEG/HEIC 格式不匹配及无�
 ```bash
 xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run --json
 ```
+
+JSON 预览包含 `plan_id`。正式复制时对相同的输入和目标传入 `--require-plan ID`，来源、布局或计划变化时会在复制前报错。App 会验证计划，并在输入或目标变化时清除旧预览。
 
 `--input PATH` 至少提供一次，可以重复。`--output-dir DIR` 必填。输入目录递归扫描，`--dry-run` 只报告计划，不发布文件，`--json` 输出结构化回执。
 
@@ -336,7 +340,7 @@ xdremux validate capture.pvt --json
 
 PVT 验证还检查 XML plist 的字符串版本及无歧义的普通成员文件。成员缺失、嵌套、符号链接、重复或损坏时拒绝验证，且不改变文件。这是结构验证，不是 Photos 导入验证。
 
-`validate STYLES_OUTPUT --apple-styles` 额外要求在 macOS 27 上完成摄影风格与纹理风格原生回读。App 在跳过已有摄影风格输出前执行此检查。普通 HDR 文件不能通过这项功能检查。
+`validate STYLES_OUTPUT --apple-styles` 额外要求在 macOS 27 上完成摄影风格与纹理风格原生回读。App 在跳过已有静态摄影风格输出前执行此检查。遇到已有实况文件对或 PVT 时会要求选择新路径。普通 HDR 文件不能通过这项功能检查。
 
 ## macOS 电影效果视频
 

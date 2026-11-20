@@ -631,8 +631,9 @@ mod tests {
         );
         assert_eq!(receipt.failed(), 1);
         assert!(receipt.failures[0].error.contains("inside an existing PVT"));
-        assert!(crate::batch_checkpoint::MotionPhotoCheckpointWriter::open(
-            &package.join("checkpoint.jsonl")
+        assert!(crate::batch_transaction::BatchJournal::new(
+            &package.join("checkpoint.jsonl"),
+            Vec::new()
         )
         .is_err());
         assert!(crate::PortableRuntime::new()

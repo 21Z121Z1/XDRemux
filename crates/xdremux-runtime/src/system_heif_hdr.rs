@@ -72,6 +72,7 @@ pub struct AuxiliaryPlaneReport {
 pub(crate) struct SystemHeifEncoded {
     pub bytes: Vec<u8>,
     pub report_path: PathBuf,
+    pub report: SystemHeifHdrReport,
     pub reference_f32_path: PathBuf,
     pub reference_f16_path: PathBuf,
     pub submitted_scene: Option<SceneLinearPair>,
@@ -96,6 +97,8 @@ pub(crate) fn encode_system_base(
     staging: &Path,
     output: &Path,
 ) -> Result<SystemHeifEncoded> {
+    let report_path = report_path_for(output);
+    validate_report_destination(&report_path, output)?;
     xdremux_heif::validate_gain_map_structure(product_base)
         .map_err(|error| RuntimeError::external("system HEIF source Gain Map", error))?;
     let geometry = xdremux_heif::primary_coded_geometry(product_base)
@@ -119,9 +122,10 @@ pub(crate) fn encode_system_base(
         height,
         staging_dir.path(),
     )?;
-    let report_path = report_path_for(output);
-    write_report(&report_path, &measurement.report)?;
-    ensure_round_trip(&measurement.report)?;
+    if let Err(error) = ensure_round_trip(&measurement.report) {
+        publish_styles_report(&report_path, &measurement.report)?;
+        return Err(error);
+    }
     let reference_f32_path = staging.join("system-hdr-reference-f32.bin");
     let reference_f16_path = staging.join("system-hdr-reference-f16.bin");
     write_f32(&reference_f32_path, &measurement.prequantized_hdr)?;
@@ -134,6 +138,7 @@ pub(crate) fn encode_system_base(
         reference_f32_path,
         reference_f16_path,
         content_headroom: measurement.report.content_headroom,
+        report: measurement.report,
         submitted_scene: Some(SceneLinearPair {
             width: dimension_usize(width)?,
             height: dimension_usize(height)?,
@@ -175,33 +180,13 @@ fn publish_measurement(measurement: &EncodedMeasurement, output: &Path) -> Resul
     Ok(())
 }
 
-pub(crate) fn record_carrier_error(path: &Path, detail: &str) {
-    let Ok(bytes) = fs::read(path) else {
-        return;
-    };
-    let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
-        return;
-    };
-    let Some(object) = value.as_object_mut() else {
-        return;
-    };
-    object.insert(
-        "styles_carrier_error".to_owned(),
-        serde_json::Value::String(detail.to_owned()),
-    );
-    if let Ok(encoded) = serde_json::to_vec_pretty(&value) {
-        let _ = fs::write(path, encoded);
-    }
-}
-
 pub(crate) fn record_after_styles(
     adapter: &AppleAdapterClient,
     heif: &Path,
-    report_path: &Path,
+    report: &mut SystemHeifHdrReport,
     reference_f32: &Path,
     reference_f16: &Path,
 ) -> Result<()> {
-    let mut report = read_report(report_path)?;
     let readback_path = staging_readback(heif)?;
     let facts = adapter.imageio_read_system_hdr(heif, &readback_path)?;
     let submitted = read_f32(reference_f16)?;
@@ -212,7 +197,6 @@ pub(crate) fn record_after_styles(
         &submitted,
         &prequantized,
     )?);
-    write_report(report_path, &report)?;
     if facts.decoded_width != report.width || facts.decoded_height != report.height {
         return Err(RuntimeError::new(
             "system HEIF HDR readback",
@@ -490,24 +474,38 @@ fn max_edge_override() -> Result<Option<u32>> {
     }
 }
 
-fn write_report(path: &Path, report: &SystemHeifHdrReport) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() && !parent.is_dir() {
-            fs::create_dir_all(parent)
-                .map_err(|error| RuntimeError::external("system HEIF report", error))?;
-        }
+fn validate_report_destination(path: &Path, output: &Path) -> Result<()> {
+    crate::live_photo_package::validate_output_parent(path)?;
+    if fs::symlink_metadata(path).is_ok()
+        || crate::batch_transaction::destination_path(path)?
+            == crate::batch_transaction::destination_path(output)?
+    {
+        return Err(RuntimeError::new(
+            "system HEIF report",
+            "choose a new report path distinct from the media output",
+        ));
     }
-    let mut encoded = serde_json::to_vec_pretty(report)
-        .map_err(|error| RuntimeError::external("system HEIF report", error))?;
-    encoded.push(b'\n');
-    fs::write(path, encoded).map_err(|error| RuntimeError::external("system HEIF report", error))
+    Ok(())
 }
 
-fn read_report(path: &Path) -> Result<SystemHeifHdrReport> {
-    let bytes =
-        fs::read(path).map_err(|error| RuntimeError::external("system HEIF report", error))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|error| RuntimeError::external("system HEIF report", error))
+pub(crate) fn publish_styles_report(path: &Path, report: &SystemHeifHdrReport) -> Result<()> {
+    use std::io::Write as _;
+    let context = "system HEIF report";
+    crate::live_photo_package::validate_output_parent(path)?;
+    let parent = crate::publication_parent(path);
+    fs::create_dir_all(parent).map_err(|error| RuntimeError::external(context, error))?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| RuntimeError::external(context, error))?;
+    serde_json::to_writer_pretty(temporary.as_file_mut(), report)
+        .map_err(|error| RuntimeError::external(context, error))?;
+    temporary
+        .write_all(b"\n")
+        .and_then(|()| temporary.as_file().sync_all())
+        .map_err(|error| RuntimeError::external(context, error))?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|error| RuntimeError::external(context, error.error))?;
+    Ok(())
 }
 
 fn write_f32(path: &Path, samples: &[f32]) -> Result<()> {
