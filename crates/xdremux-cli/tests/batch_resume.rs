@@ -43,7 +43,13 @@ fn run(output: &Path, resume: bool) -> Value {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = xdremux_cli::run_from(arguments, &mut stdout, &mut stderr);
-    assert_eq!(code, 0, "{}", String::from_utf8_lossy(&stderr));
+    assert_eq!(
+        code,
+        0,
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+    );
     assert!(stderr.is_empty());
     serde_json::from_slice(&stdout).expect("batch --json must emit one JSON document")
 }

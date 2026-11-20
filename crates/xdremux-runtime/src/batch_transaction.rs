@@ -420,7 +420,13 @@ impl BatchJournal {
             // the protected paths before acquiring a write lease.
             validate_checkpoint_path(&self.path, self.protected.iter().map(PathBuf::as_path))?;
             let mut options = OpenOptions::new();
-            options.read(true).append(true);
+            options.read(true);
+            // Windows append access omits FILE_WRITE_DATA, which set_len
+            // needs to discard a torn tail. write_line seeks under the lock.
+            #[cfg(windows)]
+            options.write(true);
+            #[cfg(not(windows))]
+            options.append(true);
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             {
                 use std::os::unix::fs::OpenOptionsExt;
