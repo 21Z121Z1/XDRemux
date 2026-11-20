@@ -14,8 +14,9 @@ use xdremux_source::{probe_bytes, SourceAsset};
 
 use crate::android_motion_photo::resolve_motion_output_target;
 use crate::batch_checkpoint::{
-    canonical_or_absolute, source_signature, source_signature_path, AndroidCheckpointIdentity,
-    CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
+    canonical_or_absolute, source_signature, source_signature_path, validate_checkpoint_path,
+    AndroidCheckpointIdentity, CheckpointOutcome, MotionPhotoCheckpoint,
+    MotionPhotoCheckpointWriter, SourceSignature,
 };
 use crate::categorize::classification_relative_directory;
 use crate::vendor_motion_metadata::VendorMetadataCarry;
@@ -313,6 +314,9 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
             "Cinematic batch planning",
             "Cinematic video does not support photo categorization or Live Photo checkpoints",
         ));
+    }
+    if let Some(path) = options.checkpoint_path.as_deref() {
+        validate_checkpoint_path(path, inputs.iter().map(PathBuf::as_path))?;
     }
     let checkpoint = if options.reuse_existing {
         match options.checkpoint_path.as_deref() {
@@ -875,6 +879,12 @@ fn process_batch_item_with_options(
                         omitted_resource_count: omitted,
                     });
                 }
+                if request.apple_features.photographic_styles {
+                    return Err(RuntimeError::new(
+                        "Live Photo Styles",
+                        "batch Live Photo Styles requires the dedicated conversion path",
+                    ));
+                }
                 let package = (request.live_photo_output == LivePhotoOutput::Pvt)
                     .then(|| item.output.clone());
                 let (output_image, output_video) = if package.is_some() {
@@ -1172,10 +1182,27 @@ impl PortableRuntime {
                 }],
             };
         }
+        let items = items.into_iter().collect::<Vec<_>>();
+        if items.is_empty() {
+            return BatchReceipt::default();
+        }
         let checkpoint = options
             .checkpoint_path
             .as_deref()
-            .map(MotionPhotoCheckpoint::load)
+            .map(|path| {
+                let protected = items
+                    .iter()
+                    .flat_map(|item| {
+                        [
+                            item.input.clone(),
+                            item.output.clone(),
+                            item.output.with_extension("mov"),
+                        ]
+                    })
+                    .collect::<Vec<_>>();
+                validate_checkpoint_path(path, protected.iter().map(PathBuf::as_path))?;
+                MotionPhotoCheckpoint::load(path)
+            })
             .transpose();
         let checkpoint = match checkpoint {
             Ok(value) => value.unwrap_or_default(),
@@ -1191,10 +1218,6 @@ impl PortableRuntime {
             }
         };
 
-        let items = items.into_iter().collect::<Vec<_>>();
-        if items.is_empty() {
-            return BatchReceipt::default();
-        }
         let jobs = options.jobs.max(1).min(items.len());
         let mut writer: Option<MotionPhotoCheckpointWriter> = None;
         let mut outcomes = (0..items.len()).map(|_| None).collect::<Vec<_>>();

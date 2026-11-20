@@ -13,6 +13,54 @@ pub const MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
 pub const DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME: &str = ".xdremux-motion-photo-checkpoint.jsonl";
 const SOURCE_HASH_BUFFER_BYTES: usize = 64 * 1024;
 
+/// The journal is a writable control file. It must be disjoint from every
+/// source, planned output and companion, even when two names alias one inode.
+pub(crate) fn validate_checkpoint_path<'a>(
+    path: &Path,
+    protected_paths: impl IntoIterator<Item = &'a Path>,
+) -> Result<()> {
+    crate::live_photo_package::validate_output_parent(path)?;
+    let path_key = canonical_or_absolute(path)?;
+    let handle = match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() => {
+            Some(same_file::Handle::from_path(path).map_err(|error| {
+                RuntimeError::external("Motion Photo checkpoint identity", error)
+            })?)
+        }
+        Ok(_) => {
+            return Err(RuntimeError::new(
+                "Motion Photo checkpoint path",
+                "checkpoint must be a regular file, not a directory or symbolic link",
+            ));
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(RuntimeError::external(
+                "Motion Photo checkpoint path",
+                error,
+            ))
+        }
+    };
+
+    for protected in protected_paths {
+        let same_path = canonical_or_absolute(protected)? == path_key;
+        let same_file = handle.as_ref().is_some_and(|handle| {
+            protected.is_file()
+                && same_file::Handle::from_path(protected).is_ok_and(|other| *handle == other)
+        });
+        if same_path || same_file {
+            return Err(RuntimeError::new(
+                "Motion Photo checkpoint path",
+                format!(
+                    "checkpoint aliases a source or output: {}",
+                    protected.display()
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceSignature {
     pub size: u64,

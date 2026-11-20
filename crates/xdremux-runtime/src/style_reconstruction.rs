@@ -460,6 +460,7 @@ pub fn reconstruct_styles_hdr_with_display(
     max_edge: u32,
     display_headroom: Option<u32>,
 ) -> Result<Value> {
+    crate::live_photo_package::validate_output_parent(&output.join("planned-output"))?;
     let plan = plan_style_reconstruction(max_edge).map_err(error)?;
     let display_plan = display_headroom
         .map(plan_style_display)

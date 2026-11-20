@@ -120,6 +120,7 @@ pub fn plan_hdr_look(
                 &Uuid::new_v4().simple().to_string()[..8]
             )),
     };
+    crate::live_photo_package::validate_output_parent(&output_dir.join("planned-output"))?;
     let mut inputs = BTreeSet::new();
     if output_dir.to_str().is_none() {
         return Err(failure("output path is not UTF-8"));
@@ -196,6 +197,7 @@ fn execute(
     mut renderer: impl FnMut(&Path, &Path) -> Result<()>,
     mut progress: impl FnMut(usize, &HdrLookResult),
 ) -> Result<HdrLookReceipt> {
+    crate::live_photo_package::validate_output_parent(&plan.output_dir.join("planned-output"))?;
     fs::create_dir_all(&plan.output_dir).map_err(io)?;
     let mut results = Vec::new();
     for (index, item) in plan.items.iter().enumerate() {
@@ -225,6 +227,7 @@ fn publish_item(
     parent: &Path,
     renderer: &mut impl FnMut(&Path, &Path) -> Result<()>,
 ) -> Result<()> {
+    crate::live_photo_package::validate_output_parent(&item.output)?;
     if fs::symlink_metadata(&item.output).is_ok() {
         return Err(failure(format!(
             "output already exists: {}",
@@ -246,6 +249,25 @@ fn publish_item(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn output_must_not_create_entries_inside_an_existing_pvt() {
+        let t = tempfile::tempdir().unwrap();
+        let input = t.path().join("source.heic");
+        fs::write(&input, b"source").unwrap();
+        let package = t.path().join("capture.pvt");
+        fs::create_dir(&package).unwrap();
+        fs::write(package.join("metadata.plist"), b"existing").unwrap();
+        let output = package.join("new");
+        assert!(plan_hdr_look(std::slice::from_ref(&input), Some(&output), false, 8, 0).is_err());
+        let mut plan =
+            plan_hdr_look(&[input], Some(&t.path().join("results")), false, 8, 0).unwrap();
+        plan.output_dir = output.clone();
+        assert!(execute(&plan, |_, _| panic!("must not render"), |_, _| {}).is_err());
+        assert!(!output.exists());
+        assert_eq!(fs::read_dir(package).unwrap().count(), 1);
+    }
+
     #[test]
     fn discovery_is_read_only_deduplicated_recursive_and_avoids_outputs() {
         let t = tempfile::tempdir().unwrap();

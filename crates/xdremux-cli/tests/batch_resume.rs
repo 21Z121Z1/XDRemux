@@ -104,3 +104,45 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
 
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn checkpoint_cannot_append_to_a_source_hard_link() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source.heic");
+    let original = fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic"),
+    )
+    .unwrap();
+    fs::write(&source, &original).unwrap();
+    let checkpoint = root.path().join("journal");
+    let actual = root.path().join("journal.motion-photo");
+    fs::hard_link(&source, actual).unwrap();
+    let output = root.path().join("output");
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let code = xdremux_cli::run_from(
+        [
+            OsString::from("batch"),
+            OsString::from("--input"),
+            path_arg(&source),
+            OsString::from("--output-dir"),
+            path_arg(&output),
+            OsString::from("--checkpoint"),
+            path_arg(&checkpoint),
+            OsString::from("--json"),
+        ],
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(fs::metadata(&source).unwrap().len(), original.len() as u64);
+    assert!(
+        fs::read(&source).unwrap() == original,
+        "source bytes changed"
+    );
+    assert_ne!(code, 0);
+    assert!(
+        !output.exists(),
+        "invalid checkpoint must fail before publication"
+    );
+}
