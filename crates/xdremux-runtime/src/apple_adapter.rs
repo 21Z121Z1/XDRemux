@@ -2188,16 +2188,22 @@ done
         let executable = root.path().join("inherited-pipes.sh");
         fs::write(
             &executable,
-            "#!/bin/sh\nread request\nsleep 2 &\nprintf '\\n'\nwait\n",
+            "#!/bin/sh\nread request\nprintf 'ready\\n'\nread request\nsleep 15 &\nprintf '\\n'\nwait\n",
         )
         .unwrap();
         fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
 
         let client = AppleAdapterClient::new(&executable);
+        // Measure cleanup from a running session. Starting a shell under
+        // test-suite load must not consume the cleanup check's budget.
+        assert_eq!(client.invoke(b"{}", DEFAULT_TIMEOUT).unwrap(), b"ready");
         let started = Instant::now();
-        let failure = client.invoke(b"{}", Duration::from_secs(1)).unwrap_err();
+        let failure = client.invoke(b"{}", DEFAULT_TIMEOUT).unwrap_err();
         assert!(failure.to_string().contains("empty response"), "{failure}");
-        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(
+            started.elapsed() < Duration::from_secs(8),
+            "helper cleanup waited for the descendant to close inherited pipes"
+        );
     }
 
     #[test]
