@@ -9,7 +9,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use xdremux_engine::{
-    resolve_recorded_cinematic_focal_length, CinematicCameraEstimate, CinematicCameraSummary,
+    resolve_recorded_cinematic_focal_length, CinematicCameraEstimate, CinematicCameraEstimator,
+    CinematicCameraIntrinsics, CinematicCameraSample, CinematicCameraSummary,
 };
 
 const MAX_JSON: usize = 1_048_576;
@@ -20,6 +21,7 @@ pub enum CinematicFocalLengthSource {
     Explicit,
     RecordedMetadata,
     GeoCalib,
+    DepthPro2,
     CameraEstimate,
 }
 
@@ -29,6 +31,7 @@ impl CinematicFocalLengthSource {
             Self::Explicit => "explicit",
             Self::RecordedMetadata => "recorded-metadata",
             Self::GeoCalib => "geocalib",
+            Self::DepthPro2 => "depthpro2",
             Self::CameraEstimate => "camera-estimate",
         }
     }
@@ -82,6 +85,97 @@ pub(crate) fn resolve(
                 });
             }
             let estimate = staging.join("camera.json");
+            if std::env::var_os("XDREMUX_DEPTHPRO2").is_some() {
+                run_tool(
+                    Command::new(tool_path(adapter, "XDREMUX_DEPTHPRO2", "xdremux-depthpro2"))
+                        .arg("--input")
+                        .arg(input)
+                        .arg("--output")
+                        .arg(&estimate),
+                    "Cinematic Depth Pro 2 FOV",
+                    Duration::from_secs(600),
+                )?;
+                return read_estimate(
+                    &estimate,
+                    source_hash,
+                    CinematicFocalLengthSource::DepthPro2,
+                );
+            }
+            if std::env::var_os("XDREMUX_GEOCALIB").is_some()
+                || sibling_exists(adapter, "xdremux-geocalib")
+            {
+                run_tool(
+                    Command::new(tool_path(adapter, "XDREMUX_GEOCALIB", "xdremux-geocalib"))
+                        .arg("--input")
+                        .arg(input)
+                        .arg("--output")
+                        .arg(&estimate),
+                    "Cinematic GeoCalib (install xdremux-geocalib beside xdremux or set XDREMUX_GEOCALIB)",
+                    Duration::from_secs(600),
+                )?;
+                return read_estimate(&estimate, source_hash, CinematicFocalLengthSource::GeoCalib);
+            }
+            if sibling_exists(adapter, "xdremux-depthpro2") {
+                run_tool(
+                    Command::new(tool_path(adapter, "XDREMUX_DEPTHPRO2", "xdremux-depthpro2"))
+                        .arg("--input")
+                        .arg(input)
+                        .arg("--output")
+                        .arg(&estimate),
+                    "Cinematic Depth Pro 2 FOV",
+                    Duration::from_secs(600),
+                )?;
+                return read_estimate(
+                    &estimate,
+                    source_hash,
+                    CinematicFocalLengthSource::DepthPro2,
+                );
+            }
+            if depthpro2_fov_model_installed() {
+                let facts = crate::apple_adapter::AppleAdapterClient::new(adapter.to_path_buf())
+                    .depthpro2_camera_estimate(input, Some(5))?;
+                let camera_estimate = CinematicCameraEstimate {
+                    schema_version: 1,
+                    source_sha256: source_hash.to_owned(),
+                    estimator: CinematicCameraEstimator {
+                        name: facts.estimator_name,
+                        revision: facts.revision,
+                        weights_sha256: facts.weights_sha256,
+                    },
+                    samples: facts
+                        .samples
+                        .into_iter()
+                        .map(|sample| CinematicCameraSample {
+                            time_seconds: sample.time_seconds,
+                            intrinsics: CinematicCameraIntrinsics {
+                                image_size: sample.image_size,
+                                focal_length_pixels: sample.focal_length_pixels,
+                                principal_point_pixels: sample.principal_point_pixels,
+                                focal_uncertainty_pixels: sample.focal_uncertainty_pixels,
+                            },
+                        })
+                        .collect(),
+                    shared_intrinsics: facts.shared_intrinsics.map(|shared| {
+                        CinematicCameraIntrinsics {
+                            image_size: shared.image_size,
+                            focal_length_pixels: shared.focal_length_pixels,
+                            principal_point_pixels: shared.principal_point_pixels,
+                            focal_uncertainty_pixels: shared.focal_uncertainty_pixels,
+                        }
+                    }),
+                };
+                let encoded = serde_json::to_vec(&camera_estimate).map_err(|error| {
+                    RuntimeError::external("Cinematic Depth Pro 2 FOV encoding", error)
+                })?;
+                std::fs::write(&estimate, encoded).map_err(|error| {
+                    RuntimeError::external("Cinematic Depth Pro 2 FOV staging", error)
+                })?;
+                return read_estimate(
+                    &estimate,
+                    source_hash,
+                    CinematicFocalLengthSource::DepthPro2,
+                );
+            }
             run_tool(
                 Command::new(tool_path(adapter, "XDREMUX_GEOCALIB", "xdremux-geocalib"))
                     .arg("--input")
@@ -94,6 +188,36 @@ pub(crate) fn resolve(
             read_estimate(&estimate, source_hash, CinematicFocalLengthSource::GeoCalib)
         }
     }
+}
+
+fn sibling_exists(adapter: &Path, name: &str) -> bool {
+    adapter
+        .parent()
+        .is_some_and(|parent| parent.join(name).exists())
+}
+
+fn depthpro2_fov_model_installed() -> bool {
+    let models_dir = if let Some(override_dir) = std::env::var_os("XDREMUX_MODEL_DIR") {
+        PathBuf::from(override_dir)
+    } else if let Some(home) = std::env::var_os("HOME") {
+        PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("XDRemux")
+            .join("Models")
+    } else {
+        return false;
+    };
+    let licensed = std::env::var_os("XDREMUX_ACCEPT_APPLE_AMLR_LICENSE")
+        .is_some_and(|value| value == "1")
+        || models_dir
+            .join(".apple-amlr-license-accepted.json")
+            .is_file();
+    licensed
+        && models_dir
+            .join("depthpro2-fov_512x896.mlpackage")
+            .join("Manifest.json")
+            .is_file()
 }
 
 fn tool_path(adapter: &Path, variable: &str, name: &str) -> PathBuf {

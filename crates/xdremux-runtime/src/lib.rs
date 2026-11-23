@@ -588,6 +588,18 @@ impl PortableRuntime {
             .map_err(|error| RuntimeError::external("Apple Portrait input staging", error))?;
 
         let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        if profile == ApplePortraitSemanticProfile::Complete
+            && xdremux_container::extract_oppo_portrait_source(source).is_err()
+        {
+            return oppo_portrait::convert_depthpro2_apple_portrait_file(
+                self,
+                &adapter,
+                source,
+                &input_path,
+                output,
+                staging.path(),
+            );
+        }
         let preflight =
             oppo_portrait::prepare_apple_portrait_source_with_profile(&adapter, source, profile)?;
         let expected_gain_map = preflight.gain_map;

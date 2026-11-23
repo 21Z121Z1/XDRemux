@@ -31,6 +31,7 @@ private let supportedSemanticRoles: Set<String> = [
     "teeth",
     "glasses",
     "sky",
+    "foreground",
 ]
 
 private let personSegmentationPrimitiveQuality: VNGeneratePersonSegmentationRequest.QualityLevel = .accurate
@@ -290,6 +291,88 @@ func generateVisionSemanticMattes(
                 outputDirectory: outputDirectory
             )
         )
+    }
+
+    if selectedRoles.contains("foreground") {
+        let foregroundRequest = VNGenerateForegroundInstanceMaskRequest()
+        let foregroundHandler = VNImageRequestHandler(
+            cgImage: image,
+            orientation: orientation,
+            options: [:]
+        )
+        try performVisionRequests([foregroundRequest]) { batch in
+            try foregroundHandler.perform(batch)
+        }
+        let observation = foregroundRequest.results?.first as? VNInstanceMaskObservation
+        let targetURL = outputDirectory.appendingPathComponent("foreground.l8")
+        if let observation, !observation.allInstances.isEmpty {
+            let scaled = try observation.generateScaledMaskForImage(
+                forInstances: observation.allInstances,
+                from: foregroundHandler
+            )
+            let w = CVPixelBufferGetWidth(scaled)
+            let h = CVPixelBufferGetHeight(scaled)
+            let bpr = CVPixelBufferGetBytesPerRow(scaled)
+            let pf = CVPixelBufferGetPixelFormatType(scaled)
+            CVPixelBufferLockBaseAddress(scaled, .readOnly)
+            defer { CVPixelBufferUnlockBaseAddress(scaled, .readOnly) }
+            guard let base = CVPixelBufferGetBaseAddress(scaled), w > 0, h > 0 else {
+                throw NSError(
+                    domain: "XDRemuxAppleAdapter",
+                    code: 14,
+                    userInfo: [NSLocalizedDescriptionKey: "Vision foreground mask has no readable base address"]
+                )
+            }
+            var l8 = Data(count: w * h)
+            l8.withUnsafeMutableBytes { destBytes in
+                guard let dest = destBytes.bindMemory(to: UInt8.self).baseAddress else { return }
+                if pf == kCVPixelFormatType_OneComponent32Float {
+                    for y in 0..<h {
+                        let row = (base + y * bpr).assumingMemoryBound(to: Float.self)
+                        let outRow = dest.advanced(by: y * w)
+                        for x in 0..<w {
+                            let clamped = min(max(row[x], 0.0), 1.0)
+                            outRow[x] = UInt8((clamped * 255.0).rounded())
+                        }
+                    }
+                } else if pf == kCVPixelFormatType_OneComponent8 {
+                    let src = base.assumingMemoryBound(to: UInt8.self)
+                    for y in 0..<h {
+                        dest.advanced(by: y * w)
+                            .update(from: src.advanced(by: y * bpr), count: w)
+                    }
+                }
+            }
+            try l8.write(to: targetURL, options: .atomic)
+            masks.append(
+                VisionSemanticMaskFacts(
+                    role: "foreground",
+                    featureName: "foreground_instance_mask",
+                    requestClass: "VNGenerateForegroundInstanceMaskRequest",
+                    revision: foregroundRequest.revision,
+                    width: w,
+                    height: h,
+                    pixelFormat: kCVPixelFormatType_OneComponent8
+                )
+            )
+        } else {
+            let axesSwapped = (5...8).contains(orientationRaw)
+            let w = axesSwapped ? image.height : image.width
+            let h = axesSwapped ? image.width : image.height
+            let empty = Data(count: max(1, w) * max(1, h))
+            try empty.write(to: targetURL, options: .atomic)
+            masks.append(
+                VisionSemanticMaskFacts(
+                    role: "foreground",
+                    featureName: "foreground_instance_mask",
+                    requestClass: "VNGenerateForegroundInstanceMaskRequest",
+                    revision: foregroundRequest.revision,
+                    width: max(1, w),
+                    height: max(1, h),
+                    pixelFormat: kCVPixelFormatType_OneComponent8
+                )
+            )
+        }
     }
 
     return masks.sorted { $0.role < $1.role }

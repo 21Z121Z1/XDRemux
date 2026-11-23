@@ -549,3 +549,46 @@ fn cinematic_rejects_unsafe_estimates_before_native_effects() {
             .starts_with(".xdremux-cinematic-")));
     }
 }
+
+#[test]
+fn automatic_cinematic_uses_depthpro2_sibling_when_geocalib_is_absent() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = source(temp.path());
+    fs::write(
+        temp.path().join("exiftool"),
+        "#!/usr/bin/python3\nprint('[{}]')\n",
+    )
+    .unwrap();
+    fs::set_permissions(
+        temp.path().join("exiftool"),
+        fs::Permissions::from_mode(0o700),
+    )
+    .unwrap();
+
+    let estimate = camera_estimate(temp.path(), &input);
+    let dp2 = temp.path().join("xdremux-depthpro2");
+    fs::write(
+        &dp2,
+        format!(
+            "#!/usr/bin/python3\nimport pathlib,sys\npathlib.Path({:?}).write_text('called')\npathlib.Path(sys.argv[sys.argv.index('--output')+1]).write_bytes(pathlib.Path({:?}).read_bytes())\n",
+            temp.path().join("depthpro2-called"),
+            estimate
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&dp2, fs::Permissions::from_mode(0o700)).unwrap();
+
+    let output = temp.path().join("pending.mov");
+    let receipt = PortableRuntime::new()
+        .generate_cinematic_envelope_file(
+            helper(temp.path(), "valid"),
+            &input,
+            &output,
+            &CinematicEnvelopeOptions::default(),
+        )
+        .unwrap();
+    assert!(temp.path().join("depthpro2-called").exists());
+    assert_eq!(receipt.focal_length_35mm, 35.0);
+    assert_eq!(receipt.focal_length_source.as_str(), "depthpro2");
+    assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
+}
