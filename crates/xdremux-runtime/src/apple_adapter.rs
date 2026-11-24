@@ -113,6 +113,7 @@ pub(super) struct DepthPro2DisparityFacts {
     pub p95_disparity: f32,
     pub model_id: String,
     pub weights_sha256: String,
+    pub focal_length_35mm: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -1430,7 +1431,12 @@ impl AppleAdapterClient {
             .ok_or_else(|| {
                 RuntimeError::new("Depth Pro 2 disparity", "disparity byte size overflows")
             })?;
-        let pixels_le_f16 = fs::read(&output_path)
+        let mut pixels_le_f16 = Vec::new();
+        fs::File::open(&output_path)
+            .and_then(|file| {
+                file.take(expected_bytes as u64 + 1)
+                    .read_to_end(&mut pixels_le_f16)
+            })
             .map_err(|error| RuntimeError::external("Depth Pro 2 disparity read", error))?;
         if pixels_le_f16.len() != expected_bytes {
             return Err(RuntimeError::new(

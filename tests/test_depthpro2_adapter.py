@@ -1,15 +1,17 @@
-from importlib.util import module_from_spec, spec_from_file_location
 import hashlib
+import io
 import json
 import os
-from pathlib import Path
 import stat
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from importlib.util import find_spec, module_from_spec, spec_from_file_location
+from pathlib import Path
+from unittest.mock import Mock, patch
 
+from model_adapters.depthpro2 import pytorch_depth
 from scripts.distribution import install_depthpro2
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +21,49 @@ SPEC.loader.exec_module(ESTIMATOR)
 
 
 class DepthPro2AdapterTests(unittest.TestCase):
+    def test_pytorch_help_is_available_without_model_weights(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "model_adapters/depthpro2/pytorch_depth.py"), "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--model", result.stdout)
+        self.assertIn("--native", result.stdout)
+
+    def test_pytorch_installer_checks_license_and_digest_before_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            weights_dir = root / "pytorch"
+            receipt = weights_dir / install_depthpro2.LICENSE_RECEIPT_NAME
+            filename = "depthpro2-s.safetensors"
+            valid = b"good"
+            spec = (filename, "https://example.org/s", len(valid), hashlib.sha256(valid).hexdigest())
+            with (
+                patch.dict(os.environ, {"XDREMUX_ACCEPT_APPLE_AMLR_LICENSE": ""}),
+                patch.dict(install_depthpro2.PYTORCH_MODELS, {"s": spec}),
+                patch.object(install_depthpro2.urllib.request, "urlopen") as fetch,
+            ):
+                with self.assertRaisesRegex(ValueError, "accept-apple-amlr-license"):
+                    install_depthpro2.download_pytorch_models(root, ["s"], accept_license=False)
+                fetch.assert_not_called()
+
+                fetch.side_effect = [io.BytesIO(b"license"), io.BytesIO(b"bad!")]
+                with self.assertRaisesRegex(ValueError, "SHA-256"):
+                    install_depthpro2.download_pytorch_models(root, ["s"], accept_license=True)
+                self.assertFalse((weights_dir / filename).exists())
+                self.assertFalse(receipt.exists())
+
+                fetch.side_effect = [io.BytesIO(valid)]
+                self.assertEqual(
+                    install_depthpro2.download_pytorch_models(root, ["s"], accept_license=True),
+                    ["depthpro2-s"],
+                )
+            self.assertEqual((weights_dir / filename).read_bytes(), valid)
+            self.assertEqual(json.loads(receipt.read_text())["modelIDs"], ["depthpro2-s"])
+            self.assertFalse((root / receipt.name).exists())
+
     def test_installer_requires_explicit_license_and_verifies_weights(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -134,6 +179,79 @@ print(json.dumps({{
                 payload["source_sha256"],
                 hashlib.sha256(video.read_bytes()).hexdigest(),
             )
+
+    @unittest.skipUnless(find_spec("numpy") and find_spec("PIL"), "requires NumPy and Pillow")
+    def test_pytorch_portrait_sidecar_returns_stored_pixel_alignment(self) -> None:
+        import numpy as np
+        from PIL import Image, ImageOps
+
+        stored = np.arange(1, 16, dtype=np.float32).reshape(3, 5)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for orientation in range(1, 9):
+                with self.subTest(orientation=orientation):
+                    image = Image.fromarray(stored)
+                    image.getexif()[274] = orientation
+                    display = np.asarray(ImageOps.exif_transpose(image))
+                    estimator = Mock(model_id="depthpro2-s", weights_sha256="a" * 64)
+                    estimator.estimate.return_value = (display, 35.0)
+                    output = root / f"orientation-{orientation}.hdis"
+                    response = pytorch_depth.portrait_disparity(
+                        estimator,
+                        {
+                            "schema_version": 2,
+                            "operation": "depthpro2-disparity",
+                            "input_path": str(root / "image.heic"),
+                            "output_path": str(output),
+                            "depthpro2_disparity": {
+                                "target_width": 5,
+                                "target_height": 3,
+                                "orientation": orientation,
+                            },
+                        },
+                    )["depthpro2_disparity"]
+                    np.testing.assert_array_equal(np.fromfile(output, dtype="<f2").reshape(3, 5), stored)
+                    self.assertEqual(int.from_bytes(b"hdis", "big"), response["pixel_format"])
+                    self.assertEqual((response["width"], response["height"]), (5, 3))
+                    self.assertEqual(response["p50_disparity"], 8.0)
+                    self.assertEqual(response["focal_length_35mm"], 35.0)
+
+    @unittest.skipUnless(
+        find_spec("torch") and find_spec("numpy") and find_spec("PIL"),
+        "requires PyTorch, NumPy and Pillow",
+    )
+    def test_pytorch_half_map_dimensions_survive_capping_and_exif_rotation(self) -> None:
+        import numpy as np
+        import torch
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "odd.png"
+            exif = Image.Exif()
+            exif[274] = 6
+            Image.new("RGB", (101, 75)).save(source, exif=exif)
+            estimator = pytorch_depth.DepthEstimator.__new__(pytorch_depth.DepthEstimator)
+            estimator.device = torch.device("cpu")
+            estimator.mean = torch.zeros((1, 3, 1, 1))
+            estimator.std = torch.ones((1, 3, 1, 1))
+            estimator.memory_format = torch.channels_last
+            estimator.model = Mock()
+            estimator.model.predict_inverse_depth.side_effect = lambda x: torch.full(
+                (1, *x.shape[-2:]), 0.5
+            )
+            for native, cap, expected_input in (
+                (False, 0, (51, 38)),
+                (False, 32, (32, 24)),
+                (True, 0, (101, 75)),
+            ):
+                with self.subTest(native=native, cap=cap):
+                    estimator.native = native
+                    estimator.max_side = cap
+                    disparity, _ = estimator.estimate(source, focal_px=75.0)
+                    actual_input = estimator.model.predict_inverse_depth.call_args.args[0]
+                    self.assertEqual(tuple(actual_input.shape[-2:]), expected_input)
+                    self.assertEqual(disparity.shape, (51, 38))
+                    np.testing.assert_allclose(disparity, 0.5, rtol=1e-6)
 
 
 if __name__ == "__main__":

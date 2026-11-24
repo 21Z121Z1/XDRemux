@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Download pluggable Apple Depth Pro 2 CoreML models and install xdremux-depthpro2."""
+"""Install local Apple Depth Pro 2 Core ML or PyTorch weights and an optional launcher."""
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import shlex
+import sys
 import tempfile
 import urllib.parse
 import urllib.request
-
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 HF_REPO = "apple/DepthPro2-coreml"
@@ -21,6 +21,28 @@ HF_REVISION = "4e607a682f993bbf95035054fc78ba9ffc81faf2"
 AMLR_LICENSE_NAME = "Apple Machine Learning Research License (AMLR)"
 AMLR_LICENSE_URL = f"https://huggingface.co/{HF_REPO}/blob/{HF_REVISION}/LICENSE"
 LICENSE_RECEIPT_NAME = ".apple-amlr-license-accepted.json"
+PYTORCH_LICENSE_URL = "https://huggingface.co/apple/DepthPro2-S/blob/903a1c1ade918831d138adcc4aedbcc8f4da0078/LICENSE"
+
+PYTORCH_MODELS = {
+    "s": (
+        "depthpro2-s.safetensors",
+        "https://huggingface.co/apple/DepthPro2-S/resolve/903a1c1ade918831d138adcc4aedbcc8f4da0078/model.safetensors",
+        97264508,
+        "583c4d630779fd231f969c738733624963ad34bd3c29f9c64088257e3436f97c",
+    ),
+    "b": (
+        "depthpro2-b.safetensors",
+        "https://huggingface.co/apple/DepthPro2-B/resolve/85e67fdfb7f5b36a6f6c4495e6789d331b1d8a04/model.safetensors",
+        386076596,
+        "244ff85e0d9bde6e0f985de1c61420abc4c2110265b495c974556225ac2b60ed",
+    ),
+    "fov": (
+        "depthpro2-fov.pt",
+        "https://ml-site.cdn-apple.com/models/depth-pro-2/depthpro2-fov-ew55zg4kq7.pt",
+        93884773,
+        None,
+    ),
+}
 
 MODEL_CATALOG: dict[str, dict[str, str]] = {
     "s": {
@@ -55,11 +77,13 @@ SELECTOR_ALIASES = {
 }
 
 
-def default_models_dir() -> Path:
+def default_models_dir(backend: str = "coreml") -> Path:
     override = os.environ.get("XDREMUX_MODEL_DIR", "").strip()
     if override:
         return Path(override).expanduser()
-    return Path.home() / "Library" / "Application Support" / "XDRemux" / "Models"
+    if backend == "coreml" or sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "XDRemux" / "Models"
+    return Path.home() / ".local" / "share" / "XDRemux" / "Models"
 
 
 def parse_models_selector(raw: str) -> list[str]:
@@ -92,12 +116,24 @@ def fetch_json(url: str) -> list[dict]:
 def download_file(repo_path: str, dest: Path, expected_size: int | None = None) -> None:
     encoded = urllib.parse.quote(repo_path, safe="/")
     url = f"https://huggingface.co/{HF_REPO}/resolve/{HF_REVISION}/{encoded}"
+    download_url(url, dest, expected_size)
+
+
+def sha256(path: Path) -> str:
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def download_url(
+    url: str, dest: Path, expected_size: int | None = None, expected_sha256: str | None = None
+) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if (
         expected_size is not None
         and expected_size > 0
         and dest.is_file()
         and dest.stat().st_size == expected_size
+        and (expected_sha256 is None or sha256(dest) == expected_sha256)
     ):
         return
 
@@ -121,8 +157,10 @@ def download_file(repo_path: str, dest: Path, expected_size: int | None = None) 
             actual_size = temporary.stat().st_size
             if actual_size != expected_size:
                 raise ValueError(
-                    f"size mismatch for {repo_path}: expected {expected_size}, got {actual_size}"
+                    f"size mismatch for {dest.name}: expected {expected_size}, got {actual_size}"
                 )
+        if expected_sha256 is not None and sha256(temporary) != expected_sha256:
+            raise ValueError(f"SHA-256 mismatch for {dest.name}")
         temporary.replace(dest)
     finally:
         if temporary is not None:
@@ -133,23 +171,22 @@ def verify_weight_digest(package_dir: Path, expected_sha256: str) -> None:
     weight_file = package_dir / "Data" / "com.apple.CoreML" / "weights" / "weight.bin"
     if not weight_file.is_file():
         raise ValueError(f"missing weights binary: {weight_file}")
-    with weight_file.open("rb") as stream:
-        actual = hashlib.file_digest(stream, "sha256").hexdigest()
+    actual = sha256(weight_file)
     if actual != expected_sha256:
         raise ValueError(
             f"{package_dir.name} weight SHA-256 mismatch: expected {expected_sha256}, got {actual}"
         )
 
 
-def write_license_receipt(models_dir: Path, model_ids: list[str]) -> None:
+def write_license_receipt(models_dir: Path, model_ids: list[str], *, backend: str = "coreml") -> None:
     payload = {
         "licenseName": AMLR_LICENSE_NAME,
-        "licenseURL": AMLR_LICENSE_URL,
-        "huggingFaceRepo": HF_REPO,
-        "revision": HF_REVISION,
+        "licenseURL": AMLR_LICENSE_URL if backend == "coreml" else PYTORCH_LICENSE_URL,
         "acceptedAtISO8601": datetime.now(timezone.utc).isoformat(),
         "modelIDs": model_ids,
     }
+    if backend == "coreml":
+        payload.update(huggingFaceRepo=HF_REPO, revision=HF_REVISION)
     receipt = models_dir / LICENSE_RECEIPT_NAME
     encoded = json.dumps(payload, indent=2) + "\n"
     temporary = None
@@ -211,37 +248,69 @@ def download_models(
     return installed_ids
 
 
+def download_pytorch_models(
+    models_dir: Path, model_keys: list[str], *, accept_license: bool
+) -> list[str]:
+    if not (accept_license or os.environ.get("XDREMUX_ACCEPT_APPLE_AMLR_LICENSE") == "1"):
+        raise ValueError(
+            f"downloading Apple Depth Pro 2 weights requires --accept-apple-amlr-license ({PYTORCH_LICENSE_URL})"
+        )
+    weights_dir = models_dir / "pytorch"
+    license_path = weights_dir / "LICENSE"
+    if not license_path.is_file():
+        download_url(PYTORCH_LICENSE_URL.replace("/blob/", "/resolve/"), license_path)
+    installed_ids = []
+    for key in model_keys:
+        filename, url, size, digest = PYTORCH_MODELS[key]
+        download_url(url, weights_dir / filename, size, digest)
+        installed_ids.append(Path(filename).stem)
+    write_license_receipt(weights_dir, installed_ids, backend="pytorch")
+    return installed_ids
+
+
 def install_launcher(
     bin_dir: Path,
     models_dir: Path,
     *,
     python_path: Path | None = None,
     adapter_path: Path | None = None,
+    backend: str = "coreml",
 ) -> Path:
     bin_dir = bin_dir.resolve(strict=True)
     models_dir = models_dir.resolve(strict=True)
-    py = (python_path or Path("/usr/bin/python3")).absolute()
+    default_python = sys.executable if backend == "pytorch" else "/usr/bin/python3"
+    py = (python_path or Path(default_python)).absolute()
     if not py.is_file() or not os.access(py, os.X_OK):
         raise ValueError(f"python interpreter must be executable: {py}")
 
-    source = (ROOT / "model_adapters/depthpro2/estimate.py").read_text(encoding="utf-8")
-    delimiter = "XDREMUX_DEPTHPRO2_MODEL_SOURCE"
-    if delimiter in source.splitlines():
-        raise ValueError("unexpected model source delimiter")
-
-    adapter_arg = (
-        f" --adapter {shlex.quote(str(adapter_path.resolve(strict=True)))}"
-        if adapter_path is not None
-        else ""
-    )
-    launcher = (
-        f"#!/bin/sh\n"
-        f"exec {shlex.quote(str(py))} -I - --models-dir {shlex.quote(str(models_dir))}"
-        f"{adapter_arg} \"$@\" <<'{delimiter}'\n"
-        f"{source}\n"
-        f"{delimiter}\n"
-    )
-    output = bin_dir / "xdremux-depthpro2"
+    quoted_python = shlex.quote(str(py))
+    quoted_models = shlex.quote(str(models_dir))
+    sources = ROOT / "model_adapters/depthpro2"
+    if backend == "pytorch":
+        source = (sources / "pytorch_depth.py").read_text(encoding="utf-8")
+        launcher = (
+            f"#!/bin/sh\n"
+            f"exec {quoted_python} -I -c {shlex.quote(source)} --models-dir {quoted_models} \"$@\"\n"
+        )
+        output = bin_dir / "xdremux-depthpro2-torch"
+    else:
+        source = (sources / "estimate.py").read_text(encoding="utf-8")
+        delimiter = "XDREMUX_DEPTHPRO2_MODEL_SOURCE"
+        if delimiter in source.splitlines():
+            raise ValueError("unexpected model source delimiter")
+        adapter_arg = (
+            f" --adapter {shlex.quote(str(adapter_path.resolve(strict=True)))}"
+            if adapter_path is not None
+            else ""
+        )
+        launcher = (
+            f"#!/bin/sh\n"
+            f"exec {quoted_python} -I - --models-dir {quoted_models}"
+            f"{adapter_arg} \"$@\" <<'{delimiter}'\n"
+            f"{source}\n"
+            f"{delimiter}\n"
+        )
+        output = bin_dir / "xdremux-depthpro2"
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -263,7 +332,8 @@ def install_launcher(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--models-dir", type=Path, default=default_models_dir())
+    parser.add_argument("--backend", choices=("coreml", "pytorch"), default="coreml")
+    parser.add_argument("--models-dir", type=Path)
     parser.add_argument("--models", default="s,b,fov", help="Comma-separated models: s, b, fov")
     parser.add_argument("--accept-apple-amlr-license", action="store_true")
     parser.add_argument("--bin-dir", type=Path, default=None)
@@ -271,21 +341,22 @@ def main() -> int:
     parser.add_argument("--adapter", type=Path, default=None)
     parser.add_argument("--skip-download", action="store_true")
     args = parser.parse_args()
+    models_dir = args.models_dir or default_models_dir(args.backend)
+    if args.backend == "pytorch" and args.adapter is not None:
+        parser.error("--adapter is only supported for the Core ML launcher")
     try:
         if not args.skip_download:
             keys = parse_models_selector(args.models)
-            installed = download_models(
-                args.models_dir,
-                keys,
-                accept_license=args.accept_apple_amlr_license,
-            )
-            print(f"models ready in {args.models_dir}: {', '.join(installed)}")
+            download = download_pytorch_models if args.backend == "pytorch" else download_models
+            installed = download(models_dir, keys, accept_license=args.accept_apple_amlr_license)
+            print(f"models ready in {models_dir}: {', '.join(installed)}")
         if args.bin_dir is not None:
             launcher = install_launcher(
                 args.bin_dir,
-                args.models_dir,
+                models_dir,
                 python_path=args.python,
                 adapter_path=args.adapter,
+                backend=args.backend,
             )
             print(launcher)
     except (OSError, ValueError) as error:

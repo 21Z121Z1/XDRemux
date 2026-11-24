@@ -940,16 +940,40 @@ pub(crate) fn convert_depthpro2_apple_portrait_file(
     )
     .map_err(|error| RuntimeError::external("Apple Portrait orientation", error))?;
 
-    let equivalent_focal_length_mm = if let Some(exif35) = properties
+    let recorded_focal = properties
         .focal_length_in_35mm_film
-        .filter(|value| value.is_finite() && *value > 0.0)
-    {
-        exif35
-    } else {
-        adapter
-            .depthpro2_camera_estimate(&metadata_carrier_path, Some(1))?
-            .equivalent_focal_length_35mm
-    };
+        .filter(|value| value.is_finite() && *value > 0.0);
+    let (equivalent_focal_length_mm, torch_disparity) =
+        if let Some(helper) = std::env::var_os("XDREMUX_DEPTHPRO2_PYTORCH") {
+            let (disparity, facts) = AppleAdapterClient::new(helper).depthpro2_disparity(
+                &metadata_carrier_path,
+                None,
+                properties.width.div_ceil(2),
+                properties.height.div_ceil(2),
+                base_orientation,
+                recorded_focal,
+            )?;
+            let focal = recorded_focal
+                .or(facts.focal_length_35mm)
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .ok_or_else(|| {
+                    RuntimeError::new(
+                        "Depth Pro 2 PyTorch",
+                        "missing or invalid 35mm focal length",
+                    )
+                })?;
+            (focal, Some((disparity, facts)))
+        } else {
+            let focal = match recorded_focal {
+                Some(value) => value,
+                None => {
+                    adapter
+                        .depthpro2_camera_estimate(&metadata_carrier_path, Some(1))?
+                        .equivalent_focal_length_35mm
+                }
+            };
+            (focal, None)
+        };
     let physical_focal_length_mm = properties
         .focal_length_mm
         .filter(|value| value.is_finite() && *value > 0.0)
@@ -966,19 +990,24 @@ pub(crate) fn convert_depthpro2_apple_portrait_file(
     let camera_calibration = derive_apple_portrait_camera_calibration(&capture_facts)
         .map_err(|error| RuntimeError::external("Apple Portrait calibration", error))?;
 
-    let (disp_width, disp_height) = if properties.width >= properties.height {
-        (768_u32, 576_u32)
-    } else {
-        (576_u32, 768_u32)
+    let (disparity, disparity_facts) = match torch_disparity {
+        Some(result) => result,
+        None => {
+            let (width, height) = if properties.width >= properties.height {
+                (768, 576)
+            } else {
+                (576, 768)
+            };
+            adapter.depthpro2_disparity(
+                &metadata_carrier_path,
+                None,
+                width,
+                height,
+                base_orientation,
+                Some(equivalent_focal_length_mm),
+            )?
+        }
     };
-    let (disparity, disparity_facts) = adapter.depthpro2_disparity(
-        &metadata_carrier_path,
-        None,
-        disp_width,
-        disp_height,
-        base_orientation,
-        Some(equivalent_focal_length_mm),
-    )?;
 
     let target_width = properties.width / 2;
     let target_height = properties.height / 2;

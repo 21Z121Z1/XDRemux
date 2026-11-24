@@ -242,7 +242,7 @@ OPPO 模式将源深度转换为视差，保留焦点元数据、光圈、Rust �
 
 此模式仍需 macOS 上公开的 ImageIO 和 Core Image API，不能在 Linux 或 Windows 上写入人像资源。Photos 编辑行为取决于消费端和系统版本。
 
-`--apple-portrait` 为受支持的 ProXDR 静态照片请求含 Vision 语义的完整资源集。缺少必需的 OPPO 深度或源数据时，在发布前失败。
+`--apple-portrait` 请求含 Vision 语义的完整资源集。源文件含有 OPPO 深度时优先使用源深度。受支持的 4:3 和 3:4 ProXDR 或 ISO Gain Map 照片也可以使用本地安装的 Depth Pro 2 权重。将 `XDREMUX_DEPTHPRO2_PYTORCH` 设为 PyTorch 启动器路径即可选择该后端。[Depth Pro 2 安装方法](../model_adapters/depthpro2/README.md)
 
 ### Motion Photo 的 Apple 风格
 

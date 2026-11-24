@@ -2,7 +2,42 @@
 
 [English](README.en.md) | 简体中文
 
-这个可插拔的 Core ML 适配器用于接入 Apple Depth Pro 2（`apple/DepthPro2-coreml`），不在 XDRemux 源码仓库或分发压缩包中内嵌或随包分发苹果模型权重。用户在明确同意上游 [Apple Machine Learning Research License](https://huggingface.co/apple/DepthPro2-coreml/blob/4e607a682f993bbf95035054fc78ba9ffc81faf2/LICENSE) 后，外部模型包存放于用户模型目录（`~/Library/Application Support/XDRemux/Models`，可通过 `XDREMUX_MODEL_DIR` 覆盖）。
+Depth Pro 2 适配器从本地加载 Apple 的 Core ML 或 PyTorch 模型权重。macOS 默认模型目录为 `~/Library/Application Support/XDRemux/Models`，Linux 独立 PyTorch 适配器默认使用 `~/.local/share/XDRemux/Models`。可以通过 `XDREMUX_MODEL_DIR` 更改目录。安装任一后端前请阅读许可条款。[Apple Machine Learning Research Model License](https://huggingface.co/apple/DepthPro2-S/blob/903a1c1ade918831d138adcc4aedbcc8f4da0078/LICENSE)
+
+## 用 PyTorch 生成半尺寸深度图
+
+S、B 模型支持任意宽高比的静态图像。命令输出 Float32 NumPy 数组（`.npy`），保存以米为单位的光轴深度。应用 EXIF 方向后，宽高分别减半并向上取整。例如 `1001×751` 会输出 `501×376`。无限远像素保存为 `+inf`。输入支持 JPEG、PNG、HEIC 以及 Pillow 能解码的其他静态图像格式。
+
+使用 Python 3.11 或更新版本的虚拟环境。安装适配器依赖前，先安装适合硬件的 PyTorch wheel。[PyTorch 安装指南](https://pytorch.org/get-started/locally/)
+
+```bash
+python3 -m venv ~/.venvs/xdremux-depthpro2
+source ~/.venvs/xdremux-depthpro2/bin/activate
+python -m pip install -r model_adapters/depthpro2/requirements-pytorch.txt
+
+python scripts/distribution/install_depthpro2.py --backend pytorch \
+  --accept-apple-amlr-license --models s,b,fov
+python model_adapters/depthpro2/pytorch_depth.py --model s \
+  --input photo.heic --output depth.npy
+```
+
+安装器把权重和许可凭据放到模型目录的 `pytorch` 子目录中，并验证 S、B 的官方 SHA-256 及共享 FOV 权重的文件大小。已知标定焦距时，可用 `--focal-length-px` 提供原图应用方向后的像素焦距。否则适配器优先使用 EXIF 里的 35 mm 等效焦距，缺少该值时按需加载 FOV 模型。
+
+默认对半尺寸图像做推理，并将推理图的长边限制在 1024 像素。适配器保留原图构图，将逆深度缩放到目标半尺寸，放大操作在 CPU 上执行。降低上限可减少内存占用，也可能使深度边缘变软。使用 `--native --max-side 0` 可按原始尺寸推理后再生成相同大小的半尺寸深度图，此模式需要更多内存。需要对齐到 32 像素时，模型临时复制 RGB 图像的最下一行和最右一列，推理后将结果裁回推理图的尺寸。
+
+设备按 CUDA、MPS、CPU 的顺序自动选择，也可用 `--device` 和 `--precision` 覆盖。CUDA 优先用 BF16，否则用 FP16，MPS 使用 BF16，CPU 使用 FP32。按相同顺序重复传入 `--input` 和 `--output` 可批量处理独立图片，模型只加载一次。
+
+### 为 Apple Portrait 选择 PyTorch
+
+在安装命令中添加 `--bin-dir`，即可将启动器安装到已有的可执行文件目录。macOS 上可以为需要合成深度的 4:3 或 3:4 HDR 静态图像选择这个启动器。
+
+```bash
+XDREMUX_DEPTHPRO2_PYTORCH=/path/to/xdremux-depthpro2-torch \
+XDREMUX_DEPTHPRO2_PYTORCH_MODEL=b \
+  xdremux convert --input photo_4x3.heic --output portrait.heic --apple-portrait
+```
+
+两个模型都已安装时，启动器默认选择 S。用 `XDREMUX_DEPTHPRO2_PYTORCH_MODEL` 设为 `s` 或 `b` 可指定型号。源文件含有 OPPO 深度时，XDRemux 优先使用源深度。Portrait 转换仍依赖 macOS Vision 和 ImageIO 适配器生成语义遮罩和写入辅助资源。
 
 ## 能力与职责边界
 
@@ -10,7 +45,7 @@
 - **静态图视差估计（`depthpro2-b_w4.mlpackage` / `depthpro2-s_w4.mlpackage`）**：在 `xdremux-apple-adapter` 内通过 Core ML 与 Metal 提供逆深度到视差的推理原语，使 `xdremux convert --apple-portrait` 可以处理没有内置 OPPO `rear.depth` 的 4:3 与 3:4 ProXDR 或 ISO Gain Map 照片。
 - **产品策略归属 Rust**：Swift 适配器仅负责 Core ML 推理、方向校正与 ImageIO/Vision 原语；Rust 负责相机观测准入、等效焦距决策、REND 生成、辅助图封装、结构校验及原子发布。
 
-## 可插拔安装
+## 安装 Core ML 模型
 
 在确认接受 Apple AMLR 许可条款后，从仓库根目录执行：
 
