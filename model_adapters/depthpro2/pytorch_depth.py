@@ -10,6 +10,7 @@ import math
 import os
 import sys
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 LICENSE_RECEIPT = ".apple-amlr-license-accepted.json"
 DECODER_STRIPE_PIXELS = 2 * 1024**2
 ATTENTION_SCORE_BUDGET = 32 * 1024**2
+MLP_TOKEN_BLOCK = 8192
 
 
 def default_models_dir() -> Path:
@@ -170,16 +172,83 @@ def limit_attention_memory():
                 ):
                     return func(*args, **options)
             else:
-                with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION]):
+                backends = [SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION]
+                if query.device.type == "cuda" and torch.backends.cudnn.is_available():
+                    params = torch.backends.cuda.SDPAParams(
+                        query, key, value, None, 0.0, False, options.get("enable_gqa", False)
+                    )
+                    if torch.backends.cuda.can_use_cudnn_attention(params):
+                        backends.append(SDPBackend.CUDNN_ATTENTION)
+                with sdpa_kernel(backends, set_priority=len(backends) > 2):
                     try:
                         return func(*args, **options)
                     except RuntimeError as error:
-                        if not str(error).startswith(("No available kernel", "No viable backend")):
+                        message = str(error)
+                        unavailable = message.startswith(
+                            ("No available kernel", "No viable backend")
+                        )
+                        cudnn_unsupported = len(backends) > 2 and (
+                            "No execution plans support the graph" in message
+                            or "CUDNN_STATUS_NOT_SUPPORTED" in message
+                        )
+                        if not (unavailable or cudnn_unsupported):
                             raise
+                if query.device.type == "cuda":
+                    # Keep the cuDNN candidate out of the bounded fallback
+                    # after a runtime plan rejection.
+                    with sdpa_kernel([*backends[:2], SDPBackend.MATH]):
+                        return query_chunked_attention(query, key, value, **options)
 
             return query_chunked_attention(query, key, value, **options)
 
     return BoundedAttention()
+
+
+def fuse_cpu_feed_forward(encoder):
+    """Fuse FP32 linear and GELU and bound the hidden activation by token block."""
+    import torch
+    from torch import nn
+
+    if not hasattr(torch.ops.mkldnn, "_linear_pointwise"):
+        return
+
+    class FusedFeedForward(nn.Module):
+        def __init__(self, mlp):
+            super().__init__()
+            self.mlp = mlp
+
+        def forward(self, values):
+            mlp = self.mlp
+            if (
+                values.ndim != 3
+                or values.shape[0] != 1
+                or values.shape[1] < MLP_TOKEN_BLOCK
+                or values.dtype != torch.float32
+                or self.training
+                or torch.is_grad_enabled()
+            ):
+                return mlp(values)
+
+            output = values.new_empty((1, values.shape[1], mlp.fc2.out_features))
+            for start in range(0, values.shape[1], MLP_TOKEN_BLOCK):
+                tokens = slice(start, start + MLP_TOKEN_BLOCK)
+                hidden = torch.ops.mkldnn._linear_pointwise(
+                    values[:, tokens], mlp.fc1.weight, mlp.fc1.bias, "gelu", [], mlp.act.approximate
+                )
+                hidden = mlp.norm(mlp.drop1(hidden))
+                torch.addmm(mlp.fc2.bias, hidden[0], mlp.fc2.weight.T, out=output[0, tokens])
+                del hidden
+            return mlp.drop2(output)
+
+    for block in encoder.blocks:
+        mlp = block.mlp
+        if (
+            isinstance(mlp.fc1, nn.Linear)
+            and isinstance(mlp.fc2, nn.Linear)
+            and mlp.fc2.bias is not None
+            and isinstance(mlp.act, nn.GELU)
+        ):
+            block.mlp = FusedFeedForward(mlp).eval()
 
 
 class FusedInverseDepthHead:
@@ -284,7 +353,28 @@ def decode_in_stripes(model, encodings, size, stripe_pixels, *, stripe_head=None
     return output[:, 0]
 
 
-def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS, stripe_head=None):
+def encode_single_image(encoder, x):
+    """Keep the single-frame prefix rule without copying the patch tokens."""
+    grid = (x.shape[-2] // encoder.patch_size, x.shape[-1] // encoder.patch_size)
+    rope = encoder.rope.get_embed(shape=grid)
+    tokens = encoder.embed(x)
+    prefix = encoder.num_prefix_tokens
+    features = []
+    for index, block in enumerate(encoder.blocks):
+        updated = block(tokens, rope=rope)
+        if index in encoder.cross_frame_blocks:
+            # Pooling a one-frame prefix is the identity. The block still
+            # sees it, and the original prefix continues to the next block.
+            updated[:, :prefix].copy_(tokens[:, :prefix])
+        tokens = updated
+        if index in encoder.reassembled_blocks:
+            features.append(tokens[:, prefix:])
+    return features, grid
+
+
+def prepare_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS, stripe_head=None):
+    """Prepare a prediction so the input can be released before striped decoding."""
+    import torch
     from depth_pro_2.model import INPUT_MULTIPLE
     from depth_pro_2.network.encoder import autocast_for
     from torch.nn.functional import pad
@@ -293,16 +383,22 @@ def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS, stri
     pad_h, pad_w = -height % INPUT_MULTIPLE, -width % INPUT_MULTIPLE
     if (height + pad_h) * (width + pad_w) <= stripe_pixels:
         with limit_attention_memory():
-            return model.predict_inverse_depth(x)
+            prediction = model.predict_inverse_depth(x)
+        return lambda: prediction
     if pad_h or pad_w:
         x = pad(x, (0, pad_w, 0, pad_h), mode="replicate")
-    with limit_attention_memory(), autocast_for(x.device, model.precision)():
-        features, grid = model.encoder.encode(x)
-    with autocast_for(x.device, model.precision)():
-        encodings = model.encoder.reassemble_tokens(features, grid)
-    del x, features
-    return decode_in_stripes(
-        model, encodings, (height, width), stripe_pixels, stripe_head=stripe_head
+    device = x.device
+    with limit_attention_memory(), autocast_for(device, model.precision)():
+        features, grid = encode_single_image(model.encoder, x)
+    del x
+    layout = torch.contiguous_format if device.type == "mps" else torch.channels_last
+    with autocast_for(device, model.precision)():
+        for index, layer in enumerate(model.encoder.reassemble):
+            level = features[index].transpose(1, 2).reshape(1, -1, *grid)
+            features[index] = layer(level.contiguous(memory_format=layout))
+            del level
+    return partial(
+        decode_in_stripes, model, features, (height, width), stripe_pixels, stripe_head=stripe_head
     )
 
 
@@ -362,6 +458,11 @@ class DepthEstimator:
             and torch.backends.mkldnn.enabled
         ):
             self.stripe_head = FusedInverseDepthHead(self.model.head)
+            matmul = getattr(torch.backends.mkldnn, "matmul", None)
+            if torch.get_float32_matmul_precision() == "highest" and getattr(
+                matmul, "fp32_precision", "ieee"
+            ) in ("none", "ieee"):
+                fuse_cpu_feed_forward(self.model.encoder)
         self.fov = None
         self.weights_sha256 = None
         self.native = args.native
@@ -439,10 +540,9 @@ class DepthEstimator:
             )
             if not math.isfinite(ratio) or ratio <= 0.0:
                 raise ValueError("invalid focal length for depth estimation")
-            inverse_depth = predict_inverse_depth(
-                self.model, x, stripe_head=self.stripe_head
-            ).unsqueeze(1)
+            predict = prepare_inverse_depth(self.model, x, stripe_head=self.stripe_head)
             del x
+            inverse_depth = predict().unsqueeze(1)
             target = display_output[::-1]
             if target != inverse_depth.shape[-2:]:
                 # Reduce a native prediction before copying it to the host.

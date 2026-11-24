@@ -31,6 +31,8 @@ python model_adapters/depthpro2/pytorch_depth.py --model b --full-size \
 
 启用 oneDNN 的 CPU 会用原模型的权重和填充规则，将 FP32 分条解码头的转置卷积和紧随其后的卷积合并。合并后的卷积在上采样前执行，省去一张大型中间张量。运算仍采用 FP32，累加顺序的变化可能带来浮点舍入差异。
 
+启用 oneDNN 的 CPU 在处理较长的 FP32 token 序列时，将编码器前馈网络的线性层和 GELU 合并，并按 token 分块以限制中间激活的大小。处理大尺寸静态图像时，CPU 和 GPU 在跨帧模块中复用单帧图块的张量，并在分条解码前释放归一化的 RGB 张量。CUDA 还会让重组后的特征图保持通道靠后的内存布局，并在 PyTorch 确认可用时使用 cuDNN 注意力。各后端按所选精度运行。
+
 设备按 CUDA、MPS、CPU 的顺序自动选择，也可用 `--device` 和 `--precision` 覆盖。CUDA 优先用 BF16，否则用 FP16，MPS 使用 BF16，CPU 使用 FP32。按相同顺序重复传入 `--input` 和 `--output` 可批量处理独立图片，模型只加载一次。
 
 ### 为 Apple Portrait 选择 PyTorch

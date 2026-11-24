@@ -31,6 +31,8 @@ For large inputs the backbone keeps global attention. The final decoder layers c
 
 On CPUs with oneDNN enabled, the FP32 stripe decoder combines the head's transposed convolution and following convolution using the original model weights and padding. It performs the combined convolution before upsampling to avoid a large intermediate tensor. The arithmetic stays in FP32, with possible rounding differences from the original accumulation order.
 
+For large FP32 token sequences on oneDNN CPUs, the encoder combines the feed-forward linear layer and GELU and processes the result in token blocks to bound the hidden activation. For large stills, the CPU and GPU paths reuse the single-frame patch tokens across the cross-frame blocks and release the normalized RGB tensor before striped decoding. CUDA also keeps the reassembled feature maps in channels-last order and can use cuDNN attention when PyTorch reports it is supported. The adapter uses the selected precision for each backend.
+
 Device selection prefers CUDA, then MPS, then CPU. `--device` and `--precision` override the defaults. CUDA uses BF16 where supported and FP16 otherwise. MPS uses BF16 and CPU uses FP32. Repeat `--input` and `--output` in matching order to process independent images with one model load.
 
 ### Use PyTorch for Apple Portrait

@@ -271,6 +271,38 @@ print(json.dumps({{
             actual = pytorch_depth.query_chunked_attention(query, key, value, score_budget=3 * 29 * 4)
         torch.testing.assert_close(actual, expected)
 
+    @unittest.skipUnless(find_spec("torch"), "requires PyTorch")
+    def test_accelerator_attention_matches_same_precision_reference(self) -> None:
+        import torch
+        from torch.nn.functional import scaled_dot_product_attention
+
+        devices = [
+            name
+            for name, available in (
+                ("cuda", torch.cuda.is_available()),
+                ("mps", torch.backends.mps.is_available()),
+            )
+            if available
+        ]
+        if not devices:
+            self.skipTest("requires a CUDA or MPS device")
+        random = torch.Generator().manual_seed(108)
+        for name in devices:
+            with self.subTest(device=name):
+                device = torch.device(name)
+                precision = pytorch_depth.select_precision(device, "auto")
+                tensors = [
+                    torch.randn(1, 2, 193, 64, generator=random).to(device, precision)
+                    for _ in range(3)
+                ]
+                expected = scaled_dot_product_attention(*tensors)
+                with (
+                    patch.object(pytorch_depth, "ATTENTION_SCORE_BUDGET", 8192),
+                    pytorch_depth.limit_attention_memory(),
+                ):
+                    actual = scaled_dot_product_attention(*tensors)
+                torch.testing.assert_close(actual, expected)
+
     @unittest.skipUnless(
         find_spec("depth_pro_2") and find_spec("torch"),
         "requires the optional Depth Pro 2 PyTorch environment",
@@ -297,6 +329,30 @@ print(json.dumps({{
         find_spec("depth_pro_2") and find_spec("torch"),
         "requires the optional Depth Pro 2 PyTorch environment",
     )
+    def test_fused_cpu_feed_forward_preserves_fp32_outputs(self) -> None:
+        import torch
+        from timm.layers import Mlp
+
+        if not torch.backends.mkldnn.is_available() or not hasattr(
+            torch.ops.mkldnn, "_linear_pointwise"
+        ):
+            self.skipTest("oneDNN fused linear is unavailable")
+        with torch.random.fork_rng(devices=[]), torch.inference_mode():
+            torch.manual_seed(841)
+            mlp = Mlp(32, hidden_features=128).eval()
+            encoder = Mock(blocks=[Mock(mlp=mlp)])
+            inputs = [torch.randn(1, length, 32) for length in (31, 8193)]
+            expected = [mlp(values) for values in inputs]
+            pytorch_depth.fuse_cpu_feed_forward(encoder)
+            for values, reference in zip(inputs, expected):
+                actual = encoder.blocks[0].mlp(values)
+                self.assertEqual(actual.dtype, torch.float32)
+                torch.testing.assert_close(actual, reference, rtol=1e-5, atol=1e-6)
+
+    @unittest.skipUnless(
+        find_spec("depth_pro_2") and find_spec("torch"),
+        "requires the optional Depth Pro 2 PyTorch environment",
+    )
     def test_striped_decoder_keeps_the_native_prediction_at_boundaries(self) -> None:
         import torch
         from depth_pro_2 import PRESETS, DepthPro2
@@ -318,10 +374,10 @@ print(json.dumps({{
                 with self.subTest(height=height, width=width):
                     image = torch.rand(1, 3, height, width)
                     expected = model.predict_inverse_depth(image)
-                    actual = pytorch_depth.predict_inverse_depth(model, image, stripe_pixels=4096)
-                    fused = pytorch_depth.predict_inverse_depth(
+                    actual = pytorch_depth.prepare_inverse_depth(model, image, stripe_pixels=4096)()
+                    fused = pytorch_depth.prepare_inverse_depth(
                         model, image, stripe_pixels=4096, stripe_head=fused_head
-                    )
+                    )()
                     self.assertGreater(float(expected.std()), 0)
                     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
                     torch.testing.assert_close(fused, expected, rtol=1e-5, atol=1e-6)
