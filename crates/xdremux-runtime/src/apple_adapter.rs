@@ -31,7 +31,8 @@ const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 pub(super) const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
-pub(super) const PYTORCH_DEPTHPRO2_TIMEOUT: Duration = Duration::from_secs(1800);
+// Depth inference from a 50 MP source can take tens of minutes on a CPU.
+pub(super) const PYTORCH_DEPTHPRO2_TIMEOUT: Duration = Duration::from_secs(3600);
 const PIPE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const PROCESS_REAP_BUDGET: Duration = Duration::from_millis(250);
 const MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;
