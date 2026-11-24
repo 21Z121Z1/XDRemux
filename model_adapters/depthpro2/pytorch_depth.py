@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate half-resolution depth maps with the local Depth Pro 2 PyTorch models."""
+"""Generate half- or full-resolution depth maps with local Depth Pro 2 PyTorch models."""
 
 from __future__ import annotations
 
@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 
 
 LICENSE_RECEIPT = ".apple-amlr-license-accepted.json"
-DEFAULT_MAX_SIDE = 1024
+DECODER_STRIPE_PIXELS = 2 * 1024**2
+ATTENTION_SCORE_BUDGET = 32 * 1024**2
 
 
 def default_models_dir() -> Path:
@@ -121,6 +122,128 @@ def select_precision(device: torch.device, requested: str) -> torch.dtype:
     return torch.bfloat16 if device.type == "mps" else torch.float32
 
 
+def query_chunked_attention(query, key, value, *, score_budget=ATTENTION_SCORE_BUDGET, **options):
+    from torch.nn.functional import scaled_dot_product_attention
+
+    # Every query still sees every key and value. Bound the scores a math
+    # backend can materialize in one operation.
+    scores_per_query = math.prod(query.shape[:-2]) * key.shape[-2]
+    rows = max(1, score_budget // scores_per_query)
+    output = query.new_empty((*query.shape[:-1], value.shape[-1]))
+    for start in range(0, query.shape[-2], rows):
+        part = slice(start, start + rows)
+        output[..., part, :].copy_(
+            scaled_dot_product_attention(query[..., part, :], key, value, **options)
+        )
+    return output
+
+
+def limit_attention_memory():
+    """Use fused attention where available and bound the dense fallback."""
+    import torch
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+    from torch.nn.functional import scaled_dot_product_attention
+    from torch.overrides import TorchFunctionMode
+
+    class BoundedAttention(TorchFunctionMode):
+        def __torch_function__(self, func, types, args=(), kwargs=None):
+            options = kwargs or {}
+            if func is not scaled_dot_product_attention or len(args) != 3:
+                return func(*args, **options)
+            query, key, value = args
+            score_count = math.prod(query.shape[:-1]) * key.shape[-2]
+            if (
+                score_count <= ATTENTION_SCORE_BUDGET
+                or options.get("attn_mask") is not None
+                or options.get("dropout_p")
+                or options.get("is_causal")
+            ):
+                return func(*args, **options)
+
+            if query.device.type == "mps":
+                # PyTorch 2.13 added fused long-sequence attention for the
+                # 64-dimensional heads used by the Depth Pro 2 S/B models.
+                if (
+                    torch.__version__ >= "2.13.0"
+                    and query.shape[-1] == key.shape[-1] == value.shape[-1] == 64
+                    and os.environ.get("PYTORCH_MPS_DISABLE_PREFILL_ATTENTION", "0") == "0"
+                ):
+                    return func(*args, **options)
+            else:
+                with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION]):
+                    try:
+                        return func(*args, **options)
+                    except RuntimeError as error:
+                        if not str(error).startswith(("No available kernel", "No viable backend")):
+                            raise
+
+            return query_chunked_attention(query, key, value, **options)
+
+    return BoundedAttention()
+
+
+def decode_in_stripes(model, encodings, size, stripe_pixels):
+    """Run the highest-resolution fusion and head with the original receptive field."""
+    import torch
+    from depth_pro_2.network.encoder import autocast_for
+
+    height, width = size
+    decoder = model.decoder
+    device = encodings[-1].device
+    # The last fusion consumes the quarter-resolution features. Keep the
+    # lower levels whole and release each skip as soon as it is used.
+    with autocast_for(device, model.precision)():
+        fused = decoder.fusions[-1](decoder.convs[-1](encodings.pop()))
+        for level in range(len(decoder.fusions) - 2, 0, -1):
+            fused = decoder.fusions[level](fused, decoder.convs[level](encodings.pop()))
+        highest_skip = encodings.pop()
+        output = fused.new_empty((1, 1, height, width), dtype=torch.float32)
+        axis = -1 if width > 4 * height else -2
+        pixel_extent = size[axis]
+        quarter_extent = (pixel_extent + 3) // 4
+        across = fused.shape[-2 if axis == -1 else -1] * 4
+        step = max(1, stripe_pixels // (4 * across))
+        for start in range(0, quarter_extent, step):
+            end = min(start + step, quarter_extent)
+            # Quarter-scale halo: skip projection (1), two residual blocks
+            # (2 each), and the half/full-resolution depth head (1 total).
+            left = max(0, start - 6)
+            right = min(fused.shape[axis], end + 6)
+            skip = decoder.convs[0](highest_skip.narrow(axis, left, right - left))
+            decoded = decoder.fusions[0](fused.narrow(axis, left, right - left), skip)
+            del skip
+            with torch.autocast(device_type=device.type, enabled=False):
+                prediction = model.head(decoded.float())
+            del decoded
+            offset = (start - left) * 4
+            count = min(end * 4, pixel_extent) - start * 4
+            output.narrow(axis, start * 4, count).copy_(
+                prediction.narrow(axis, offset, count)[..., :height, :width]
+            )
+            del prediction
+    return output[:, 0]
+
+
+def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS):
+    from depth_pro_2.model import INPUT_MULTIPLE
+    from depth_pro_2.network.encoder import autocast_for
+    from torch.nn.functional import pad
+
+    height, width = x.shape[-2:]
+    pad_h, pad_w = -height % INPUT_MULTIPLE, -width % INPUT_MULTIPLE
+    if (height + pad_h) * (width + pad_w) <= stripe_pixels:
+        with limit_attention_memory():
+            return model.predict_inverse_depth(x)
+    if pad_h or pad_w:
+        x = pad(x, (0, pad_w, 0, pad_h), mode="replicate")
+    with limit_attention_memory(), autocast_for(x.device, model.precision)():
+        features, grid = model.encoder.encode(x)
+    with autocast_for(x.device, model.precision)():
+        encodings = model.encoder.reassemble_tokens(features, grid)
+    del x, features
+    return decode_in_stripes(model, encodings, (height, width), stripe_pixels)
+
+
 class DepthEstimator:
     def __init__(self, args: argparse.Namespace):
         models_dir = args.models_dir / "pytorch"
@@ -203,6 +326,7 @@ class DepthEstimator:
         focal_px: float | None = None,
         orientation: int | None = None,
         focal_35mm: float | None = None,
+        full_size: bool = False,
     ) -> tuple[np.ndarray, float]:
         import numpy as np
         import torch
@@ -221,9 +345,10 @@ class DepthEstimator:
                     focal_px = get_focal_length_px(image)
             elif focal_35mm is not None:
                 focal_px = focal_35mm * max(size) / 36.0
-            output_size = half_size(size)
+            output_size = size if full_size else half_size(size)
             working_size = inference_size(size if self.native else output_size, self.max_side)
             rgb = sample_rgb(image, working_size, orientation)
+        del image
 
         display_size = size[::-1] if orientation in (5, 6, 7, 8) else size
         display_output = output_size[::-1] if orientation in (5, 6, 7, 8) else output_size
@@ -237,15 +362,15 @@ class DepthEstimator:
             x = x.to(dtype=torch.float32, memory_format=self.memory_format)
             x.div_(255.0).sub_(self.mean).div_(self.std)
             del rgb
-            inverse_depth = self.model.predict_inverse_depth(x).unsqueeze(1)
             ratio = (
                 self.estimate_focal_length_px(x) / x.shape[-1]
                 if focal_px is None
                 else focal_px / display_size[0]
             )
-            del x
             if not math.isfinite(ratio) or ratio <= 0.0:
                 raise ValueError("invalid focal length for depth estimation")
+            inverse_depth = predict_inverse_depth(self.model, x).unsqueeze(1)
+            del x
             target = display_output[::-1]
             if target != inverse_depth.shape[-2:]:
                 # Reduce a native prediction before copying it to the host.
@@ -356,13 +481,18 @@ def main() -> int:
     parser.add_argument(
         "--max-side",
         type=int,
-        default=DEFAULT_MAX_SIDE,
-        help="Limit the longer inference edge (default: 1024; 0 disables the cap).",
+        default=0,
+        help="Optionally limit the longer inference edge (default: 0, unlimited).",
     )
     parser.add_argument(
         "--native",
         action="store_true",
         help="Use input resolution, subject to --max-side, before reducing the output.",
+    )
+    parser.add_argument(
+        "--full-size",
+        action="store_true",
+        help="Produce a full-resolution depth map. Inference uses the original size by default.",
     )
     parser.add_argument(
         "--focal-length-px",
@@ -404,7 +534,9 @@ def main() -> int:
             import numpy as np
 
             for source, output in zip(args.input, args.output):
-                disparity, _ = estimator.estimate(source, focal_px=args.focal_length_px)
+                disparity, _ = estimator.estimate(
+                    source, focal_px=args.focal_length_px, full_size=args.full_size
+                )
                 with np.errstate(divide="ignore", over="ignore"):
                     np.reciprocal(disparity, out=disparity)
                 write_array(output, disparity)

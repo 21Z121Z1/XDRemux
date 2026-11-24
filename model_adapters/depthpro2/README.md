@@ -4,9 +4,9 @@
 
 Depth Pro 2 适配器从本地加载 Apple 的 Core ML 或 PyTorch 模型权重。macOS 默认模型目录为 `~/Library/Application Support/XDRemux/Models`，Linux 独立 PyTorch 适配器默认使用 `~/.local/share/XDRemux/Models`。可以通过 `XDREMUX_MODEL_DIR` 更改目录。安装任一后端前请阅读许可条款。[Apple Machine Learning Research Model License](https://huggingface.co/apple/DepthPro2-S/blob/903a1c1ade918831d138adcc4aedbcc8f4da0078/LICENSE)
 
-## 用 PyTorch 生成半尺寸深度图
+## 用 PyTorch 生成半尺寸或全尺寸深度图
 
-S、B 模型支持任意宽高比的静态图像。命令输出 Float32 NumPy 数组（`.npy`），保存以米为单位的光轴深度。应用 EXIF 方向后，宽高分别减半并向上取整。例如 `1001×751` 会输出 `501×376`。无限远像素保存为 `+inf`。输入支持 JPEG、PNG、HEIC 以及 Pillow 能解码的其他静态图像格式。
+S、B 模型支持任意宽高比的静态图像。命令输出 Float32 NumPy 数组（`.npy`），保存以米为单位的光轴深度。应用 EXIF 方向后，默认将宽高分别减半并向上取整。例如 `8192×6144` 会输出约 12.6 MP 的 `4096×3072` 深度图。使用 `--full-size` 时，`6000×4000` 图像会输出相同尺寸的深度图。无限远像素保存为 `+inf`。输入支持 JPEG、PNG、HEIC 以及 Pillow 能解码的其他静态图像格式。
 
 使用 Python 3.11 或更新版本的虚拟环境。安装适配器依赖前，先安装适合硬件的 PyTorch wheel。[PyTorch 安装指南](https://pytorch.org/get-started/locally/)
 
@@ -19,11 +19,15 @@ python scripts/distribution/install_depthpro2.py --backend pytorch \
   --accept-apple-amlr-license --models s,b,fov
 python model_adapters/depthpro2/pytorch_depth.py --model s \
   --input photo.heic --output depth.npy
+python model_adapters/depthpro2/pytorch_depth.py --model b --full-size \
+  --input photo_24mp.heic --output depth_full.npy
 ```
 
 安装器把权重和许可凭据放到模型目录的 `pytorch` 子目录中，并验证 S、B 的官方 SHA-256 及共享 FOV 权重的文件大小。已知标定焦距时，可用 `--focal-length-px` 提供原图应用方向后的像素焦距。否则适配器优先使用 EXIF 里的 35 mm 等效焦距，缺少该值时按需加载 FOV 模型。
 
-默认对半尺寸图像做推理，并将推理图的长边限制在 1024 像素。适配器保留原图构图，将逆深度缩放到目标半尺寸，放大操作在 CPU 上执行。降低上限可减少内存占用，也可能使深度边缘变软。使用 `--native --max-side 0` 可按原始尺寸推理后再生成相同大小的半尺寸深度图，此模式需要更多内存。需要对齐到 32 像素时，模型临时复制 RGB 图像的最下一行和最右一列，推理后将结果裁回推理图的尺寸。
+半尺寸模式按输出尺寸推理。`--full-size` 按原尺寸推理并保存全尺寸图。`--native` 按原尺寸推理并保存半尺寸图。这些模式默认都不额外缩小推理图。需要减小推理尺寸时，可以显式设置 `--max-side`。适配器会将逆深度缩放到所需的输出尺寸。降低长边上限可能使深度边缘变软。
+
+处理大图时，主干网络保留全局注意力。解码器的最后几层采用带重叠区域的分条计算，为每条边界保留完整的像素邻域，从而降低同尺寸、同精度下的峰值内存。设备支持时使用融合注意力。PyTorch 2.13 起支持 MPS 长序列融合注意力。旧版 MPS 会分批计算查询，但保留所有键和值，耗时可能更长。实际耗时和内存取决于模型、设备、精度和补边后的尺寸。需要对齐到 32 像素时，适配器临时复制 RGB 图像的最下一行和最右一列，推理后将结果裁回推理图尺寸。
 
 设备按 CUDA、MPS、CPU 的顺序自动选择，也可用 `--device` 和 `--precision` 覆盖。CUDA 优先用 BF16，否则用 FP16，MPS 使用 BF16，CPU 使用 FP32。按相同顺序重复传入 `--input` 和 `--output` 可批量处理独立图片，模型只加载一次。
 

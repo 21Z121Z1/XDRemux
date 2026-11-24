@@ -4,9 +4,9 @@ English | [简体中文](README.md)
 
 The Depth Pro 2 adapter uses locally installed Apple model weights for Core ML and PyTorch. On macOS the default model directory is `~/Library/Application Support/XDRemux/Models`. The standalone PyTorch adapter uses `~/.local/share/XDRemux/Models` on Linux. Set `XDREMUX_MODEL_DIR` to choose a different directory. Review the license before installing either backend. [Apple Machine Learning Research Model License](https://huggingface.co/apple/DepthPro2-S/blob/903a1c1ade918831d138adcc4aedbcc8f4da0078/LICENSE)
 
-## Generate half-resolution depth with PyTorch
+## Generate half- or full-resolution depth with PyTorch
 
-The S and B models accept still images at any aspect ratio. The command writes a Float32 NumPy array (`.npy`) with depth in meters along the optical axis. Width and height are each halved and rounded up after applying EXIF orientation. A `1001×751` image yields a `501×376` map. Pixels at infinite depth carry `+inf`. JPEG, PNG, HEIC and the other still formats supported by Pillow can be used.
+The S and B models accept still images at any aspect ratio. The command writes a Float32 NumPy array (`.npy`) with depth in meters along the optical axis. By default it halves the oriented width and height and rounds each up. For example, `8192×6144` yields a `4096×3072` map of about 12.6 MP. With `--full-size`, a `6000×4000` image yields a `6000×4000` map. Pixels at infinite depth carry `+inf`. JPEG, PNG, HEIC and the other still formats supported by Pillow can be used.
 
 Use a Python 3.11+ virtual environment. Install a PyTorch wheel compatible with your hardware before installing the adapter requirements. [PyTorch installation](https://pytorch.org/get-started/locally/)
 
@@ -19,11 +19,15 @@ python scripts/distribution/install_depthpro2.py --backend pytorch \
   --accept-apple-amlr-license --models s,b,fov
 python model_adapters/depthpro2/pytorch_depth.py --model s \
   --input photo.heic --output depth.npy
+python model_adapters/depthpro2/pytorch_depth.py --model b --full-size \
+  --input photo_24mp.heic --output depth_full.npy
 ```
 
 The installer puts the weights and license receipt in the model directory's `pytorch` subdirectory. It checks the official S and B SHA-256 digests and the size of Apple's shared FOV checkpoint. Supply `--focal-length-px` for a calibrated focal length in original oriented pixels. Otherwise the helper uses the image's 35mm-equivalent EXIF focal length when available and loads the FOV checkpoint on demand.
 
-By default the adapter runs inference on a half-resolution copy and caps its longer edge at 1024 pixels. It preserves framing, resamples the inverse depth to the requested half resolution, and performs any output upscaling on the CPU. A lower cap reduces memory and can soften depth edges. Use `--native --max-side 0` to infer at the original size before producing the same half-resolution map. Native inference uses more memory. For inputs that need 32-pixel alignment, the model temporarily repeats the last RGB row and column and trims the prediction back to the working image size.
+The half-resolution mode runs inference at the output size. `--full-size` runs at the input size and saves the full map. Use `--native` to run at the input size and save a half-resolution map. These modes apply no additional input resizing by default. Set `--max-side` explicitly if you want a smaller inference size. The adapter rescales the inverse depth to the requested output size. A lower cap can soften depth edges.
+
+For large inputs the backbone keeps global attention. The final decoder layers consume overlapping stripes with the full pixel neighborhood at each stripe boundary. This reduces peak memory at the same resolution and precision. Fused attention is used where supported. PyTorch 2.13 and newer provide fused long-sequence attention on MPS. Older MPS builds use query chunks with all keys and values, which can take longer. Runtime and memory vary by model, device, precision, and padded dimensions. For 32-pixel alignment, the adapter temporarily repeats the last RGB row and column and crops the result to the working image size.
 
 Device selection prefers CUDA, then MPS, then CPU. `--device` and `--precision` override the defaults. CUDA uses BF16 where supported and FP16 otherwise. MPS uses BF16 and CPU uses FP32. Repeat `--input` and `--output` in matching order to process independent images with one model load.
 

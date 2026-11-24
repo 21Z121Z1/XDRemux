@@ -30,7 +30,8 @@ pub(super) mod texture;
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
+pub(super) const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
+pub(super) const PYTORCH_DEPTHPRO2_TIMEOUT: Duration = Duration::from_secs(1800);
 const PIPE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const PROCESS_REAP_BUDGET: Duration = Duration::from_millis(250);
 const MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;
@@ -1371,11 +1372,11 @@ impl AppleAdapterClient {
     pub(super) fn depthpro2_disparity(
         &self,
         input: &Path,
-        variant: Option<&str>,
         target_width: u32,
         target_height: u32,
         orientation: u8,
         focal_length_35mm: Option<f64>,
+        timeout: Duration,
     ) -> Result<(ApplePortraitDisparity, DepthPro2DisparityFacts)> {
         if target_width == 0 || target_height == 0 {
             return Err(RuntimeError::new(
@@ -1392,7 +1393,6 @@ impl AppleAdapterClient {
             input_path: input_path(input)?,
             output_path: input_path(&output_path)?,
             depthpro2_disparity: DepthPro2DisparityConfigWire {
-                variant: variant.map(ToOwned::to_owned),
                 target_width,
                 target_height,
                 orientation: Some(u32::from(orientation)),
@@ -1401,7 +1401,7 @@ impl AppleAdapterClient {
         };
         let encoded = serde_json::to_vec(&request)
             .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
-        let output = self.invoke(&encoded, APPLE_COMPUTE_TIMEOUT)?;
+        let output = self.invoke(&encoded, timeout)?;
         let response: DepthPro2DisparityResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
         validate_schema(response.schema_version)?;
@@ -1945,8 +1945,6 @@ struct DepthPro2DisparityRequestWire {
 
 #[derive(Debug, Serialize)]
 struct DepthPro2DisparityConfigWire {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    variant: Option<String>,
     target_width: u32,
     target_height: u32,
     #[serde(skip_serializing_if = "Option::is_none")]

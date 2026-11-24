@@ -32,7 +32,9 @@ use xdremux_engine::{
 };
 
 #[cfg(target_os = "macos")]
-use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
+use crate::apple_adapter::{
+    AppleAdapterClient, AppleImageProperties, APPLE_COMPUTE_TIMEOUT, PYTORCH_DEPTHPRO2_TIMEOUT,
+};
 
 #[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
@@ -947,11 +949,11 @@ pub(crate) fn convert_depthpro2_apple_portrait_file(
         if let Some(helper) = std::env::var_os("XDREMUX_DEPTHPRO2_PYTORCH") {
             let (disparity, facts) = AppleAdapterClient::new(helper).depthpro2_disparity(
                 &metadata_carrier_path,
-                None,
                 properties.width.div_ceil(2),
                 properties.height.div_ceil(2),
                 base_orientation,
                 recorded_focal,
+                PYTORCH_DEPTHPRO2_TIMEOUT,
             )?;
             let focal = recorded_focal
                 .or(facts.focal_length_35mm)
@@ -1000,11 +1002,11 @@ pub(crate) fn convert_depthpro2_apple_portrait_file(
             };
             adapter.depthpro2_disparity(
                 &metadata_carrier_path,
-                None,
                 width,
                 height,
                 base_orientation,
                 Some(equivalent_focal_length_mm),
+                APPLE_COMPUTE_TIMEOUT,
             )?
         }
     };

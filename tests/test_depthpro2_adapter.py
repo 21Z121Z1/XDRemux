@@ -31,6 +31,7 @@ class DepthPro2AdapterTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--model", result.stdout)
         self.assertIn("--native", result.stdout)
+        self.assertIn("--full-size", result.stdout)
 
     def test_pytorch_installer_checks_license_and_digest_before_publication(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -217,10 +218,10 @@ print(json.dumps({{
                     self.assertEqual(response["focal_length_35mm"], 35.0)
 
     @unittest.skipUnless(
-        find_spec("torch") and find_spec("numpy") and find_spec("PIL"),
-        "requires PyTorch, NumPy and Pillow",
+        find_spec("depth_pro_2") and find_spec("torch") and find_spec("numpy") and find_spec("PIL"),
+        "requires the optional Depth Pro 2 PyTorch environment",
     )
-    def test_pytorch_half_map_dimensions_survive_capping_and_exif_rotation(self) -> None:
+    def test_pytorch_map_dimensions_follow_scale_and_exif_rotation(self) -> None:
         import numpy as np
         import torch
         from PIL import Image
@@ -239,19 +240,63 @@ print(json.dumps({{
             estimator.model.predict_inverse_depth.side_effect = lambda x: torch.full(
                 (1, *x.shape[-2:]), 0.5
             )
-            for native, cap, expected_input in (
-                (False, 0, (51, 38)),
-                (False, 32, (32, 24)),
-                (True, 0, (101, 75)),
+            for native, full_size, cap, expected_input, expected_output in (
+                (False, False, 0, (51, 38), (51, 38)),
+                (False, False, 32, (32, 24), (51, 38)),
+                (True, False, 0, (101, 75), (51, 38)),
+                (False, True, 0, (101, 75), (101, 75)),
             ):
-                with self.subTest(native=native, cap=cap):
+                with self.subTest(native=native, full_size=full_size, cap=cap):
                     estimator.native = native
                     estimator.max_side = cap
-                    disparity, _ = estimator.estimate(source, focal_px=75.0)
+                    disparity, _ = estimator.estimate(source, focal_px=75.0, full_size=full_size)
                     actual_input = estimator.model.predict_inverse_depth.call_args.args[0]
                     self.assertEqual(tuple(actual_input.shape[-2:]), expected_input)
-                    self.assertEqual(disparity.shape, (51, 38))
+                    self.assertEqual(disparity.shape, expected_output)
                     np.testing.assert_allclose(disparity, 0.5, rtol=1e-6)
+
+    @unittest.skipUnless(find_spec("torch"), "requires PyTorch")
+    def test_query_chunking_keeps_all_keys_in_attention(self) -> None:
+        import torch
+        from torch.nn.attention import SDPBackend, sdpa_kernel
+        from torch.nn.functional import scaled_dot_product_attention
+
+        random = torch.Generator().manual_seed(152)
+        query = torch.randn(1, 3, 17, 16, generator=random)
+        key = torch.randn(1, 3, 29, 16, generator=random)
+        value = torch.randn(1, 3, 29, 16, generator=random)
+        with sdpa_kernel(SDPBackend.MATH):
+            expected = scaled_dot_product_attention(query, key, value)
+            actual = pytorch_depth.query_chunked_attention(query, key, value, score_budget=3 * 29 * 4)
+        torch.testing.assert_close(actual, expected)
+
+    @unittest.skipUnless(
+        find_spec("depth_pro_2") and find_spec("torch"),
+        "requires the optional Depth Pro 2 PyTorch environment",
+    )
+    def test_striped_decoder_keeps_the_native_prediction_at_boundaries(self) -> None:
+        import torch
+        from depth_pro_2 import PRESETS, DepthPro2
+
+        config = PRESETS["depthpro2-s"]
+        with torch.random.fork_rng(devices=[]), torch.inference_mode():
+            torch.manual_seed(152)
+            model = DepthPro2(
+                config.backbone_preset,
+                config.reassembled_blocks,
+                config.cross_frame_blocks,
+                config.dims_reassemble,
+                config.dim_decoder,
+                fov=False,
+            ).eval()
+            model.head[-2].bias.fill_(0.2)
+            for height, width in ((131, 97), (31, 179)):
+                with self.subTest(height=height, width=width):
+                    image = torch.rand(1, 3, height, width)
+                    expected = model.predict_inverse_depth(image)
+                    actual = pytorch_depth.predict_inverse_depth(model, image, stripe_pixels=4096)
+                    self.assertGreater(float(expected.std()), 0)
+                    torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
 
 
 if __name__ == "__main__":
