@@ -29,6 +29,8 @@ The half-resolution mode runs inference at the output size. `--full-size` runs a
 
 For large inputs the backbone keeps global attention. The final decoder layers consume overlapping stripes with the full pixel neighborhood at each stripe boundary. This reduces peak memory at the same resolution and precision. Fused attention is used where supported. PyTorch 2.13 and newer provide fused long-sequence attention on MPS. Older MPS builds use query chunks with all keys and values, which can take longer. Runtime and memory vary by model, device, precision, and padded dimensions. For 32-pixel alignment, the adapter temporarily repeats the last RGB row and column and crops the result to the working image size.
 
+On CPUs with oneDNN enabled, the FP32 stripe decoder combines the head's transposed convolution and following convolution using the original model weights and padding. It performs the combined convolution before upsampling to avoid a large intermediate tensor. The arithmetic stays in FP32, with possible rounding differences from the original accumulation order.
+
 Device selection prefers CUDA, then MPS, then CPU. `--device` and `--precision` override the defaults. CUDA uses BF16 where supported and FP16 otherwise. MPS uses BF16 and CPU uses FP32. Repeat `--input` and `--output` in matching order to process independent images with one model load.
 
 ### Use PyTorch for Apple Portrait

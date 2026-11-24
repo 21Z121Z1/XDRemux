@@ -236,6 +236,7 @@ print(json.dumps({{
             estimator.mean = torch.zeros((1, 3, 1, 1))
             estimator.std = torch.ones((1, 3, 1, 1))
             estimator.memory_format = torch.channels_last
+            estimator.stripe_head = None
             estimator.model = Mock()
             estimator.model.predict_inverse_depth.side_effect = lambda x: torch.full(
                 (1, *x.shape[-2:]), 0.5
@@ -274,6 +275,28 @@ print(json.dumps({{
         find_spec("depth_pro_2") and find_spec("torch"),
         "requires the optional Depth Pro 2 PyTorch environment",
     )
+    def test_fused_inverse_depth_head_matches_original_at_image_edges(self) -> None:
+        import torch
+        from depth_pro_2.network.decoder import create_inverse_depth_head
+
+        random = torch.Generator().manual_seed(841)
+        with torch.random.fork_rng(devices=[]), torch.inference_mode():
+            torch.manual_seed(841)
+            for channels in (64, 128):
+                head = create_inverse_depth_head(channels).eval()
+                head[-2].bias.fill_(0.25)
+                fused = pytorch_depth.FusedInverseDepthHead(head)
+                for shape in ((17, 23), (1, 7), (9, 1)):
+                    with self.subTest(channels=channels, shape=shape):
+                        decoded = torch.randn(1, channels, *shape, generator=random)
+                        expected = head(decoded)
+                        self.assertGreater(float(expected.std()), 0)
+                        torch.testing.assert_close(fused(decoded), expected, rtol=1e-5, atol=1e-6)
+
+    @unittest.skipUnless(
+        find_spec("depth_pro_2") and find_spec("torch"),
+        "requires the optional Depth Pro 2 PyTorch environment",
+    )
     def test_striped_decoder_keeps_the_native_prediction_at_boundaries(self) -> None:
         import torch
         from depth_pro_2 import PRESETS, DepthPro2
@@ -290,13 +313,18 @@ print(json.dumps({{
                 fov=False,
             ).eval()
             model.head[-2].bias.fill_(0.2)
+            fused_head = pytorch_depth.FusedInverseDepthHead(model.head)
             for height, width in ((131, 97), (31, 179)):
                 with self.subTest(height=height, width=width):
                     image = torch.rand(1, 3, height, width)
                     expected = model.predict_inverse_depth(image)
                     actual = pytorch_depth.predict_inverse_depth(model, image, stripe_pixels=4096)
+                    fused = pytorch_depth.predict_inverse_depth(
+                        model, image, stripe_pixels=4096, stripe_head=fused_head
+                    )
                     self.assertGreater(float(expected.std()), 0)
                     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-6)
+                    torch.testing.assert_close(fused, expected, rtol=1e-5, atol=1e-6)
 
 
 if __name__ == "__main__":

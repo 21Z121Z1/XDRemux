@@ -182,7 +182,66 @@ def limit_attention_memory():
     return BoundedAttention()
 
 
-def decode_in_stripes(model, encodings, size, stripe_pixels):
+class FusedInverseDepthHead:
+    """Combine the FP32 transposed convolution and its following 3×3 convolution."""
+
+    def __init__(self, head):
+        import torch
+
+        self.first = head[0]
+        self.finish = head[3:]
+        upsampling, convolution = head[1:3]
+        out_channels = convolution.weight.shape[0]
+        in_channels = upsampling.weight.shape[0]
+
+        with (
+            torch.inference_mode(),
+            torch.autocast(device_type=convolution.weight.device.type, enabled=False),
+        ):
+            # A stride-2 transpose convolution picks a different kernel for
+            # each output phase. Shift the output by one pixel so all four
+            # phases use the same 2×2 neighborhood of input cells.
+            weights = convolution.weight.new_zeros((out_channels, 4, in_channels, 2, 2))
+            for phase_y in range(2):
+                for phase_x in range(2):
+                    phase = 2 * phase_y + phase_x
+                    for row in range(3):
+                        for col in range(3):
+                            y, iy = divmod(phase_y + row - 2, 2)
+                            x, ix = divmod(phase_x + col - 2, 2)
+                            weights[:, phase, :, y + 1, x + 1].add_(
+                                convolution.weight[:, :, row, col]
+                                @ upsampling.weight[:, :, iy, ix].T
+                            )
+            self.weights = weights.flatten(0, 1).contiguous(memory_format=torch.channels_last)
+
+            # The transpose convolution's bias exists only inside the image.
+            # Remove its contribution where the next convolution sees padding.
+            edge = torch.einsum("ocij,c->oij", convolution.weight, upsampling.bias)
+            self.bias = (convolution.bias + edge.sum(dim=(1, 2))).repeat_interleave(4)
+            self.top = edge[:, 0, :].sum(1).view(1, -1, 1)
+            self.bottom = edge[:, 2, :].sum(1).view(1, -1, 1)
+            self.left = edge[:, :, 0].sum(1).view(1, -1, 1)
+            self.right = edge[:, :, 2].sum(1).view(1, -1, 1)
+            self.edge = edge
+
+    def __call__(self, decoded):
+        from torch.nn.functional import conv2d, pixel_shuffle
+
+        phases = conv2d(self.first(decoded), self.weights, self.bias, padding=1)
+        output = pixel_shuffle(phases, 2)[..., 1:-1, 1:-1]
+        del phases
+        output[..., 0, :].sub_(self.top)
+        output[..., -1, :].sub_(self.bottom)
+        output[..., :, 0].sub_(self.left)
+        output[..., :, -1].sub_(self.right)
+        for row, kernel_row in ((0, 0), (-1, 2)):
+            for col, kernel_col in ((0, 0), (-1, 2)):
+                output[..., row, col].add_(self.edge[:, kernel_row, kernel_col])
+        return self.finish(output)
+
+
+def decode_in_stripes(model, encodings, size, stripe_pixels, *, stripe_head=None):
     """Run the highest-resolution fusion and head with the original receptive field."""
     import torch
     from depth_pro_2.network.encoder import autocast_for
@@ -190,6 +249,7 @@ def decode_in_stripes(model, encodings, size, stripe_pixels):
     height, width = size
     decoder = model.decoder
     device = encodings[-1].device
+    head = model.head if stripe_head is None else stripe_head
     # The last fusion consumes the quarter-resolution features. Keep the
     # lower levels whole and release each skip as soon as it is used.
     with autocast_for(device, model.precision)():
@@ -213,7 +273,7 @@ def decode_in_stripes(model, encodings, size, stripe_pixels):
             decoded = decoder.fusions[0](fused.narrow(axis, left, right - left), skip)
             del skip
             with torch.autocast(device_type=device.type, enabled=False):
-                prediction = model.head(decoded.float())
+                prediction = head(decoded.float())
             del decoded
             offset = (start - left) * 4
             count = min(end * 4, pixel_extent) - start * 4
@@ -224,7 +284,7 @@ def decode_in_stripes(model, encodings, size, stripe_pixels):
     return output[:, 0]
 
 
-def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS):
+def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS, stripe_head=None):
     from depth_pro_2.model import INPUT_MULTIPLE
     from depth_pro_2.network.encoder import autocast_for
     from torch.nn.functional import pad
@@ -241,7 +301,9 @@ def predict_inverse_depth(model, x, *, stripe_pixels=DECODER_STRIPE_PIXELS):
     with autocast_for(x.device, model.precision)():
         encodings = model.encoder.reassemble_tokens(features, grid)
     del x, features
-    return decode_in_stripes(model, encodings, (height, width), stripe_pixels)
+    return decode_in_stripes(
+        model, encodings, (height, width), stripe_pixels, stripe_head=stripe_head
+    )
 
 
 class DepthEstimator:
@@ -292,6 +354,14 @@ class DepthEstimator:
         if self.memory_format == torch.channels_last:
             convert_conv2d_weight_memory_format(model, torch.channels_last)
         self.model = model.to(self.device).eval()
+        self.stripe_head = None
+        if (
+            self.device.type == "cpu"
+            and self.precision == torch.float32
+            and torch.backends.mkldnn.is_available()
+            and torch.backends.mkldnn.enabled
+        ):
+            self.stripe_head = FusedInverseDepthHead(self.model.head)
         self.fov = None
         self.weights_sha256 = None
         self.native = args.native
@@ -369,7 +439,9 @@ class DepthEstimator:
             )
             if not math.isfinite(ratio) or ratio <= 0.0:
                 raise ValueError("invalid focal length for depth estimation")
-            inverse_depth = predict_inverse_depth(self.model, x).unsqueeze(1)
+            inverse_depth = predict_inverse_depth(
+                self.model, x, stripe_head=self.stripe_head
+            ).unsqueeze(1)
             del x
             target = display_output[::-1]
             if target != inverse_depth.shape[-2:]:
