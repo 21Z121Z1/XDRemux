@@ -114,7 +114,7 @@ The separate `model_adapters/geocalib/` component is a runtime ML primitive, out
 | `tests/` | Python regressions, repository policy tests, verification self-tests, and small synthetic fixtures. |
 | `fixtures/` | Versioned real media used by strict validation checks. |
 | `scripts/` | [Repository automation](../scripts/README.en.md) for CI, validation, Apple checks, diagnostics, distribution, and performance. |
-| `docs/` | Current guidance and validation records. Historical audits are in `docs/history/`. |
+| `docs/` | Current guidance and validation records. |
 | `research/` | OPPO Styles, Texture Styles, video Styles, and Palette investigations. |
 | `benchmarks/` | Versioned performance baselines. Generated measurements remain separate. |
 | `research/oppo_styles/models/` | Optional research models and their documentation. |

@@ -31,8 +31,6 @@
 
 ## 使用项目技能
 
-按适用条件使用 [pstack 流程](.agents/skills/pstack-workflow/SKILL.md)、[行为 TDD](.agents/skills/pstack-tdd/SKILL.md)、[工程原则](.agents/skills/pstack-engineering-principles/SKILL.md)、[审查](.agents/skills/pstack-review/SKILL.md)和[文字整理](.agents/skills/pstack-unslop/SKILL.md)。这些技能是固定来源版本的项目适配，不依赖 Cursor 运行环境。
-
 实际 CLI 操作与证据选择见 [XDRemux 验证](.agents/skills/xdremux-verify/SKILL.md)。
 
 | 契约 | 现有检查 |

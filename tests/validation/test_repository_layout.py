@@ -65,7 +65,7 @@ class RepositoryLayoutTests(unittest.TestCase):
     def test_current_commands_do_not_use_pre_migration_test_paths(self) -> None:
         stale = re.compile(r"\bdiscover\b[^\n]*\s-s\s+Tests\b|(?<![\w/])Tests/fixtures/")
         for path in sorted(self.paths):
-            if not path.endswith((".md", ".sh", ".yml")) or path.startswith("docs/history/"):
+            if not path.endswith((".md", ".sh", ".yml")):
                 continue
             with self.subTest(path=path):
                 self.assertIsNone(stale.search((ROOT / path).read_text(encoding="utf-8")))
@@ -73,7 +73,7 @@ class RepositoryLayoutTests(unittest.TestCase):
     def test_active_document_links_resolve_with_exact_case(self) -> None:
         link = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)\)")
         for path in sorted(self.paths):
-            if not path.endswith(".md") or path == "docs/history/iso-conformance-audit-20260511.md":
+            if not path.endswith(".md"):
                 continue
             for target in link.findall((ROOT / path).read_text(encoding="utf-8")):
                 url = urlsplit(target.strip("<>"))
