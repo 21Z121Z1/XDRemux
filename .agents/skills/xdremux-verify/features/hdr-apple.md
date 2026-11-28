@@ -9,7 +9,6 @@ Check the relevant behavior:
 - HDR reconstruction and coded or display orientation.
 - Complete Styles/Texture or Portrait resources.
 - Cinematic pending-state recognition.
-- The macOS app's switch for the same product feature.
 - Preservation of published output when required checks fail.
 
 ## Use the public entry points
@@ -44,7 +43,6 @@ For the affected profile, run `bash scripts/apple/check_rust_cli_apple_portrait.
 
 Use the current `docs/cinematic.en.md` procedure and existing `scripts/apple/verify_cinematic_envelope.py`. Preserve the distinction between pending-state recognition and native preprocessing.
 
-For app changes, run `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh`. Also exercise the affected entry point in the actual app.
 
 ### System Gain Map experiment
 

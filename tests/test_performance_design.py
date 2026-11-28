@@ -114,17 +114,6 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertIn("$(sw_vers -productVersion) ($(uname -m))", workflow)
         self.assertIn("not treated as an RGB 4:4:4 Gain Map backend", workflow)
 
-    def test_app_queue_status_projection_avoids_filter_arrays(self) -> None:
-        source = self.source("apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift")
-        self.assertNotIn("queue.filter { $0.status.isTerminal }.count", source)
-        for status in (
-            ".pending", ".running", ".converted", ".skippedExisting", ".failed", ".cancelled"
-        ):
-            self.assertNotIn(f"queue.filter {{ $0.status == {status} }}.count", source)
-        self.assertNotIn("queue.firstIndex(where: { $0.id == item.id })", source)
-        self.assertIn("struct ConversionQueueStatusCounts", source)
-        self.assertIn("queueIndexByID.reserveCapacity(queue.count)", source)
-
 
 if __name__ == "__main__":
     unittest.main()

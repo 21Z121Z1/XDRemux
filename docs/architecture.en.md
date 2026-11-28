@@ -17,7 +17,6 @@ This document explains ownership and output safety. For commands, use the [CLI r
 | LibLivePhoto | Provide the portable Motion Photo and Live Photo format implementation. |
 | `Sources/XDRemuxAppleAdapter/` | Call Apple frameworks and return observations through the Rust-defined protocol. |
 | `Sources/XDTextureNative/` and `Sources/XDCinematicNative/` | Implement native Texture and Cinematic operations for the adapter. |
-| `apps/macos/XDRemuxApp/` | Present the Mac interface and invoke the product operations. |
 | `xdremux_py/` | Provide research and training tools outside the product runtime. |
 
 ### Rust product stack

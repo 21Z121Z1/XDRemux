@@ -29,7 +29,7 @@ STYLE_PRODUCT = RUST_BUILD + SWIFT_BUILD + (
 RESEARCH = {
     "portable-evidence": RUST_BUILD + SWIFT_BUILD + (
         "tests/**", "research/**", "scripts/**", "xdremux_py/**",
-        "model_adapters/**", "crates/**", "Sources/**", "apps/**",
+        "model_adapters/**", "crates/**", "Sources/**",
         "pyproject.toml", ".gitignore",
     ),
     "video-carrier": ("research/video_styles/**", "tests/test_video_style*.py"),

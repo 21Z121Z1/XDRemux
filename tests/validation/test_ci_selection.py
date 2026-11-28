@@ -81,7 +81,7 @@ class CheckSelectionTests(unittest.TestCase):
         for name in ("rust-workspace-tests", "apple-capability-adapter-handshake",
                      "rust-driven-apple-portrait-cli", "rust-driven-oppo-native-portrait-cli",
                      "rust-driven-apple-styles-consumer", "rust-native-texture-and-app-switch",
-                     "oriented-heif-imageio-readback", "macos-app-models",
+                     "oriented-heif-imageio-readback",
                      "rust-component-conformance", "engine-plan-vectors",
                      "rust-motion-photo-real-fixtures"):
             self.assertIn(name, checks)

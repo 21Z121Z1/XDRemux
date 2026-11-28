@@ -190,15 +190,6 @@ def main():
                 run([cli,'batch','--input',fixture,'--output-dir',batch,'--apple-styles','--jobs','2','--json'],case/'batch.log',env)
                 paths=list(batch.glob('*.heic'));assert len(paths)==1
                 facts=check(paths[0],baseline,adapter,case);facts['entry_point']='batch';summary['cases'].append(facts)
-                app_smoke=out/'app-texture-smoke'
-                app=ROOT/'apps/macos/XDRemuxApp'
-                run(['swiftc','-O','-parse-as-library',app/'Sources/AppModels.swift',
-                     app/'Sources/HDRLookViewModel.swift',
-                     app/'Sources/RustCLIClient.swift',app/'Sources/RustAppConversionBridge.swift',
-                     app/'Tests/XDRemuxAppTextureSmoke.swift','-o',app_smoke],case/'app-build.log')
-                app_output=case/'app-styles-texture.heic'
-                run([app_smoke,fixture,baseline,app_output],case/'app-bridge.log',{**env,'XDREMUX_CLI':str(cli)})
-                facts=check(app_output,baseline,adapter,case);facts['entry_point']='app';summary['cases'].append(facts)
                 sentinel=case/'existing.heic';sentinel.write_bytes(b'previous published output')
                 failing={**env,'XDREMUX_TEXTURE_INJECT_FAILURE':'texture-infer'}
                 run([cli,'convert','--input',fixture,'--output',sentinel,'--apple-styles'],case/'expected-failure.log',failing,success=False)

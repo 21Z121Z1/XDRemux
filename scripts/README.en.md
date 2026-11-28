@@ -31,7 +31,7 @@ Packaging checks each bundled Mach-O file's architecture and deployment target. 
 
 ## Keep tools with their owner
 
-App build and model-test launchers belong beside the Xcode project in [`apps/macos/XDRemuxApp/scripts/`](../apps/macos/XDRemuxApp/scripts/). Research training and export tools belong to their research area, such as [`research/oppo_styles/tools/`](../research/oppo_styles/tools/).
+Research training and export tools belong to their research area, such as [`research/oppo_styles/tools/`](../research/oppo_styles/tools/).
 
 Python regressions belong in [`tests/`](../tests/README.en.md). Real media belongs in [`fixtures/`](../fixtures/README.en.md). Small synthetic vectors belong in `tests/fixtures/`. Save generated reports in the ignored `artifacts/` directory.
 

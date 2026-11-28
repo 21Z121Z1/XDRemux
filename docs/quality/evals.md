@@ -20,7 +20,7 @@
 
 ## 选择现有脚本
 
-可移植验证脚本位于 `scripts/validation/`。App 模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
+可移植验证脚本位于 `scripts/validation/`。
 
 | 脚本 | 用途 |
 | --- | --- |
@@ -28,7 +28,6 @@
 | `scripts/validation/verify_error_messages.sh` | 通过实际 CLI 检查部分帮助和错误行为。 |
 | `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复执行带分类输出的批量转换。 |
 | `scripts/validation/verify_validate_only_harness.sh` | 检查仅验证模式的行为。 |
-| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 在 macOS 上构建并运行 App 模型测试。 |
 
 根据修改影响的行为选择证据：
 

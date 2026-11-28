@@ -45,9 +45,7 @@ and failures are displayed in the terminal; `--json` emits them to stdout.
 Originals and existing destinations are preserved. Folder discovery skips
 symlinks and generated HDR-look files. A failed photo does not stop the batch;
 any failure produces a nonzero exit status. Requires supported embedded Styles
-data, Apple Silicon and macOS 27 or newer. Missing data fails explicitly. The
-macOS app's **摄影风格 HDR** workspace uses this same command for photo/folder
-selection, headroom and output-directory choices.
+data, Apple Silicon and macOS 27 or newer. Missing data fails explicitly.
 
 See [Styles HDR reconstruction](styles-reconstruction.en.md) for algorithm and
 native-readback limits. The separate research command below retains its full
