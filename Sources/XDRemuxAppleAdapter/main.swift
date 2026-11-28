@@ -36,6 +36,8 @@ private struct AdapterRequest: Decodable {
     let cinematicEnvelope: CinematicEnvelopeRequest?
     let texture: TexturePrimitiveRequest?
     let systemHeifHdr: SystemHeifHdrRequest?
+    let depthPro2Disparity: DepthPro2DisparityRequest?
+    let depthPro2Camera: DepthPro2CameraRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -55,6 +57,8 @@ private struct AdapterRequest: Decodable {
         case cinematicEnvelope = "cinematic_envelope"
         case texture
         case systemHeifHdr = "system_heif_hdr"
+        case depthPro2Disparity = "depthpro2_disparity"
+        case depthPro2Camera = "depthpro2_camera"
     }
 }
 
@@ -266,6 +270,8 @@ private struct AdapterResponse: Encodable {
     let sceneClassification: VisionSceneClassificationFacts?
     let cinematicEnvelope: CinematicEnvelopeFacts?
     let systemHeifHdr: SystemHeifHdrFacts?
+    let depthPro2Disparity: DepthPro2DisparityFacts?
+    let depthPro2Camera: DepthPro2CameraEstimateFacts?
 
     init(
         schemaVersion: Int,
@@ -279,7 +285,9 @@ private struct AdapterResponse: Encodable {
         videoToolboxMain10: VideoToolboxMain10Facts? = nil,
         sceneClassification: VisionSceneClassificationFacts? = nil,
         cinematicEnvelope: CinematicEnvelopeFacts? = nil,
-        systemHeifHdr: SystemHeifHdrFacts? = nil
+        systemHeifHdr: SystemHeifHdrFacts? = nil,
+        depthPro2Disparity: DepthPro2DisparityFacts? = nil,
+        depthPro2Camera: DepthPro2CameraEstimateFacts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -293,6 +301,8 @@ private struct AdapterResponse: Encodable {
         self.sceneClassification = sceneClassification
         self.cinematicEnvelope = cinematicEnvelope
         self.systemHeifHdr = systemHeifHdr
+        self.depthPro2Disparity = depthPro2Disparity
+        self.depthPro2Camera = depthPro2Camera
     }
 
     enum CodingKeys: String, CodingKey {
@@ -308,6 +318,8 @@ private struct AdapterResponse: Encodable {
         case sceneClassification = "scene_classification"
         case cinematicEnvelope = "cinematic_envelope"
         case systemHeifHdr = "system_heif_hdr"
+        case depthPro2Disparity = "depthpro2_disparity"
+        case depthPro2Camera = "depthpro2_camera"
     }
 }
 
@@ -1137,6 +1149,41 @@ private func encodedResponse(for input: Data) throws -> Data {
             gainMap: nil,
             imageProperties: nil,
             semanticMasks: nil
+        )
+    case "depthpro2-disparity":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.depthPro2Disparity else {
+            fail("depthpro2-disparity requires input_path, output_path, and depthpro2_disparity")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            depthPro2Disparity: try runDepthPro2Disparity(
+                inputPath: inputPath,
+                outputPath: outputPath,
+                configuration: configuration
+            )
+        )
+    case "depthpro2-camera-estimate":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty else {
+            fail("depthpro2-camera-estimate requires input_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            depthPro2Camera: try runDepthPro2CameraEstimate(
+                inputPath: inputPath,
+                configuration: request.depthPro2Camera
+            )
         )
     default:
         fail("unsupported apple adapter operation \(request.operation)")

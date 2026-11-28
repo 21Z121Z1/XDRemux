@@ -1314,6 +1314,94 @@ fn run_convert(
     let asset = match probe_bytes(&source) {
         Ok(value) => value,
         Err(error) => {
+            #[cfg(target_os = "macos")]
+            let is_heif_container = source.len() >= 12
+                && &source[4..8] == b"ftyp"
+                && matches!(&source[8..12], b"heic" | b"heix" | b"mif1");
+            #[cfg(target_os = "macos")]
+            if arguments.product.apple_portrait
+                && !arguments.product.apple_portrait_oppo
+                && (xdremux_runtime::analyze_iso_heif(&source).is_ok() || is_heif_container)
+            {
+                if let Some(path) = &output {
+                    if let Err(err) = xdremux_runtime::validate_still_output_path(path) {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {err}", "错误：{err}")
+                        );
+                        return 1;
+                    }
+                }
+                let adapter = match resolve_apple_adapter_executable() {
+                    Ok(path) => path,
+                    Err(adapter_error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(language, "error: {adapter_error}", "错误：{adapter_error}")
+                        );
+                        return 1;
+                    }
+                };
+                let output = output.unwrap_or_else(|| input.clone());
+                return match runtime.convert_apple_portrait_file_with_profile(
+                    &adapter,
+                    &source,
+                    &output,
+                    apple_portrait_profile,
+                ) {
+                    Ok(receipt) if receipt.output == input => {
+                        if writeln!(
+                            stdout,
+                            "{}",
+                            message!(
+                                language,
+                                "converted: {} (in place)",
+                                "已转换：{}（原地替换）",
+                                input.display()
+                            )
+                        )
+                        .is_err()
+                        {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    Ok(receipt) => {
+                        if writeln!(
+                            stdout,
+                            "{}",
+                            message!(
+                                language,
+                                "converted: {} -> {}",
+                                "已转换：{} -> {}",
+                                input.display(),
+                                receipt.output.display()
+                            )
+                        )
+                        .is_err()
+                        {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    Err(portrait_error) => {
+                        let _ = writeln!(
+                            stderr,
+                            "{}",
+                            message!(
+                                language,
+                                "error: {portrait_error}",
+                                "错误：{portrait_error}"
+                            )
+                        );
+                        1
+                    }
+                };
+            }
             // A standalone ISO dual-layer HEIF has no vendor extension block,
             // so vendor detection fails before the standard graph is tried.
             if xdremux_runtime::analyze_iso_heif(&source).is_ok() {

@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use xdremux_engine::{
     apple_style_scene_scores_from_vision_observations, AppleAuxiliaryKind, AppleAuxiliaryPayload,
     AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleL8Mask, AppleMetadataValue,
-    AppleSemanticRole, AppleStyleSceneScores, AppleVisionClassificationObservation,
-    OperationCapability,
+    ApplePortraitDisparity, AppleSemanticRole, AppleStyleSceneScores,
+    AppleVisionClassificationObservation, OperationCapability,
 };
 use xdremux_format::FourCC;
 
@@ -30,7 +30,9 @@ pub(super) mod texture;
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
+pub(super) const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
+// Depth inference from a 50 MP source can take tens of minutes on a CPU.
+pub(super) const PYTORCH_DEPTHPRO2_TIMEOUT: Duration = Duration::from_secs(3600);
 const PIPE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const PROCESS_REAP_BUDGET: Duration = Duration::from_millis(250);
 const MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;
@@ -99,6 +101,42 @@ pub(super) struct AppleCinematicEnvelopeFacts {
     pub focal_length_35mm: f32,
     pub aperture: f32,
     pub disparity_track_written: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub(super) struct DepthPro2DisparityFacts {
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: u32,
+    pub min_disparity: f32,
+    pub max_disparity: f32,
+    pub p05_disparity: f32,
+    pub p50_disparity: f32,
+    pub p95_disparity: f32,
+    pub model_id: String,
+    pub weights_sha256: String,
+    pub focal_length_35mm: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub(super) struct DepthPro2CameraSampleFacts {
+    pub time_seconds: f64,
+    pub image_size: [u32; 2],
+    pub focal_length_pixels: [f64; 2],
+    pub principal_point_pixels: [f64; 2],
+    pub focal_uncertainty_pixels: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub(super) struct DepthPro2CameraEstimateFacts {
+    pub estimator_name: String,
+    pub revision: String,
+    pub weights_sha256: String,
+    pub equivalent_focal_length_35mm: f64,
+    pub horizontal_fov_degrees: f64,
+    pub vertical_fov_degrees: f64,
+    pub samples: Vec<DepthPro2CameraSampleFacts>,
+    pub shared_intrinsics: Option<DepthPro2CameraSampleFacts>,
 }
 
 pub(super) struct AppleVideoToolboxMain10Encode<'a> {
@@ -1261,6 +1299,208 @@ impl AppleAdapterClient {
         Ok(masks)
     }
 
+    pub(super) fn vision_foreground_matte(
+        &self,
+        input: &Path,
+        orientation: Option<u32>,
+    ) -> Result<AppleL8Mask> {
+        let output_directory = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Apple Vision foreground directory", error))?;
+        let output = self.invoke_request_with_timeout(
+            AdapterRequest {
+                schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+                operation: "vision-semantic-mattes".to_owned(),
+                input_path: Some(input_path(input)?),
+                output_path: Some(input_path(output_directory.path())?),
+                roles: Some(vec!["foreground".to_owned()]),
+                orientation,
+                metadata_source_path: None,
+                lossy_quality: None,
+            },
+            APPLE_COMPUTE_TIMEOUT,
+        )?;
+        let response: SemanticResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let wire = response
+            .semantic_masks
+            .into_iter()
+            .find(|item| item.role == "foreground")
+            .ok_or_else(|| {
+                RuntimeError::new(
+                    "Apple Vision foreground matte",
+                    "adapter omitted foreground mask",
+                )
+            })?;
+        if FourCC::new(wire.pixel_format.to_be_bytes()) != FourCC::new(*b"L008") {
+            return Err(RuntimeError::new(
+                "Apple Vision foreground matte",
+                "foreground mask is not L008",
+            ));
+        }
+        if wire.width == 0 || wire.height == 0 {
+            return Err(RuntimeError::new(
+                "Apple Vision foreground matte",
+                "foreground mask has zero geometry",
+            ));
+        }
+        let expected_bytes = usize::try_from(wire.width)
+            .ok()
+            .and_then(|width| {
+                usize::try_from(wire.height)
+                    .ok()
+                    .and_then(|height| width.checked_mul(height))
+            })
+            .ok_or_else(|| {
+                RuntimeError::new(
+                    "Apple Vision foreground matte",
+                    "foreground mask geometry overflows",
+                )
+            })?;
+        if expected_bytes > MAX_APPLE_L8_MASK_BYTES {
+            return Err(RuntimeError::new(
+                "Apple Vision foreground matte",
+                "foreground mask exceeds safety limit",
+            ));
+        }
+        let path = output_directory.path().join("foreground.l8");
+        let pixels = fs::read(&path)
+            .map_err(|error| RuntimeError::external("Apple Vision foreground mask read", error))?;
+        AppleL8Mask::new(wire.width, wire.height, pixels)
+            .map_err(|error| RuntimeError::external("Apple Vision foreground mask", error))
+    }
+
+    pub(super) fn depthpro2_disparity(
+        &self,
+        input: &Path,
+        target_width: u32,
+        target_height: u32,
+        orientation: u8,
+        focal_length_35mm: Option<f64>,
+        timeout: Duration,
+    ) -> Result<(ApplePortraitDisparity, DepthPro2DisparityFacts)> {
+        if target_width == 0 || target_height == 0 {
+            return Err(RuntimeError::new(
+                "Depth Pro 2 disparity",
+                "disparity geometry must be non-zero",
+            ));
+        }
+        let sidecars = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Depth Pro 2 disparity staging", error))?;
+        let output_path = sidecars.path().join("disparity.hdis");
+        let request = DepthPro2DisparityRequestWire {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "depthpro2-disparity",
+            input_path: input_path(input)?,
+            output_path: input_path(&output_path)?,
+            depthpro2_disparity: DepthPro2DisparityConfigWire {
+                target_width,
+                target_height,
+                orientation: Some(u32::from(orientation)),
+                focal_length_35mm,
+            },
+        };
+        let encoded = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&encoded, timeout)?;
+        let response: DepthPro2DisparityResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let facts = response.depthpro2_disparity;
+        if FourCC::new(facts.pixel_format.to_be_bytes()) != FourCC::new(*b"hdis") {
+            return Err(RuntimeError::new(
+                "Depth Pro 2 disparity",
+                "adapter returned non-hdis disparity format",
+            ));
+        }
+        if facts.width != target_width || facts.height != target_height {
+            return Err(RuntimeError::new(
+                "Depth Pro 2 disparity",
+                format!(
+                    "adapter returned {}x{}; expected {}x{}",
+                    facts.width, facts.height, target_width, target_height
+                ),
+            ));
+        }
+        let expected_bytes = usize::try_from(target_width)
+            .ok()
+            .and_then(|width| {
+                usize::try_from(target_height)
+                    .ok()
+                    .and_then(|height| width.checked_mul(height).and_then(|n| n.checked_mul(2)))
+            })
+            .ok_or_else(|| {
+                RuntimeError::new("Depth Pro 2 disparity", "disparity byte size overflows")
+            })?;
+        let mut pixels_le_f16 = Vec::new();
+        fs::File::open(&output_path)
+            .and_then(|file| {
+                file.take(expected_bytes as u64 + 1)
+                    .read_to_end(&mut pixels_le_f16)
+            })
+            .map_err(|error| RuntimeError::external("Depth Pro 2 disparity read", error))?;
+        if pixels_le_f16.len() != expected_bytes {
+            return Err(RuntimeError::new(
+                "Depth Pro 2 disparity",
+                format!(
+                    "disparity buffer has {} bytes; expected {expected_bytes}",
+                    pixels_le_f16.len()
+                ),
+            ));
+        }
+        let far = if facts.min_disparity.is_finite() {
+            facts.min_disparity.max(0.0)
+        } else {
+            0.0
+        };
+        let near = if facts.max_disparity.is_finite() && facts.max_disparity > far {
+            facts.max_disparity
+        } else {
+            far + 1e-3
+        };
+        Ok((
+            ApplePortraitDisparity {
+                width: facts.width,
+                height: facts.height,
+                far,
+                near,
+                pixels_le_f16,
+            },
+            facts,
+        ))
+    }
+
+    pub(super) fn depthpro2_camera_estimate(
+        &self,
+        input: &Path,
+        sample_count: Option<u32>,
+    ) -> Result<DepthPro2CameraEstimateFacts> {
+        let request = DepthPro2CameraRequestWire {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "depthpro2-camera-estimate",
+            input_path: input_path(input)?,
+            depthpro2_camera: sample_count.map(|count| DepthPro2CameraConfigWire {
+                sample_count: Some(count),
+            }),
+        };
+        let encoded = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&encoded, APPLE_COMPUTE_TIMEOUT)?;
+        let response: DepthPro2CameraResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let facts = response.depthpro2_camera;
+        if !facts.equivalent_focal_length_35mm.is_finite()
+            || facts.equivalent_focal_length_35mm <= 0.0
+        {
+            return Err(RuntimeError::new(
+                "Depth Pro 2 FOV",
+                "returned invalid 35mm-equivalent focal length",
+            ));
+        }
+        Ok(facts)
+    }
+
     fn invoke_request(&self, request: AdapterRequest) -> Result<Vec<u8>> {
         self.invoke_request_with_timeout(request, self.timeout)
     }
@@ -1693,6 +1933,52 @@ struct CinematicEnvelopeResponseFacts {
     focal_length_35mm: f32,
     aperture: f32,
     disparity_track_written: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct DepthPro2DisparityRequestWire {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    depthpro2_disparity: DepthPro2DisparityConfigWire,
+}
+
+#[derive(Debug, Serialize)]
+struct DepthPro2DisparityConfigWire {
+    target_width: u32,
+    target_height: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orientation: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    focal_length_35mm: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DepthPro2DisparityResponse {
+    schema_version: u32,
+    depthpro2_disparity: DepthPro2DisparityFacts,
+}
+
+#[derive(Debug, Serialize)]
+struct DepthPro2CameraRequestWire {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    depthpro2_camera: Option<DepthPro2CameraConfigWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct DepthPro2CameraConfigWire {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sample_count: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DepthPro2CameraResponse {
+    schema_version: u32,
+    depthpro2_camera: DepthPro2CameraEstimateFacts,
 }
 
 #[derive(Debug, Serialize)]

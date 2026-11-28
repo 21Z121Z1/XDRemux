@@ -245,7 +245,7 @@ This profile generates no skin, teeth, or glasses masks and makes no Vision requ
 
 The profile still requires public ImageIO and Core Image APIs on macOS. It is not a Linux or Windows Portrait writer. Photos editing depends on the consumer and OS version.
 
-`--apple-portrait` requests the complete resource set with Vision semantics for supported ProXDR stills. Missing required OPPO depth or source data causes failure before publication.
+`--apple-portrait` requests the complete resource set with Vision semantics. It uses OPPO depth when present. Supported 4:3 and 3:4 ProXDR and ISO Gain Map stills can also use locally installed Depth Pro 2 weights. Set `XDREMUX_DEPTHPRO2_PYTORCH` to the PyTorch launcher path to select that backend. [Depth Pro 2 installation](../model_adapters/depthpro2/README.en.md)
 
 ### Apple Styles on a Motion Photo
 

@@ -114,3 +114,51 @@ fn canonical_portrait_file_transaction_publishes_only_after_rust_and_imageio_val
         "staging files must not escape the transaction"
     );
 }
+
+#[test]
+fn depthpro2_portrait_transaction_converts_non_depth_four_by_three_proxdr_when_models_exist() {
+    let Some(executable) = adapter_executable() else {
+        return;
+    };
+    let models_dir = std::env::var_os("XDREMUX_MODEL_DIR")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| {
+                PathBuf::from(home)
+                    .join("Library")
+                    .join("Application Support")
+                    .join("XDRemux")
+                    .join("Models")
+            })
+        });
+    let Some(models_dir) = models_dir else {
+        return;
+    };
+    let has_disparity_model = ["depthpro2-b_w4.mlpackage", "depthpro2-s_w4.mlpackage"]
+        .iter()
+        .any(|name| models_dir.join(name).join("Manifest.json").is_file());
+    let has_license = models_dir
+        .join(".apple-amlr-license-accepted.json")
+        .is_file();
+    if !(has_disparity_model && has_license) {
+        return;
+    }
+
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic");
+    let source = fs::read(&fixture).expect("read committed 4:3 ProXDR fixture");
+    let temporary = tempfile::tempdir().expect("create Depth Pro 2 Portrait output directory");
+    let output = temporary.path().join("portrait-depthpro2.heic");
+
+    let receipt = PortableRuntime::new()
+        .convert_apple_portrait_file(&executable, &source, &output)
+        .expect("Rust must convert 4:3 non-depth ProXDR through Depth Pro 2 + ImageIO");
+
+    assert_eq!(receipt.output, output);
+    assert!(receipt.auxiliary.satisfies_portrait_editing());
+    assert!(output.is_file());
+    assert!(xdremux_heif::validate_gain_map_structure(
+        &fs::read(&output).expect("read Depth Pro 2 Portrait output")
+    )
+    .is_ok());
+}

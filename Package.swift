@@ -30,7 +30,13 @@ let package = Package(
         .executableTarget(
             name: "XDRemuxAppleAdapter",
             dependencies: ["XDStylesNative", "XDCinematicNative", "XDTextureNative"],
-            path: "Sources/XDRemuxAppleAdapter"
+            path: "Sources/XDRemuxAppleAdapter",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("CoreML"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalPerformanceShaders"),
+            ]
         ),
         .target(
             name: "XDTextureNative",
