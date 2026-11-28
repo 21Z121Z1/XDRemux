@@ -1,4 +1,5 @@
 use crate::i18n::{message, Language};
+use crate::CliOutcome;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
@@ -314,7 +315,7 @@ pub(crate) fn run(
     arguments: ValidateArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let profile = if let Some(name) = &arguments.hdr_profile {
         GainMapValidationProfile::Bt2020 {
             transfer: if name == "bt2020-pq" {
@@ -373,9 +374,9 @@ pub(crate) fn run(
                         "错误：无法写入验证结果：{error}"
                     )
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
-            0
+            CliOutcome::Success
         }
         Err(error) if arguments.json => {
             let value = json!({
@@ -396,7 +397,7 @@ pub(crate) fn run(
                     )
                 );
             }
-            1
+            CliOutcome::Failure
         }
         Err(error) => {
             let _ = writeln!(
@@ -404,7 +405,7 @@ pub(crate) fn run(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            1
+            CliOutcome::Failure
         }
     }
 }

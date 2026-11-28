@@ -31,6 +31,31 @@ use xdremux_source::{
     SourceInspection,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CliOutcome {
+    Success,
+    Failure,
+    Usage,
+}
+
+impl CliOutcome {
+    pub(crate) const fn exit_code(self) -> u8 {
+        match self {
+            Self::Success => 0,
+            Self::Failure => 1,
+            Self::Usage => 2,
+        }
+    }
+
+    pub(crate) const fn from_success(success: bool) -> Self {
+        if success {
+            Self::Success
+        } else {
+            Self::Failure
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "xdremux",
@@ -323,9 +348,13 @@ fn write_clap_error(
     error: clap::Error,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let kind = error.kind();
-    let code = u8::try_from(error.exit_code()).unwrap_or(2);
+    let outcome = match error.exit_code() {
+        0 => CliOutcome::Success,
+        1 => CliOutcome::Failure,
+        _ => CliOutcome::Usage,
+    };
     let rendered = if language == Language::ZhCn
         && !matches!(kind, ErrorKind::DisplayHelp | ErrorKind::DisplayVersion)
     {
@@ -347,9 +376,9 @@ fn write_clap_error(
         write!(stderr, "{rendered}")
     };
     if result.is_err() {
-        return 1;
+        return CliOutcome::Failure;
     }
-    code
+    outcome
 }
 
 /// Describe the HDR metadata the conversion carried from the source.
@@ -398,14 +427,14 @@ fn parse_cli(args: impl IntoIterator<Item = OsString>) -> Result<Cli, clap::Erro
     parse_cli_language(args, Language::En)
 }
 
-fn write_root_help(language: Language, stdout: &mut impl Write) -> u8 {
+fn write_root_help(language: Language, stdout: &mut impl Write) -> CliOutcome {
     let mut command = i18n::command(Cli::command(), language);
     match command
         .write_long_help(&mut *stdout)
         .and_then(|()| writeln!(stdout))
     {
-        Ok(()) => 0,
-        Err(_) => 1,
+        Ok(()) => CliOutcome::Success,
+        Err(_) => CliOutcome::Failure,
     }
 }
 
@@ -560,7 +589,7 @@ fn run_inspect(
     json: bool,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let inspection = match inspect_path(&input) {
         Ok(value) => value,
         Err(error) => {
@@ -569,7 +598,7 @@ fn run_inspect(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     };
 
@@ -590,9 +619,9 @@ fn run_inspect(
                 "错误：无法写入输出：{error}"
             )
         );
-        return 1;
+        return CliOutcome::Failure;
     }
-    0
+    CliOutcome::Success
 }
 
 /// Convert a standalone ISO dual-layer HEIF through the standard graph path.
@@ -604,7 +633,7 @@ fn convert_iso_heif(
     request: ConversionRequest,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let output = output.cloned().unwrap_or_else(|| input.to_path_buf());
     let request = ConversionRequest {
         container: container_for_output(&output),
@@ -619,7 +648,7 @@ fn convert_iso_heif(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     };
     let printed = if output == input {
@@ -650,7 +679,7 @@ fn convert_iso_heif(
         let _ = writeln!(stdout, "{line}");
     }
     match printed {
-        Ok(()) => 0,
+        Ok(()) => CliOutcome::Success,
         Err(error) => {
             let _ = writeln!(
                 stderr,
@@ -661,7 +690,7 @@ fn convert_iso_heif(
                     "错误：无法写入输出：{error}"
                 )
             );
-            1
+            CliOutcome::Failure
         }
     }
 }
@@ -809,7 +838,7 @@ fn emit_android_motion_receipt(
     receipt: AndroidMotionPhotoFileReceipt,
     json_report: bool,
     stdout: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     if json_report {
         let resources = receipt
             .resources
@@ -869,9 +898,9 @@ fn emit_android_motion_receipt(
             "motion_video_copies": 1,
         });
         if serde_json::to_writer_pretty(&mut *stdout, &document).is_err() {
-            return 1;
+            return CliOutcome::Failure;
         }
-        return if writeln!(stdout).is_ok() { 0 } else { 1 };
+        return CliOutcome::from_success(writeln!(stdout).is_ok());
     }
     if writeln!(
         stdout,
@@ -886,7 +915,7 @@ fn emit_android_motion_receipt(
     )
     .is_err()
     {
-        return 1;
+        return CliOutcome::Failure;
     }
     let carried = if receipt.vendor_metadata.carried_attributes.is_empty() {
         message!(language, "none", "无")
@@ -907,9 +936,9 @@ fn emit_android_motion_receipt(
     )
     .is_ok()
     {
-        0
+        CliOutcome::Success
     } else {
-        1
+        CliOutcome::Failure
     }
 }
 
@@ -1018,9 +1047,9 @@ fn plan_cli_motion(
     plan
 }
 
-fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> u8 {
+fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> CliOutcome {
     if accept {
-        return 0;
+        return CliOutcome::Success;
     }
     if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         let _ = writeln!(
@@ -1036,7 +1065,7 @@ fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> 
         if std::io::stdin().read_line(&mut answer).is_ok() {
             let answer = answer.trim();
             if answer.eq_ignore_ascii_case("y") || answer.eq_ignore_ascii_case("yes") {
-                return 0;
+                return CliOutcome::Success;
             }
         }
     }
@@ -1049,7 +1078,7 @@ fn confirm_target(language: Language, accept: bool, stderr: &mut impl Write) -> 
             "写入前已停止。非交互运行需要 --accept-unverified-target 才接受此风险。该选项不能启用尚不存在的编码器"
         )
     );
-    1
+    CliOutcome::Failure
 }
 
 fn run_convert(
@@ -1057,7 +1086,7 @@ fn run_convert(
     arguments: ConvertArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let selected_motion_target = arguments.motion_target.or_else(|| {
         arguments
             .target
@@ -1078,7 +1107,7 @@ fn run_convert(
                 "错误：Apple 编辑功能需要 --target apple"
             )
         );
-        return 1;
+        return CliOutcome::Failure;
     }
     if (arguments.motion_video.is_some()
         && !matches!(
@@ -1098,7 +1127,7 @@ fn run_convert(
         let _ = writeln!(stderr, "{}", message!(language,
             "error: --motion-video requires google-heic; video compatibility and JSON reports require a Google target",
             "错误：--motion-video 必须使用 google-heic；视频兼容策略及 JSON 报告仅支持 Google 输出目标"));
-        return 1;
+        return CliOutcome::Failure;
     }
     if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
         let _ = writeln!(
@@ -1110,7 +1139,7 @@ fn run_convert(
                 "错误：--motion-target 仅适用于 Motion Photo 输入"
             )
         );
-        return 1;
+        return CliOutcome::Failure;
     }
     if let Err(error) = reject_package_input(&arguments.input) {
         let _ = writeln!(
@@ -1118,7 +1147,7 @@ fn run_convert(
             "{}",
             message!(language, "error: {error}", "错误：{error}")
         );
-        return 1;
+        return CliOutcome::Failure;
     }
     if arguments.product.apple_cinematic {
         let options = arguments.cinematic_options();
@@ -1166,7 +1195,7 @@ fn run_convert(
                     input.display()
                 )
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     };
 
@@ -1182,8 +1211,10 @@ fn run_convert(
             target_preflight(ConversionTarget::Huawei, true, true),
             stderr,
         );
-        if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
-            return 1;
+        if confirm_target(language, arguments.accept_unverified_target, stderr)
+            != CliOutcome::Success
+        {
+            return CliOutcome::Failure;
         }
         let output = output.unwrap_or_else(|| {
             default_google_motion_output(&input, MotionOutputTarget::GoogleHeic)
@@ -1211,7 +1242,7 @@ fn run_convert(
                     "{}",
                     message!(language, "error: {error}", "错误：{error}")
                 );
-                1
+                CliOutcome::Failure
             }
         };
     }
@@ -1224,18 +1255,18 @@ fn run_convert(
                     "{}",
                     message!(language, "error: {error}", "错误：{error}")
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         if apple_portrait || apple_styles || request.apple_features.any() {
             let _ = writeln!(stderr, "{}", message!(language,
                 "error: Apple editing features cannot be combined with an Android Motion Photo output",
                 "错误：Apple 编辑功能不能与 Android Motion Photo 输出组合"));
-            return 1;
+            return CliOutcome::Failure;
         }
         if let Err(error) = reject_package_input(&movie_path) {
             let _ = writeln!(stderr, "error: {error}");
-            return 1;
+            return CliOutcome::Failure;
         }
         if input == movie_path
             || (fs::canonicalize(&input).is_ok()
@@ -1245,7 +1276,7 @@ fn run_convert(
                 stderr,
                 "error: Apple still and movie inputs must be distinct files"
             );
-            return 1;
+            return CliOutcome::Failure;
         }
         let movie = match fs::read(&movie_path) {
             Ok(value) => value,
@@ -1255,7 +1286,7 @@ fn run_convert(
                     "error: could not read {}: {error}",
                     movie_path.display()
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         let target = MotionOutputTarget::GoogleHeic;
@@ -1269,8 +1300,10 @@ fn run_convert(
                 stderr,
             );
             print_target_preflight(language, destination, plan, stderr);
-            if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
-                return 1;
+            if confirm_target(language, arguments.accept_unverified_target, stderr)
+                != CliOutcome::Success
+            {
+                return CliOutcome::Failure;
             }
         }
         let output = output.unwrap_or_else(|| default_google_motion_output(&input, target));
@@ -1306,7 +1339,7 @@ fn run_convert(
                     "{}",
                     message!(language, "error: {error}", "错误：{error}")
                 );
-                1
+                CliOutcome::Failure
             }
         };
     }
@@ -1332,7 +1365,7 @@ fn run_convert(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     };
     let result = match &asset {
@@ -1346,7 +1379,7 @@ fn run_convert(
                         "{}",
                         message!(language, "error: {error}", "错误：{error}")
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             };
             if apple_portrait {
@@ -1359,7 +1392,7 @@ fn run_convert(
                         "错误：Apple Portrait 需要 ProXDR 静态照片"
                     )
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
             if let Some(destination) = arguments.target {
                 let heic =
@@ -1373,8 +1406,10 @@ fn run_convert(
                     stderr,
                 );
                 print_target_preflight(language, destination, plan, stderr);
-                if confirm_target(language, arguments.accept_unverified_target, stderr) != 0 {
-                    return 1;
+                if confirm_target(language, arguments.accept_unverified_target, stderr)
+                    != CliOutcome::Success
+                {
+                    return CliOutcome::Failure;
                 }
             }
             let resolved_motion_target = match motion_target {
@@ -1386,7 +1421,7 @@ fn run_convert(
                             "{}",
                             message!(language, "error: {error}", "错误：{error}")
                         );
-                        return 1;
+                        return CliOutcome::Failure;
                     }
                 },
                 None => None,
@@ -1427,7 +1462,7 @@ fn run_convert(
                             "{}",
                             message!(language, "error: {error}", "错误：{error}")
                         );
-                        1
+                        CliOutcome::Failure
                     }
                 };
             }
@@ -1453,7 +1488,7 @@ fn run_convert(
                                 "{}",
                                 message!(language, "error: {error}", "错误：{error}")
                             );
-                            return 1;
+                            return CliOutcome::Failure;
                         }
                     }
                 }
@@ -1468,7 +1503,7 @@ fn run_convert(
                             "错误：实况风格需要 Apple 适配器"
                         )
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             } else {
                 runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
@@ -1494,8 +1529,8 @@ fn run_convert(
                                 package.display()
                             )
                         ) {
-                            Ok(()) => 0,
-                            Err(_) => 1,
+                            Ok(()) => CliOutcome::Success,
+                            Err(_) => CliOutcome::Failure,
                         };
                     }
                     writeln!(
@@ -1517,7 +1552,7 @@ fn run_convert(
                         "{}",
                         message!(language, "error: {error}", "错误：{error}")
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             }
         }
@@ -1535,7 +1570,7 @@ fn run_convert(
                         "错误：--motion-target 仅适用于 Motion Photo 输入"
                     )
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
             request = match target_request(arguments.target, TargetAssetKind::ProXdr, request) {
                 Ok(request) => request,
@@ -1545,7 +1580,7 @@ fn run_convert(
                         "{}",
                         message!(language, "error: {error}", "错误：{error}")
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             };
             if let Some(path) = &output {
@@ -1555,7 +1590,7 @@ fn run_convert(
                         "{}",
                         message!(language, "error: {error}", "错误：{error}")
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             }
             let output = output.unwrap_or_else(|| {
@@ -1580,7 +1615,7 @@ fn run_convert(
                                 "{}",
                                 message!(language, "error: {error}", "错误：{error}")
                             );
-                            return 1;
+                            return CliOutcome::Failure;
                         }
                     };
                     match runtime.convert_apple_portrait_file_with_profile(
@@ -1618,14 +1653,14 @@ fn run_convert(
                                 "{}",
                                 message!(language, "error: {error}", "错误：{error}")
                             );
-                            return 1;
+                            return CliOutcome::Failure;
                         }
                     }
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
                     let _ = writeln!(stderr, "{}", message!(language, "error: Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics", "错误：Portrait 转换需要 macOS ImageIO/Core Image；完整模式还需要 Vision 语义能力"));
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             } else if apple_styles {
                 #[cfg(target_os = "macos")]
@@ -1638,7 +1673,7 @@ fn run_convert(
                                 "{}",
                                 message!(language, "error: {error}", "错误：{error}")
                             );
-                            return 1;
+                            return CliOutcome::Failure;
                         }
                     };
                     match runtime.convert_apple_photographic_styles_file(&adapter, &source, &output)
@@ -1672,7 +1707,7 @@ fn run_convert(
                                 "{}",
                                 message!(language, "error: {error}", "错误：{error}")
                             );
-                            return 1;
+                            return CliOutcome::Failure;
                         }
                     }
                 }
@@ -1687,7 +1722,7 @@ fn run_convert(
                             "错误：--apple-styles 需要 macOS ImageIO/Vision 能力"
                         )
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             } else {
                 let receipt = match runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
@@ -1698,7 +1733,7 @@ fn run_convert(
                             "{}",
                             message!(language, "error: {error}", "错误：{error}")
                         );
-                        return 1;
+                        return CliOutcome::Failure;
                     }
                 };
                 let printed = if output == input {
@@ -1742,9 +1777,9 @@ fn run_convert(
                 "错误：无法写入输出：{error}"
             )
         );
-        return 1;
+        return CliOutcome::Failure;
     }
-    0
+    CliOutcome::Success
 }
 
 fn run_cinematic_envelope(
@@ -1752,7 +1787,7 @@ fn run_cinematic_envelope(
     arguments: CinematicEnvelopeArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     #[cfg(target_os = "macos")]
     {
         let adapter = match resolve_apple_adapter_executable() {
@@ -1763,7 +1798,7 @@ fn run_cinematic_envelope(
                     "{}",
                     message!(language, "error: {error}", "错误：{error}")
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         match PortableRuntime::new().generate_cinematic_envelope_file(
@@ -1830,7 +1865,7 @@ fn run_cinematic_envelope(
                         receipt.disparity_track_written
                     )
                 );
-                0
+                CliOutcome::Success
             }
             Err(error) => {
                 let _ = writeln!(
@@ -1838,7 +1873,7 @@ fn run_cinematic_envelope(
                     "{}",
                     message!(language, "error: {error}", "错误：{error}")
                 );
-                1
+                CliOutcome::Failure
             }
         }
     }
@@ -1859,7 +1894,7 @@ fn run_cinematic_envelope(
                 "错误：--apple-cinematic 需要 macOS 和 Apple Cinematic 框架"
             )
         );
-        1
+        CliOutcome::Failure
     }
 }
 
@@ -2043,7 +2078,7 @@ fn run_batch(
     arguments: BatchArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let selected_motion_target = arguments.motion_target.or_else(|| {
         arguments
             .target
@@ -2064,7 +2099,7 @@ fn run_batch(
                 "错误：Apple 编辑功能需要 --target apple"
             )
         );
-        return 2;
+        return CliOutcome::Usage;
     }
     if arguments.motion_video_compat.is_some()
         && !matches!(
@@ -2085,7 +2120,7 @@ fn run_batch(
                 "错误：--motion-video-compat 需要 Google Motion Photo 输出目标"
             )
         );
-        return 2;
+        return CliOutcome::Usage;
     }
     if arguments.product.apple_cinematic && arguments.motion_target.is_some() {
         let _ = writeln!(
@@ -2097,7 +2132,7 @@ fn run_batch(
                 "错误：--motion-target 不能与 --apple-cinematic 组合"
             )
         );
-        return 2;
+        return CliOutcome::Usage;
     }
     if arguments.product.apple_cinematic
         && (arguments.resume
@@ -2109,7 +2144,7 @@ fn run_batch(
             stderr,
             "{}", message!(language, "error: --apple-cinematic does not support photo categorization or Live Photo checkpoint/resume options", "错误：--apple-cinematic 不支持照片分类或 Live Photo 检查点/恢复选项")
         );
-        return 2;
+        return CliOutcome::Usage;
     }
     let inputs = match discover_batch_inputs(&arguments) {
         Ok(inputs) => inputs,
@@ -2119,7 +2154,7 @@ fn run_batch(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 2;
+            return CliOutcome::Usage;
         }
     };
     if let Some(destination) = arguments.target {
@@ -2149,9 +2184,10 @@ fn run_batch(
             print_target_preflight(language, destination, plan, stderr);
         }
         if requires_confirmation
-            && confirm_target(language, arguments.accept_unverified_target, stderr) != 0
+            && confirm_target(language, arguments.accept_unverified_target, stderr)
+                != CliOutcome::Success
         {
-            return 1;
+            return CliOutcome::Failure;
         }
     }
     let reuse_existing = arguments.skip_existing || arguments.resume;
@@ -2165,7 +2201,7 @@ fn run_batch(
     };
     if reuse_existing && checkpoint_path.is_none() {
         let _ = writeln!(stderr, "{}", message!(language, "error: --skip-existing/--resume requires --output-dir or --checkpoint for durable provenance", "错误：--skip-existing/--resume 需要 --output-dir 或 --checkpoint 来保存持久化来源记录"));
-        return 2;
+        return CliOutcome::Usage;
     }
     let plan_options = BatchPlanOptions {
         output_dir: arguments.output_dir.clone(),
@@ -2191,7 +2227,7 @@ fn run_batch(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 2;
+            return CliOutcome::Usage;
         }
     };
 
@@ -2211,14 +2247,14 @@ fn run_batch(
                         "{}",
                         message!(language, "error: {error}", "错误：{error}")
                     );
-                    return 1;
+                    return CliOutcome::Failure;
                 }
             }
         }
         #[cfg(not(target_os = "macos"))]
         {
             let _ = writeln!(stderr, "{}", message!(language, "error: Apple feature intents require macOS ImageIO/Vision/Core Image capabilities", "错误：Apple 功能需要 macOS ImageIO/Vision/Core Image 能力"));
-            return 1;
+            return CliOutcome::Failure;
         }
     } else {
         None
@@ -2294,7 +2330,7 @@ fn run_batch(
                         "错误：无法写入 batch JSON：{error}"
                     )
                 );
-                return 1;
+                return CliOutcome::Failure;
             }
         }
     } else {
@@ -2373,7 +2409,7 @@ fn run_batch(
         );
     }
 
-    u8::from(!receipt.is_success())
+    CliOutcome::from_success(receipt.is_success())
 }
 
 pub fn run_from<I, S>(args: I, stdout: &mut impl Write, stderr: &mut impl Write) -> u8
@@ -2384,14 +2420,14 @@ where
     let args = args.into_iter().map(Into::into).collect::<Vec<_>>();
     let language = i18n::resolve(&args, |name| std::env::var_os(name));
     if args.is_empty() {
-        return write_root_help(language, stdout);
+        return write_root_help(language, stdout).exit_code();
     }
     let cli = match parse_cli_language(args, language) {
         Ok(cli) => cli,
-        Err(error) => return write_clap_error(language, error, stdout, stderr),
+        Err(error) => return write_clap_error(language, error, stdout, stderr).exit_code(),
     };
     let language = cli.lang.unwrap_or(language);
-    match cli.command {
+    let outcome = match cli.command {
         RootCommand::HdrLook(arguments) => hdr_look::run(language, arguments, stdout, stderr),
         RootCommand::ReconstructStyles(arguments) => {
             reconstruct_styles::run(arguments, stdout, stderr)
@@ -2403,7 +2439,8 @@ where
         RootCommand::Batch(arguments) => run_batch(language, arguments, stdout, stderr),
         RootCommand::Categorize(arguments) => categorize::run(language, arguments, stdout, stderr),
         RootCommand::Validate(arguments) => validate::run(language, arguments, stdout, stderr),
-    }
+    };
+    outcome.exit_code()
 }
 
 #[cfg(test)]
@@ -3020,5 +3057,14 @@ mod tests {
     #[test]
     fn clap_command_definition_is_internally_consistent() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn cli_outcome_maps_to_expected_exit_codes() {
+        assert_eq!(CliOutcome::Success.exit_code(), 0);
+        assert_eq!(CliOutcome::Failure.exit_code(), 1);
+        assert_eq!(CliOutcome::Usage.exit_code(), 2);
+        assert_eq!(CliOutcome::from_success(true), CliOutcome::Success);
+        assert_eq!(CliOutcome::from_success(false), CliOutcome::Failure);
     }
 }

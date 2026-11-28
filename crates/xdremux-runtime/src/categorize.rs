@@ -511,27 +511,56 @@ fn completed_item(
     }
 }
 
-fn execute_asset(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CategorizeMode<'a> {
+    Preview,
+    Apply { expected_plan: Option<&'a str> },
+}
+
+fn preview_asset(
+    items: &[&PhotoAssetCategorizationItem],
+    contract: &PhotoClassificationContract,
+) -> Vec<CategorizeItemReceipt> {
+    items
+        .iter()
+        .map(|item| {
+            let disposition = match item.disposition {
+                PhotoAssetCategorizationDisposition::Duplicate => CategorizeDisposition::Duplicate,
+                PhotoAssetCategorizationDisposition::Copy => CategorizeDisposition::DryRun,
+            };
+            completed_item(item, contract, disposition)
+        })
+        .collect()
+}
+
+fn abort_asset_publication(
+    items: &[&PhotoAssetCategorizationItem],
+    contract: &PhotoClassificationContract,
+    published: &[(PathBuf, same_file::Handle)],
+    mut detail: String,
+) -> Vec<CategorizeItemReceipt> {
+    if !published.is_empty() {
+        if let Some(rollback) = rollback_published(published) {
+            detail.push_str("; ");
+            detail.push_str(&rollback);
+        }
+    }
+    items
+        .iter()
+        .map(|candidate| match candidate.disposition {
+            PhotoAssetCategorizationDisposition::Duplicate => {
+                completed_item(candidate, contract, CategorizeDisposition::Duplicate)
+            }
+            PhotoAssetCategorizationDisposition::Copy => failed_item(candidate, contract, &detail),
+        })
+        .collect()
+}
+
+fn apply_asset(
     items: &[&PhotoAssetCategorizationItem],
     contract: &PhotoClassificationContract,
     source_fingerprints: &BTreeMap<PathBuf, ResourceFingerprint>,
-    dry_run: bool,
 ) -> Vec<CategorizeItemReceipt> {
-    if dry_run {
-        return items
-            .iter()
-            .map(|item| {
-                let disposition = match item.disposition {
-                    PhotoAssetCategorizationDisposition::Duplicate => {
-                        CategorizeDisposition::Duplicate
-                    }
-                    PhotoAssetCategorizationDisposition::Copy => CategorizeDisposition::DryRun,
-                };
-                completed_item(item, contract, disposition)
-            })
-            .collect();
-    }
-
     let copy_items = items
         .iter()
         .copied()
@@ -542,18 +571,12 @@ fn execute_asset(
         match stage_copy(item, &source_fingerprints[&item.source]) {
             Ok(value) => staged.push(value),
             Err(error) => {
-                let detail = format!("asset staging aborted before publication: {error}");
-                return items
-                    .iter()
-                    .map(|candidate| match candidate.disposition {
-                        PhotoAssetCategorizationDisposition::Duplicate => {
-                            completed_item(candidate, contract, CategorizeDisposition::Duplicate)
-                        }
-                        PhotoAssetCategorizationDisposition::Copy => {
-                            failed_item(candidate, contract, &detail)
-                        }
-                    })
-                    .collect();
+                return abort_asset_publication(
+                    items,
+                    contract,
+                    &[],
+                    format!("asset staging aborted before publication: {error}"),
+                );
             }
         }
     }
@@ -577,29 +600,15 @@ fn execute_asset(
                     }
                     (Err(error), _) => error,
                 };
-                {
-                    let mut detail = format!(
+                return abort_asset_publication(
+                    items,
+                    contract,
+                    &published,
+                    format!(
                         "asset publication sync failed for {}: {issue}",
                         destination.display()
-                    );
-                    if let Some(rollback) = rollback_published(&published) {
-                        detail.push_str("; ");
-                        detail.push_str(&rollback);
-                    }
-                    return items
-                        .iter()
-                        .map(|candidate| match candidate.disposition {
-                            PhotoAssetCategorizationDisposition::Duplicate => completed_item(
-                                candidate,
-                                contract,
-                                CategorizeDisposition::Duplicate,
-                            ),
-                            PhotoAssetCategorizationDisposition::Copy => {
-                                failed_item(candidate, contract, &detail)
-                            }
-                        })
-                        .collect();
-                }
+                    ),
+                );
             }
             Err(error) if error.error.kind() == io::ErrorKind::AlreadyExists => {
                 let source_fingerprint = source_fingerprints.get(&staged_copy.item.source);
@@ -610,47 +619,27 @@ fn execute_asset(
                     raced_duplicates.insert(destination);
                     continue;
                 }
-                let mut detail = format!(
-                    "destination appeared during no-clobber publication: {}",
-                    destination.display()
+                return abort_asset_publication(
+                    items,
+                    contract,
+                    &published,
+                    format!(
+                        "destination appeared during no-clobber publication: {}",
+                        destination.display()
+                    ),
                 );
-                if let Some(rollback) = rollback_published(&published) {
-                    detail.push_str("; ");
-                    detail.push_str(&rollback);
-                }
-                return items
-                    .iter()
-                    .map(|candidate| match candidate.disposition {
-                        PhotoAssetCategorizationDisposition::Duplicate => {
-                            completed_item(candidate, contract, CategorizeDisposition::Duplicate)
-                        }
-                        PhotoAssetCategorizationDisposition::Copy => {
-                            failed_item(candidate, contract, &detail)
-                        }
-                    })
-                    .collect();
             }
             Err(error) => {
-                let mut detail = format!(
-                    "no-clobber publication failed for {}: {}",
-                    destination.display(),
-                    error.error
+                return abort_asset_publication(
+                    items,
+                    contract,
+                    &published,
+                    format!(
+                        "no-clobber publication failed for {}: {}",
+                        destination.display(),
+                        error.error
+                    ),
                 );
-                if let Some(rollback) = rollback_published(&published) {
-                    detail.push_str("; ");
-                    detail.push_str(&rollback);
-                }
-                return items
-                    .iter()
-                    .map(|candidate| match candidate.disposition {
-                        PhotoAssetCategorizationDisposition::Duplicate => {
-                            completed_item(candidate, contract, CategorizeDisposition::Duplicate)
-                        }
-                        PhotoAssetCategorizationDisposition::Copy => {
-                            failed_item(candidate, contract, &detail)
-                        }
-                    })
-                    .collect();
             }
         }
     }
@@ -680,7 +669,14 @@ impl PortableRuntime {
         output_root: impl AsRef<Path>,
         dry_run: bool,
     ) -> Result<CategorizeReceipt> {
-        self.categorize_files_with_plan(inputs, output_root, dry_run, None)
+        let mode = if dry_run {
+            CategorizeMode::Preview
+        } else {
+            CategorizeMode::Apply {
+                expected_plan: None,
+            }
+        };
+        self.categorize_files_with_mode(inputs, output_root, mode)
     }
 
     pub fn categorize_files_with_plan(
@@ -689,6 +685,26 @@ impl PortableRuntime {
         output_root: impl AsRef<Path>,
         dry_run: bool,
         expected_plan: Option<&str>,
+    ) -> Result<CategorizeReceipt> {
+        if dry_run && expected_plan.is_some() {
+            return Err(RuntimeError::new(
+                "categorization preview",
+                "dry-run preview cannot require a previous plan",
+            ));
+        }
+        let mode = if dry_run {
+            CategorizeMode::Preview
+        } else {
+            CategorizeMode::Apply { expected_plan }
+        };
+        self.categorize_files_with_mode(inputs, output_root, mode)
+    }
+
+    pub fn categorize_files_with_mode(
+        &self,
+        inputs: &[PathBuf],
+        output_root: impl AsRef<Path>,
+        mode: CategorizeMode<'_>,
     ) -> Result<CategorizeReceipt> {
         let output_root = output_root.as_ref();
         crate::live_photo_package::validate_output_parent(&output_root.join("planned-output"))?;
@@ -702,11 +718,16 @@ impl PortableRuntime {
         .map_err(|error| RuntimeError::external("categorization planning", error))?;
 
         let plan_id = fingerprint_plan(&plan.items, &prepared.source_fingerprints);
-        if expected_plan.is_some_and(|expected| expected != plan_id) {
-            return Err(RuntimeError::new(
-                "categorization preview",
-                "plan changed; run a new preview before copying",
-            ));
+        if let CategorizeMode::Apply {
+            expected_plan: Some(expected),
+        } = mode
+        {
+            if expected != plan_id {
+                return Err(RuntimeError::new(
+                    "categorization preview",
+                    "plan changed; run a new preview before copying",
+                ));
+            }
         }
 
         let mut grouped = BTreeMap::<String, Vec<&PhotoAssetCategorizationItem>>::new();
@@ -725,12 +746,13 @@ impl PortableRuntime {
                     format!("missing classification contract for asset {asset_id}"),
                 )
             })?;
-            receipt.items.extend(execute_asset(
-                &items,
-                contract,
-                &prepared.source_fingerprints,
-                dry_run,
-            ));
+            let item_receipts = match mode {
+                CategorizeMode::Preview => preview_asset(&items, contract),
+                CategorizeMode::Apply { .. } => {
+                    apply_asset(&items, contract, &prepared.source_fingerprints)
+                }
+            };
+            receipt.items.extend(item_receipts);
         }
         Ok(receipt)
     }
@@ -800,6 +822,47 @@ mod tests {
         assert_eq!(receipt.dry_run(), 1);
         assert_eq!(receipt.failed(), 0);
         assert!(!output.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn dry_run_with_expected_plan_is_rejected_and_mode_preview_apply_roundtrips() {
+        let root = unique_dir("mode-plan");
+        fs::create_dir_all(&root).unwrap();
+        let input = root.join("master.heic");
+        let output = root.join("out");
+        fs::write(&input, b"capture Oplus_4294967296 payload").unwrap();
+
+        let runtime = PortableRuntime::new();
+        let preview = runtime
+            .categorize_files_with_mode(
+                std::slice::from_ref(&input),
+                &output,
+                CategorizeMode::Preview,
+            )
+            .unwrap();
+        assert_eq!(preview.dry_run(), 1);
+        assert!(!output.exists());
+
+        let rejected = runtime.categorize_files_with_plan(
+            std::slice::from_ref(&input),
+            &output,
+            true,
+            Some(&preview.plan_id),
+        );
+        assert!(rejected.is_err());
+
+        let applied = runtime
+            .categorize_files_with_mode(
+                &[input],
+                &output,
+                CategorizeMode::Apply {
+                    expected_plan: Some(&preview.plan_id),
+                },
+            )
+            .unwrap();
+        assert_eq!(applied.copied(), 1);
+        assert_eq!(applied.failed(), 0);
         fs::remove_dir_all(root).unwrap();
     }
 }

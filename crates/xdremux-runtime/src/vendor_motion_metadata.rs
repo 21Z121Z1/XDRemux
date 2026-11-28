@@ -7,10 +7,39 @@ use crate::{Result, RuntimeError};
 
 const OPLUS_CAMERA: &str = "http://ns.oplus.com/photos/1.0/camera/";
 
+/// Typed vendor destination route for Motion Photo publication and metadata carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VendorRoute {
+    Legacy,
+    Apple,
+    AndroidStandard,
+    Samsung,
+    Oppo,
+    Vivo,
+    Xiaomi,
+    Huawei,
+}
+
+impl VendorRoute {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Legacy => "motion-target",
+            Self::Apple => "apple",
+            Self::AndroidStandard => "android-standard",
+            Self::Samsung => "samsung",
+            Self::Oppo => "oppo",
+            Self::Vivo => "vivo",
+            Self::Xiaomi => "xiaomi",
+            Self::Huawei => "huawei",
+        }
+    }
+}
+
 /// What a destination may copy. A namespace of `None` means no vendor attributes
 /// are added, even when the source has them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VendorMetadataCarry {
+    pub route: VendorRoute,
     pub destination: &'static str,
     pub container: &'static str,
     pub preserve_namespace: Option<&'static str>,
@@ -22,8 +51,10 @@ pub struct VendorMetadataCarry {
 
 impl VendorMetadataCarry {
     pub const fn legacy() -> Self {
+        let route = VendorRoute::Legacy;
         Self {
-            destination: "motion-target",
+            route,
+            destination: route.as_str(),
             container: "public-motion-photo-1.0",
             preserve_namespace: None,
             leave_out_unmapped: false,
@@ -34,14 +65,16 @@ impl VendorMetadataCarry {
     pub const fn from_target(target: ConversionTarget) -> Self {
         match target {
             ConversionTarget::Apple => Self {
-                destination: "apple",
+                route: VendorRoute::Apple,
+                destination: VendorRoute::Apple.as_str(),
                 container: "apple-live-photo-pair",
                 preserve_namespace: None,
                 leave_out_unmapped: false,
                 gaps: &["Apple output is a HEIC+MOV pair, not an Android Motion Photo"],
             },
             ConversionTarget::AndroidStandard | ConversionTarget::Honor => Self {
-                destination: "android-standard",
+                route: VendorRoute::AndroidStandard,
+                destination: VendorRoute::AndroidStandard.as_str(),
                 container: "public-motion-photo-1.0",
                 preserve_namespace: None,
                 leave_out_unmapped: false,
@@ -52,7 +85,8 @@ impl VendorMetadataCarry {
                 ],
             },
             ConversionTarget::Samsung => Self {
-                destination: "samsung",
+                route: VendorRoute::Samsung,
+                destination: VendorRoute::Samsung.as_str(),
                 container: "public-motion-photo-1.0",
                 preserve_namespace: None,
                 leave_out_unmapped: true,
@@ -65,7 +99,8 @@ impl VendorMetadataCarry {
                 ],
             },
             ConversionTarget::Oppo => Self {
-                destination: "oppo",
+                route: VendorRoute::Oppo,
+                destination: VendorRoute::Oppo.as_str(),
                 container: "public-motion-photo-1.0",
                 preserve_namespace: Some(OPLUS_CAMERA),
                 leave_out_unmapped: true,
@@ -79,7 +114,8 @@ impl VendorMetadataCarry {
                 ],
             },
             ConversionTarget::Vivo => Self {
-                destination: "vivo",
+                route: VendorRoute::Vivo,
+                destination: VendorRoute::Vivo.as_str(),
                 container: "vivo-preserved-source-layout",
                 preserve_namespace: None,
                 leave_out_unmapped: false,
@@ -97,7 +133,8 @@ impl VendorMetadataCarry {
                 ],
             },
             ConversionTarget::Xiaomi => Self {
-                destination: "xiaomi",
+                route: VendorRoute::Xiaomi,
+                destination: VendorRoute::Xiaomi.as_str(),
                 container: "public-motion-photo-1.0",
                 preserve_namespace: None,
                 leave_out_unmapped: true,
@@ -111,7 +148,8 @@ impl VendorMetadataCarry {
                 ],
             },
             ConversionTarget::Huawei => Self {
-                destination: "huawei",
+                route: VendorRoute::Huawei,
+                destination: VendorRoute::Huawei.as_str(),
                 container: "harmony-openharmony-heic-mp4",
                 preserve_namespace: None,
                 leave_out_unmapped: false,
@@ -728,5 +766,61 @@ mod tests {
             .not_carried
             .iter()
             .any(|item| item.contains("not invented") || item.contains("none were invented")));
+    }
+
+    #[test]
+    fn vendor_route_matches_destination_string_for_every_target() {
+        let cases = [
+            (
+                VendorMetadataCarry::legacy(),
+                VendorRoute::Legacy,
+                "motion-target",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Apple),
+                VendorRoute::Apple,
+                "apple",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::AndroidStandard),
+                VendorRoute::AndroidStandard,
+                "android-standard",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Honor),
+                VendorRoute::AndroidStandard,
+                "android-standard",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Samsung),
+                VendorRoute::Samsung,
+                "samsung",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Oppo),
+                VendorRoute::Oppo,
+                "oppo",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Vivo),
+                VendorRoute::Vivo,
+                "vivo",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Xiaomi),
+                VendorRoute::Xiaomi,
+                "xiaomi",
+            ),
+            (
+                VendorMetadataCarry::from_target(ConversionTarget::Huawei),
+                VendorRoute::Huawei,
+                "huawei",
+            ),
+        ];
+        for (carry, expected_route, expected_name) in cases {
+            assert_eq!(carry.route, expected_route);
+            assert_eq!(carry.route.as_str(), expected_name);
+            assert_eq!(carry.destination, expected_name);
+        }
     }
 }

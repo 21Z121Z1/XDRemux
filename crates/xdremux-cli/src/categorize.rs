@@ -1,4 +1,5 @@
 use crate::i18n::{message, Language};
+use crate::CliOutcome;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use serde_json::json;
-use xdremux_runtime::PortableRuntime;
+use xdremux_runtime::{CategorizeMode, PortableRuntime};
 
 const CATEGORIZE_RECEIPT_SCHEMA_VERSION: u32 = 1;
 
@@ -211,7 +212,7 @@ pub(crate) fn run(
     arguments: CategorizeArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let inputs = match discover_inputs(&arguments) {
         Ok(inputs) => inputs,
         Err(error) => {
@@ -220,15 +221,21 @@ pub(crate) fn run(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 2;
+            return CliOutcome::Usage;
         }
     };
 
-    let receipt = match PortableRuntime::new().categorize_files_with_plan(
+    let mode = if arguments.dry_run {
+        CategorizeMode::Preview
+    } else {
+        CategorizeMode::Apply {
+            expected_plan: arguments.require_plan.as_deref(),
+        }
+    };
+    let receipt = match PortableRuntime::new().categorize_files_with_mode(
         &inputs,
         &arguments.output_dir,
-        arguments.dry_run,
-        arguments.require_plan.as_deref(),
+        mode,
     ) {
         Ok(receipt) => receipt,
         Err(error) => {
@@ -237,7 +244,7 @@ pub(crate) fn run(
                 "{}",
                 message!(language, "error: {error}", "错误：{error}")
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     };
 
@@ -281,7 +288,7 @@ pub(crate) fn run(
                     "错误：无法写入 categorize JSON：{error}"
                 )
             );
-            return 1;
+            return CliOutcome::Failure;
         }
     } else {
         for item in &receipt.items {
@@ -322,7 +329,7 @@ pub(crate) fn run(
         );
     }
 
-    u8::from(!receipt.is_success())
+    CliOutcome::from_success(receipt.is_success())
 }
 
 #[cfg(test)]
