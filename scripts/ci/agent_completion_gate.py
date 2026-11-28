@@ -23,8 +23,6 @@ PRODUCTION_PREFIXES = (
     ".cargo/",
     "Sources/",
     "xdremux/",
-    "apps/macos/XDRemuxApp/Sources/",
-    "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/",
 )
 PRODUCT_BUILD_INPUTS = {
     "Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",

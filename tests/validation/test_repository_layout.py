@@ -56,7 +56,7 @@ class RepositoryLayoutTests(unittest.TestCase):
         )
         for path in sorted(self.paths):
             if not (path.endswith((".sh", ".yml")) and
-                    path.startswith(("scripts/", "apps/", ".github/workflows/"))):
+                    path.startswith(("scripts/", ".github/workflows/"))):
                 continue
             for target in reference.findall((ROOT / path).read_text(encoding="utf-8")):
                 with self.subTest(source=path, target=target):
@@ -145,27 +145,6 @@ class RepositoryLayoutTests(unittest.TestCase):
                     self.assertEqual(Path(arguments[0]).resolve(), work.resolve())
                     index = arguments.index("--manifest-path")
                     self.assertEqual(Path(arguments[index + 1]), ROOT / "Cargo.toml")
-
-    @unittest.skipUnless(shutil.which("bash"), "bash is required for shell entrypoints")
-    def test_app_model_launcher_resolves_project_root_after_relocation(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            work = Path(directory)
-            xcodebuild = work / "xcodebuild"
-            xcodebuild.write_text('#!/bin/sh\nprintf "%s\\n" "$PWD" "$@" > "$LAYOUT_CALL_LOG"\nexit 37\n')
-            xcodebuild.chmod(0o755)
-            log = work / "call.log"
-            env = dict(os.environ, PATH=f"{work}{os.pathsep}{os.environ.get('PATH', '')}",
-                       XDREMUX_APP_MODEL_DERIVED_DATA=str(work / "DerivedData"),
-                       LAYOUT_CALL_LOG=str(log))
-            result = subprocess.run(
-                ["bash", str(ROOT / "apps/macos/XDRemuxApp/scripts/verify_model_tests.sh")],
-                cwd=work, env=env, capture_output=True, text=True, timeout=10, check=False,
-            )
-            self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
-            arguments = log.read_text().splitlines()
-            self.assertEqual(Path(arguments[0]).resolve(), ROOT)
-            index = arguments.index("-project")
-            self.assertIn(arguments[index + 1] + "/project.pbxproj", self.paths)
 
 
 if __name__ == "__main__":

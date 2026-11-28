@@ -49,7 +49,7 @@ Swift package 对外提供一个可执行产品 `xdremux-apple-adapter`，其 Sw
 
 适配器是随产品分发的平台组件，不是另一套公开 CLI。运行时通过有版本号的 JSON 协议与适配器通信。每个辅助进程都有运行时限。机器可读结果写入 stdout，诊断信息写入 stderr。
 
-`xdremux-runtime` 负责通信机制。引擎不启动辅助进程，也不实现通信层。macOS App 同样调用 Rust CLI 执行产品操作。
+`xdremux-runtime` 负责通信机制。引擎不启动辅助进程，也不实现通信层。
 
 适配器的 ImageIO 探针报告 Gain Map、视差、Portrait Effects Matte 和语义蒙版等辅助资源。Rust 判断这些观察是否满足 Portrait 编辑契约。适配器构建检查平台实现；产品行为由 Rust 测试和 Rust 发起的消费者检查验证。
 
@@ -63,7 +63,7 @@ Swift package 对外提供一个可执行产品 `xdremux-apple-adapter`，其 Sw
 
 ## 构建与验证 macOS 包
 
-完整 macOS 产品面向 Apple silicon（`arm64`）和 macOS 27 或更新版本。App、Swift package 和产品归档使用 macOS 27.0 部署目标。适配器在报告能力前拒绝不支持的主机。
+完整 macOS 产品面向 Apple silicon（`arm64`）和 macOS 27 或更新版本。Swift package 和产品归档使用 macOS 27.0 部署目标。适配器在报告能力前拒绝不支持的主机。
 
 [`rust-cli-core.yml`](../.github/workflows/rust-cli-core.yml) 工作流使用 `xcode-27` 运行器构建一个 arm64 产品包。打包实现位于 [`scripts/distribution/`](../scripts/distribution/)，保留根 Swift package 和两个原生目标。Linux、Windows 和 macOS 分别运行 Rust 核心检查。这些检查不能证明各平台均具备完整的 Apple 功能。
 
@@ -110,7 +110,6 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `Sources/XDCinematicNative/` 与 `Sources/XDTextureNative/` | 适配器使用的原生操作。 |
 | `model_adapters/` | 向 Rust 返回观测的本地模型原语。 |
 | `xdremux_py/` | Python 研究和训练工具。 |
-| `apps/macos/XDRemuxApp/` | SwiftUI App、Xcode 工程、App 测试与构建脚本。 |
 | `tests/` | Python 回归、仓库规则检查、验证框架自测和小型合成样本。 |
 | `fixtures/` | 严格验证检查使用的版本化真实媒体。 |
 | `scripts/` | 用于 CI、验证、Apple 检查、诊断、分发和性能测量的[仓库自动化](../scripts/README.md)。 |
@@ -118,23 +117,6 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `research/` | OPPO Styles、Texture Styles、视频 Styles 和 Palette 研究。 |
 | `benchmarks/` | 版本化性能基线；生成的测量结果另行保存。 |
 | `research/oppo_styles/models/` | 可选研究模型及其文档。 |
-
-## 构建与检查 macOS App
-
-App 调用 Rust CLI。Swift 负责界面状态、队列，以及将 CLI 回执转换为 App 状态。App 将 CLI 和 Apple 适配器作为辅助程序打包。转换策略仍由 Rust 负责。
-
-运行 `clean` 前，检查是否设置了 `XDREMUX_DERIVED_DATA`。脚本会删除该变量指定的目录；默认目录为 `.build/xcode`。
-
-从仓库根目录运行 App 脚本，每次选择一项操作：
-
-| 命令 | 结果 |
-| --- | --- |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh run` | 构建 Release 并打开 App。 |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh build` | 构建 Release，不打开 App。 |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh debug` | 构建 Debug 并打开 App。 |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh verify` | 构建 App 并运行脚本中列出的检查。 |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh logs` | 输出已保存构建日志的最后 200 行。 |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh clean` | 删除配置的派生数据目录。 |
 
 ## 区分研究控制与公开接口
 

@@ -74,7 +74,7 @@ A later commit or tracked edit invalidates the receipt. Re-run the appropriate c
 
 The gate treats canonical Rust `crates/` and Apple adapter or app sources as product implementation. Source changes require regression evidence. Product changes also require functional, integration, or device evidence.
 
-Cargo and Swift manifests, lockfiles, toolchain configuration, and the app's Xcode project are build inputs. They are not documentation-only changes. Deletions count, as do both sides of a move across component ownership. Git paths and tracked status use NUL-delimited records. Quoting, embedded whitespace, or arbitrary path bytes cannot hide a change.
+Cargo and Swift manifests, lockfiles, and toolchain configuration are build inputs. They are not documentation-only changes. Deletions count, as do both sides of a move across component ownership. Git paths and tracked status use NUL-delimited records. Quoting, embedded whitespace, or arbitrary path bytes cannot hide a change.
 
 A research `.rs` file remains research code. Rust syntax alone does not make that file product implementation.
 

@@ -49,7 +49,7 @@ Keep the boundary narrow:
 
 The adapter ships as a platform component, not another public CLI. The runtime communicates with it through a versioned JSON protocol. Each helper process has a bounded lifetime. Machine-readable output uses stdout, and diagnostics use stderr.
 
-`xdremux-runtime` owns this transport. The engine does not launch helper processes or implement the transport. The macOS app also invokes the Rust CLI for product work.
+`xdremux-runtime` owns this transport. The engine does not launch helper processes or implement the transport.
 
 The adapter's ImageIO probe reports auxiliary resources such as Gain Map, disparity, Portrait Effects Matte, and semantic mattes. Rust decides whether those observations satisfy the Portrait editing contract. An adapter build checks the platform implementation. Rust tests and Rust-driven consumer checks establish the product behavior.
 
@@ -110,7 +110,6 @@ The separate `model_adapters/geocalib/` component is a runtime ML primitive, out
 | `Sources/XDCinematicNative/` and `Sources/XDTextureNative/` | Native operations used by the adapter. |
 | `model_adapters/` | Local model primitives that return observations to Rust. |
 | `xdremux_py/` | Python research and training tools. |
-| `apps/macos/XDRemuxApp/` | SwiftUI app, Xcode project, app tests, and app build scripts. |
 | `tests/` | Python regressions, repository policy tests, verification self-tests, and small synthetic fixtures. |
 | `fixtures/` | Versioned real media used by strict validation checks. |
 | `scripts/` | [Repository automation](../scripts/README.en.md) for CI, validation, Apple checks, diagnostics, distribution, and performance. |
@@ -118,23 +117,6 @@ The separate `model_adapters/geocalib/` component is a runtime ML primitive, out
 | `research/` | OPPO Styles, Texture Styles, video Styles, and Palette investigations. |
 | `benchmarks/` | Versioned performance baselines. Generated measurements remain separate. |
 | `research/oppo_styles/models/` | Optional research models and their documentation. |
-
-## Build and inspect the macOS app
-
-The app invokes the Rust CLI. Swift owns presentation state, the queue, and conversion of CLI receipts into app state. The app bundles the CLI and Apple adapter as helpers. Conversion policy remains in Rust.
-
-Before `clean`, check `XDREMUX_DERIVED_DATA` if it is set. The script deletes that directory. The default is `.build/xcode`.
-
-Run the app script from the repository root. Select one operation:
-
-| Command | Result |
-| --- | --- |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh run` | Build Release and open the app. |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh build` | Build Release without opening the app. |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh debug` | Build Debug and open the app. |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh verify` | Build the app and run the checks listed in the script. |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh logs` | Print the last 200 lines of the saved build log. |
-| `apps/macos/XDRemuxApp/scripts/build_and_run.sh clean` | Delete the configured derived-data directory. |
 
 ## Keep research controls separate
 

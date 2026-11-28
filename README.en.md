@@ -4,7 +4,7 @@ English | [简体中文](README.md)
 
 XDRemux converts supported vendor ProXDR photos to ISO/TS 21496-1 HDR HEIC. It also converts supported Android Motion Photos to Apple Live Photo pairs.
 
-The Rust `xdremux` CLI detects source type, HDR structure, and conversion routing. The macOS app uses the same product implementation. Source compatibility depends on the actual file structure and available resources, not only the device name.
+The Rust `xdremux` CLI detects source type, HDR structure, and conversion routing. Source compatibility depends on the actual file structure and available resources, not only the device name.
 
 ## Supported tasks
 

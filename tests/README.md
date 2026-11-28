@@ -30,14 +30,13 @@ python3 -m unittest discover -s tests -t . -v
 
 ## 选择验证脚本
 
-可复用的可移植检查位于 `scripts/validation/`。App 模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
+可复用的可移植检查位于 `scripts/validation/`。
 
 | 脚本 | 用途 |
 | --- | --- |
 | `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | 转换并验证真实 Motion Photo 样本集。 |
 | `scripts/validation/verify_error_messages.sh` | 检查部分 CLI 帮助和错误结果。 |
 | `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复执行分类批处理的行为。 |
-| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 构建并运行 macOS App 模型测试。 |
 
 `tests/validation/` 保存完成门禁、工作流配置和仓库结构的 Python 自测，不放 shell 启动器。检查选择见[回归与真实媒体指南](../docs/quality/evals.md)。
 

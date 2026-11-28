@@ -130,8 +130,7 @@ class CompletionGateTests(unittest.TestCase):
                      "scripts/distribution/build_native.py",
                      "scripts/distribution/macos.py",
                      "scripts/distribution/native-dependencies.json",
-                     "crates/xdremux-runtime/Cargo.toml",
-                     "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj"):
+                     "crates/xdremux-runtime/Cargo.toml"):
             with self.subTest(path=name):
                 self.base = self.git("rev-parse", "HEAD").stdout.strip()
                 self.add_tracked_file(name)

@@ -31,7 +31,7 @@ python3 -m unittest tests.validation.test_repository_layout -v
 
 ## 工具与所属实现放在一起
 
-App 构建与模型测试启动器放在 Xcode 工程旁的 [`apps/macos/XDRemuxApp/scripts/`](../apps/macos/XDRemuxApp/scripts/)。研究训练与导出工具放在所属研究目录，例如 [`research/oppo_styles/tools/`](../research/oppo_styles/tools/)。
+研究训练与导出工具放在所属研究目录，例如 [`research/oppo_styles/tools/`](../research/oppo_styles/tools/)。
 
 Python 回归测试放在 [`tests/`](../tests/README.md)，真实媒体放在 [`fixtures/`](../fixtures/README.md)，小型合成向量放在 `tests/fixtures/`。生成报告保存到已忽略的 `artifacts/` 目录。
 

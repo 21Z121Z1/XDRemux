@@ -17,7 +17,6 @@ Rust 工作区负责 XDRemux 的产品行为。Apple 适配器执行 Rust 请求
 | LibLivePhoto | 提供可移植的 Motion Photo 和 Live Photo 文件格式实现。 |
 | `Sources/XDRemuxAppleAdapter/` | 调用 Apple 框架，通过 Rust 定义的协议返回观测结果。 |
 | `Sources/XDTextureNative/` 和 `Sources/XDCinematicNative/` | 为适配器实现原生纹理风格和电影效果操作。 |
-| `apps/macos/XDRemuxApp/` | 提供 Mac 界面并调用产品操作。 |
 | `xdremux_py/` | 提供独立于产品运行时的研究和训练工具。 |
 
 ### Rust 产品栈

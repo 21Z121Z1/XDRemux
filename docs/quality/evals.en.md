@@ -20,7 +20,7 @@ The corpus covers several JPEG and HEIC/HEIF layouts. Read the workflow and test
 
 ## Select an existing script
 
-Portable validation scripts are in `scripts/validation/`. The app's model-test launcher is in `apps/macos/XDRemuxApp/scripts/`.
+Portable validation scripts are in `scripts/validation/`.
 
 | Script | Purpose |
 | --- | --- |
@@ -28,7 +28,6 @@ Portable validation scripts are in `scripts/validation/`. The app's model-test l
 | `scripts/validation/verify_error_messages.sh` | Check selected help and error behavior through the real CLI. |
 | `scripts/validation/verify_batch_categorize_idempotence.sh` | Check repeated batch conversion with categorized output. |
 | `scripts/validation/verify_validate_only_harness.sh` | Check validation-only behavior. |
-| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | Build and run app model tests on macOS. |
 
 Choose evidence for the part that changed:
 

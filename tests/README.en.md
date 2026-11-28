@@ -30,14 +30,13 @@ These tests cover repository rules, documentation, app architecture, and optiona
 
 ## Select a validation script
 
-Reusable portable checks are in `scripts/validation/`. The app model-test launcher is in `apps/macos/XDRemuxApp/scripts/`.
+Reusable portable checks are in `scripts/validation/`.
 
 | Script | Purpose |
 | --- | --- |
 | `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | Convert and validate the real Motion Photo corpus. |
 | `scripts/validation/verify_error_messages.sh` | Check selected CLI help and error results. |
 | `scripts/validation/verify_batch_categorize_idempotence.sh` | Check repeated categorized batch behavior. |
-| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | Build and run macOS app model tests. |
 
 `tests/validation/` contains Python self-tests for the completion gate, workflow configuration, and repository layout. Shell launchers do not belong there. See the [regression and real-media guide](../docs/quality/evals.en.md) to select checks.
 
