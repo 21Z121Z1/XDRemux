@@ -120,6 +120,7 @@ class PerformanceBudgetTests(unittest.TestCase):
         launch_value: dict[str, object],
         baseline_value: dict[str, object] | None = None,
         *, historical: bool = False,
+        advisory_timing: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory(prefix="xdremux-perf-budget-") as raw:
             work = Path(raw)
@@ -142,6 +143,7 @@ class PerformanceBudgetTests(unittest.TestCase):
                     "--expected-head",
                     HEAD,
                     *(["--historical-replay"] if historical else []),
+                    *(["--advisory-timing"] if advisory_timing else []),
                 ],
                 cwd=ROOT,
                 text=True,
@@ -430,6 +432,27 @@ class PerformanceBudgetTests(unittest.TestCase):
             result = self.run_checker(bad, launches(), reference)
             self.assertEqual(result.returncode, 2, mutation + result.stdout + result.stderr)
             self.assertIn("batch", result.stderr)
+
+    def test_advisory_timing_warns_without_failing_on_wall_or_rss_regression(self) -> None:
+        current = benchmark(large_wall=20.0, large_p95=25.0)
+        current["cases"][1]["max_peak_rss_bytes"] = 200 * MIB
+        for sample in current["cases"][1]["samples"]:
+            sample["peak_rss_bytes"] = 200 * MIB
+        current["cases"][1]["median_peak_rss_bytes"] = 200 * MIB
+        completed = self.run_checker(current, launches(), advisory_timing=True)
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("performance advisory warnings", completed.stdout)
+        self.assertIn("hdr-uhdr-rgb444 median_wall_seconds regressed", completed.stdout)
+        self.assertIn("hdr-uhdr-rgb444 max_peak_rss_mib regressed", completed.stdout)
+
+    def test_advisory_timing_still_fails_on_structural_helper_launch_regression(self) -> None:
+        completed = self.run_checker(
+            benchmark(large_wall=20.0),
+            launches(portrait=2),
+            advisory_timing=True,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("apple-portrait helper launches regressed", completed.stderr)
 
 
 if __name__ == "__main__":
