@@ -311,6 +311,8 @@ def main() -> int:
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--historical-replay", action="store_true",
                         help="Read an archived v1 run under its original summary contract; not current CI evidence")
+    parser.add_argument("--advisory-timing", action="store_true",
+                        help="Report wall-clock and RSS budget overages as warnings instead of failing; structural launch and validation checks remain hard gates")
     args = parser.parse_args()
 
     baseline = load_object(args.baseline, "performance baseline")
@@ -353,6 +355,7 @@ def main() -> int:
         validated_samples(benchmark_report, current_cases)
 
     failures: list[str] = []
+    advisory_warnings: list[str] = []
     print("product performance regression budget:")
     for name, reference_raw in reference_cases.items():
         if not isinstance(name, str) or not isinstance(reference_raw, dict):
@@ -398,9 +401,11 @@ def main() -> int:
                 f"reference={reference:.3f}{unit} budget={limit:.3f}{unit}"
             )
             if observed > limit:
-                failures.append(
-                    f"{name} {metric} regressed: {observed:.3f}{unit} > {limit:.3f}{unit}"
-                )
+                message = f"{name} {metric} regressed: {observed:.3f}{unit} > {limit:.3f}{unit}"
+                if args.advisory_timing:
+                    advisory_warnings.append(message)
+                else:
+                    failures.append(message)
 
     reference_launches = baseline.get("apple_adapter_process_launches")
     current_launches = launch_report.get("cases")
@@ -416,6 +421,11 @@ def main() -> int:
         print(f"  {name}: observed={observed} max={limit}")
         if observed > limit:
             failures.append(f"{name} helper launches regressed: {observed} > {limit}")
+
+    if advisory_warnings:
+        print("performance advisory warnings (non-blocking in --advisory-timing mode):")
+        for warning in advisory_warnings:
+            print(f"  - {warning}")
 
     if failures:
         print("performance regression gate failed:", file=sys.stderr)
