@@ -28,7 +28,7 @@ Use the [project README](../README.en.md) to build the CLI and run a first conve
 | [Test suite guide](../tests/README.en.md) | Test owners and commands. |
 | [Fixture guide](../fixtures/README.en.md) | Versioned media and identity rules. |
 | [Script index](../scripts/README.en.md) | Build, validation, performance, and research commands. |
-| [Agent guide](../AGENTS.md) | Repository rules and project pstack skills. |
+| [Agent guide](../AGENTS.md) | Repository rules and project verification skills. |
 | [Technical writing guide](style-guide.en.md) | ASD-STE100, Chinese writing rules, terminology, and bilingual review. |
 
 Current bilingual documents use English as their canonical source. Both languages must preserve the same behavior and limitations.
@@ -51,11 +51,6 @@ These records describe a specific version, experiment, or source state. Their me
 
 | Record | Reading options |
 | --- | --- |
-| ISO conformance audit, 2026-05-11 | [Summary](history/iso-conformance-audit-20260511.summary.en.md), [original record](history/iso-conformance-audit-20260511.md). |
-| Encoding quality and size, 2026-07-18 | [Summary](validation/encoding-quality-pareto-20260718.summary.en.md), [original record](validation/encoding-quality-pareto-20260718.md). |
-| Vendor Live Photo geometry | [Summary](validation/vendor-live-photo-geometry.summary.en.md), [original record](validation/vendor-live-photo-geometry.md). |
-| HDR Log multi-sample check, 2026-10-14 | [Validation record](validation/20261014-hdr-log-multisample.en.md). |
-| HDR Log thumbnail check, 2026-10-14 | [Validation record](validation/20261014-hdr-log-thumbnail.en.md). |
 | Version 1.4 | [Release record](releases/v1.4.md). |
 
 Use current references for current behavior. Retain historical paths, values, and conclusions when reading an older result.

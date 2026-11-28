@@ -12,8 +12,6 @@ For Chinese, apply Fenng's [Tech-Doc-Style-Chinese Skill](https://github.com/Fen
 
 XDRemux does not claim formal ASD-STE100 compliance. A style check cannot certify terminology, technical truth, or complete compliance with the standard.
 
-The repository's [pstack workflow](../.agents/skills/pstack-workflow/SKILL.md) coordinates source review, scoped changes, verification, and independent review. These project skills retain their recorded upstream provenance. They do not require Cursor or grant permission for external actions.
-
 ## Preserve meaning before changing style
 
 Apply these priorities in order:

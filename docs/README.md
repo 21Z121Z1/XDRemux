@@ -28,7 +28,7 @@
 | [测试套件说明](../tests/README.md) | 测试职责和执行命令。 |
 | [测试样本说明](../fixtures/README.md) | 版本化媒体和文件身份规则。 |
 | [脚本索引](../scripts/README.md) | 构建、验证、性能和研究命令。 |
-| [Agent 指南](../AGENTS.zh-CN.md) | 仓库规则与项目 pstack Skill。 |
+| [Agent 指南](../AGENTS.zh-CN.md) | 仓库规则与项目验证 Skill。 |
 | [技术写作规范](style-guide.md) | ASD-STE100、中文写作规则、术语及双语审阅。 |
 
 当前双语文档以英文为原稿。两个版本必须保留相同的行为说明和限制。
@@ -51,11 +51,6 @@
 
 | 记录 | 阅读入口 |
 | --- | --- |
-| ISO 一致性审计，2026 年 5 月 11 日 | [摘要](history/iso-conformance-audit-20260511.summary.md)、[原始记录](history/iso-conformance-audit-20260511.md)。 |
-| 编码质量与体积，2026 年 7 月 18 日 | [摘要](validation/encoding-quality-pareto-20260718.summary.md)、[原始记录](validation/encoding-quality-pareto-20260718.md)。 |
-| 厂商 Live Photo 几何 | [摘要](validation/vendor-live-photo-geometry.summary.md)、[原始记录](validation/vendor-live-photo-geometry.md)。 |
-| HDR Log 多样本检查，2026 年 10 月 14 日 | [验证记录](validation/20261014-hdr-log-multisample.md)。 |
-| HDR Log 缩略图检查，2026 年 10 月 14 日 | [验证记录](validation/20261014-hdr-log-thumbnail.md)。 |
 | 1.4 版本 | [发布记录](releases/v1.4.md)。 |
 
 当前行为以当前参考文档为准。阅读旧结果时，保留历史路径、数值和结论的原有含义。

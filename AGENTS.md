@@ -31,8 +31,6 @@ Finalize the canonical English document before translating it into Chinese. Pres
 
 ## Use the project skills
 
-Use the [pstack workflow](.agents/skills/pstack-workflow/SKILL.md), [behavioral TDD](.agents/skills/pstack-tdd/SKILL.md), [engineering principles](.agents/skills/pstack-engineering-principles/SKILL.md), [review](.agents/skills/pstack-review/SKILL.md), and [prose cleanup](.agents/skills/pstack-unslop/SKILL.md) when their descriptions apply. These are project adaptations pinned to a source version. They do not require the Cursor runtime.
-
 Use [XDRemux verification](.agents/skills/xdremux-verify/SKILL.md) for CLI procedures and evidence selection.
 
 | Contract | Existing checks |

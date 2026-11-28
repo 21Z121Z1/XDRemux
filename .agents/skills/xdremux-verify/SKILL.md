@@ -67,4 +67,3 @@ This skill contains no executable helper. Use the existing repository commands n
 
 If a command or interface changes, exercise the affected path before updating its recipe. Record an unavailable native or device environment as a verification gap. Do not weaken the required journey to remove that gap. Do not schedule future upkeep unless requested.
 
-Adapted using pstack `create-verification-skill` at `a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4`. See [sources.json](sources.json) and [LICENSE](LICENSE).

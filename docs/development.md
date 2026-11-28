@@ -114,7 +114,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `tests/` | Python 回归、仓库规则检查、验证框架自测和小型合成样本。 |
 | `fixtures/` | 严格验证检查使用的版本化真实媒体。 |
 | `scripts/` | 用于 CI、验证、Apple 检查、诊断、分发和性能测量的[仓库自动化](../scripts/README.md)。 |
-| `docs/` | 当前指导和验证记录。历史审计位于 `docs/history/`。 |
+| `docs/` | 当前指导和验证记录。 |
 | `research/` | OPPO Styles、Texture Styles、视频 Styles 和 Palette 研究。 |
 | `benchmarks/` | 版本化性能基线；生成的测量结果另行保存。 |
 | `research/oppo_styles/models/` | 可选研究模型及其文档。 |
