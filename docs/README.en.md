@@ -28,7 +28,7 @@ Use the [project README](../README.en.md) to build the CLI and run a first conve
 | [Test suite guide](../tests/README.en.md) | Test owners and commands. |
 | [Fixture guide](../fixtures/README.en.md) | Versioned media and identity rules. |
 | [Script index](../scripts/README.en.md) | Build, validation, performance, and research commands. |
-| [Agent guide](../AGENTS.md) | Repository rules and project pstack skills. |
+| [Agent guide](../AGENTS.md) | Repository rules and project verification skills. |
 | [Technical writing guide](style-guide.en.md) | ASD-STE100, Chinese writing rules, terminology, and bilingual review. |
 
 Current bilingual documents use English as their canonical source. Both languages must preserve the same behavior and limitations.

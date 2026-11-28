@@ -28,7 +28,7 @@
 | [测试套件说明](../tests/README.md) | 测试职责和执行命令。 |
 | [测试样本说明](../fixtures/README.md) | 版本化媒体和文件身份规则。 |
 | [脚本索引](../scripts/README.md) | 构建、验证、性能和研究命令。 |
-| [Agent 指南](../AGENTS.zh-CN.md) | 仓库规则与项目 pstack Skill。 |
+| [Agent 指南](../AGENTS.zh-CN.md) | 仓库规则与项目验证 Skill。 |
 | [技术写作规范](style-guide.md) | ASD-STE100、中文写作规则、术语及双语审阅。 |
 
 当前双语文档以英文为原稿。两个版本必须保留相同的行为说明和限制。
