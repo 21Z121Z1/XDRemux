@@ -33,10 +33,20 @@ class CheckSelectionTests(unittest.TestCase):
                 self.assertFalse(policy["production_changed"])
                 self.assertFalse(policy["source_changed"])
 
-    def test_classification_change_does_not_launch_unrelated_native_experiments(self):
-        path = "crates/xdremux-classification/src/lib.rs"
-        self.assertEqual(self.selected_jobs([path]), {"portable-evidence"})
-        self.assertEqual(select([path])["runner"], "xcode-27")
+    def test_product_crate_changes_do_not_launch_unrelated_research_experiments(self):
+        for path in (
+            "crates/xdremux-classification/src/lib.rs",
+            "crates/xdremux-heif/src/styles.rs",
+            "crates/xdremux-cli/src/lib.rs",
+            "Cargo.lock",
+            "Package.swift",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.selected_jobs([path]), set())
+                self.assertEqual(select([path])["runner"], "xcode-27")
+
+    def test_product_plan_change_does_not_launch_unrelated_research_experiments(self):
+        self.assertEqual(self.selected_jobs(["scripts/ci/product-plan.json"]), {"portable-evidence"})
 
     def test_video_constructor_change_selects_its_native_consumer(self):
         self.assertEqual(self.selected_jobs(["research/video_styles/CarrierProbe.swift"]),
@@ -46,28 +56,16 @@ class CheckSelectionTests(unittest.TestCase):
         self.assertEqual(self.selected_jobs(["scripts/apple/pvt_native_import/readiness_control.py"]),
                          {"portable-evidence", "pvt-native-import"})
 
-    def test_styles_resource_change_keeps_all_affected_native_measurements(self):
-        jobs = self.selected_jobs(["crates/xdremux-heif/src/styles.rs"])
-        self.assertTrue({"styles-version-control", "style-tone-response",
-                         "system-heif-hdr-api", "pvt-native-import"}.issubset(jobs))
-        self.assertNotIn("video-carrier", jobs)
-        self.assertNotIn("coreml-candidate", jobs)
-        self.assertNotIn("texture-probe-build", jobs)
+    def test_style_research_script_change_selects_its_native_measurement(self):
+        self.assertEqual(self.selected_jobs(["scripts/apple/check_style_tone_response.py"]),
+                         {"portable-evidence", "style-tone-response"})
+        self.assertEqual(self.selected_jobs(["scripts/apple/probe_system_heif_hdr_api.sh"]),
+                         {"portable-evidence", "system-heif-hdr-api"})
+        self.assertEqual(self.selected_jobs(["scripts/apple/check_styles_version_hypothesis.sh"]),
+                         {"portable-evidence", "styles-version-control"})
 
     def test_selector_changes_exercise_every_research_consumer(self):
         self.assertEqual(self.selected_jobs(["scripts/ci/select_checks.py"]), set(RESEARCH))
-
-    def test_rust_build_changes_do_not_launch_independently_compiled_probes(self):
-        expected = {"portable-evidence", "styles-version-control", "style-tone-response",
-                    "system-heif-hdr-api", "pvt-native-import"}
-        self.assertEqual(self.selected_jobs(["Cargo.lock"]), expected)
-        self.assertEqual(self.selected_jobs(["rust-toolchain.toml"]), expected)
-        self.assertEqual(self.selected_jobs(["crates/xdremux-runtime/Cargo.toml"]), expected)
-
-    def test_swift_package_changes_do_not_launch_the_rust_only_pvt_probe(self):
-        self.assertEqual(self.selected_jobs(["Package.swift"]),
-                         {"portable-evidence", "styles-version-control", "style-tone-response",
-                          "system-heif-hdr-api"})
 
     def test_manual_replay_preserves_every_experiment(self):
         result = select([], manual=True)
@@ -106,6 +104,7 @@ class GitSelectionCommandTests(unittest.TestCase):
         self.git("config", "user.email", "ci-fixture@example.invalid")
         self.write("README.md", "baseline")
         self.write("crates/xdremux-runtime/src/lib.rs", "baseline")
+        self.write("scripts/apple/pvt_native_import/probe.py", "baseline")
         self.commit()
         self.base = self.git("rev-parse", "HEAD")
 
@@ -144,6 +143,13 @@ class GitSelectionCommandTests(unittest.TestCase):
 
     def test_move_out_of_product_scope_keeps_the_removed_owner_visible(self):
         self.git("mv", "crates/xdremux-runtime/src/lib.rs", "retired.md")
+        self.commit()
+        output = self.outputs(self.run_selector())
+        self.assertEqual(output["product"], "true")
+        self.assertEqual(output["pvt-native-import"], "false")
+
+    def test_move_out_of_research_scope_keeps_the_removed_owner_visible(self):
+        self.git("mv", "scripts/apple/pvt_native_import/probe.py", "retired-pvt.md")
         self.commit()
         output = self.outputs(self.run_selector())
         self.assertEqual(output["product"], "true")

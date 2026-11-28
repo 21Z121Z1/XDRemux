@@ -11,26 +11,13 @@ from scripts.ci.agent_completion_gate import changed_files, repository_root, res
 
 # Changes to selection or its owning workflow exercise every selected consumer.
 COMMON = (
-    ".github/workflows/research.yml", "scripts/ci/**",
+    ".github/workflows/research.yml", "scripts/ci/select_checks.py",
     "tests/validation/test_ci_selection.py",
 )
-RUST_BUILD = ("Cargo.toml", "crates/*/Cargo.toml", "Cargo.lock", "rust-toolchain*", ".cargo/**")
-SWIFT_BUILD = ("Package.swift", "Package.resolved")
-STYLE_PRODUCT = RUST_BUILD + SWIFT_BUILD + (
-    "crates/xdremux-cli/**", "crates/xdremux-engine/**",
-    "crates/xdremux-runtime/src/apple*.rs",
-    "crates/xdremux-runtime/src/style*.rs", "crates/xdremux-runtime/src/lib.rs",
-    "crates/xdremux-runtime/tests/apple*.rs",
-    "crates/xdremux-heif/**", "crates/xdremux-codec/**", "crates/xdremux-hdr/**",
-    "crates/xdremux-format/**", "crates/xdremux-metadata/**",
-    "crates/xdremux-source/**", "crates/xdremux-container/**",
-    "Sources/**", "fixtures/proxdr/**", "fixtures/SHA256SUMS",
-)
 RESEARCH = {
-    "portable-evidence": RUST_BUILD + SWIFT_BUILD + (
+    "portable-evidence": (
         "tests/**", "research/**", "scripts/**", "xdremux_py/**",
-        "model_adapters/**", "crates/**", "Sources/**", "apps/**",
-        "pyproject.toml", ".gitignore",
+        "model_adapters/**", "pyproject.toml", ".gitignore",
     ),
     "video-carrier": ("research/video_styles/**", "tests/test_video_style*.py"),
     "coreml-candidate": (
@@ -41,29 +28,23 @@ RESEARCH = {
     "texture-probe-build": (
         "research/texture_styles/**", "tests/test_texture_research_probe.py",
     ),
-    "styles-version-control": STYLE_PRODUCT + (
+    "styles-version-control": (
         "scripts/apple/check_styles_version_hypothesis.sh",
         "research/oppo_styles/tools/probe_style_version.py", "tests/test_style_version_probe.py",
     ),
-    "style-tone-response": STYLE_PRODUCT + (
+    "style-tone-response": (
         "scripts/apple/run_style_tone_sweep.sh", "scripts/apple/check_style_tone_response.py",
         "scripts/apple/check_rust_style_consumer.sh", "tests/test_style_tone_response.py",
         "research/oppo_styles/tools/measure_style_editor_response.py",
     ),
-    "system-heif-hdr-api": STYLE_PRODUCT + (
+    "system-heif-hdr-api": (
         "scripts/apple/probe_system_heif_hdr_api.sh", "scripts/apple/measure_system_heif_hdr.sh",
         "scripts/apple/score_system_hdr_tone.py", "tests/test_style_tone_response.py",
         "crates/xdremux-runtime/tests/system_heif_hdr.rs",
     ),
-    "pvt-native-import": RUST_BUILD + (
+    "pvt-native-import": (
         "scripts/apple/pvt_native_import/**", "tests/test_pvt*.py",
-        "tests/fixtures/pvt_boot_status/**", "crates/xdremux-motion-photo/**",
-        "crates/xdremux-runtime/src/live_photo/**", "crates/xdremux-runtime/src/lib.rs",
-        "crates/xdremux-cli/**", "crates/xdremux-engine/**",
-        "crates/xdremux-source/**", "crates/xdremux-container/**",
-        "crates/xdremux-format/**", "crates/xdremux-heif/**",
-        "crates/xdremux-codec/**", "crates/xdremux-hdr/**",
-        "crates/xdremux-metadata/**", "fixtures/**",
+        "tests/fixtures/pvt_boot_status/**",
     ),
 }
 

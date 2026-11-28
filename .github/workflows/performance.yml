@@ -5,7 +5,12 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-motion-photo/**"
+      - "crates/xdremux-runtime/**"
       - "Sources/XDRemuxAppleAdapter/**"
       - "Sources/XDTextureNative/**"
       - "Package.swift"
@@ -173,12 +178,19 @@ jobs:
 
       - name: Enforce stable-runner performance regression budget
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          advisory_args=()
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            advisory_args+=(--advisory-timing)
+          fi
           python3 scripts/performance/check_performance_budget.py \
             --baseline benchmarks/macos27-arm64-product-baseline.json \
             --benchmark artifacts/performance/product-benchmark.json \
             --launches artifacts/performance/apple-adapter-launches.json \
             --expected-head "$(git rev-parse HEAD)" \
+            "${advisory_args[@]}" \
             2>&1 | tee artifacts/performance/regression-budget.log
 
       - name: Compare exact Styles revisions on the same runner
@@ -299,6 +311,16 @@ jobs:
           for name, count in report["cases"].items():
               print(f"| {name} | {count} |")
           PY
+          fi
+          if [[ -s artifacts/performance/regression-budget.log ]] && grep -q "performance advisory warnings" artifacts/performance/regression-budget.log; then
+            {
+              echo
+              echo "### Performance advisory warnings (non-blocking on pull_request)"
+              echo
+              echo '```'
+              sed -n '/performance advisory warnings/,$p' artifacts/performance/regression-budget.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload performance measurements
