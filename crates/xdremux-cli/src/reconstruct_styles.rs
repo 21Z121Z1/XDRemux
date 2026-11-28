@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::Args;
 
+use crate::CliOutcome;
+
 #[derive(Debug, Args)]
 pub(super) struct ReconstructStylesArgs {
     /// Original HEIC/HEIF containing Styles metadata, delta map and Linear Thumbnail. Repeat for a batch.
@@ -32,7 +34,7 @@ pub(super) fn run(
     args: ReconstructStylesArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (args, stdout);
@@ -40,7 +42,7 @@ pub(super) fn run(
             stderr,
             "error: Photographic Styles reversal requires macOS and its native Apple adapter"
         );
-        1
+        CliOutcome::Failure
     }
     #[cfg(target_os = "macos")]
     {
@@ -48,7 +50,7 @@ pub(super) fn run(
             Ok(path) => path,
             Err(e) => {
                 let _ = writeln!(stderr, "error: {e}");
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         let mut failures = 0;
@@ -77,9 +79,9 @@ pub(super) fn run(
         .is_err()
             || writeln!(stdout).is_err()
         {
-            return 1;
+            return CliOutcome::Failure;
         }
-        u8::from(failures > 0)
+        CliOutcome::from_success(failures == 0)
     }
 }
 

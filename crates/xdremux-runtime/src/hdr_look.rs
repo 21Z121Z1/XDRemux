@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -24,11 +24,18 @@ pub struct HdrLookPlan {
     pub items: Vec<HdrLookItem>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HdrLookStatus {
+    Success,
+    Failed,
+}
+
 #[derive(Debug, Serialize)]
 pub struct HdrLookResult {
     #[serde(flatten)]
     pub item: HdrLookItem,
-    pub status: String,
+    pub status: HdrLookStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -204,7 +211,11 @@ fn execute(
         let result = publish_item(item, &plan.output_dir, &mut renderer);
         let row = HdrLookResult {
             item: item.clone(),
-            status: if result.is_ok() { "success" } else { "failed" }.into(),
+            status: if result.is_ok() {
+                HdrLookStatus::Success
+            } else {
+                HdrLookStatus::Failed
+            },
             error: result.err().map(|e| e.to_string()),
         };
         progress(index, &row);
@@ -216,7 +227,10 @@ fn execute(
         output_dir: plan.output_dir.clone(),
         headroom: plan.headroom,
         max_edge: plan.max_edge,
-        failures: results.iter().filter(|r| r.status == "failed").count(),
+        failures: results
+            .iter()
+            .filter(|r| r.status == HdrLookStatus::Failed)
+            .count(),
         results,
     })
 }
@@ -367,5 +381,26 @@ mod tests {
             b"concurrent output"
         );
         assert_eq!(fs::read_dir(out).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn hdr_look_status_preserves_wire_values_and_rejects_unknown_values() {
+        assert_eq!(
+            serde_json::to_string(&HdrLookStatus::Success).unwrap(),
+            "\"success\""
+        );
+        assert_eq!(
+            serde_json::to_string(&HdrLookStatus::Failed).unwrap(),
+            "\"failed\""
+        );
+        assert_eq!(
+            serde_json::from_str::<HdrLookStatus>("\"success\"").unwrap(),
+            HdrLookStatus::Success
+        );
+        assert_eq!(
+            serde_json::from_str::<HdrLookStatus>("\"failed\"").unwrap(),
+            HdrLookStatus::Failed
+        );
+        assert!(serde_json::from_str::<HdrLookStatus>("\"partial\"").is_err());
     }
 }

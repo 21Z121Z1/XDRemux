@@ -19,7 +19,7 @@ use xdremux_motion_photo::{
 use xdremux_source::{motion_still_encoding, MotionStillEncoding, SourceAsset};
 
 use crate::vendor_motion_metadata::{
-    carry_vendor_metadata, VendorMetadataCarry, VendorMetadataReport,
+    carry_vendor_metadata, VendorMetadataCarry, VendorMetadataReport, VendorRoute,
 };
 use crate::{Result, RuntimeError};
 
@@ -234,7 +234,7 @@ fn convert_android_motion_photo(
             ));
         }
     }
-    if carry.destination == "huawei" {
+    if carry.route == VendorRoute::Huawei {
         return convert_huawei_harmony_file(marker_source, output, compatibility, carry);
     }
     let photo = MotionPhoto::parse(source, ParseOptions::compatible())
@@ -242,7 +242,10 @@ fn convert_android_motion_photo(
     photo
         .validate()
         .map_err(|error| RuntimeError::external("Android Motion Photo source validation", error))?;
-    if matches!(carry.destination, "oppo" | "vivo" | "xiaomi") && photo.still().mime != "image/jpeg"
+    if matches!(
+        carry.route,
+        VendorRoute::Oppo | VendorRoute::Vivo | VendorRoute::Xiaomi
+    ) && photo.still().mime != "image/jpeg"
     {
         return republish_heic_as_sdr_jpeg(
             &photo,
@@ -253,7 +256,7 @@ fn convert_android_motion_photo(
             carry,
         );
     }
-    if carry.destination == "vivo" {
+    if carry.route == VendorRoute::Vivo {
         if vivo_native_single_file(&photo) {
             return publish_preserved_vivo_source(
                 marker_source,
@@ -418,7 +421,7 @@ fn convert_android_motion_photo(
             "copying source vendor attributes changed the video, presentation time, gain map, or video count",
         ));
     }
-    if carry.destination == "samsung" && is_heif_file(&bytes) {
+    if carry.route == VendorRoute::Samsung && is_heif_file(&bytes) {
         samsung_top_level_mpvd_reaches_eof(&bytes)?;
     }
 

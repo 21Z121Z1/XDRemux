@@ -58,10 +58,14 @@ pub use android_motion_photo::{
     resolve_motion_output_target, AndroidMotionPhotoFileReceipt, AndroidMotionPhotoPairSource,
     AndroidMotionResourceAudit, AndroidMotionResourceOperation,
 };
-pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
+pub use categorize::{
+    CategorizeDisposition, CategorizeItemReceipt, CategorizeMode, CategorizeReceipt,
+};
 #[cfg(target_os = "macos")]
 pub use hdr_look::render_hdr_look;
-pub use hdr_look::{plan_hdr_look, HdrLookItem, HdrLookPlan, HdrLookReceipt, HdrLookResult};
+pub use hdr_look::{
+    plan_hdr_look, HdrLookItem, HdrLookPlan, HdrLookReceipt, HdrLookResult, HdrLookStatus,
+};
 pub use live_photo::LivePhotoFileReceipt;
 pub use live_photo_package::validate_still_output_path;
 pub use live_photo_package::LivePhotoPackagePublicationError;
@@ -74,7 +78,7 @@ pub use validation::{
     GainMapValidationProfile, IsoHdrSemanticsReport, IsoHdrValidationReport,
     LivePhotoValidationReport, RegisteredHdrProcessingReport, ValidationReport,
 };
-pub use vendor_motion_metadata::{VendorMetadataCarry, VendorMetadataReport};
+pub use vendor_motion_metadata::{VendorMetadataCarry, VendorMetadataReport, VendorRoute};
 pub use xdremux_heif::PhotographicStylesAssembly;
 
 use std::error::Error;

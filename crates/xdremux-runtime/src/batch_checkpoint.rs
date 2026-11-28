@@ -67,6 +67,14 @@ pub struct SourceSignature {
     pub sha256: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum CheckpointStatus {
+    Success,
+    SkippedExisting,
+    Failure,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 struct CheckpointItem {
     #[serde(rename = "inputPath", alias = "input_path")]
@@ -106,7 +114,7 @@ struct CheckpointItem {
         skip_serializing_if = "Option::is_none"
     )]
     output_sha256: Option<String>,
-    status: String,
+    status: CheckpointStatus,
     #[serde(rename = "inputSize", alias = "input_size", default)]
     input_size: Option<u64>,
     #[serde(rename = "inputSHA256", alias = "input_sha256", default)]
@@ -131,8 +139,10 @@ impl CheckpointItem {
     }
 
     fn reusable(&self, signature: &SourceSignature) -> bool {
-        matches!(self.status.as_str(), "success" | "skipped_existing")
-            && self.input_size == Some(signature.size)
+        matches!(
+            self.status,
+            CheckpointStatus::Success | CheckpointStatus::SkippedExisting
+        ) && self.input_size == Some(signature.size)
             && self.input_sha256.as_deref() == Some(signature.sha256.as_str())
     }
 }
@@ -204,7 +214,7 @@ impl MotionPhotoCheckpoint {
             };
             // Failed records do not carry output identities, but must still
             // supersede older successful entries for the same source/route.
-            if !valid && item.status != "failure" {
+            if !valid && item.status != CheckpointStatus::Failure {
                 continue;
             }
             let key = (item.input_path.clone(), item.route_key());
@@ -535,5 +545,33 @@ mod tests {
             .reusable_item(&source, &signature, true)
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn unknown_checkpoint_status_is_rejected_during_load() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.jpg");
+        let image = root.path().join("source.heic");
+        let video = root.path().join("source.mov");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&image, b"image").unwrap();
+        fs::write(&video, b"video").unwrap();
+        let signature = source_signature_path(&source).unwrap();
+        let checkpoint = root.path().join("unknown-status.jsonl");
+        let header = serde_json::json!({"kind":"header", "schemaVersion":3});
+        let item = serde_json::json!({
+            "kind":"item",
+            "inputPath": canonical_existing(&source).unwrap(),
+            "outputImagePath": canonical_existing(&image).unwrap(),
+            "outputVideoPath": canonical_existing(&video).unwrap(),
+            "status": "unknown_state",
+            "inputSize": signature.size,
+            "inputSHA256": signature.sha256,
+            "assetIdentifier": "ASSET-ID",
+        });
+        fs::write(&checkpoint, format!("{header}\n{item}\n")).unwrap();
+
+        let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
+        assert!(loaded.items.is_empty());
     }
 }

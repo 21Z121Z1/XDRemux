@@ -2,6 +2,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::i18n::Language;
+use crate::CliOutcome;
 use clap::Args;
 
 #[derive(Debug, Args)]
@@ -34,7 +35,7 @@ pub(super) fn run(
     args: HdrLookArgs,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> u8 {
+) -> CliOutcome {
     let plan = match xdremux_runtime::plan_hdr_look(
         &args.inputs,
         args.output_dir.as_deref(),
@@ -45,13 +46,13 @@ pub(super) fn run(
         Ok(plan) => plan,
         Err(e) => {
             let _ = writeln!(stderr, "error: {e}");
-            return 2;
+            return CliOutcome::Usage;
         }
     };
     if args.dry_run {
-        return u8::from(
-            serde_json::to_writer_pretty(&mut *stdout, &plan).is_err() || writeln!(stdout).is_err(),
-        );
+        let ok =
+            serde_json::to_writer_pretty(&mut *stdout, &plan).is_ok() && writeln!(stdout).is_ok();
+        return CliOutcome::from_success(ok);
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -63,7 +64,7 @@ pub(super) fn run(
                 "HDR look 需要 Apple Silicon 和 macOS 27 或更新版本"
             )
         );
-        1
+        CliOutcome::Failure
     }
     #[cfg(target_os = "macos")]
     {
@@ -71,15 +72,14 @@ pub(super) fn run(
             Ok(path) => path,
             Err(e) => {
                 let _ = writeln!(stderr, "error: {e}");
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         let receipt = match xdremux_runtime::render_hdr_look(&plan, &adapter, |index, row| {
             if !args.json {
-                let status = if row.status == "success" {
-                    language.text("done", "完成")
-                } else {
-                    language.text("failed", "失败")
+                let status = match row.status {
+                    xdremux_runtime::HdrLookStatus::Success => language.text("done", "完成"),
+                    xdremux_runtime::HdrLookStatus::Failed => language.text("failed", "失败"),
                 };
                 let _ = writeln!(
                     stderr,
@@ -97,7 +97,7 @@ pub(super) fn run(
             Ok(receipt) => receipt,
             Err(e) => {
                 let _ = writeln!(stderr, "error: {e}");
-                return 1;
+                return CliOutcome::Failure;
             }
         };
         let written = if args.json {
@@ -114,7 +114,7 @@ pub(super) fn run(
                 receipt.failures
             )
         };
-        u8::from(receipt.failures > 0 || written.is_err())
+        CliOutcome::from_success(receipt.failures == 0 && written.is_ok())
     }
 }
 

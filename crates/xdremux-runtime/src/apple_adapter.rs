@@ -317,20 +317,22 @@ impl AppleAdapterSession {
         })
     }
 
-    fn is_running(&mut self) -> Result<bool> {
+    /// Poll the adapter child process and reap its handle if it has already exited.
+    /// Returns `true` when no live child remains and the session must be restarted.
+    fn reap_if_exited(&mut self) -> Result<bool> {
         let Some(child) = self.child.as_mut() else {
-            return Ok(false);
+            return Ok(true);
         };
         if child
             .try_wait()
             .map_err(|error| RuntimeError::external("Apple adapter wait", error))?
             .is_none()
         {
-            return Ok(true);
+            return Ok(false);
         }
         // Once reaped, this numeric PID no longer proves process-group ownership.
         self.child.take();
-        Ok(false)
+        Ok(true)
     }
 
     fn invoke(&mut self, executable: &Path, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
@@ -1306,8 +1308,8 @@ impl AppleAdapterClient {
             )
         })?;
         let needs_restart = if let Some(current) = session.as_mut() {
-            match current.is_running() {
-                Ok(running) => !running,
+            match current.reap_if_exited() {
+                Ok(exited) => exited,
                 Err(error) => {
                     session.take();
                     return Err(error);

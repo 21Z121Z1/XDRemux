@@ -390,10 +390,16 @@ pub(crate) struct BatchJournal {
     session: Mutex<Option<OpenJournal>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JournalHealth {
+    Healthy,
+    Poisoned,
+}
+
 struct OpenJournal {
     file: File,
     index: TransactionIndex,
-    failed: bool,
+    health: JournalHealth,
 }
 
 impl BatchJournal {
@@ -472,7 +478,7 @@ impl BatchJournal {
             *session = Some(OpenJournal {
                 file,
                 index,
-                failed: false,
+                health: JournalHealth::Healthy,
             });
         }
         Ok(session)
@@ -491,7 +497,7 @@ impl BatchJournal {
     pub(crate) fn append(&self, key: &TransactionKey, publication: &Publication) -> Result<()> {
         let mut session = self.session()?;
         let state = session.as_mut().expect("open journal");
-        if state.failed {
+        if state.health == JournalHealth::Poisoned {
             return Err(problem(
                 "previous checkpoint write failed; resume with a new invocation",
             ));
@@ -504,7 +510,7 @@ impl BatchJournal {
             },
         );
         if result.is_err() {
-            state.failed = true;
+            state.health = JournalHealth::Poisoned;
             return result;
         }
         state.index.0.insert(key.clone(), publication.clone());
